@@ -29,7 +29,8 @@
 //                                                                                   //
 //  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
-#if (defined(WITH_PARDISO) || defined(WITH_MKL))
+#if (!defined(HEX_LU_PARDISO_H) && (defined(WITH_PARDISO) || defined(WITH_MKL)))
+#define HEX_LU_PARDISO_H
 
 // --------------------------------------------------------------------------------- //
 
@@ -119,11 +120,13 @@ extern "C" void pardiso
  * 
  * Uses direct sparse solver Pardiso.
  */
-template <class IdxT, class DataT>
-class LUft_Pardiso : public LUft<IdxT,DataT>
+class LUft_Pardiso : public LUft
 {
     public:
     
+        // run-time selection mechanism
+        factorizerRunTimeSelectionDefinitions(LUft_Pardiso, "pardiso")
+        
         /// Default constructor.
         LUft_Pardiso ();
         
@@ -133,14 +136,8 @@ class LUft_Pardiso : public LUft<IdxT,DataT>
         // Disable bitwise copy
         LUft_Pardiso const & operator= (LUft_Pardiso const &) = delete;
         
-        /// New instance of the factorizer.
-        virtual LUft<IdxT,DataT> * New () const { return new LUft_Pardiso<IdxT,DataT>(); }
-        
-        /// Get name of the factorizer.
-        virtual std::string name () const { return "pardiso"; }
-        
         /// Factorize.
-        virtual void factorize (CsrMatrix<IdxT,DataT> const & matrix, LUftData data);
+        virtual void factorize (CsrMatrix<LU_int_t,Complex> const & matrix, LUftData data);
         
         /// Validity indicator.
         virtual bool valid () const { return size() != 0; }
@@ -149,7 +146,7 @@ class LUft_Pardiso : public LUft<IdxT,DataT>
         virtual std::size_t size () const;
         
         /// Solve equations.
-        virtual void solve (const ArrayView<DataT> b, ArrayView<DataT> x, int eqs) const;
+        virtual void solve (const cArrayView b, cArrayView x, int eqs) const;
         
         /// Save to disk.
         virtual void save (std::string name) const;

@@ -29,7 +29,8 @@
 //                                                                                   //
 //  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
-#ifdef WITH_MUMPS
+#if ( !defined(HEX_LU_MUMPS_H) && defined(WITH_MUMPS) )
+#define HEX_LU_MUMPS_H
 
 // --------------------------------------------------------------------------------- //
 
@@ -72,8 +73,7 @@
  * to this class should contain only upper or lower part of the matrix (together
  * with the main diagonal).
  */
-template <class IdxT, class DataT>
-class LUft_MUMPS : public LUft<IdxT,DataT>
+class LUft_MUMPS : public LUft
 {
     public:
         
@@ -85,6 +85,9 @@ class LUft_MUMPS : public LUft<IdxT,DataT>
         }
         Data;
         
+        // run-time selection mechanism
+        factorizerRunTimeSelectionDefinitions(LUft_MUMPS, "mumps")
+        
         /// Default constructor.
         LUft_MUMPS ();
         
@@ -94,14 +97,8 @@ class LUft_MUMPS : public LUft<IdxT,DataT>
         // Disable bitwise copy
         LUft_MUMPS const & operator= (LUft_MUMPS const &) = delete;
         
-        /// New instance of the factorizer.
-        virtual LUft<IdxT,DataT> * New () const { return new LUft_MUMPS<IdxT,DataT>(); }
-        
-        /// Get name of the factorizer.
-        virtual std::string name () const { return "mumps"; }
-        
         /// Factorize.
-        virtual void factorize (CsrMatrix<IdxT,DataT> const & matrix, LUftData data);
+        virtual void factorize (CsrMatrix<LU_int_t,Complex> const & matrix, LUftData data);
         
         /// Validity indicator.
         virtual bool valid () const
@@ -120,7 +117,7 @@ class LUft_MUMPS : public LUft<IdxT,DataT>
         }
         
         /// Solve equations.
-        virtual void solve (const ArrayView<DataT> b, ArrayView<DataT> x, int eqs) const;
+        virtual void solve (const cArrayView b, cArrayView x, int eqs) const;
         
         /// Save large data to disk.
         virtual void save (std::string name) const
@@ -160,7 +157,7 @@ class LUft_MUMPS : public LUft<IdxT,DataT>
         
         // data arrays
         NumberArray<MUMPS_INT> I, J;
-        NumberArray<DataT> A;
+        NumberArray<Complex> A;
 };
 
-#endif // WITH_MUMPS
+#endif // HEX_LU_MUMPS_H, WITH_MUMPS

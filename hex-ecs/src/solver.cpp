@@ -52,7 +52,7 @@ Solver::Solver
 void Solver::choose_preconditioner ()
 {
     // create the preconditioner
-    prec_ = Preconditioners::choose(cmd_.preconditioner, par_, inp_, ang_, bspline_inner_, bspline_full_, cmd_);
+    prec_ = PreconditionerBase::Choose(cmd_.preconditioner, par_, inp_, ang_, bspline_inner_, bspline_full_, cmd_);
     
     // check success
     if (prec_ == nullptr)

@@ -29,11 +29,15 @@
 //                                                                                   //
 //  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
-#ifdef WITH_SCALAPACK
+#if (!defined(HEX_LU_SCALAPACK_H) && defined(WITH_SCALAPACK))
+#define HEX_LU_SCALAPACK_H
 
 // --------------------------------------------------------------------------------- //
 
 #include "hex-csrmatrix.h"
+
+// --------------------------------------------------------------------------------- //
+
 #include "luft.h"
 
 // --------------------------------------------------------------------------------- //
@@ -45,11 +49,13 @@
  * They are converted to a banded format (using reverse Cuthill McKee algorithm)
  * and solved by a direct application of the banded PZGBTRF + PZGBTRS routines.
  */
-template <class IdxT, class DataT>
-class LUft_SCALAPACK : public LUft<IdxT,DataT>
+class LUft_SCALAPACK : public LUft
 {
     public:
     
+        // run-time selection mechanism
+        factorizerRunTimeSelectionDefinitions(LUft_SCALAPACK, "scalapack")
+        
         /// Default constructor.
         LUft_SCALAPACK ();
         
@@ -59,14 +65,8 @@ class LUft_SCALAPACK : public LUft<IdxT,DataT>
         // Disable bitwise copy
         LUft_SCALAPACK const & operator= (LUft_SCALAPACK const &) = delete;
         
-        /// New instance of the factorizer.
-        virtual LUft<IdxT,DataT> * New () const { return new LUft_SCALAPACK<IdxT,DataT>(); }
-        
-        /// Get name of the factorizer.
-        virtual std::string name () const { return "scalapack"; }
-        
         /// Factorize.
-        virtual void factorize (CsrMatrix<IdxT,DataT> const & matrix, LUftData data);
+        virtual void factorize (CsrMatrix<LU_int_t,Complex> const & matrix, LUftData data);
         
         /// Validity indicator.
         virtual bool valid () const { return size() != 0; }
@@ -75,7 +75,7 @@ class LUft_SCALAPACK : public LUft<IdxT,DataT>
         virtual std::size_t size () const;
         
         /// Solve equations.
-        virtual void solve (const ArrayView<DataT> b, ArrayView<DataT> x, int eqs) const;
+        virtual void solve (const cArrayView b, cArrayView x, int eqs) const;
         
         /// Save to disk.
         virtual void save (std::string name) const;

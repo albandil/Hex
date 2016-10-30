@@ -37,15 +37,12 @@
 
 // --------------------------------------------------------------------------------- //
 
-template<>
-LUft_MUMPS<LU_int_t,Complex>::LUft_MUMPS ()
-    : LUft<LU_int_t,Complex>()
+LUft_MUMPS::LUft_MUMPS () : LUft()
 {
     settings.job = MUMPS_NOACTION;
 }
 
-template<>
-LUft_MUMPS<LU_int_t,Complex>::~LUft_MUMPS ()
+LUft_MUMPS::~LUft_MUMPS ()
 {
     drop ();
     
@@ -57,8 +54,7 @@ LUft_MUMPS<LU_int_t,Complex>::~LUft_MUMPS ()
     }
 }
 
-template<>
-std::size_t LUft_MUMPS<LU_int_t,Complex>::size () const
+std::size_t LUft_MUMPS::size () const
 {
     #define INFO(x) info[x-1]
     std::size_t elems_size = (settings.INFO(9) > 0 ? settings.INFO(9) : std::size_t{1000000} * std::abs(settings.INFO(9)));
@@ -67,8 +63,7 @@ std::size_t LUft_MUMPS<LU_int_t,Complex>::size () const
     return sizeof(MUMPS_COMPLEX) * elems_size + sizeof(MUMPS_INT) * index_size;
 }
 
-template<>
-void LUft_MUMPS<LU_int_t,Complex>::factorize (CsrMatrix<LU_int_t,Complex> const & matrix, LUftData data)
+void LUft_MUMPS::factorize (CsrMatrix<LU_int_t,Complex> const & matrix, LUftData data)
 {
     //
     // Create matrix of the system (i.e. the IJV triplets of the symmetric part).
@@ -145,8 +140,7 @@ void LUft_MUMPS<LU_int_t,Complex>::factorize (CsrMatrix<LU_int_t,Complex> const 
         MUMPS_C(&settings);
 }
 
-template<>
-void LUft_MUMPS<LU_int_t,Complex>::solve (const cArrayView b, cArrayView x, int eqs) const
+void LUft_MUMPS::solve (const cArrayView b, cArrayView x, int eqs) const
 {
     // copy right-hand side to the solution vector
     if (x.data() != b.data())
@@ -163,9 +157,10 @@ void LUft_MUMPS<LU_int_t,Complex>::solve (const cArrayView b, cArrayView x, int 
     MUMPS_C(&settings);
 }
 
+
 // --------------------------------------------------------------------------------- //
 
-addFactorizerToRuntimeSelectionTable(MUMPS, LU_int_t, Complex)
+addClassToParentRunTimeSelectionTable(LUft, LUft_MUMPS)
 
 // --------------------------------------------------------------------------------- //
 

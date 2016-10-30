@@ -34,11 +34,8 @@
 
 // --------------------------------------------------------------------------------- //
 
-#include <memory>
-
-// --------------------------------------------------------------------------------- //
-
 #include "hex-arrays.h"
+#include "hex-rts.h"
 
 // --------------------------------------------------------------------------------- //
 
@@ -72,121 +69,121 @@ extern LUftData defaultLUftData;
  * to disk (link, save), destroy the data (drop) and load later when needed
  * (load). The most important function is "solve".
  */
-template <class IdxT, class DataT>
 class LUft
 {
     public:
         
-        /// Default constructor.
-        LUft () : filename_() {}
+        //
+        // Run-time selection mechanism (object factory).
+        //
         
-        /// Get new empty factorization object of given type.
-        static LUft * Choose (std::string factorizer = "any");
+            baseClassRunTimeSelectionDefinitions(LUft, ())
         
-        /// Get new empty factorization object of the same type.
-        virtual LUft * New () const = 0;
+        //
+        // Class member functions.
+        //
         
-        /// Destructor.
-        virtual ~LUft () {}
-        
-        /// Get name of the factorizer.
-        virtual std::string name () const = 0;
-        
-        /// Factorize.
-        virtual void factorize (CsrMatrix<IdxT,DataT> const & matrix, LUftData data = defaultLUftData) = 0;
-        
-        /**
-         * @brief Validity indicator.
-         * 
-         * Returns true when the object contains a valid LU factorization.
-         */
-        virtual bool valid () const { return false; }
-        
-        /**
-         * @brief Free memory.
-         * 
-         * Release memory occupied by the LU-factorization numeric object.
-         */
-        virtual void drop () {}
-        
-        /**
-         * @brief Size of the numerical data.
-         * 
-         * Return the number of bytes occupied by the stored elements
-         * of the LU-factorization. This doesn't contain any other structural data.
-         */
-        virtual std::size_t size () const { return 0; }
-        
-        /**
-         * @brief Estimation of the condition number.
-         * 
-         * Note: Currently implemented only for UMFPACK backend.
-         */
-        virtual Real cond () const { return 0; }
-        
-        /**
-         * @brief Solve equations.
-         * 
-         * The parameter "b" is assumed to contain several right hand
-         * side vectors (their count is supplied as the optional parameter
-         * "eqs"). The results are stored in "x", which has the same size
-         * as "b".
-         */
-        virtual void solve (const ArrayView<DataT> b, ArrayView<DataT> x, int eqs) const = 0;
-        
-        /**
-         * @brief Solve equations.
-         * 
-         * The parameter "b" is assumed to contain several right hand
-         * side vectors (their count is supplied as the optional parameter
-         * "eqs").
-         */
-        virtual NumberArray<DataT> solve (const ArrayView<DataT> b, int eqs = 1) const
-        {
-            // reserve space for the solution
-            NumberArray<DataT> x (b.size());
+            /// Default constructor.
+            LUft () : filename_() {}
             
-            // solve
-            this->solve(b, x, eqs);
+            /// Destructor.
+            virtual ~LUft () {}
             
-            // return the result
-            return x;
-        }
-        
-        /**
-         * @brief Link to a disk file.
-         * 
-         * This function will set a filename that will be used if
-         * any of the functions @ref save or @ref load is used without
-         * a specific filename.
-         */
-        virtual void link (std::string name) { filename_ = name; }
-        
-        /**
-         * @brief Unlink disk file.
-         */
-        virtual void unlink () { filename_.clear(); }
-        
-        /**
-         * @brief Name of the linked disk file.
-         */
-        virtual std::string filename () const { return filename_; }
-        
-        /**
-         * @brief Save factorization object to a disk file.
-         * 
-         * Stores the LU-factorization data to a disk file in the native format
-         * of the library used.
-         */
-        virtual void save (std::string name) const = 0;
-        virtual void save () const { this->save(filename_); }
-        
-        /**
-         * @brief Load factorization object from a disk file.
-         */
-        virtual void load (std::string name, bool throw_on_io_failure = true) = 0;
-        virtual void load () { this->load(filename_, true); }
-        virtual void silent_load () { this->load(filename_, false); }
+            /// Factorize.
+            virtual void factorize (CsrMatrix<LU_int_t,Complex> const & matrix, LUftData data = defaultLUftData) = 0;
+            
+            /**
+             * @brief Validity indicator.
+             * 
+             * Returns true when the object contains a valid LU factorization.
+             */
+            virtual bool valid () const { return false; }
+            
+            /**
+             * @brief Free memory.
+             * 
+             * Release memory occupied by the LU-factorization numeric object.
+             */
+            virtual void drop () {}
+            
+            /**
+             * @brief Size of the numerical data.
+             * 
+             * Return the number of bytes occupied by the stored elements
+             * of the LU-factorization. This doesn't contain any other structural data.
+             */
+            virtual std::size_t size () const { return 0; }
+            
+            /**
+             * @brief Estimation of the condition number.
+             * 
+             * Note: Currently implemented only for UMFPACK backend.
+             */
+            virtual Real cond () const { return 0; }
+            
+            /**
+             * @brief Solve equations.
+             * 
+             * The parameter "b" is assumed to contain several right hand
+             * side vectors (their count is supplied as the optional parameter
+             * "eqs"). The results are stored in "x", which has the same size
+             * as "b".
+             */
+            virtual void solve (const cArrayView b, cArrayView x, int eqs) const = 0;
+            
+            /**
+             * @brief Solve equations.
+             * 
+             * The parameter "b" is assumed to contain several right hand
+             * side vectors (their count is supplied as the optional parameter
+             * "eqs").
+             */
+            virtual cArray solve (const cArrayView b, int eqs = 1) const
+            {
+                // reserve space for the solution
+                cArray x (b.size());
+                
+                // solve
+                this->solve(b, x, eqs);
+                
+                // return the result
+                return x;
+            }
+            
+            /**
+             * @brief Link to a disk file.
+             * 
+             * This function will set a filename that will be used if
+             * any of the functions @ref save or @ref load is used without
+             * a specific filename.
+             */
+            virtual void link (std::string name) { filename_ = name; }
+            
+            /**
+             * @brief Unlink disk file.
+             */
+            virtual void unlink () { filename_.clear(); }
+            
+            /**
+             * @brief Name of the linked disk file.
+             */
+            virtual std::string filename () const { return filename_; }
+            
+            /**
+             * @brief Save factorization object to a disk file.
+             * 
+             * Stores the LU-factorization data to a disk file in the native format
+             * of the library used.
+             */
+            virtual void save (std::string name) const = 0;
+            virtual void save () const { this->save(filename_); }
+            
+            /**
+             * @brief Load factorization object from a disk file.
+             */
+            virtual void load (std::string name, bool throw_on_io_failure = true) = 0;
+            virtual void load () { this->load(filename_, true); }
+            virtual void silent_load () { this->load(filename_, false); }
         
     private:
         
@@ -196,28 +193,8 @@ class LUft
 
 // --------------------------------------------------------------------------------- //
 
-extern std::shared_ptr<std::vector<LUft<LU_int_t,Complex>*>> LU;
-
-// --------------------------------------------------------------------------------- //
-
-template<class IdxT, class DataT>
-int addNewFactorizer (LUft<IdxT,DataT>* lu)
-{
-    // create the container
-    if (LU.get() == nullptr)
-        LU.reset(new std::vector<LUft<LU_int_t,Complex>*>());
-    
-    // add the new run-time selectable
-    LU->push_back(lu);
-    
-    // return number of factorizers
-    return LU->size();
-}
-
-// --------------------------------------------------------------------------------- //
-
-#define addFactorizerToRuntimeSelectionTable(FACTORIZER,IdxT,DataT) \
-    int tmp##FACTORIZER = addNewFactorizer(new LUft_##FACTORIZER<IdxT,DataT>());
+#define factorizerRunTimeSelectionDefinitions(TYPE,NAME) \
+    derivedClassRunTimeSelectionDefinitions(LUft, (), TYPE, (), NAME)
 
 // --------------------------------------------------------------------------------- //
 

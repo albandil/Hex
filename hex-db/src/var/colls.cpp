@@ -46,14 +46,9 @@
 
 // --------------------------------------------------------------------------------- //
 
-createNewScatteringQuantity(CollisionStrength);
+createNewScatteringQuantity(CollisionStrength, "colls")
 
 // --------------------------------------------------------------------------------- //
-
-std::string CollisionStrength::name ()
-{
-    return "colls";
-}
 
 std::string CollisionStrength::description ()
 {

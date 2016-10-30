@@ -29,83 +29,60 @@
 //                                                                                   //
 //  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
-#ifndef HEX_HYBPRECONDITIONER_H
-#define HEX_HYBPRECONDITIONER_H
+#ifndef HEX_RTS_H
 
 // --------------------------------------------------------------------------------- //
 
-#include <set>
+#include <memory>
 #include <string>
 #include <vector>
 
 // --------------------------------------------------------------------------------- //
 
-#include "hex-arrays.h"
-#include "hex-matrix.h"
+#include "hex-misc.h"
 
 // --------------------------------------------------------------------------------- //
 
-#include "ILUPreconditioner.h"
-#include "KPAPreconditioner.h"
+#define baseClassRunTimeSelectionDefinitions(BASE,CTORARGS) \
+    virtual BASE * New CTORARGS const = 0; \
+    virtual std::string name () const = 0; \
+    static std::unique_ptr<std::vector<BASE*>> RTS_Table; \
+    static int Add (BASE * ptr) \
+    { \
+        if (RTS_Table.get() == nullptr) \
+            RTS_Table.reset(new std::vector<BASE*>()); \
+        RTS_Table->push_back(ptr); \
+        return RTS_Table->size(); \
+    } \
+    template <class ...Params> static BASE * Choose (std::string str, Params & ...p) \
+    { \
+        if (RTS_Table.get() == nullptr) \
+            HexException("No run-time selectables in " #BASE "."); \
+        for (BASE *obj : *RTS_Table) \
+        { \
+            if (obj->name() == str or str == "any") \
+                return obj->New(p...); \
+        } \
+        std::cout << "Error!" << std::endl; \
+        std::cout << "  The selectable \"" << str << "\" is not available in " #BASE "." << std::endl; \
+        std::cout << "  The program may not be compiled with support for that object." << std::endl; \
+        std::cout << "  The available selectables are: "; \
+        for (BASE *obj : *RTS_Table) \
+            std::cout << "\"" << obj->name() << "\" "; \
+        std::cout << std::endl << std::endl; \
+        std::exit(1); \
+    }
+
+#define defineBaseClassRunTimeSelectionTable(BASE) \
+    std::unique_ptr<std::vector<BASE*>> BASE::RTS_Table; \
+
+#define derivedClassRunTimeSelectionDefinitions(BASE,CTORARGS,TYPE,ARGS,NAME) \
+    virtual BASE * New CTORARGS const { return new TYPE ARGS ; } \
+    virtual std::string name () const { return NAME ; };
+
+#define addClassToParentRunTimeSelectionTable(BASE,TYPE) \
+    int add_##TYPE##_to_##BASE = BASE::Add(new TYPE());
 
 // --------------------------------------------------------------------------------- //
 
-/**
- * @brief Hybrid preconditioner.
- * 
- * Combination of ILU and KPA:
- * - KPA is used for angular blocks with no asymptotic channels.
- * - ILU is used for angular blocks with asymptotic channels.
- */
-class HybCGPreconditioner : public ILUCGPreconditioner, public KPACGPreconditioner
-{
-    public:
-        
-        // run-time selection mechanism
-        preconditionerRunTimeSelectionDefinitions(HybCGPreconditioner, "HYB")
-        
-        // default constructor needed by the RTS mechanism
-        HybCGPreconditioner () {}
-        
-        // constructor
-        HybCGPreconditioner
-        (
-            Parallel const & par,
-            InputFile const & inp,
-            AngularBasis const & ll,
-            Bspline const & bspline_inner,
-            Bspline const & bspline_full,
-            CommandLine const & cmd
-        ) : CGPreconditioner(par, inp, ll, bspline_inner, bspline_full, cmd),
-            ILUCGPreconditioner(par, inp, ll, bspline_inner, bspline_full, cmd),
-            KPACGPreconditioner(par, inp, ll, bspline_inner, bspline_full, cmd)
-        {
-            // nothing more to do
-        }
-        
-        // preconditioner description
-        virtual std::string description () const;
-        
-        // reuse parent definitions
-        using CGPreconditioner::multiply;
-        using CGPreconditioner::rhs;
-        using CGPreconditioner::precondition;
-        
-        // declare own definitions
-        virtual void setup ();
-        virtual void update (Real E);
-        virtual void finish ();
-        
-        // inner CG callback (needed by parent)
-        virtual void CG_init (int iblock) const;
-        virtual void CG_prec (int iblock, const cArrayView r, cArrayView z) const;
-        virtual void CG_mmul (int iblock, const cArrayView r, cArrayView z) const;
-        virtual void CG_exit (int iblock) const;
-        
-        // decide whether to use the ILU preconditioner
-        bool ilu_needed (int iblock) const;
-};
-
-// --------------------------------------------------------------------------------- //
-
-#endif
+#endif // HEX_RTS_H

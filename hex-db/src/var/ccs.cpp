@@ -48,14 +48,9 @@
 
 // --------------------------------------------------------------------------------- //
 
-createNewScatteringQuantity(CompleteCrossSection);
+createNewScatteringQuantity(CompleteCrossSection, "ccs")
 
 // --------------------------------------------------------------------------------- //
-
-std::string CompleteCrossSection::name ()
-{
-    return "ccs";
-}
 
 std::string CompleteCrossSection::description ()
 {

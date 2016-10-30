@@ -31,8 +31,10 @@
 
 #if (defined(WITH_PARDISO) || defined(WITH_MKL))
 
+// --------------------------------------------------------------------------------- //
+
 #ifdef _OPENMP
-#include <omp.h>
+    #include <omp.h>
 #endif
 
 // --------------------------------------------------------------------------------- //
@@ -41,8 +43,7 @@
 
 // --------------------------------------------------------------------------------- //
 
-template<>
-void LUft_Pardiso<LU_int_t,Complex>::pardisoerror (int error) const
+void LUft_Pardiso::pardisoerror (int error) const
 {
     switch (error)
     {
@@ -83,9 +84,7 @@ void LUft_Pardiso<LU_int_t,Complex>::pardisoerror (int error) const
     }
 }
 
-template<>
-LUft_Pardiso<LU_int_t,Complex>::LUft_Pardiso ()
-    : LUft<LU_int_t,Complex>()
+LUft_Pardiso::LUft_Pardiso () : LUft()
 {
     std::memset(pt_,    0, sizeof(pt_));
     std::memset(iparm_, 0, sizeof(iparm_));
@@ -103,8 +102,7 @@ LUft_Pardiso<LU_int_t,Complex>::LUft_Pardiso ()
 #endif
 }
 
-template<>
-void LUft_Pardiso<LU_int_t,Complex>::drop ()
+void LUft_Pardiso::drop ()
 {
     int maxfct = 1;     // maximal number of numerical factorizations
     int mtype  = 13;    // matrix type: complex symmetric
@@ -124,14 +122,12 @@ void LUft_Pardiso<LU_int_t,Complex>::drop ()
     pardisoerror(error);
 }
 
-template<>
-LUft_Pardiso<LU_int_t,Complex>::~LUft_Pardiso ()
+LUft_Pardiso::~LUft_Pardiso ()
 {
     drop();
 }
 
-template<>
-void LUft_Pardiso<LU_int_t,Complex>::factorize (CsrMatrix<LU_int_t,Complex> const & matrix, LUftData data)
+void LUft_Pardiso::factorize (CsrMatrix<LU_int_t,Complex> const & matrix, LUftData data)
 {
     //
     // Cast matrix data to the data types expected by Pardiso (32-bit Int and 8-byte Real).
@@ -204,8 +200,7 @@ void LUft_Pardiso<LU_int_t,Complex>::factorize (CsrMatrix<LU_int_t,Complex> cons
         pardisoerror(error);
 }
 
-template<>
-void LUft_Pardiso<LU_int_t,Complex>::solve (const cArrayView b, cArrayView x, int eqs) const
+void LUft_Pardiso::solve (const cArrayView b, cArrayView x, int eqs) const
 {
     int maxfct = 1;
     int mnum = 1;
@@ -241,8 +236,7 @@ void LUft_Pardiso<LU_int_t,Complex>::solve (const cArrayView b, cArrayView x, in
     pardisoerror(error);
 }
 
-template<>
-std::size_t LUft_Pardiso<LU_int_t,Complex>::size () const
+std::size_t LUft_Pardiso::size () const
 {
     // IPARM(18) is negative for invalid / uninitialized setups,
     // but Hex-ecs is expecting zero
@@ -250,22 +244,21 @@ std::size_t LUft_Pardiso<LU_int_t,Complex>::size () const
     return IPARM(18) > 0 ? IPARM(18) * std::size_t(16) : 0;
 }
 
-template<>
-void LUft_Pardiso<LU_int_t,Complex>::save (std::string name) const
+void LUft_Pardiso::save (std::string name) const
 { 
     HexException("Pardiso factorizer does not yet support --out-of-core option.");
 }
 
-template<>
-void LUft_Pardiso<LU_int_t,Complex>::load (std::string name, bool throw_on_io_failure)
+void LUft_Pardiso::load (std::string name, bool throw_on_io_failure)
 {
     if (throw_on_io_failure)
         HexException("Pardiso factorizer does not yet support --out-of-core option.");
 }
 
+
 // --------------------------------------------------------------------------------- //
 
-addFactorizerToRuntimeSelectionTable(Pardiso, LU_int_t, Complex)
+addClassToParentRunTimeSelectionTable(LUft, LUft_Pardiso)
 
 // --------------------------------------------------------------------------------- //
 

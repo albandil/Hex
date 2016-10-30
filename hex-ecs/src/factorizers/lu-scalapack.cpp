@@ -37,58 +37,51 @@
 
 // --------------------------------------------------------------------------------- //
 
-template<>
-LUft_SCALAPACK<LU_int_t,Complex>::LUft_SCALAPACK ()
+LUft_SCALAPACK::LUft_SCALAPACK () : LUft()
 {
     // nothing
 }
 
-template<>
-void LUft_SCALAPACK<LU_int_t,Complex>::drop ()
+void LUft_SCALAPACK::drop ()
 {
     
 }
 
-template<>
-LUft_SCALAPACK<LU_int_t,Complex>::~LUft_SCALAPACK ()
+LUft_SCALAPACK::~LUft_SCALAPACK ()
 {
     // nothing
 }
 
-template<>
-void LUft_SCALAPACK<LU_int_t,Complex>::factorize (CsrMatrix<LU_int_t,Complex> const & matrix, LUftData data)
+void LUft_SCALAPACK::factorize (CsrMatrix<LU_int_t,Complex> const & matrix, LUftData data)
 {
     
 }
 
-template<>
-void LUft_SCALAPACK<LU_int_t,Complex>::solve (const ArrayView<Complex> b, ArrayView<Complex> x, int eqs) const
+void LUft_SCALAPACK::solve (const cArrayView b, cArrayView x, int eqs) const
 {
     
 }
 
-template<>
-void LUft_SCALAPACK<LU_int_t,Complex>::save (std::string name) const
+void LUft_SCALAPACK::save (std::string name) const
 {
     HexException("ScaLAPACK factorizer does not yet support --out-of-core option.");
 }
 
-template<>
-void LUft_SCALAPACK<LU_int_t,Complex>::load (std::string name, bool throw_on_io_failure)
+void LUft_SCALAPACK::load (std::string name, bool throw_on_io_failure)
 {
     if (throw_on_io_failure)
         HexException("ScaLAPACK factorizer does not yet support --out-of-core option.");
 }
 
-template<>
-std::size_t LUft_SCALAPACK<LU_int_t,Complex>::size () const
+std::size_t LUft_SCALAPACK::size () const
 {
     return 0;
 }
 
+
 // --------------------------------------------------------------------------------- //
 
-/* addFactorizerToRuntimeSelectionTable(SCALAPACK, LU_int_t, Complex) */
+addClassToParentRunTimeSelectionTable(LUft, LUft_SCALAPACK)
 
 // --------------------------------------------------------------------------------- //
 

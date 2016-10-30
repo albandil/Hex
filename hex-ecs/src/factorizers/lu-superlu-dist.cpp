@@ -41,15 +41,12 @@
 
 // --------------------------------------------------------------------------------- //
 
-template<>
-LUft_SUPERLU_DIST<LU_int_t,Complex>::LUft_SUPERLU_DIST ()
-    : LUft<LU_int_t,Complex>(), size_(0)
+LUft_SUPERLU_DIST::LUft_SUPERLU_DIST () : LUft(), size_(0)
 {
     // nothing
 }
 
-template<>
-void LUft_SUPERLU_DIST<LU_int_t,Complex>::drop ()
+void LUft_SUPERLU_DIST::drop ()
 {
     if (size_ != 0)
     {
@@ -63,14 +60,12 @@ void LUft_SUPERLU_DIST<LU_int_t,Complex>::drop ()
     }
 }
 
-template<>
-LUft_SUPERLU_DIST<LU_int_t,Complex>::~LUft_SUPERLU_DIST ()
+LUft_SUPERLU_DIST::~LUft_SUPERLU_DIST ()
 {
     drop();
 }
 
-template<>
-void LUft_SUPERLU_DIST<LU_int_t,Complex>::factorize (CsrMatrix<LU_int_t,Complex> const & matrix, LUftData data)
+void LUft_SUPERLU_DIST::factorize (CsrMatrix<LU_int_t,Complex> const & matrix, LUftData data)
 {
     //
     // Create matrix of the system.
@@ -168,8 +163,7 @@ void LUft_SUPERLU_DIST<LU_int_t,Complex>::factorize (CsrMatrix<LU_int_t,Complex>
         size_ = mem_usage.for_lu;
 }
 
-template<>
-void LUft_SUPERLU_DIST<LU_int_t,Complex>::solve (const cArrayView b, cArrayView x, int eqs) const
+void LUft_SUPERLU_DIST::solve (const cArrayView b, cArrayView x, int eqs) const
 {
     //
     // Create matrix of the system.
@@ -252,22 +246,21 @@ void LUft_SUPERLU_DIST<LU_int_t,Complex>::solve (const cArrayView b, cArrayView 
         PStatFree(&stat);
 }
 
-template<>
-void LUft_SUPERLU_DIST<LU_int_t,Complex>::save (std::string name) const
+void LUft_SUPERLU_DIST::save (std::string name) const
 { 
     HexException("SuperLU_dist factorizer does not yet support --out-of-core option.");
 }
 
-template<>
-void LUft_SUPERLU_DIST<LU_int_t,Complex>::load (std::string name, bool throw_on_io_failure)
+void LUft_SUPERLU_DIST::load (std::string name, bool throw_on_io_failure)
 {
     if (throw_on_io_failure)
         HexException("SuperLU_dist factorizer does not yet support --out-of-core option.");
 }
 
+
 // --------------------------------------------------------------------------------- //
 
-addFactorizerToRuntimeSelectionTable(SUPERLU_DIST, LU_int_t, Complex)
+addClassToParentRunTimeSelectionTable(LUft, LUft_SUPERLU_DIST)
 
 // --------------------------------------------------------------------------------- //
 

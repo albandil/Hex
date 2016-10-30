@@ -138,29 +138,24 @@ template <class IdxT> NumberArray<IdxT> cuthill_mckee
     return R;
 }
 
-template<>
-LUft_LAPACK<LU_int_t,Complex>::LUft_LAPACK ()
-    : LUft<LU_int_t,Complex>()
+LUft_LAPACK::LUft_LAPACK () : LUft()
 {
     
 }
 
-template<>
-void LUft_LAPACK<LU_int_t,Complex>::drop ()
+void LUft_LAPACK::drop ()
 {
     R_.drop();
     LU_.drop();
     ipiv_.drop();
 }
 
-template<>
-LUft_LAPACK<LU_int_t,Complex>::~LUft_LAPACK ()
+LUft_LAPACK::~LUft_LAPACK ()
 {
     
 }
 
-template<>
-void LUft_LAPACK<LU_int_t,Complex>::factorize (CsrMatrix<LU_int_t,Complex> const & matrix, LUftData data)
+void LUft_LAPACK::factorize (CsrMatrix<LU_int_t,Complex> const & matrix, LUftData data)
 {
     // reorder the matrix to make the bandwidth as small as possible
     //R_ = cuthill_mckee(matrix.p(), matrix.i());
@@ -210,8 +205,7 @@ void LUft_LAPACK<LU_int_t,Complex>::factorize (CsrMatrix<LU_int_t,Complex> const
         HexException("LAPACK: Matrix is singular.");
 }
 
-template<>
-void LUft_LAPACK<LU_int_t,Complex>::solve (const cArrayView b, cArrayView x, int eqs) const
+void LUft_LAPACK::solve (const cArrayView b, cArrayView x, int eqs) const
 {
     // number of equation in a set
     std::size_t neq = b.size() / eqs;
@@ -237,22 +231,19 @@ void LUft_LAPACK<LU_int_t,Complex>::solve (const cArrayView b, cArrayView x, int
         x[s * neq + R_[i]] = xp[s * neq + i];
 }
 
-template<>
-std::size_t LUft_LAPACK<LU_int_t,Complex>::size () const
+std::size_t LUft_LAPACK::size () const
 {
     return R_.size()    * sizeof(LU_int_t)
          + LU_.size()   * sizeof(Complex)
          + ipiv_.size() * sizeof(blas::Int);
 }
 
-template<>
-void LUft_LAPACK<LU_int_t,Complex>::save (std::string name) const
+void LUft_LAPACK::save (std::string name) const
 { 
     HexException("LAPACK factorizer does not yet support --out-of-core option.");
 }
 
-template<>
-void LUft_LAPACK<LU_int_t,Complex>::load (std::string name, bool throw_on_io_failure)
+void LUft_LAPACK::load (std::string name, bool throw_on_io_failure)
 {
     if (throw_on_io_failure)
         HexException("LAPACK factorizer does not yet support --out-of-core option.");
@@ -260,6 +251,6 @@ void LUft_LAPACK<LU_int_t,Complex>::load (std::string name, bool throw_on_io_fai
 
 // --------------------------------------------------------------------------------- //
 
-addFactorizerToRuntimeSelectionTable(LAPACK, LU_int_t, Complex)
+addClassToParentRunTimeSelectionTable(LUft, LUft_LAPACK)
 
 // --------------------------------------------------------------------------------- //

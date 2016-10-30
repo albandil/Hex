@@ -29,11 +29,15 @@
 //                                                                                   //
 //  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
-#ifdef WITH_SUPERLU_DIST
+#if (!defined(HEX_LU_SUPERLU_DIST_H) && defined(WITH_SUPERLU_DIST))
+#define HEX_LU_SUPERLU_DIST_H
 
 // --------------------------------------------------------------------------------- //
 
 #include "hex-csrmatrix.h"
+
+// --------------------------------------------------------------------------------- //
+
 #include "luft.h"
 
 // --------------------------------------------------------------------------------- //
@@ -49,10 +53,12 @@
  * library SuperLU (distributed version). It is derived from LUft and
  * shares interface with that class.
  */
-template <class IdxT, class DataT>
-class LUft_SUPERLU_DIST : public LUft<IdxT,DataT>
+class LUft_SUPERLU_DIST : public LUft
 {
     public:
+        
+        // run-time selection mechanism
+        factorizerRunTimeSelectionDefinitions(LUft_SUPERLU_DIST, "superlu_dist")
         
         /// Default constructor.
         LUft_SUPERLU_DIST ();
@@ -63,14 +69,8 @@ class LUft_SUPERLU_DIST : public LUft<IdxT,DataT>
         // Disable bitwise copy
         LUft_SUPERLU_DIST const & operator= (LUft_SUPERLU_DIST const &) = delete;
         
-        /// New instance of the factorizer.
-        virtual LUft<IdxT,DataT> * New () const { return new LUft_SUPERLU_DIST<IdxT,DataT>(); }
-        
-        /// Get name of the factorizer.
-        virtual std::string name () const { return "superlu_dist"; }
-        
         /// Factorize.
-        virtual void factorize (CsrMatrix<IdxT,DataT> const & matrix, LUftData data);
+        virtual void factorize (CsrMatrix<LU_int_t,Complex> const & matrix, LUftData data);
         
         /// Validity indicator.
         virtual bool valid () const { return size_ != 0; }
@@ -79,7 +79,7 @@ class LUft_SUPERLU_DIST : public LUft<IdxT,DataT>
         virtual std::size_t size () const { return size_; }
         
         /// Solve equations.
-        virtual void solve (const ArrayView<DataT> b, ArrayView<DataT> x, int eqs) const;
+        virtual void solve (const cArrayView b, cArrayView x, int eqs) const;
         
         /// Save factorization data to disk.
         virtual void save (std::string name) const;

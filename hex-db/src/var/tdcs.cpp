@@ -49,14 +49,9 @@
 
 // --------------------------------------------------------------------------------- //
 
-createNewScatteringQuantity(TripleDifferentialCrossSection);
+createNewScatteringQuantity(TripleDifferentialCrossSection, "tdcs")
 
 // --------------------------------------------------------------------------------- //
-
-std::string TripleDifferentialCrossSection::name ()
-{
-    return "tdcs";
-}
 
 std::string TripleDifferentialCrossSection::description ()
 {

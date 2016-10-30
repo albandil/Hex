@@ -29,20 +29,31 @@
 //                                                                                   //
 //  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
+#ifndef HEX_LU_LAPACK_H
+#define HEX_LU_LAPACK_H
+
+// --------------------------------------------------------------------------------- //
+
 #include "hex-csrmatrix.h"
 
+// --------------------------------------------------------------------------------- //
+
 #include "luft.h"
+
+// --------------------------------------------------------------------------------- //
 
 /**
  * @brief LU factorization using LAPACK.
  * 
  * This makes sense only for very small matrices.
  */
-template <class IdxT, class DataT>
-class LUft_LAPACK : public LUft<IdxT,DataT>
+class LUft_LAPACK : public LUft
 {
     public:
-    
+        
+        // run-time selection mechanism
+        factorizerRunTimeSelectionDefinitions(LUft_LAPACK, "lapack")
+        
         /// Default constructor.
         LUft_LAPACK ();
         
@@ -52,14 +63,8 @@ class LUft_LAPACK : public LUft<IdxT,DataT>
         // Disable bitwise copy
         LUft_LAPACK const & operator= (LUft_LAPACK const &) = delete;
         
-        /// New instance of the factorizer.
-        virtual LUft<IdxT,DataT> * New () const { return new LUft_LAPACK<IdxT,DataT>(); }
-        
-        /// Get name of the factorizer.
-        virtual std::string name () const { return "lapack"; }
-        
         /// Factorize.
-        virtual void factorize (CsrMatrix<IdxT,DataT> const & matrix, LUftData data);
+        virtual void factorize (CsrMatrix<LU_int_t,Complex> const & matrix, LUftData data);
         
         /// Validity indicator.
         virtual bool valid () const { return size() != 0; }
@@ -68,7 +73,7 @@ class LUft_LAPACK : public LUft<IdxT,DataT>
         virtual std::size_t size () const;
         
         /// Solve equations.
-        virtual void solve (const ArrayView<DataT> b, ArrayView<DataT> x, int eqs) const;
+        virtual void solve (const cArrayView b, cArrayView x, int eqs) const;
         
         /// Save to disk.
         virtual void save (std::string name) const;
@@ -96,3 +101,7 @@ class LUft_LAPACK : public LUft<IdxT,DataT>
         /// Matrix half-bandwidth.
         blas::Int k_;
 };
+
+// --------------------------------------------------------------------------------- //
+
+#endif // HEX_LU_LAPACK_H

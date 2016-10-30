@@ -93,7 +93,13 @@ int main (int argc, char* argv[])
                 cmd.factorizer == "mumps"
             )
             {
-                HexException("You need to run the program using MPI launcher and with --mpi option to use the distributed SuperLU.");
+#ifdef WITH_MPI
+                // initialize MPI, even though just one process
+                cmd.parallel = true;
+#else
+                // sorry, this is not possible
+                HexException("You need to run the program using MPI launcher and with --mpi option to use the distributed LU factorization libraries.");
+#endif
             }
         }
         

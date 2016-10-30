@@ -32,16 +32,27 @@
 #ifndef HEX_ILUPRECONDITIONER_H
 #define HEX_ILUPRECONDITIONER_H
 
+// --------------------------------------------------------------------------------- //
+
 #include "luft.h"
-#include "preconditioners.h"
+
+// --------------------------------------------------------------------------------- //
+
+#include "CGPreconditioner.h"
+
+// --------------------------------------------------------------------------------- //
 
 #ifdef _OPENMP
-#include <omp.h>
+    #include <omp.h>
 #endif
 
+// --------------------------------------------------------------------------------- //
+
 #ifdef WITH_SUPERLU_DIST
-#include <superlu_zdefs.h>
+    #include <superlu_zdefs.h>
 #endif
+
+// --------------------------------------------------------------------------------- //
 
 /**
  * @brief ILU-preconditioned CG-based preconditioner.
@@ -54,12 +65,13 @@ class ILUCGPreconditioner : public virtual CGPreconditioner
 {
     public:
         
-        static const std::string prec_name;
-        static const std::string prec_description;
+        // run-time selection mechanism
+        preconditionerRunTimeSelectionDefinitions(ILUCGPreconditioner, "ILU")
         
-        virtual std::string const & name () const { return prec_name; }
-        virtual std::string const & description () const { return prec_description; }
+        // default constructor needed by the RTS mechanism
+        ILUCGPreconditioner () {}
         
+        // constructor
         ILUCGPreconditioner
         (
             Parallel const & par,
@@ -70,7 +82,11 @@ class ILUCGPreconditioner : public virtual CGPreconditioner
             CommandLine const & cmd
         );
         
+        // destructor
         ~ILUCGPreconditioner ();
+        
+        // preconditioner description
+        virtual std::string description () const;
         
         // reuse parent definitions
         using CGPreconditioner::multiply;
@@ -93,7 +109,7 @@ class ILUCGPreconditioner : public virtual CGPreconditioner
         mutable std::vector<LUftData> data_;
         
         // LU decompositions of the diagonal blocks
-        mutable std::vector<std::shared_ptr<LUft<LU_int_t,Complex>>> lu_;
+        mutable std::vector<std::shared_ptr<LUft>> lu_;
         
         // prepare data structures for LU factorizations
         void reset_lu ();
@@ -108,5 +124,7 @@ class ILUCGPreconditioner : public virtual CGPreconditioner
         gridinfo_t grid_;
 #endif
 };
+
+// --------------------------------------------------------------------------------- //
 
 #endif

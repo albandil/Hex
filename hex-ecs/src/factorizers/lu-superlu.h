@@ -29,11 +29,15 @@
 //                                                                                   //
 //  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
-#ifdef WITH_SUPERLU
+#if (!defined(HEX_LU_SUPERLU_H) && defined(WITH_SUPERLU))
+#define HEX_LU_SUPERLU_H
 
 // --------------------------------------------------------------------------------- //
 
 #include "hex-csrmatrix.h"
+
+// --------------------------------------------------------------------------------- //
+
 #include "luft.h"
 
 // --------------------------------------------------------------------------------- //
@@ -53,11 +57,13 @@
  * library SuperLU (sequential version). It is derived from LUft and
  * shares interface with that class.
  */
-template <class IdxT, class DataT>
-class LUft_SUPERLU : public LUft<IdxT,DataT>
+class LUft_SUPERLU : public LUft
 {
     public:
     
+        // run-time selection mechanism
+        factorizerRunTimeSelectionDefinitions(LUft_SUPERLU, "superlu")
+        
         /// Default constructor.
         LUft_SUPERLU ();
         
@@ -67,14 +73,8 @@ class LUft_SUPERLU : public LUft<IdxT,DataT>
         // Disable bitwise copy
         LUft_SUPERLU const & operator= (LUft_SUPERLU const &) = delete;
         
-        /// New instance of the factorizer.
-        virtual LUft<IdxT,DataT> * New () const { return new LUft_SUPERLU<IdxT,DataT>(); }
-        
-        /// Get name of the factorizer.
-        virtual std::string name () const { return "superlu"; }
-        
         /// Factorize.
-        virtual void factorize (CsrMatrix<IdxT,DataT> const & matrix, LUftData data);
+        virtual void factorize (CsrMatrix<LU_int_t,Complex> const & matrix, LUftData data);
         
         /// Validity indicator.
         virtual bool valid () const;
@@ -83,7 +83,7 @@ class LUft_SUPERLU : public LUft<IdxT,DataT>
         virtual std::size_t size () const { return size_; }
         
         /// Solve equations.
-        virtual void solve (const ArrayView<DataT> b, ArrayView<DataT> x, int eqs) const;
+        virtual void solve (const cArrayView b, cArrayView x, int eqs) const;
         
         /// Save factorization data to disk.
         virtual void save (std::string name) const;

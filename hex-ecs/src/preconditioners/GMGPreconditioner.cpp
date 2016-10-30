@@ -31,10 +31,16 @@
 
 #include "hex-matrix.h"
 
+// --------------------------------------------------------------------------------- //
+
 #include "GMGPreconditioner.h"
 
-const std::string GMGPreconditioner::prec_name = "GMG";
-const std::string GMGPreconditioner::prec_description = "Geometric multigrid.";
+// --------------------------------------------------------------------------------- //
+
+std::string GMGPreconditioner::description () const
+{
+    return "Geometric multigrid.";
+}
 
 template <class T> NumberArray<T> dither (NumberArray<T> const & arr)
 {
@@ -480,3 +486,9 @@ void GMGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArray<
         }
     }
 }
+
+// --------------------------------------------------------------------------------- //
+
+addClassToParentRunTimeSelectionTable(PreconditionerBase, GMGPreconditioner)
+
+// --------------------------------------------------------------------------------- //

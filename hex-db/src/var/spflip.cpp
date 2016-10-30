@@ -48,14 +48,9 @@
 
 // --------------------------------------------------------------------------------- //
 
-createNewScatteringQuantity(SpinFlipCrossSection);
+createNewScatteringQuantity(SpinFlipCrossSection, "spflip")
 
 // --------------------------------------------------------------------------------- //
-
-std::string SpinFlipCrossSection::name ()
-{
-    return "spflip";
-}
 
 std::string SpinFlipCrossSection::description ()
 {

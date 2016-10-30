@@ -55,7 +55,7 @@
 
 // --------------------------------------------------------------------------------- //
 
-createNewScatteringQuantity(IntegralCrossSection);
+createNewScatteringQuantity(IntegralCrossSection, "ics")
 
 // --------------------------------------------------------------------------------- //
 
@@ -140,11 +140,6 @@ void db_interpolate (sqlite3_context* pdb, int n, sqlite3_value** val)
 }
 
 // --------------------------------------------------------------------------------- //
-
-std::string IntegralCrossSection::name ()
-{
-    return "ics";
-}
 
 std::string IntegralCrossSection::description ()
 {

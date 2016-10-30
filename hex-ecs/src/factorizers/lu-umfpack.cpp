@@ -37,8 +37,7 @@
 
 // --------------------------------------------------------------------------------- //
 
-template<>
-std::size_t LUft_UMFPACK<LU_int_t,Complex>::size () const
+std::size_t LUft_UMFPACK::size () const
 {
     if (numeric_ == nullptr)
         return 0;
@@ -57,20 +56,17 @@ std::size_t LUft_UMFPACK<LU_int_t,Complex>::size () const
     return status == 0 ? (lnz + unz) * 16LL : 0LL; // Byte count
 }
 
-template<>
-bool LUft_UMFPACK<LU_int_t,Complex>::valid () const
+bool LUft_UMFPACK::valid () const
 {
     return numeric_ != nullptr and size() > 0;
 }
 
-template<>
-double LUft_UMFPACK<LU_int_t,Complex>::cond () const
+double LUft_UMFPACK::cond () const
 {
     return info_[UMFPACK_RCOND];
 }
 
-template<>
-void LUft_UMFPACK<LU_int_t,Complex>::factorize (CsrMatrix<LU_int_t,Complex> const & matrix, LUftData data)
+void LUft_UMFPACK::factorize (CsrMatrix<LU_int_t,Complex> const & matrix, LUftData data)
 {
     // Use standard UMFPACK sequence
     void *Symbolic, *Numeric;
@@ -130,8 +126,7 @@ void LUft_UMFPACK<LU_int_t,Complex>::factorize (CsrMatrix<LU_int_t,Complex> cons
     numeric_ = Numeric;
 }
 
-template<>
-void LUft_UMFPACK<LU_int_t,Complex>::solve (const cArrayView b, cArrayView x, int eqs) const
+void LUft_UMFPACK::solve (const cArrayView b, cArrayView x, int eqs) const
 {
     // number of unknowns
     std::size_t N = p_.size() - 1;
@@ -176,8 +171,7 @@ void LUft_UMFPACK<LU_int_t,Complex>::solve (const cArrayView b, cArrayView x, in
     }
 }
 
-template<>
-void LUft_UMFPACK<LU_int_t,Complex>::save (std::string name) const
+void LUft_UMFPACK::save (std::string name) const
 {
     p_.hdfsave("csr-p-" + name);
     i_.hdfsave("csr-i-" + name);
@@ -192,8 +186,7 @@ void LUft_UMFPACK<LU_int_t,Complex>::save (std::string name) const
         HexException("[LUft::save] Failed to save LU object \"%s\" (size = %ld).", name.c_str(), size());
 }
 
-template<>
-void LUft_UMFPACK<LU_int_t,Complex>::load (std::string name, bool throw_on_io_failure)
+void LUft_UMFPACK::load (std::string name, bool throw_on_io_failure)
 {
     if (not p_.hdfload("csr-p-" + name) or
         not i_.hdfload("csr-i-" + name) or
@@ -214,8 +207,7 @@ void LUft_UMFPACK<LU_int_t,Complex>::load (std::string name, bool throw_on_io_fa
         HexException("[LUft::save] Failed to load LU object \"%s\".", name.c_str());
 }
 
-template<>
-void LUft_UMFPACK<LU_int_t,Complex>::drop ()
+void LUft_UMFPACK::drop ()
 {
     if (numeric_ != nullptr)
     {
@@ -229,7 +221,7 @@ void LUft_UMFPACK<LU_int_t,Complex>::drop ()
 
 // --------------------------------------------------------------------------------- //
 
-addFactorizerToRuntimeSelectionTable(UMFPACK, LU_int_t, Complex)
+addClassToParentRunTimeSelectionTable(LUft, LUft_UMFPACK)
 
 // --------------------------------------------------------------------------------- //
 

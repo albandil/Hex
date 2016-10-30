@@ -32,21 +32,20 @@
 #ifndef HEX_GMGPRECONDITIONER_H
 #define HEX_GMGPRECONDITIONER_H
 
-#include "preconditioners.h"
+// --------------------------------------------------------------------------------- //
 
-/**
- * @brief Geometric multigrid preconditioner.
- */
+#include "NoPreconditioner.h"
+
+// --------------------------------------------------------------------------------- //
+
 class GMGPreconditioner : public NoPreconditioner
 {
     public:
         
-        static const std::string prec_name;
-        static const std::string prec_description;
+        // run-time selection mechanism
+        preconditionerRunTimeSelectionDefinitions(GMGPreconditioner, "GMG")
         
-        virtual std::string const & name () const { return prec_name; }
-        virtual std::string const & description () const { return prec_description; }
-        
+        // constructor
         GMGPreconditioner
         (
             Parallel const & par,
@@ -57,6 +56,7 @@ class GMGPreconditioner : public NoPreconditioner
             CommandLine const & cmd
         );
         
+        // sub-grid contructor
         GMGPreconditioner
         (
             Parallel const & par,
@@ -68,7 +68,11 @@ class GMGPreconditioner : public NoPreconditioner
             int level
         );
         
+        // destructor
         virtual ~GMGPreconditioner ();
+        
+        // preconditioner description
+        virtual std::string description () const;
         
         // reuse parent definitions
         using NoPreconditioner::rhs;
@@ -97,5 +101,7 @@ class GMGPreconditioner : public NoPreconditioner
         
         PreconditionerBase * subgrid_;
 };
+
+// --------------------------------------------------------------------------------- //
 
 #endif

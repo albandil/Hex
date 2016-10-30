@@ -31,20 +31,28 @@
 
 #include <iostream>
 
+// --------------------------------------------------------------------------------- //
+
 #include "hex-arrays.h"
 #include "hex-blas.h"
 #include "hex-hydrogen.h"
 #include "hex-misc.h"
 
+// --------------------------------------------------------------------------------- //
+
 #include "gauss.h"
-#include "preconditioners.h"
 #include "radial.h"
 
-#ifndef NO_LAPACK
+// --------------------------------------------------------------------------------- //
 
-const std::string KPACGPreconditioner::prec_name = "KPA";
-const std::string KPACGPreconditioner::prec_description = 
-    "Block inversion using conjugate gradients preconditioned by Kronecker product approximation.";
+#include "KPAPreconditioner.h"
+
+// --------------------------------------------------------------------------------- //
+
+std::string KPACGPreconditioner::description () const
+{
+    return "Block inversion using conjugate gradients preconditioned by Kronecker product approximation.";
+}
 
 void KPACGPreconditioner::sData::hdflink (const char* file)
 {
@@ -221,7 +229,7 @@ void KPACGPreconditioner::prepare
     }
     
     // wait for completition of diagonalization on other nodes
-    par_.wait();
+    par_->wait();
 
     // load all preconditioner matrices needed by this MPI node
 //     for (int l : needed_l)
@@ -241,13 +249,13 @@ void KPACGPreconditioner::setup ()
     
         // compose list of angular momenta NEEDED by this MPI node
         std::set<int> needed_l;
-        for (int l = 0; l <= inp_.maxell; l++)
+        for (int l = 0; l <= inp_->maxell; l++)
         {
             // check if this angular momentum is needed by some of the blocks owned by this process
             bool need_this_l = false;
-            for (unsigned ill = 0; ill < ang_.states().size(); ill++)
+            for (unsigned ill = 0; ill < ang_->states().size(); ill++)
             {
-                if (par_.isMyWork(ill) and (ang_.states()[ill].first == l or ang_.states()[ill].second == l))
+                if (par_->isMyWork(ill) and (ang_->states()[ill].first == l or ang_->states()[ill].second == l))
                     need_this_l = true;
             }
             
@@ -258,14 +266,14 @@ void KPACGPreconditioner::setup ()
         
         // compose list of angular momenta that this MPI node will COMPUTE
         std::set<int> comp_l;
-        for (int l = 0; l <= inp_.maxell; l++)
+        for (int l = 0; l <= inp_->maxell; l++)
         {
             // compute l-th preconditioner matrices if either
             // a) nodes share scratch and even distribution assigns l-th preconditioner matrices to this node, or
-            if (cmd_.shared_scratch and par_.isMyWork(l))
+            if (cmd_->shared_scratch and par_->isMyWork(l))
                 comp_l.insert(l);
             // b) nodes do not share scratch and this node will need l-th preconditioner matrices
-            if (not cmd_.shared_scratch and needed_l.find(l) != needed_l.end())
+            if (not cmd_->shared_scratch and needed_l.find(l) != needed_l.end())
                 comp_l.insert(l);
         }
         
@@ -274,21 +282,21 @@ void KPACGPreconditioner::setup ()
     //
         
         // status array indicating necessity to calculate the preconditioner matrix for given 'l'
-        Array<bool> done_atom (inp_.maxell + 1, true);
+        Array<bool> done_atom (inp_->maxell + 1, true);
         
         // "to compute matrices": link them to scratch disk files and check presence
         for (int l : comp_l)
         {
-            prec_inner_[l].hdflink(format("kpa-%d-%.4lx.hdf",l,rad_.bspline_inner().hash()).c_str());
-            prec_proj_ [l].hdflink(format("kpa-%d-%.4lx.hdf",l,rad_.bspline_inner().hash()).c_str());
+            prec_inner_[l].hdflink(format("kpa-%d-%.4lx.hdf",l,rad_->bspline_inner().hash()).c_str());
+            prec_proj_ [l].hdflink(format("kpa-%d-%.4lx.hdf",l,rad_->bspline_inner().hash()).c_str());
             done_atom[l] = prec_inner_[l].hdfcheck();
         }
         
         // "needed matrices": link them to scratch disk files and check presence, load if present
         for (int l : needed_l)
         {
-            prec_inner_[l].hdflink(format("kpa-%d-%.4lx.hdf",l,rad_.bspline_inner().hash()).c_str());
-            prec_proj_ [l].hdflink(format("kpa-%d-%.4lx.hdf",l,rad_.bspline_inner().hash()).c_str());
+            prec_inner_[l].hdflink(format("kpa-%d-%.4lx.hdf",l,rad_->bspline_inner().hash()).c_str());
+            prec_proj_ [l].hdflink(format("kpa-%d-%.4lx.hdf",l,rad_->bspline_inner().hash()).c_str());
             done_atom[l] = prec_inner_[l].hdfcheck();
             
             if (done_atom[l])
@@ -307,15 +315,15 @@ void KPACGPreconditioner::setup ()
             std::cout << std::endl << "\tPrepare preconditioner matrices for atomic grid" << std::endl;
             prepare
             (
-                prec_inner_, rad_.bspline_inner().Nspline(),
-                rad_.S_inner(), rad_.D_inner(), rad_.Mm1_tr_inner(), rad_.Mm2_inner(),
+                prec_inner_, rad_->bspline_inner().Nspline(),
+                rad_->S_inner(), rad_->D_inner(), rad_->Mm1_tr_inner(), rad_->Mm2_inner(),
                 done_atom, comp_l, needed_l
             );
             std::cout << std::endl << "\tPrepare preconditioner matrices for projectile grid" << std::endl;
             prepare
             (
-                prec_proj_, rad_.bspline_inner().Nspline(),
-                rad_.S_inner(), rad_.D_inner(), Complex(-inp_.Zp) * rad_.Mm1_tr_inner(), rad_.Mm2_inner(),
+                prec_proj_, rad_->bspline_inner().Nspline(),
+                rad_->S_inner(), rad_->D_inner(), Complex(-inp_->Zp) * rad_->Mm1_tr_inner(), rad_->Mm2_inner(),
                 done_atom, comp_l, needed_l
             );
         }
@@ -338,8 +346,8 @@ void KPACGPreconditioner::CG_init (int iblock) const
     CGPreconditioner::CG_init(iblock);
     
     // get block angular momenta
-    int l1 = ang_.states()[iblock].first;
-    int l2 = ang_.states()[iblock].second;
+    int l1 = ang_->states()[iblock].first;
+    int l2 = ang_->states()[iblock].second;
     
     // initialize self
     lock_kpa_access();
@@ -357,7 +365,7 @@ void KPACGPreconditioner::CG_init (int iblock) const
     unlock_kpa_access();
     
     // calculate workspace size
-    std::size_t size = rad_.bspline_inner().Nspline() * rad_.bspline_inner().Nspline();
+    std::size_t size = rad_->bspline_inner().Nspline() * rad_->bspline_inner().Nspline();
     
     // allocate thread workspace
     unsigned ithread = 0;
@@ -370,28 +378,28 @@ void KPACGPreconditioner::CG_init (int iblock) const
 void KPACGPreconditioner::CG_mmul (int iblock, const cArrayView p, cArrayView q) const
 {
     // multiply by components
-    if (cmd_.kpa_simple_rad or cmd_.lightweight_full)
+    if (cmd_->kpa_simple_rad or cmd_->lightweight_full)
     {
         // get block angular momemnta
-        int l1 = ang_.states()[iblock].first;
-        int l2 = ang_.states()[iblock].second;
+        int l1 = ang_->states()[iblock].first;
+        int l2 = ang_->states()[iblock].second;
         
         // multiply 'p' by the diagonal block (except for the two-electron term)
-        kron_dot(0., q,  1., p, Complex(E_) * rad_.S_inner(), rad_.S_inner());
-        kron_dot(1., q, -1., p, Complex(0.5) * rad_.D_inner() - rad_.Mm1_tr_inner() + Complex(0.5*(l1+1)*l1) * rad_.Mm2_inner(), rad_.S_inner());
-        kron_dot(1., q, -1., p, rad_.S_inner(), Complex(0.5) * rad_.D_inner() + Complex(inp_.Zp) * rad_.Mm1_tr_inner() + Complex(0.5*(l2+1)*l2) * rad_.Mm2_inner());
+        kron_dot(0., q,  1., p, Complex(E_) * rad_->S_inner(), rad_->S_inner());
+        kron_dot(1., q, -1., p, Complex(0.5) * rad_->D_inner() - rad_->Mm1_tr_inner() + Complex(0.5*(l1+1)*l1) * rad_->Mm2_inner(), rad_->S_inner());
+        kron_dot(1., q, -1., p, rad_->S_inner(), Complex(0.5) * rad_->D_inner() + Complex(inp_->Zp) * rad_->Mm1_tr_inner() + Complex(0.5*(l2+1)*l2) * rad_->Mm2_inner());
         
         // multiply 'p' by the two-electron integrals
-        for (int lambda = 0; lambda <= rad_.maxlambda(); lambda++)
+        for (int lambda = 0; lambda <= rad_->maxlambda(); lambda++)
         {
             // calculate angular integral
-            Real f = special::computef(lambda, l1, l2, l1, l2, inp_.L);
+            Real f = special::computef(lambda, l1, l2, l1, l2, inp_->L);
             if (not std::isfinite(f))
-                HexException("Invalid result of computef(%d,%d,%d,%d,%d,%d).", lambda, l1, l2, l1, l2, inp_.L);
+                HexException("Invalid result of computef(%d,%d,%d,%d,%d,%d).", lambda, l1, l2, l1, l2, inp_->L);
             
             // multiply
             if (f != 0.)
-                rad_.apply_R_matrix(lambda, inp_.Zp * f, p, 1., q, cmd_.kpa_simple_rad);
+                rad_->apply_R_matrix(lambda, inp_->Zp * f, p, 1., q, cmd_->kpa_simple_rad);
         }
     }
     
@@ -405,11 +413,11 @@ void KPACGPreconditioner::CG_mmul (int iblock, const cArrayView p, cArrayView q)
 void KPACGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z) const
 {
     // get angular momenta of this block
-    int l1 = ang_.states()[iblock].first;
-    int l2 = ang_.states()[iblock].second;
+    int l1 = ang_->states()[iblock].first;
+    int l2 = ang_->states()[iblock].second;
     
     // dimension of the matrices
-    std::size_t Nspline_inner = rad_.bspline_inner().Nspline();
+    std::size_t Nspline_inner = rad_->bspline_inner().Nspline();
     
     // get workspace
     int ithread = 0;
@@ -455,13 +463,13 @@ void KPACGPreconditioner::CG_exit (int iblock) const
     lock_kpa_access();
     {
         // get block angular momenta
-        int l1 = ang_.states()[iblock].first;
-        int l2 = ang_.states()[iblock].second;
+        int l1 = ang_->states()[iblock].first;
+        int l2 = ang_->states()[iblock].second;
         
         // update reference count (allow drop only in out-of-core)
-        if (refcount_inner_[l1] > 1 or not cmd_.outofcore)
+        if (refcount_inner_[l1] > 1 or not cmd_->outofcore)
             refcount_inner_[l1]--;
-        if (refcount_proj_[l2] > 1 or not cmd_.outofcore)
+        if (refcount_proj_[l2] > 1 or not cmd_->outofcore)
             refcount_proj_[l2]--;
         
         // release memory
@@ -501,5 +509,8 @@ void KPACGPreconditioner::unlock_kpa_access () const
 #endif    
 }
 
+// --------------------------------------------------------------------------------- //
 
-#endif
+addClassToParentRunTimeSelectionTable(PreconditionerBase, KPACGPreconditioner)
+
+// --------------------------------------------------------------------------------- //

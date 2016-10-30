@@ -32,7 +32,11 @@
 #ifndef HEX_CGPRECONDITIONER_H
 #define HEX_CGPRECONDITIONER_H
 
-#include "preconditioners.h"
+// --------------------------------------------------------------------------------- //
+
+#include "NoPreconditioner.h"
+
+// --------------------------------------------------------------------------------- //
 
 /**
  * @brief CG iteration-based preconditioner.
@@ -45,12 +49,13 @@ class CGPreconditioner : public NoPreconditioner
 {
     public:
         
-        static const std::string prec_name;
-        static const std::string prec_description;
+        // run-time selection mechanism
+        preconditionerRunTimeSelectionDefinitions(CGPreconditioner, "cg")
         
-        virtual std::string const & name () const { return prec_name; }
-        virtual std::string const & description () const { return prec_description; }
+        // default constructor needed by the RTS mechanism
+        CGPreconditioner () {}
         
+        // constructor
         CGPreconditioner
         (
             Parallel const & par,
@@ -60,7 +65,10 @@ class CGPreconditioner : public NoPreconditioner
             Bspline const & bspline_full,
             CommandLine const & cmd
         ) : NoPreconditioner(par, inp, ll, bspline_inner, bspline_full, cmd),
-            n_(ang_.states().size(), -1) {}
+            n_(ll.states().size(), -1) {}
+        
+        // description of the preconditioner
+        virtual std::string description () const;
         
         // reuse parent definitions
         using NoPreconditioner::setup;
@@ -72,6 +80,7 @@ class CGPreconditioner : public NoPreconditioner
         virtual void precondition (BlockArray<Complex> const & r, BlockArray<Complex> & z) const;
         virtual void finish ();
         
+        // solve diagonal block
         int solve_block (int ill, const cArrayView r, cArrayView z) const;
         
         // inner CG driver
@@ -94,5 +103,7 @@ class CGPreconditioner : public NoPreconditioner
         // timing
         mutable std::size_t us_axby_, us_mmul_, us_norm_, us_prec_, us_spro_;
 };
+
+// --------------------------------------------------------------------------------- //
 
 #endif

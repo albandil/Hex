@@ -41,6 +41,10 @@
 
 // --------------------------------------------------------------------------------- //
 
+#include "hex-rts.h"
+
+// --------------------------------------------------------------------------------- //
+
 #include <sqlitepp/sqlitepp.hpp>
 
 // --------------------------------------------------------------------------------- //
@@ -54,19 +58,29 @@ class ScatteringQuantity
     
     public:
         
+        // run-time selection mechanism
+        
+            baseClassRunTimeSelectionDefinitions(ScatteringQuantity, ())
+        
         // properties
             
-            /// String identification of the variable.
-            virtual std::string name () = 0;
-            
             /// Longer description text for use in program help.
-            virtual std::string description () = 0;
+            virtual std::string description ()
+            {
+                return "";
+            }
             
             /// List of all scattering event parameters (with description) that have to be specified by user.
-            virtual std::vector<std::pair<std::string,std::string>> params () = 0;
+            virtual std::vector<std::pair<std::string,std::string>> params ()
+            {
+                return std::vector<std::pair<std::string,std::string>>();
+            }
             
             /// List of vectorizable scattering event parameters that have to be specified by user.
-            virtual std::vector<std::string> vparams () = 0;
+            virtual std::vector<std::string> vparams ()
+            {
+                return std::vector<std::string>();
+            }
             
             /// List of other scattering quantities that need to be initialized/updated/etc before this class
             /// because this class makes use of their data.
@@ -102,25 +116,24 @@ class ScatteringQuantity
             }
             
             /// write out requested data
-            virtual bool run (std::map<std::string,std::string> const & params) = 0;
+            virtual bool run (std::map<std::string,std::string> const & params)
+            {
+                return true;
+            }
 };
 
 // --------------------------------------------------------------------------------- //
-
-extern std::unique_ptr<std::vector<ScatteringQuantity*>> quantities;
-
-bool register_new_quantity (ScatteringQuantity* Q);
 
 ScatteringQuantity * get_quantity (std::string name);
 
 // --------------------------------------------------------------------------------- //
 
 // define new scattering quantity
-#define createNewScatteringQuantity(Q) \
+#define createNewScatteringQuantity(Q, NAME) \
 class Q : public ScatteringQuantity \
 { \
     public: \
-        std::string name (); \
+        derivedClassRunTimeSelectionDefinitions(ScatteringQuantity, (), Q, (), NAME) \
         std::string description (); \
         std::vector<std::pair<std::string,std::string>> params (); \
         std::vector<std::string> vparams (); \
@@ -130,7 +143,7 @@ class Q : public ScatteringQuantity \
         bool updateTable (); \
         bool run (std::map<std::string,std::string> const & params); \
 }; \
-bool Q##_##registered = register_new_quantity(new Q())
+addClassToParentRunTimeSelectionTable(ScatteringQuantity, Q)
 
 // --------------------------------------------------------------------------------- //
 

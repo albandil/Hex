@@ -46,14 +46,9 @@
 
 // --------------------------------------------------------------------------------- //
 
-createNewScatteringQuantity(MomentumTransfer);
+createNewScatteringQuantity(MomentumTransfer, "momtf")
 
 // --------------------------------------------------------------------------------- //
-
-std::string MomentumTransfer::name ()
-{
-    return "momtf";
-}
 
 std::string MomentumTransfer::description ()
 {

@@ -49,14 +49,9 @@
 
 // --------------------------------------------------------------------------------- //
 
-createNewScatteringQuantity(IonizationAmplitude);
+createNewScatteringQuantity(IonizationAmplitude, "ionamp")
 
 // --------------------------------------------------------------------------------- //
-
-std::string IonizationAmplitude::name ()
-{
-    return "ionamp";
-}
 
 std::string IonizationAmplitude::description ()
 {

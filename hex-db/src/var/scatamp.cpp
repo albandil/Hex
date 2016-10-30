@@ -47,14 +47,9 @@
 
 // --------------------------------------------------------------------------------- //
 
-createNewScatteringQuantity(ScatteringAmplitude);
+createNewScatteringQuantity(ScatteringAmplitude, "scatamp")
 
 // --------------------------------------------------------------------------------- //
-
-std::string ScatteringAmplitude::name ()
-{
-    return "scatamp";
-}
 
 std::string ScatteringAmplitude::description ()
 {

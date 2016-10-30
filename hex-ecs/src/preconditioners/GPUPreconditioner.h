@@ -29,19 +29,31 @@
 //                                                                                   //
 //  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
-#ifndef HEX_GPUPRECONDITIONER_H
+#if (!defined(HEX_GPUPRECONDITIONER_H) && defined(WITH_OPENCL))
 #define HEX_GPUPRECONDITIONER_H
 
+// --------------------------------------------------------------------------------- //
+
 #include <string>
+
+// --------------------------------------------------------------------------------- //
+
+#include <CL/cl.h>
+
+// --------------------------------------------------------------------------------- //
 
 #include "hex-arrays.h"
 #include "hex-matrix.h"
 
-#include "preconditioners.h"
+// --------------------------------------------------------------------------------- //
 
-#ifdef WITH_OPENCL
+#include "KPAPreconditioner.h"
+
+// --------------------------------------------------------------------------------- //
 
 #include "clarrays.h"
+
+// --------------------------------------------------------------------------------- //
 
 /**
  * @brief KPA-preconditioned CG-preconditioner.
@@ -60,11 +72,8 @@ class GPUCGPreconditioner : public virtual KPACGPreconditioner
 {
     public:
         
-        static const std::string prec_name;
-        static const std::string prec_description;
-        
-        virtual std::string const & name () const { return prec_name; }
-        virtual std::string const & description () const { return prec_description; }
+        // run-time selection mechanism
+        preconditionerRunTimeSelectionDefinitions(GPUCGPreconditioner, "GPU")
         
         typedef struct sData
         {
@@ -87,6 +96,10 @@ class GPUCGPreconditioner : public virtual KPACGPreconditioner
             std::string filename;
         } Data;
         
+        // default constructor needed by the RTS mechanism
+        GPUCGPreconditioner () {}
+        
+        // constructor
         GPUCGPreconditioner
         (
             Parallel const & par,
@@ -100,6 +113,9 @@ class GPUCGPreconditioner : public virtual KPACGPreconditioner
         {
             // nothing more to do
         }
+        
+        // preconditioner description
+        virtual std::string description () const;
         
         // reuse parent definitions
         using KPACGPreconditioner::rhs;
@@ -150,6 +166,6 @@ class GPUCGPreconditioner : public virtual KPACGPreconditioner
         cl_short nsrcseg_, ndstseg_;
 };
 
-#endif
+// --------------------------------------------------------------------------------- //
 
 #endif

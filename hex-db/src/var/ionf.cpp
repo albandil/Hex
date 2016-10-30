@@ -52,14 +52,9 @@
 
 // --------------------------------------------------------------------------------- //
 
-createNewScatteringQuantity(IonizationF);
+createNewScatteringQuantity(IonizationF, "ionf")
 
 // --------------------------------------------------------------------------------- //
-
-std::string IonizationF::name ()
-{
-    return "ionf";
-}
 
 std::string IonizationF::description ()
 {

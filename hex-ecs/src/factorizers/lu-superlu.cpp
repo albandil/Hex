@@ -37,15 +37,12 @@
 
 // --------------------------------------------------------------------------------- //
 
-template<>
-LUft_SUPERLU<LU_int_t,Complex>::LUft_SUPERLU ()
-    : LUft<LU_int_t,Complex>(), size_(0)
+LUft_SUPERLU::LUft_SUPERLU () : LUft(), size_(0)
 {
     // nothing
 }
 
-template<>
-void LUft_SUPERLU<LU_int_t,Complex>::factorize (CsrMatrix<LU_int_t,Complex> const & matrix, LUftData data)
+void LUft_SUPERLU::factorize (CsrMatrix<LU_int_t,Complex> const & matrix, LUftData data)
 {
     //
     // Create matrix of the system.
@@ -173,8 +170,7 @@ void LUft_SUPERLU<LU_int_t,Complex>::factorize (CsrMatrix<LU_int_t,Complex> cons
         size_ = mem_usage.for_lu;
 }
 
-template<>
-void LUft_SUPERLU<LU_int_t,Complex>::solve (const cArrayView b, cArrayView x, int eqs) const
+void LUft_SUPERLU::solve (const cArrayView b, cArrayView x, int eqs) const
 {
     //
     // Create matrix of the system.
@@ -305,27 +301,23 @@ void LUft_SUPERLU<LU_int_t,Complex>::solve (const cArrayView b, cArrayView x, in
         HexException("SuperLU/?gssvx failed with status %d.", info);
 }
 
-template<>
-bool LUft_SUPERLU<LU_int_t,Complex>::valid () const
+bool LUft_SUPERLU::valid () const
 {
     return size_ != 0;
 }
 
-template<>
-void LUft_SUPERLU<LU_int_t,Complex>::save (std::string name) const
+void LUft_SUPERLU::save (std::string name) const
 {
     HexException("SuperLU factorizer does not yet support --out-of-core option.");
 }
 
-template<>
-void LUft_SUPERLU<LU_int_t,Complex>::load (std::string name, bool throw_on_io_failure)
+void LUft_SUPERLU::load (std::string name, bool throw_on_io_failure)
 {
     if (throw_on_io_failure)
         HexException("SuperLU factorizer does not yet support --out-of-core option.");
 }
 
-template<>
-void LUft_SUPERLU<LU_int_t,Complex>::drop ()
+void LUft_SUPERLU::drop ()
 {
     if (size_ != 0)
     {
@@ -335,9 +327,10 @@ void LUft_SUPERLU<LU_int_t,Complex>::drop ()
     }
 }
 
+
 // --------------------------------------------------------------------------------- //
 
-addFactorizerToRuntimeSelectionTable(SUPERLU, LU_int_t, Complex)
+addClassToParentRunTimeSelectionTable(LUft, LUft_SUPERLU)
 
 // --------------------------------------------------------------------------------- //
 

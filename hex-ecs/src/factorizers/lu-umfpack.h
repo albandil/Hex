@@ -29,7 +29,8 @@
 //                                                                                   //
 //  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
-#ifdef WITH_UMFPACK
+#if (!defined(HEX_LU_UMFPACK) && defined(WITH_UMFPACK))
+#define HEX_LU_UMFPACK
 
 // --------------------------------------------------------------------------------- //
 
@@ -38,6 +39,9 @@
 // --------------------------------------------------------------------------------- //
 
 #include "hex-csrmatrix.h"
+
+// --------------------------------------------------------------------------------- //
+
 #include "luft.h"
 
 // --------------------------------------------------------------------------------- //
@@ -79,14 +83,16 @@
  * library UMFPACK (part of SuiteSparse toolkit). It is derived from LUft and
  * shares interface with that class.
  */
-template <class IdxT, class DataT>
-class LUft_UMFPACK : public LUft<IdxT,DataT>
+class LUft_UMFPACK : public LUft
 {
     public:
     
+        // run-time selection mechanism
+        factorizerRunTimeSelectionDefinitions(LUft_UMFPACK, "umfpack")
+        
         /// Default constructor.
         LUft_UMFPACK ()
-            : LUft<IdxT,DataT>(), numeric_(nullptr), info_(UMFPACK_INFO) {}
+            : LUft(), numeric_(nullptr), info_(UMFPACK_INFO) {}
         
         /// Destructor.
         virtual ~LUft_UMFPACK () { drop(); }
@@ -94,14 +100,8 @@ class LUft_UMFPACK : public LUft<IdxT,DataT>
         // Disable bitwise copy
         LUft_UMFPACK const & operator= (LUft_UMFPACK const &) = delete;
         
-        /// New instance of the factorizer.
-        virtual LUft<IdxT,DataT> * New () const { return new LUft_UMFPACK<IdxT,DataT>(); }
-        
-        /// Get name of the factorizer.
-        virtual std::string name () const { return "umfpack"; }
-        
         /// Factorize.
-        virtual void factorize (CsrMatrix<IdxT,DataT> const & matrix, LUftData data);
+        virtual void factorize (CsrMatrix<LU_int_t,Complex> const & matrix, LUftData data);
         
         /// Return factorization information.
         rArray const & info () const { return info_; }
@@ -116,7 +116,7 @@ class LUft_UMFPACK : public LUft<IdxT,DataT>
         virtual Real cond () const;
         
         /// Solve equations.
-        virtual void solve (const ArrayView<DataT> b, ArrayView<DataT> x, int eqs) const;
+        virtual void solve (const cArrayView b, cArrayView x, int eqs) const;
         
         /// Save factorization data to disk.
         virtual void save (std::string name) const;

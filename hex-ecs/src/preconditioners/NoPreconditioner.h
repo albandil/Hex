@@ -32,7 +32,11 @@
 #ifndef HEX_NOPRECONDITIONER_H
 #define HEX_NOPRECONDITIONER_H
 
+// --------------------------------------------------------------------------------- //
+
 #include "preconditioners.h"
+
+// --------------------------------------------------------------------------------- //
 
 /**
  * @brief Solution driver without actual preconditioner.
@@ -51,14 +55,13 @@ class NoPreconditioner : public PreconditionerBase
 {
     public:
         
-        static const std::string prec_name;
-        static const std::string prec_description;
+        // run-time selection mechanism
+        preconditionerRunTimeSelectionDefinitions(NoPreconditioner, "none")
         
-        virtual std::string const & name () const { return prec_name; }
-        virtual std::string const & description () const { return prec_description; }
+        // default constructor required by RTS system
+        NoPreconditioner ();
         
-        RadialIntegrals const & rad () const { return rad_; }
-        
+        // constructor
         NoPreconditioner
         (
             Parallel const & par,
@@ -67,17 +70,13 @@ class NoPreconditioner : public PreconditionerBase
             Bspline const & bspline_inner,
             Bspline const & bspline_full,
             CommandLine const & cmd
-        ) : PreconditionerBase(),
-            E_(0), cmd_(cmd), par_(par), inp_(inp), ang_(ll),
-            A_blocks_ (ang_.states().size() * ang_.states().size()),
-            B1_blocks_(ang_.states().size() * ang_.states().size()),
-            B2_blocks_(ang_.states().size() * ang_.states().size()),
-            Cu_blocks_(ang_.states().size() * ang_.states().size()),
-            Cl_blocks_(ang_.states().size() * ang_.states().size()),
-            rad_(bspline_inner, bspline_full, ang_.maxlambda() + 1)
-        {
-            // nothing to do
-        }
+        );
+        
+        // destructor
+        ~NoPreconditioner ();
+        
+        // description of the preconditioner
+        virtual std::string description () const;
         
         virtual void setup ();
         virtual void update (Real E);
@@ -88,6 +87,7 @@ class NoPreconditioner : public PreconditionerBase
         
         // internal routines
         BlockSymBandMatrix<Complex> calc_A_block (int ill, int illp, bool twoel = true) const;
+        RadialIntegrals const & rad () const { return *rad_; }
         
     protected:
         
@@ -95,16 +95,16 @@ class NoPreconditioner : public PreconditionerBase
         Real E_;
         
         // command line switches
-        CommandLine const & cmd_;
+        CommandLine const * cmd_;
         
         // parallel environment
-        Parallel const & par_;
+        Parallel const * par_;
         
         // input parameters
-        InputFile const & inp_;
+        InputFile const * inp_;
         
         // coupled states
-        AngularBasis const & ang_;
+        AngularBasis const * ang_;
         
         // Sub-blocks composing the angular blocks of the full matrix:
         //  ┏━━━━━━┯━━━━━━━━┓
@@ -130,10 +130,12 @@ class NoPreconditioner : public PreconditionerBase
         std::vector<std::pair<int,int>> Nchan_;
         
         // radial integrals for the solution
-        RadialIntegrals rad_;
+        RadialIntegrals * rad_;
         
         // hydrogen orbitals B-spline overlaps and expansions (on inner basis)
         std::vector<cArrays> Sp, Xp;
 };
+
+// --------------------------------------------------------------------------------- //
 
 #endif

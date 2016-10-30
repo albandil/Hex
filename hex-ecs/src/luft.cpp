@@ -33,10 +33,6 @@
 
 // --------------------------------------------------------------------------------- //
 
-std::shared_ptr<std::vector<LUft<LU_int_t,Complex>*>> LU;
-
-// --------------------------------------------------------------------------------- //
-
 LUftData defaultLUftData =
 {
     /* drop_tolerance */            1e-8
@@ -49,28 +45,6 @@ LUftData defaultLUftData =
 
 // --------------------------------------------------------------------------------- //
 
-template<> LUft<LU_int_t,Complex> * LUft<LU_int_t,Complex>::Choose (std::string factorizer)
-{
-    if (LU.get() == nullptr)
-        HexException("No LU factorization method available.");
-    
-    for (LUft<LU_int_t,Complex> *lu : *LU)
-    {
-        if (lu->name() == factorizer or factorizer == "any")
-        {
-            return lu->New();
-        }
-    }
-    
-    std::cout << "Error!" << std::endl;
-    std::cout << "  The LU factorizer \"" << factorizer << "\" is not available." << std::endl;
-    std::cout << "  The program may not be compiled with support for that factorizer." << std::endl;
-    std::cout << "  The available factorizers are: ";
-    
-    for (LUft<LU_int_t,Complex> *lu : *LU)
-        std::cout << "\"" << lu->name() << "\" ";
-    
-    std::cout << std::endl << std::endl;
-    
-    std::exit(1);
-}
+defineBaseClassRunTimeSelectionTable(LUft)
+
+// --------------------------------------------------------------------------------- //

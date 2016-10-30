@@ -44,6 +44,10 @@
 #include "io.h"
 #include "preconditioners.h"
 
+#ifdef WITH_OPENCL
+    #include <CL/cl.h>
+#endif
+
 const std::string sample_input =
     "# This is a sample input file for the program hex-ecs.\n"
     "# Lines introduced by the hash symbol are comments, which document the options,\n"
@@ -326,19 +330,33 @@ void CommandLine::parse (int argc, char* argv[])
             },
         "preconditioner", "p", 1, [&](std::vector<std::string> const & optargs) -> bool
             {
-                // preconditioner
-                if ((preconditioner = Preconditioners::findByName(optargs[0])) == -1)
+                // look-up the preconditioner
+                std::vector<PreconditionerBase*>::const_iterator ip = std::find_if
+                (
+                    PreconditionerBase::RTS_Table->begin(),
+                    PreconditionerBase::RTS_Table->end(),
+                    [&](PreconditionerBase* ptr)
+                    {
+                        return ptr->name() == optargs[0];
+                    }
+                );
+                
+                if (ip == PreconditionerBase::RTS_Table->end())
+                {
                     HexException("Unknown preconditioner \"%s\".", optargs[0].c_str());
+                }
+                
+                preconditioner = optargs[0];
                 return true;
             },
         "list-preconditioners", "P", 0, [&](std::vector<std::string> const & optargs) -> bool
             {
-                // preconditioners description
-                std::cout << "\nPreconditioners description (first one is default):\n\n";
-                for (unsigned i = 0; i < Preconditioners::size(); i++)
+                // look-up the preconditioners description
+                std::cout << "\nPreconditioners description (first one is the default):\n\n";
+                for (PreconditionerBase const * ip : *PreconditionerBase::RTS_Table)
                 {
-                    std::cout << Preconditioners::name(i) << "\n";
-                    std::cout << "\t" << Preconditioners::description(i) << "\n";
+                    std::cout << ip->name() << "\n";
+                    std::cout << "\t" << ip->description() << "\n";
                 }
                 std::cout << std::endl;
                 std::exit(EXIT_SUCCESS);
@@ -560,9 +578,20 @@ void CommandLine::parse (int argc, char* argv[])
             },
         "multigrid-coarse-prec", "", 1, [&](std::vector<std::string> const & optargs) -> bool
             {
-                // preconditioner
-                if ((multigrid_coarse_prec = Preconditioners::findByName(optargs[0])) == -1)
-                    HexException("Unknown coarse preconditioner \"%s\".", optargs[0].c_str());
+                // look-up the preconditioner
+                std::vector<PreconditionerBase*>::const_iterator ip = std::find_if
+                (
+                    PreconditionerBase::RTS_Table->begin(),
+                    PreconditionerBase::RTS_Table->end(),
+                    [&](PreconditionerBase* ptr)
+                    {
+                        return ptr->name() == optargs[0];
+                    }
+                );
+                
+                if (ip == PreconditionerBase::RTS_Table->end())
+                    HexException("Unknown coarse preconditioner");
+                
                 return true;
             },
         
@@ -950,8 +979,8 @@ void zip_solution
     
     // factorize the overlap matrix
     CsrMatrix<LU_int_t,Complex> S_csr = r.S_inner().tocoo<LU_int_t>().tocsr();
-    std::shared_ptr<LUft<LU_int_t,Complex>> S_lu;
-    S_lu.reset(LUft<LU_int_t,Complex>::Choose(cmd.factorizer));
+    std::shared_ptr<LUft> S_lu;
+    S_lu.reset(LUft::Choose(cmd.factorizer));
     S_lu->factorize(S_csr);
     
     // compute all needed bound states

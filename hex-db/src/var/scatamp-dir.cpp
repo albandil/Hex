@@ -47,14 +47,9 @@
 
 // --------------------------------------------------------------------------------- //
 
-createNewScatteringQuantity(ScatteringAmplitudeDir);
+createNewScatteringQuantity(ScatteringAmplitudeDir, "scatamp-dir")
 
 // --------------------------------------------------------------------------------- //
-
-std::string ScatteringAmplitudeDir::name ()
-{
-    return "scatamp-dir";
-}
 
 std::string ScatteringAmplitudeDir::description ()
 {
