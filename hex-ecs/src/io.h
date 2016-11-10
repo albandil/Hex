@@ -307,6 +307,9 @@ class InputFile
         {
             // read inputfile
             read(inputfile);
+            
+            // maximal angular momentum
+            maxell = levels + L + Pi;
         }
         
         // read data from file
@@ -331,6 +334,9 @@ class InputFile
             // 'nL', the limit on number of coupled angular states;
             // there will be 'nL * (L + 1 - Pi)' coupled angular state pairs
             int levels;
+            
+            // upper limit on the smaller of the one-electron angular momenta
+            int limit;
             
             // maximal one-electron orbital quantum number
             int maxell;

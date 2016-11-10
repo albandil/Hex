@@ -932,16 +932,13 @@ void InputFile::read (std::ifstream & inf)
     levels = ReadNext<int>(inf).val;
     
     // single-electron angular momentum limit
-    maxell = ReadNext<int>(inf).val;
-    if (maxell < 0)
-        maxell = levels + L + Pi;
-    maxell = std::min(maxell, levels + L + Pi);
+    limit = ReadNext<int>(inf).val;
     
     std::cout << "\tL = " << L << std::endl;
     std::cout << "\tS = " << Spin << std::endl;
     std::cout << "\tPi = " << Pi << std::endl;
     std::cout << "\tnL = " << levels << std::endl;
-    std::cout << "\tlimit = " << maxell << std::endl;
+    std::cout << "\tlimit = " << limit << std::endl;
     
     Zp = ReadNext<int>(inf).val;
     
