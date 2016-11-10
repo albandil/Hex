@@ -99,8 +99,8 @@ const std::string sample_input =
     "# --------------- Other conditions ----------------\n"
     "\n"
     "# Angular momenta.\n"
-    "# L  S  Pi limit\n"
-    "  0  *  0  4\n"
+    "# L  S  Pi nL limit\n"
+    "  0  *  0  4  -1\n"
     "\n"
     "# Projectile charge (+/-1)\n"
     "  -1\n"
@@ -147,41 +147,49 @@ void CommandLine::parse (int argc, char* argv[])
             },
         "help", "h", 0, [&](std::vector<std::string> const & optargs) -> bool
             {
+                // get all factorizers
+                std::ostringstream f;
+                for (LUft const * lu : *LUft::RTS_Table)
+                    f << " '" << lu->name() << "'";
+                
                 // print usage information
                 std::cout << "\n"
                     "Available switches (short forms in parentheses):                                                                                                          \n"
                     "                                                                                                                                                          \n"
+                    "Basic usage                                                                                                                                               \n"
                     "\t--example                  (-e)  Create sample input file.                                                                                              \n"
                     "\t--help                     (-h)  Display this help.                                                                                                     \n"
                     "\t--input <filename>         (-i)  Use custom input file (other than \"ecs.inp\").                                                                        \n"
                     "\t--zip <parameters>         (-z)  Solution file to zip (i.e. evaluate in B-spline basis and produce VTK datafile).                                       \n"
                     "\t                                 The '<parameters>' stands for '<filename> <Xmin> <Ymin> <Xmax> <Ymax> <Xn> <Yn>'.                                      \n"
                     "\t--write-grid               (-g)  Write grid layout to a VTK file.                                                                                       \n"
+                    "\t--write-intermediate-solutions   Write all intermediate solution (after every iteration of the PCOCG solver).                                           \n"
+                    "\t--carry-initial-guess            Whether to use previous-energy solution as an initial guess for the new energy.                                        \n"
+                    "\t--refine-solution                Load existing solutions and check that they are within tolerance, update if needed.                                    \n"
+                    "                                                                                                                                                          \n"
 #ifdef WITH_MPI
+                    "MPI setup                                                                                                                                                 \n"
                     "\t--mpi                      (-m)  Use MPI (assuming that the program has been launched by mpiexec).                                                      \n"
+                    "\t--groupsize <number>       (-G)  How many processes factorize single LU (used by 'superlu_dist' and 'mumps' preconditioners).                           \n"
+                    "                                                                                                                                                          \n"
 #endif
+                    "LU decomposition                                                                                                                                          \n"
+                    "\t--lu <name>                (-F)  Factorization library (one of" + f.str() + "). Default is 'umfpack'.\n"
+#ifdef WITH_MUMPS
+                    "\t--mumps-out-of-core              Use out-of-core capability of MUMPS (this is independent on --out-of-core option).                                     \n"
+                    "\t--mumps-verbose                  Verbosity level of the MUMPS library. Zero ('0') means no output, higher numbers increase the verbosity.               \n"
+#endif
+                    "                                                                                                                                                          \n"
+                    "Stage selection                                                                                                                                           \n"
                     "\t--stg-integ                (-a)  Only calculate needed radial integrals.                                                                                \n"
                     "\t--stg-integ-solve          (-b)  Only calculate integrals and the solution.                                                                             \n"
                     "\t--stg-extract              (-c)  Only extract amplitudes (assumes that the solution files exist).                                                       \n"
+                    "                                                                                                                                                          \n"
+                    "Right-hand side                                                                                                                                           \n"
                     "\t--exact-rhs                      Use a different variant of right-hand side (slower and should be almost the same as the default - faster - variant).   \n"
                     "\t--fast-bessel                    Use faster Bessel function evaluation routine (not the Steed/Barnett) when calculating RHS.                            \n"
-                    "\t--preconditioner <name>    (-p)  Preconditioner to use (default: ILU).                                                                                  \n"
-                    "\t--list-preconditioners     (-P)  List available preconditioners with short description of each.                                                         \n"
-                    "\t--ssor <number>                  Apply SSOR coupling.                                                                                                   \n"
-                    "\t--tolerance <number>       (-T)  Set tolerance for the conjugate gradients solver (default: 1e-8).                                                      \n"
-                    "\t--prec-tolerance <number>  (-t)  Set tolerance for the conjugate gradients preconditioner (default: 1e-8).                                              \n"
-                    "\t--drop-tolerance <number>  (-d)  Set drop tolerance for the ILU preconditioner (default: 1e-15).                                                        \n"
-                    "\t--lu <name>                (-F)  Factorization library (one of 'umfpack', 'superlu', 'superlu_dist' and 'mumps'). Default is 'umfpack' (if available).  \n"
-                    "\t--no-lu-update                   Do not recalculate LU factorization for different energies, use the first factorization for all of them.               \n"
-                    "\t--ilu-max-iter <number>          Maximal number of iterations of the nested ILU preconditioner. When the number is exceeded, exception is thrown.       \n"
-                    "\t--parallel-factorization         Factorize multiple blocks simultaneously.                                                                              \n"
-                    "\t--no-parallel-extraction         Disallow parallel extraction of T-matrices (e.g. when the whole solution does not fit into the memory).                \n"
-                    "\t--extract-rho-begin              Where to start averaging / extrapolating the T-matrix.                                                                 \n"
-                    "\t--extract-rho[-end]              Radius for T-matrix extraction.                                                                                        \n"
-                    "\t--extract-samples                Number of evaluations of the T-matrix between --extract-rho-begin and --extract-rho.                                   \n"
-                    "\t--extract-extrapolate            Radially extrapolate the extracted T-matrices instead of simple averaging.                                             \n"
-                    "\t--groupsize <number>       (-G)  How many processes factorize single LU (only used for 'superlu_dist').                                                 \n"
-                    "\t--write-intermediate-solutions   Write all intermediate solution (after every iteration of the PCOCG solver).                                           \n"
+                    "                                                                                                                                                          \n"
+                    "Disk access                                                                                                                                               \n"
                     "\t--own-radial-cache         (-w)  Keep two-electron radial integrals not referenced by preconditioner only on disk (slows down only the initialization). \n"
                     "\t--no-radial-cache          (-r)  Keep all two-electron radial integrals only on disk (slows down also the solution process).                            \n"
                     "\t--out-of-core              (-o)  Use hard disk drive to store most of intermediate data and thus to save RAM (considerably slower).                     \n"
@@ -190,19 +198,34 @@ void CommandLine::parse (int argc, char* argv[])
                     "\t--shared-scratch           (-s)  Let every MPI process calculate only a subset of shared radial integrals (assume shared output directory).             \n"
 //                     "\t--lightweight-radial-cache (-l)  Do not precalculate two-electron integrals and only apply them on the fly (slower, but saves RAM).                     \n"
                     "\t--lightweight-full         (-L)  Avoid precalculating all large matrices and only apply them on the fly (only available for KPA preconditioner).        \n"
-                    "\t--kpa-simple-rad           (-R)  Use simplified radial integral matrix for nested KPA iterations (experimental).                                        \n"
-                    "\t--hyb-additional-levels <number> When using the HYB preconditioner: precondition more blocks with ILU, useful close below an excitation threshold.      \n"
-#ifdef WITH_MUMPS
-                    "\t--coupling-limit                 Maximal multipole to be considered by the coupled preconditioner.                                                      \n"
-                    "\t--mumps-out-of-core              Use out-of-core capability of MUMPS (this is independent on --out-of-core option).                                     \n"
-                    "\t--mumps-verbose                  Verbosity level of the MUMPS library. Zero ('0') means no output, higher numbers increase the verbosity.               \n"
-#endif
+                    "                                                                                                                                                          \n"
+                    "Preconditioners (general)                                                                                                                                 \n"
+                    "\t--preconditioner <name>    (-p)  Preconditioner to use (default: ILU).                                                                                  \n"
+                    "\t--list-preconditioners     (-P)  List available preconditioners with short description of each.                                                         \n"
+                    "\t--ssor <number>                  Apply SSOR coupling.                                                                                                   \n"
+                    "\t--tolerance <number>       (-T)  Set tolerance for the conjugate gradients solver (default: 1e-8).                                                      \n"
+                    "\t--prec-tolerance <number>  (-t)  Set tolerance for the conjugate gradients preconditioner (default: 1e-8).                                              \n"
+                    "\t--drop-tolerance <number>  (-d)  Set drop tolerance for the ILU preconditioner (default: 1e-15).                                                        \n"
 #ifndef DISABLE_PARALLEL_PRECONDITION
                     "\t--parallel-precondition          Apply multiple block preconditioners in parallel.                                                                      \n"
 #endif
-                    "\t--carry-initial-guess            Whether to use previous-energy solution as an initial guess for the new energy.                                        \n"
-                    "\t--refine-solution                Load existing solutions and check that they are within tolerance, update if needed.                                    \n"
+                    "                                                                                                                                                          \n"
+                    "ILU preconditioner                                                                                                                                        \n"
+                    "\t--parallel-factorization         Factorize multiple blocks simultaneously.                                                                              \n"
+                    "\t--no-lu-update                   Do not recalculate LU factorization for different energies, use the first factorization for all of them.               \n"
+                    "\t--ilu-max-iter <number>          Maximal number of iterations of the nested ILU preconditioner. When the number is exceeded, exception is thrown.       \n"
+                    "                                                                                                                                                          \n"
+                    "KPA preconditioner                                                                                                                                        \n"
+                    "\t--kpa-simple-rad           (-R)  Use simplified radial integral matrix for nested KPA iterations (experimental).                                        \n"
+                    "                                                                                                                                                          \n"
+                    "HYB preconditioner                                                                                                                                        \n"
+                    "\t--hyb-additional-levels <number> When using the HYB preconditioner: precondition more blocks with ILU, useful close below an excitation threshold.      \n"
+                    "                                                                                                                                                          \n"
+                    "Coupled preconditioner                                                                                                                                    \n"
+                    "\t--coupling-limit                 Maximal multipole to be considered by the coupled preconditioner.                                                      \n"
+                    "                                                                                                                                                          \n"
 #ifdef WITH_OPENCL
+                    "GPU preconditioner                                                                                                                                        \n"
                     "\t--cl-list                        List all OpenCL platforms and devices available.                                                                       \n"
                     "\t--cl-platform <index>            Use given OpenCL platform for GPU preconditioner (default is 0, i.e. the first platform found).                        \n"
                     "\t--cl-device <index>              Use given OpenCL device for GPU preconditioner (default is 0, i.e. the first device found).                            \n"
@@ -210,8 +233,21 @@ void CommandLine::parse (int argc, char* argv[])
                     "\t--cl-multiply                    Do the sparse matrix multiplication on the OpenCL device (memory intensive!).                                          \n"
                     "\t--cl-host-multiply               Keep vectors in host memory when doing matrix multiplication on OpenCL device.                                         \n"
 #endif
-                    "\t--multigrid-depth                Depth of the geometric multigrid (= maximal refinement level of the original B-spline knot sequence).                  \n"
-                    "\t--multigrid-coarse-prec          What preconditioner to use for preconditioning of the solution of the coarse problem (specified in input file).        \n"
+                    "                                                                                                                                                          \n"
+                    "Multigrid preconditioner                                                                                                                                  \n"
+                    "\t--multigrid-depth <number>       Depth of the geometric multigrid (= maximal refinement level of the original B-spline knot sequence).                  \n"
+                    "\t--multigrid-coarse-prec <name>   What preconditioner to use for preconditioning of the solution of the coarse problem (specified in input file).        \n"
+                    "                                                                                                                                                          \n"
+                    "Domain decomposition preconditioner                                                                                                                       \n"
+                    "\t--dom-panels <number>            Number of domain decomposition panels along each axis.                                                                 \n"
+                    "\t--dom-overlap <number>           Domain decomposition panel overlap. 0 = no overlap. 1 = overlap of the size equal to the non-overlapped panel size.    \n"
+                    "                                                                                                                                                          \n"
+                    "Post-processing                                                                                                                                           \n"
+                    "\t--no-parallel-extraction         Disallow parallel extraction of T-matrices (e.g. when the whole solution does not fit into the memory).                \n"
+                    "\t--extract-rho-begin              Where to start averaging / extrapolating the T-matrix.                                                                 \n"
+                    "\t--extract-rho[-end]              Radius for T-matrix extraction.                                                                                        \n"
+                    "\t--extract-samples                Number of evaluations of the T-matrix between --extract-rho-begin and --extract-rho.                                   \n"
+                    "\t--extract-extrapolate            Radially extrapolate the extracted T-matrices instead of simple averaging.                                             \n"
                     "\n"
                 ;
                 std::exit(EXIT_SUCCESS);
@@ -352,7 +388,7 @@ void CommandLine::parse (int argc, char* argv[])
         "list-preconditioners", "P", 0, [&](std::vector<std::string> const & optargs) -> bool
             {
                 // look-up the preconditioners description
-                std::cout << "\nPreconditioners description (first one is the default):\n\n";
+                std::cout << "\nPreconditioners description (\"ILU\" is the default):\n\n";
                 for (PreconditionerBase const * ip : *PreconditionerBase::RTS_Table)
                 {
                     std::cout << ip->name() << "\n";
@@ -592,6 +628,18 @@ void CommandLine::parse (int argc, char* argv[])
                 if (ip == PreconditionerBase::RTS_Table->end())
                     HexException("Unknown coarse preconditioner");
                 
+                return true;
+            },
+        "dom-panels", "", 1, [&](std::vector<std::string> const & optargs) -> bool
+            {
+                // domain decomposition panels
+                dom_panels = std::stoi(optargs[0]);
+                return true;
+            },
+        "dom-overlap", "", 1, [&](std::vector<std::string> const & optargs) -> bool
+            {
+                // domain decomposition panels
+                dom_overlap = std::stod(optargs[0]);
                 return true;
             },
         
@@ -883,10 +931,17 @@ void InputFile::read (std::ifstream & inf)
     // number of angular momentum pairs per total angular momentum
     levels = ReadNext<int>(inf).val;
     
+    // single-electron angular momentum limit
+    maxell = ReadNext<int>(inf).val;
+    if (maxell < 0)
+        maxell = levels + L + Pi;
+    maxell = std::min(maxell, levels + L + Pi);
+    
     std::cout << "\tL = " << L << std::endl;
     std::cout << "\tS = " << Spin << std::endl;
     std::cout << "\tPi = " << Pi << std::endl;
     std::cout << "\tnL = " << levels << std::endl;
+    std::cout << "\tlimit = " << maxell << std::endl;
     
     Zp = ReadNext<int>(inf).val;
     

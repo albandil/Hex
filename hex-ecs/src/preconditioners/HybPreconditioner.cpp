@@ -39,7 +39,7 @@
 
 std::string HybCGPreconditioner::description () const
 {
-    return "Combination of ILU and KPA.";
+    return "Combination of ILU and KPA. ILU is used for blocks with non-zero number of asymptotic channels, KPA otherwise.";
 }
 
 bool HybCGPreconditioner::ilu_needed (int iblock) const

@@ -78,6 +78,7 @@ class NoPreconditioner : public PreconditionerBase
         // description of the preconditioner
         virtual std::string description () const;
         
+        // member functions
         virtual void setup ();
         virtual void update (Real E);
         virtual void finish ();

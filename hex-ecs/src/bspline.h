@@ -65,6 +65,10 @@ class Bspline
          */
         Bspline (int order, rArrayView const & rknots, Real th, rArrayView const & cknots);
         
+        // move constructor
+        Bspline (Bspline && other);
+        
+        // destructor
         ~Bspline ();
         
         /**

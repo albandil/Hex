@@ -41,8 +41,7 @@ std::string CoupledPreconditioner::description () const
 {
     return "Coupled preconditioner that uses LU decomposition "
     "of a matrix composed of all diagonal and selected off-diagonal blocks. This is just a testing feature "
-    "and is likely to severely exceed your RAM. Usage of '--lu mumps' is more or less mandatory, and even that "
-    "may prove insufficient.";
+    "and is likely to severely exceed your RAM.";
 }
 
 void CoupledPreconditioner::update (Real E)

@@ -93,7 +93,7 @@ class CommandLine
               carry_initial_guess(false), gpu_multiply(false), extract_extrapolate(false), extract_rho(-1), extract_rho_begin(-1), extract_samples(-1),
               refine_solution(false), map_solution(), map_solution_target(), ssor(-1), noluupdate(false), coupling_limit(1000),
               gpu_host_multiply(false), mumps_outofcore(false), mumps_verbose(0), kpa_drop(-1), exact_rhs(true), write_intermediate_solutions(false),
-              fast_bessel(false), hyb_additional_levels(0), multigrid_depth(0), multigrid_coarse_prec(0)
+              fast_bessel(false), hyb_additional_levels(0), multigrid_depth(0), multigrid_coarse_prec(0), dom_panels(1), dom_overlap(1)
         {
             // get command line options
             parse(argc, argv);
@@ -263,6 +263,12 @@ class CommandLine
         
         /// What preconditioner to use for solution of the coarse problem.
         int multigrid_coarse_prec;
+        
+        /// Domain decomposition panels.
+        int dom_panels;
+        
+        /// Domain decomposition overlap.
+        double dom_overlap;
 };
 
 /**
@@ -301,9 +307,6 @@ class InputFile
         {
             // read inputfile
             read(inputfile);
-            
-            // compute angular momentum limit
-            maxell = levels + L + Pi;
         }
         
         // read data from file
