@@ -50,7 +50,7 @@ AngularBasis::AngularBasis (InputFile const & inp)
         for (int l1 = ell; l1 <= sum - ell; l1++)
         {
             int l2 = sum - l1;
-            if (std::abs(l1 - l2) <= inp.L and inp.L <= l1 + l2 and std::max(l1, l2) <= maxell_)
+            if (std::abs(l1 - l2) <= inp.L and inp.L <= l1 + l2 and std::min(l1, l2) <= maxell_)
             {
                 std::cout << "(" << l1 << "," << l2 << ") ";
                 states_.push_back(std::make_pair(l1, l2));
