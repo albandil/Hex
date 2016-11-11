@@ -34,7 +34,7 @@
 #include "ang.h"
 
 AngularBasis::AngularBasis (InputFile const & inp)
-    : L_(inp.L), S_(0), Pi_(inp.Pi), maxell_(inp.maxell), maxlambda_(inp.L + 2 * inp.levels)
+    : L_(inp.L), S_(0), Pi_(inp.Pi), maxell_(inp.maxell), maxlambda_(inp.L + inp.Pi + 2 * inp.levels)
 {
     std::cout << "Setting up the coupled angular states..." << std::endl;
     

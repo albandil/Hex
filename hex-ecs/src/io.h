@@ -308,8 +308,8 @@ class InputFile
             // read inputfile
             read(inputfile);
             
-            // maximal angular momentum
-            maxell = levels + L + Pi;
+            // maximal angular momentum (the same for both parities)
+            maxell = levels + L;
         }
         
         // read data from file
