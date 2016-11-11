@@ -8,10 +8,10 @@
 # Compiler and linker + flags                                                  #
 # ---------------------------------------------------------------------------- #
 
-CXX = g++
+CXX ?= g++
 
-CFLAGS = -fopenmp -O2 -Wall -std=c++11 -pedantic-errors -fPIC
-LFLAGS = -fopenmp -O2 -lstdc++
+CFLAGS ?= -fopenmp -O2 -Wall -std=c++11 -pedantic-errors -fPIC
+LFLAGS ?= -fopenmp -O2 -lstdc++
 
 # ---------------------------------------------------------------------------- #
 # GiNaC                                                                        #
