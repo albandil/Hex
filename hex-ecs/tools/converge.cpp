@@ -361,7 +361,7 @@ void converge_energy (calcdata & c)
             // add another angular state
             pcs = c.pcs;
             c.nL++;
-            if (limit >= 0) c.limit++;
+            if (c.limit >= 0) c.limit++;
             calculate(c);
         }
         while (cs_difference(pcs, c.pcs) > tolerance);
