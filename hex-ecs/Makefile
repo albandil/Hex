@@ -9,14 +9,14 @@
 # ---------------------------------------------------------------------------- #
 
 # C++ compiler (g++, clang, ...)
-CXX = g++
+CXX ?= g++
 
 # build mode ("debug" or "release")
-TARGET = release
+TARGET ?= release
 
 # global compiler flags
-CFLAGS = -fopenmp -Wall -mtune=native -march=native -fcx-limited-range -Wno-unknown-pragmas
-LFLAGS = -fopenmp -lstdc++
+CFLAGS ?= -fopenmp -Wall -mtune=native -march=native -fcx-limited-range -Wno-unknown-pragmas
+LFLAGS ?= -fopenmp -lstdc++
 
 # ---------------------------------------------------------------------------- #
 # BLAS & LAPACK                                                                #
