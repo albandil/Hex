@@ -124,7 +124,7 @@ class GPUCGPreconditioner : public virtual KPACGPreconditioner
         // declare own definitions
         virtual void setup ();
         virtual void finish ();
-        virtual void multiply (BlockArray<Complex> const & p, BlockArray<Complex> & q) const;
+        virtual void multiply (BlockArray<Complex> const & p, BlockArray<Complex> & q, MatrixSelection::Selection tri) const;
         virtual void precondition (BlockArray<Complex> const & r, BlockArray<Complex> & z) const;
         
     protected:

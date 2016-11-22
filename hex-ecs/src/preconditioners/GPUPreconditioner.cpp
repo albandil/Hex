@@ -353,12 +353,12 @@ void GPUCGPreconditioner::setup ()
     }
 }
 
-void GPUCGPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Complex> & q) const
+void GPUCGPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Complex> & q, MatrixSelection::Selection tri) const
 {
     if (not cmd_->gpu_multiply)
     {
         // user parent's routine
-        KPACGPreconditioner::multiply(p,q);
+        KPACGPreconditioner::multiply(p,q,tri);
     }
     else
     {
