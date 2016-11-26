@@ -61,7 +61,7 @@ bool LUft_UMFPACK::valid () const
     return numeric_ != nullptr and size() > 0;
 }
 
-double LUft_UMFPACK::cond () const
+Real LUft_UMFPACK::cond () const
 {
     return info_[UMFPACK_RCOND];
 }
@@ -81,14 +81,19 @@ void LUft_UMFPACK::factorize (CsrMatrix<LU_int_t,Complex> const & matrix, LUftDa
     Control[UMFPACK_DROPTOL] = data.drop_tolerance;
     
     // diagnostic information
-    rArray Info (UMFPACK_INFO);
+    double Info[UMFPACK_INFO];
     
     // matrix data
     LU_int_t m = matrix.rows();
     LU_int_t n = matrix.cols();
     p_ = matrix.p();
     i_ = matrix.i();
+#ifndef SINGLE
     x_ = matrix.x();
+#else
+    x_.resize(matrix.x().size());
+    for (std::size_t i = 0; i < x_.size(); i++) x_[i] = Complex(matrix.x()[i].real(), matrix.x()[i].imag());
+#endif
     
     // analyze the sparse structure
     status = UMFPACK_SYMBOLIC_F
@@ -110,7 +115,7 @@ void LUft_UMFPACK::factorize (CsrMatrix<LU_int_t,Complex> const & matrix, LUftDa
     (
         p_.data(), i_.data(),    // column and row indices
         reinterpret_cast<const double*>(x_.data()), 0,    // matrix data
-        Symbolic, &Numeric, Control, &Info[0]    // UMFPACK internals
+        Symbolic, &Numeric, Control, Info    // UMFPACK internals
     );
     if (status != 0)
     {
@@ -135,6 +140,19 @@ void LUft_UMFPACK::solve (const cArrayView b, cArrayView x, int eqs) const
     assert(eqs * N == x.size());
     assert(eqs * N == b.size());
     
+#ifdef SINGLE
+    NumberArray<std::complex<double>> B(b.size()), X(x.size());
+    for (std::size_t i = 0; i < b.size(); i++)
+    {
+        B[i].real(b[i].real());
+        B[i].imag(b[i].imag());
+        X[i].real(x[i].real());
+        X[i].imag(x[i].imag());
+    }
+#else
+    cArrayView B(b), X(x);
+#endif
+    
     // solve for all RHSs
     for (int eq = 0; eq < eqs; eq++)
     {
@@ -150,11 +168,11 @@ void LUft_UMFPACK::solve (const cArrayView b, cArrayView x, int eqs) const
             nullptr,
             
             // solutions (interleaved)
-            reinterpret_cast<double*>(&x[0] + eq * N),
+            reinterpret_cast<double*>(&X[0] + eq * N),
             nullptr,
             
             // right-hand side vectors (interleaved)
-            reinterpret_cast<const double*>(&b[0] + eq * N),
+            reinterpret_cast<const double*>(&B[0] + eq * N),
             nullptr,
             
             numeric_,   // factorization object
@@ -169,6 +187,14 @@ void LUft_UMFPACK::solve (const cArrayView b, cArrayView x, int eqs) const
             UMFPACK_REPORT_STATUS_F(0, status);
         }
     }
+    
+#ifdef SINGLE
+    for (std::size_t i = 0; i < x.size(); i++)
+    {
+        x[i].real(X[i].real());
+        x[i].imag(X[i].imag());
+    }
+#endif
 }
 
 void LUft_UMFPACK::save (std::string name) const

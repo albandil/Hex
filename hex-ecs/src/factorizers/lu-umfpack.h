@@ -104,7 +104,7 @@ class LUft_UMFPACK : public LUft
         virtual void factorize (CsrMatrix<LU_int_t,Complex> const & matrix, LUftData data);
         
         /// Return factorization information.
-        rArray const & info () const { return info_; }
+        NumberArray<double> const & info () const { return info_; }
         
         /// Validity indicator.
         virtual bool valid () const;
@@ -140,7 +140,7 @@ class LUft_UMFPACK : public LUft
     public:
         
         /// Set of status flags produced by UMFPACK.
-        mutable rArray info_;
+        mutable NumberArray<double> info_;
 };
 
 #endif // WITH_UMFPACK
