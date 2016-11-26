@@ -53,13 +53,14 @@ std::string CGPreconditioner::description () const
 int CGPreconditioner::solve_block (int ill, const cArrayView r, cArrayView z) const
 {
     // shorthands
-    int Nspline_inner = rad_->bspline_inner().Nspline();
+    int Nspline_inner_x = rad_->bspline_inner_x().Nspline();
+    int Nspline_inner_y = rad_->bspline_inner_y().Nspline();
     
     // prepare the block-preconditioner for run
     this->CG_init(ill);
     
     // maximal number of nested iterations
-    int max_iterations = Nspline_inner;
+    int max_iterations = Nspline_inner_x + Nspline_inner_y;
     
     // adjust max iterations for ILU-preconditioned blocks
     if (HybCGPreconditioner const * hp = dynamic_cast<HybCGPreconditioner const*>(this))
@@ -186,7 +187,7 @@ void CGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArray<C
         // NOTE : If the BLAS is multi-threaded, this will result in nested parallelism.
         //        Some combinations of system kernel and OpenMP implementation lead to system
         //        freeze. It can be avoided by using a serial BLAS.
-        # pragma omp parallel for schedule (dynamic, 1) if (cmd_.parallel_precondition && cmd_.groupsize == 1)
+        # pragma omp parallel for schedule (dynamic, 1) if (cmd_->parallel_precondition && cmd_->groupsize == 1)
 #endif
         for (int ill = 0; ill < (int)ang_->states().size(); ill++) if (par_->isMyGroupWork(ill))
         {
@@ -237,9 +238,12 @@ void CGPreconditioner::CG_mmul (int iblock, const cArrayView p, cArrayView q) co
 {
     std::memset(q.data(), 0, q.size() * sizeof(Complex));
     
-    std::size_t Nspline_inner = rad_->bspline_inner().Nspline();
-    std::size_t Nspline_full = rad_->bspline_full().Nspline();
-    std::size_t Nspline_outer = Nspline_full - Nspline_inner;
+    std::size_t Nspline_inner_x = rad_->bspline_inner_x().Nspline();
+    std::size_t Nspline_inner_y = rad_->bspline_inner_y().Nspline();
+    std::size_t Nspline_full_x = rad_->bspline_full_x().Nspline();
+    std::size_t Nspline_full_y = rad_->bspline_full_y().Nspline();
+    std::size_t Nspline_outer_x = Nspline_full_x - Nspline_inner_x;
+    std::size_t Nspline_outer_y = Nspline_full_y - Nspline_inner_y;
     std::size_t Nang = ang_->states().size();
     std::size_t iang = iblock * Nang + iblock;
     
@@ -247,8 +251,8 @@ void CGPreconditioner::CG_mmul (int iblock, const cArrayView p, cArrayView q) co
     {
         dynamic_cast<NoPreconditioner const*>(this)->calc_A_block(iblock, iblock).dot
         (
-            1.0_r, cArrayView(p, 0, Nspline_inner * Nspline_inner),
-            1.0_r, cArrayView(q, 0, Nspline_inner * Nspline_inner),
+            1.0_r, cArrayView(p, 0, Nspline_inner_x * Nspline_inner_y),
+            1.0_r, cArrayView(q, 0, Nspline_inner_x * Nspline_inner_y),
             !cmd_->parallel_precondition
         );
     }
@@ -258,8 +262,8 @@ void CGPreconditioner::CG_mmul (int iblock, const cArrayView p, cArrayView q) co
         
         A_blocks_[iang].dot
         (
-            1.0_r, cArrayView(p, 0, Nspline_inner * Nspline_inner),
-            1.0_r, cArrayView(q, 0, Nspline_inner * Nspline_inner),
+            1.0_r, cArrayView(p, 0, Nspline_inner_x * Nspline_inner_y),
+            1.0_r, cArrayView(q, 0, Nspline_inner_x * Nspline_inner_y),
             !cmd_->parallel_precondition
         );
         
@@ -278,8 +282,8 @@ void CGPreconditioner::CG_mmul (int iblock, const cArrayView p, cArrayView q) co
             if (cmd_->outofcore) const_cast<SymBandMatrix<Complex>&>(B1_blocks_[iang][m * Nchan1 + n]).hdfload();
             B1_blocks_[iang][m * Nchan1 + n].dot
             (
-                1.0_r, cArrayView(p, Nspline_inner * Nspline_inner + n * Nspline_outer, Nspline_outer),
-                1.0_r, cArrayView(q, Nspline_inner * Nspline_inner + m * Nspline_outer, Nspline_outer)
+                1.0_r, cArrayView(p, Nspline_inner_x * Nspline_inner_y + n * Nspline_outer_x, Nspline_outer_x),
+                1.0_r, cArrayView(q, Nspline_inner_x * Nspline_inner_y + m * Nspline_outer_x, Nspline_outer_x)
             );
             if (cmd_->outofcore) const_cast<SymBandMatrix<Complex>&>(B1_blocks_[iang][m * Nchan1 + n]).drop();
         }
@@ -291,8 +295,8 @@ void CGPreconditioner::CG_mmul (int iblock, const cArrayView p, cArrayView q) co
             if (cmd_->outofcore) const_cast<SymBandMatrix<Complex>&>(B2_blocks_[iang][m * Nchan2 + n]).hdfload();
             B2_blocks_[iang][m * Nchan2 + n].dot
             (
-                1.0_r, cArrayView(p, Nspline_inner * Nspline_inner + (Nchan1 + n) * Nspline_outer, Nspline_outer),
-                1.0_r, cArrayView(q, Nspline_inner * Nspline_inner + (Nchan1 + m) * Nspline_outer, Nspline_outer)
+                1.0_r, cArrayView(p, Nspline_inner_x * Nspline_inner_y + (Nchan1 + n) * Nspline_outer_y, Nspline_outer_y),
+                1.0_r, cArrayView(q, Nspline_inner_x * Nspline_inner_y + (Nchan1 + m) * Nspline_outer_y, Nspline_outer_y)
             );
             if (cmd_->outofcore) const_cast<SymBandMatrix<Complex>&>(B2_blocks_[iang][m * Nchan2 + n]).drop();
         }

@@ -29,96 +29,74 @@
 //                                                                                   //
 //  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
-#ifndef HEX_MOMENTS
-#define HEX_MOMENTS
+#ifndef HEX_ECS_RADIAL_H
+#define HEX_ECS_RADIAL_H
+
+// --------------------------------------------------------------------------------- //
 
 #include <cmath>
 #include <functional>
 #include <vector>
 
+// --------------------------------------------------------------------------------- //
+
 #include "hex-arrays.h"
 #include "hex-symbandmatrix.h"
 #include "hex-special.h"
+
+// --------------------------------------------------------------------------------- //
 
 #include "bspline.h"
 #include "gauss.h"
 #include "io.h"
 #include "parallel.h"
 
+// --------------------------------------------------------------------------------- //
+
+// This is a hard-coded number of points for Gauss-Legendre quadrature of the radial functions.
 #define EXPANSION_QUADRATURE_POINTS 20
 
+// --------------------------------------------------------------------------------- //
+
+// Complex -> Complex function.
+typedef std::function<Complex(Complex)> CCFunction;
+
+// Complex x Complex -> Complex function.
+typedef std::function<Complex(Complex,Complex)> C2CFunction;
+
+// --------------------------------------------------------------------------------- //
+
 /**
- * Potential suppressing factor. 
- * @param y Radial coordinate of some electron.
- * @param x Radial coordinate of the other electron.
- * @param R Truncation radius.
+ * @brief Class that calculates and manages the radial integrals for given B-spline bases.
+ * 
+ * This class contains important routines for calculation of overlap matrices and matrix elements of various
+ * functions for given B-spline bases. The calculation of the overlaps uses Gauss-Legendre quadrature,
+ * that is to be specified in a form of a preallocated @ref GaussLegendre object.
+ * 
+ * The overlaps considered are one-electron integrals of various one-dimensional functions
+ * (or given arbitrary function) and two-electron overlaps of the multipole elements (or given
+ * adbitrary function).
+ * 
+ * There are two variants of the B-spline basis specified for every axis: the inner basis and the
+ * full basis. These bases can be identical, when no channel reduction is used in the solution
+ * of the scattering equations (typically for above-ionization energies). However, the inner and
+ * outer bases can be different, when the channel reduction will take place.
+ * The inner basis then contains real B-spline knots only and will be used for the full-channel
+ * calculation of the inner problem. The full basis contains the inner basis knots but is generally much longer
+ * and terminated by the ECS complex grid section. This basis is used for solution of energy-allowed channels.
+ * The energy-forbidden channels are thus solved only in the inner basis, which is all right,
+ * because the energy-forbidden channel functions exponentially decrease with the radial distance.
  */
-inline Real damp (Complex y, Complex x, Complex R)
-{
-    // compute hyperradius
-    Real r = std::max(x.real(), y.real());
-    
-    // if sufficiently far, return clean zero
-    if (r > R.real())
-        return 0.;
-    
-    // else damp using tanh(x) distribution
-    return std::tanh(0.125 * (R.real() - r));
-}
-
-class weightEdgeDamp
-{
-    public:
-        
-        // constructor
-        weightEdgeDamp(Bspline const & bspline)
-            : bspline_(bspline) {}
-        
-        // weight function
-        Real operator() (Complex z) const
-        {
-            Real R0 = bspline_.R0();
-            
-            // this will suppress function value from R0-5 onwards
-            // which is useful for expanding (divergent) Ricatti-Bessel function
-            return (z.imag() == 0.) ? (1 + std::tanh(R0 - 5 - z.real()))/2 : 0.;
-        }
-    
-    private:
-        
-        /// B-spline environment
-        Bspline const & bspline_;
-};
-
-class weightEndDamp
-{
-    public:
-        
-        // constructor
-        weightEndDamp (Bspline const & bspline)
-            : bspline_(bspline) {}
-        
-        // weight function
-        Real operator() (Complex z) const
-        {
-            Real Rmax = bspline_.Rmax();
-            
-            // whis will suppress function value at Rmax
-            // which is useful for expanding everywhere-nonzero hydrogenic function
-            return std::tanh(Rmax - z.real());
-        }
-        
-    private:
-        
-        /// B-spline environment
-        Bspline const & bspline_;
-};
-
 class RadialIntegrals
 {
     public:
         
-        // constructor
+        /**
+         * @brief Constructor for idential bases.
+         * 
+         * This constructor will initialize the RadialIntegrals object assuming that the radial
+         * B-spline bases for both axes are identical.
+         */
         RadialIntegrals
         (
             Bspline const & bspline_inner,
@@ -126,12 +104,66 @@ class RadialIntegrals
             int Nlambdas
         );
         
-        // public callable members
+        /**
+         * @brief Constructor for distinct bases.
+         * 
+         * This constructor will initialize the RadialIntegrals object with different B-spline
+         * bases for every axis.
+         */
+        RadialIntegrals
+        (
+            Bspline const & bspline_x_inner,
+            Bspline const & bspline_x_full,
+            Bspline const & bspline_y_inner,
+            Bspline const & bspline_y_full,
+            int Nlambdas
+        );
+        
+        /**
+         * @brief Calculate one-electron integral matrices.
+         * 
+         * This function will calculate the common one-electron overlap matrices
+         * S, D, Mm1, Mm2. The parameters @c sharedscratch and @c iammaster are used
+         * when writing the results to disk to avoid multiple processes writing
+         * the same file.
+         */
+        void setupOneElectronIntegrals (bool sharedscratch = false, bool iammaster = true);
+        
+        /**
+         * @brief Calculate one-electron integral matrices.
+         * 
+         * This function calls the other @ref setupOneElectronIntegrals with the
+         * appropriate parameters.
+         */
         void setupOneElectronIntegrals (Parallel const & par, CommandLine const & cmd);
+        
+        /**
+         * @brief Calculate the two-electron integral matrix.
+         * 
+         * This function will calculate the two-electron multipole overlap
+         * matrices.
+         */
         void setupTwoElectronIntegrals (Parallel const & par, CommandLine const & cmd);
         
-        // verbosity control
+        /**
+         * @brief Verbosity control.
+         * 
+         * Setting this to false will inhibit standard output messages from this class.
+         */
         void verbose (bool v) { verbose_ = v; }
+        
+        /**
+         * @brief Maximal multipole moment.
+         *
+         * Returns maximal multipole (also known as "angular momentum transfer"),
+         * for which there are precomputed two-electron integrals.
+         */
+        int maxlambda () const { return Nlambdas_ - 1; }
+        
+        // compute overlap matrix of radial function
+        Complex computeOverlapMatrixElement_iknot (Bspline const & bspline, GaussLegendre const & g, int i, int j, CCFunction func, int iknot) const;
+        Complex computeOverlapMatrixElement (Bspline const & bspline, GaussLegendre const & g, int i, int j, CCFunction func) const;
+        SymBandMatrix<Complex> computeOverlapMatrix (Bspline const & bspline, CCFunction func) const;
         
         /**
          * @brief Partial derivative overlap.
@@ -144,7 +176,8 @@ class RadialIntegrals
          */
         Complex computeD_iknot
         (
-            Bspline const & bspline, GaussLegendre const & g,
+            Bspline const & bspline,
+            GaussLegendre const & g,
             int i, int j, int iknot
         ) const;
         
@@ -158,16 +191,8 @@ class RadialIntegrals
          */
         Complex computeD
         (
-            Bspline const & bspline, GaussLegendre const & g,
-            int i, int j, int maxknot = -1
-        ) const;
-        
-        /// Calculate inter-basis overlap between two B-splines.
-        Complex computeS12
-        (
+            Bspline const & bspline,
             GaussLegendre const & g,
-            Bspline const & bspline1,
-            Bspline const & bspline2,
             int i, int j
         ) const;
         
@@ -185,9 +210,12 @@ class RadialIntegrals
          */
         Complex computeM_iknot
         (
-            Bspline const & bspline, GaussLegendre const & g,
+            Bspline const & bspline,
+            GaussLegendre const & g,
             int a, int i, int j,
-            int iknot, Complex R, Real scale
+            int iknot,
+            CCFunction weight,
+            Real scale
         ) const;
         
         /**
@@ -202,9 +230,11 @@ class RadialIntegrals
          */
         Complex computeM
         (
-            Bspline const & bspline, GaussLegendre const & g,
+            Bspline const & bspline,
+            GaussLegendre const & g,
             int a, int i, int j,
-            int maxknot = -1, bool scale = false
+            bool truncate = false,
+            bool scale = false
         ) const;
         
         /**
@@ -225,32 +255,23 @@ class RadialIntegrals
             int a
         ) const;
         
+        /**
+         * @brief Two-electron integral for multipole @f$ lambda @f$ - diagonal knots contribution.
+         * 
+         * The two-electron integral calculated using @ref computeR is calculated
+         * as a sum of contributions from individual 2D parcels bounded by Cartesian product
+         * of the relevant knots. The two-electron integral on a chosen parcel often separates
+         * to a product of one-dimensional integrals. This function returns the contribution from
+         * all 2D knot parcels, where it does NOT separate.
+         */
         cArray diagonalR (int lambda) const;
         
         /**
-         * @brief Two-electron integral.
+         * @brief Two-electron integral for multipole @f$ lambda @f$.
          * 
          * Compute the two-electron (Slater-type) four-B-spline integral.
-         * 
-         * @param lambda Multipole degree.
-         * @param i First (x-dependent) B-spline index.
-         * @param j Second (y-dependent) B-spline index.
-         * @param k Third (x-dependent) B-spline index.
-         * @param l Fourth (y-dependent) B-spline index.
-         * @param Mtr_L Logarithms of R₀-truncated partial moments.
-         * @param Mtr_mLm1 Logarithms of R₀-truncated partial moments.
-         * 
-         * Given the R-type integral symmetry, following calls will produce identical results:
-         * 
-         * @code
-         * computeR(lambda, i, j, k, l);
-         * computeR(lambda, j, i, l, k);
-         * computeR(lambda, k, j, i, l);
-         * computeR(lambda, i, l, k, j);
-         * computeR(lambda, k, l, i, j);
-         * @endcode
-         * 
-         * @return Value of Rtr.
+         * Uses the "diagonal" contribution from @ref diagonalR and the off-diagonal
+         * contributions calculated from products of the partial moments.
          */
         Complex computeR
         (
@@ -279,7 +300,12 @@ class RadialIntegrals
          * @param iknot Integration interval (t[iknot] ... t[iknot+1]).
          * @param iknotmax Truncation knot for use in damping factor.
          */
-        Complex computeRdiag (int L, int a, int b, int c, int d, int iknot, int iknotmax) const;
+        Complex computeRdiag
+        (
+            int L,
+            int a, int b, int c, int d,
+            int iknot, int iknotmax
+        ) const;
         
         /**
          * @brief Triangular R-integral.
@@ -372,160 +398,18 @@ class RadialIntegrals
             int L, int iknot, int iknotmax
         ) const;
         
-        /** 
-         * @brief Compute B-spline overlaps of arbitrary function.
-         * 
-         * @param bspline B-spline basis.
-         * @param g Gauss-Legendre integrator adapted to the B-spline basis.
-         * @param funct Some one-dimensional function (Complex -> Complex).
-         * @param weightf Weight function to multiply every value of the hydrogenic function (Complex -> Real).
-         */
-        cArray overlap (Bspline const & bspline, GaussLegendre const & g, std::function<Complex(Complex)> funct, std::function<Real(Complex)> weightf) const;
-        
-        /** 
-         * @brief Compute P-overlaps
-         * 
-         * Compute overlap vector of B-splines vs. hydrogen Pnl function.
-         * 
-         * @param bspline B-spline basis.
-         * @param g Gauss-Legendre integrator adapted to the B-spline basis.
-         * @param n Principal quantum number.
-         * @param l Orbital quantum number.
-         * @param weightf Weight function to multiply every value of the hydrogenic function (Complex -> Real).
-         */
-        cArray overlapP (Bspline const & bspline, GaussLegendre const & g, int n, int l, std::function<Real(Complex)> weightf) const;
-
-        /**
-         * @brief Compute j-overlaps
-         * 
-         * Compute B-spline overlap integrals for Riccati-Bessel function.
-         * 
-         * @param maxell Maximal degree of the Riccati-Bessel function.
-         * @param vk Array containing linear momenta.
-         * @param weightf Weight function to multiply every value of the Bessel function (Complex -> Real).
-         * @return Array of shape [vk.size() × (maxell + 1) × Nspline] in column-major format.
-         */
-        cArray overlapj (Bspline const & bspline, GaussLegendre const & g, int maxell, const rArrayView vk, std::function<Real(Complex)> weightf, bool fast_bessel = false) const;
-        
-        /// Return reference to the B-spline object.
-        Bspline const & bspline_inner () const { return bspline_inner_; }
-        Bspline const & bspline_full  () const { return bspline_full_ ; }
-        
-        /// Return the Gauss-Legendre integrator object.
-        GaussLegendre const & gaussleg_inner () const { return g_inner_; }
-        GaussLegendre const & gaussleg_full  () const { return g_full_ ; }
-        
-        /// Return reference to the precomputed derivative overlap matrix.
-        SymBandMatrix<Complex> const & D_inner () const { return D_inner_; }
-        SymBandMatrix<Complex> const & D_full  () const { return D_full_; }
-        
-        /// Return reference to the precomputed overlap matrix.
-        SymBandMatrix<Complex> const & S_inner () const { return S_inner_; }
-        SymBandMatrix<Complex> const & S_full  () const { return S_full_ ; }
-        
-        /// Return reference to the precomputed integral moment matrix of order -1.
-        SymBandMatrix<Complex> const & Mm1_inner () const { return Mm1_inner_; }
-        SymBandMatrix<Complex> const & Mm1_full  () const { return Mm1_full_ ; }
-        
-        /// Return reference to the precomputed integral moment matrix of order -1, truncated at the end of the real grid.
-        SymBandMatrix<Complex> const & Mm1_tr_inner () const { return Mm1_tr_inner_; }
-        SymBandMatrix<Complex> const & Mm1_tr_full  () const { return Mm1_tr_full_ ; }
-        
-        /// Return reference to the precomputed integral moment matrix of order -2.
-        SymBandMatrix<Complex> const & Mm2_inner () const { return Mm2_inner_; }
-        SymBandMatrix<Complex> const & Mm2_full  () const { return Mm2_full_ ; }
-        
-        /// Return reference to the precomputed array of diagonal contributions to two-electron integrals.
-        cArray const & R_tr_dia_diag (unsigned i) const
-        {
-            assert(i < R_tr_dia_diag_.size());
-            return R_tr_dia_diag_[i];
-        }
-        
-        /// Return reference to the precomputed matrix of two-electron integrals for given multipole.
-        BlockSymBandMatrix<Complex> const & R_tr_dia (unsigned i) const
-        {
-            assert(i < R_tr_dia_.size());
-            return R_tr_dia_[i];
-        }
-        
-        /// Return reference to precomputed full (scaled) integral moments of order L.
-        SymBandMatrix<Complex> const & Mtr_L_inner (int L) const { return Mtr_L_inner_[L]; }
-        SymBandMatrix<Complex> const & Mtr_L_full  (int L) const { return Mtr_L_full_ [L]; }
-        
-        /// Return reference to precomputed full (scaled) integral moments of order -L-1.
-        SymBandMatrix<Complex> const & Mtr_mLm1_inner (int L) const { return Mtr_mLm1_inner_[L]; }
-        SymBandMatrix<Complex> const & Mtr_mLm1_full  (int L) const { return Mtr_mLm1_full_ [L]; }
-        
-        /// Return view of precomputed partial integral moments of order L.
-        cArrayView Mitr_L_inner (int L) const
-        {
-            if (L < 0)
-                return Mitr_L_inner_;
-            
-            std::size_t mi_size = bspline_inner_.Nspline() * (2 * bspline_inner_.order() + 1) * (bspline_inner_.order() + 1);
-            
-            return cArrayView
-            (
-                Mitr_L_inner_,
-                L * mi_size,
-                mi_size
-            );
-        }
-        
-        cArrayView Mitr_L_full (int L) const
-        {
-            if (L < 0)
-                return Mitr_L_full_;
-            
-            std::size_t mi_size = bspline_full_.Nspline() * (2 * bspline_full_.order() + 1) * (bspline_full_.order() + 1);
-            
-            return cArrayView
-            (
-                Mitr_L_full_,
-                L * mi_size,
-                mi_size
-            );
-        }
-        
-        /// Return view of precomputed partial integral moments of order -L-1.
-        cArrayView Mitr_mLm1_inner (int L) const
-        {
-            if (L < 0)
-                return Mitr_mLm1_inner_;
-            
-            std::size_t mi_size = bspline_inner_.Nspline() * (2 * bspline_inner_.order() + 1) * (bspline_inner_.order() + 1);
-            
-            return cArrayView
-            (
-                Mitr_mLm1_inner_,
-                L * mi_size,
-                mi_size
-            );
-        }
-        
-        cArrayView Mitr_mLm1_full (int L) const
-        {
-            if (L < 0)
-                return Mitr_mLm1_full_;
-            
-            std::size_t mi_size = bspline_full_.Nspline() * (2 * bspline_full_.order() + 1) * (bspline_full_.order() + 1);
-            
-            return cArrayView
-            (
-                Mitr_mLm1_full_,
-                L * mi_size,
-                mi_size
-            );
-        }
-        
         /**
          * @brief Calculate particular sub-matrix of the radial integrals matrix.
          * 
          * Calculate particular sub-matrix of the radial integrals matrix (with block indices "i" and "k")
          * and return it in a form of a dense array (copying structure of the overlap matrix).
          */
-        SymBandMatrix<Complex> calc_R_tr_dia_block (unsigned lambda, int i, int k, bool simple = false) const;
+        SymBandMatrix<Complex> calc_R_tr_dia_block
+        (
+            unsigned lambda,
+            int i, int k,
+            bool simple = false
+        ) const;
         
         /**
          * @brief Multiply vector by matrix of two-electron integrals.
@@ -545,39 +429,186 @@ class RadialIntegrals
             bool simple = false
         ) const;
         
-        /// Return maximal multipole, for which there are precomputed two-electron integrals.
-        int maxlambda () const { return Nlambdas_ - 1; }
+        /** 
+         * @brief Compute B-spline overlaps of arbitrary one-dimensional function.
+         * 
+         * @param bspline B-spline basis.
+         * @param g Gauss-Legendre integrator adapted to the B-spline basis.
+         * @param funct Some one-dimensional function (Complex -> Complex).
+         */
+        cArray overlap
+        (
+            Bspline const & bspline,
+            GaussLegendre const & g,
+            CCFunction funct
+        ) const;
+        
+        /** 
+         * @brief Compute B-spline overlaps of arbitrary two-dimensional function.
+         * 
+         * @param bsplinex B-spline basis for x-axis.
+         * @param gx Gauss-Legendre integrator adapted to the B-spline basis for x-axis.
+         * @param bspliney B-spline basis for y-axis.
+         * @param gy Gauss-Legendre integrator adapted to the B-spline basis for y-axis.
+         * @param funct Some one-dimensional function (Complex x Complex -> Complex).
+         */
+        cArray overlap
+        (
+            Bspline const & bsplinex,
+            GaussLegendre const & gx,
+            Bspline const & bspliney,
+            GaussLegendre const & gy,
+            C2CFunction funct
+        ) const;
+        
+        /** 
+         * @brief Compute P-overlaps
+         * 
+         * Compute overlap vector of B-splines vs. hydrogen Pnl function.
+         * 
+         * @param bspline B-spline basis.
+         * @param g Gauss-Legendre integrator adapted to the B-spline basis.
+         * @param n Principal quantum number.
+         * @param l Orbital quantum number.
+         * @param weightf Weight function to multiply every value of the hydrogenic function (Complex -> Real).
+         */
+        cArray overlapP
+        (
+            Bspline const & bspline,
+            GaussLegendre const & g,
+            int n, int l
+        ) const;
+        
+        /**
+         * @brief Compute j-overlaps
+         * 
+         * Compute B-spline overlap integrals for Riccati-Bessel function.
+         * 
+         * @param maxell Maximal degree of the Riccati-Bessel function.
+         * @param vk Array containing linear momenta.
+         * @param weightf Weight function to multiply every value of the Bessel function (Complex -> Real).
+         * @return Array of shape [vk.size() × (maxell + 1) × Nspline] in column-major format.
+         */
+        cArray overlapj
+        (
+            Bspline const & bspline,
+            GaussLegendre const & g,
+            int maxell,
+            const rArrayView vk,
+            bool fast_bessel = false
+        ) const;
+        
+        // Return reference to the B-spline object.
+        Bspline const & bspline_inner_x () const { return bspline_inner_x_; }
+        Bspline const & bspline_full_x  () const { return bspline_full_x_ ; }
+        Bspline const & bspline_inner_y () const { return bspline_inner_y_; }
+        Bspline const & bspline_full_y  () const { return bspline_full_y_ ; }
+        
+        // Return the Gauss-Legendre integrator object.
+        GaussLegendre const & gaussleg_inner_x () const { return g_inner_x_; }
+        GaussLegendre const & gaussleg_full_x  () const { return g_full_x_ ; }
+        GaussLegendre const & gaussleg_inner_y () const { return g_inner_y_; }
+        GaussLegendre const & gaussleg_full_y  () const { return g_full_y_ ; }
+        
+        #define OneElectronMatrixAccessors(M) \
+            SymBandMatrix<Complex> const & M##_inner_x () const { return M##_inner_x_; } \
+            SymBandMatrix<Complex> const & M##_full_x  () const { return M##_full_x_; } \
+            SymBandMatrix<Complex> const & M##_inner_y () const { return M##_inner_y_; } \
+            SymBandMatrix<Complex> const & M##_full_y  () const { return M##_full_y_; } \
+            Complex M##_inner_x (std::size_t i, std::size_t j) const { return M##_inner_x_(i,j); } \
+            Complex M##_full_x  (std::size_t i, std::size_t j) const { return M##_full_x_(i,j);  } \
+            Complex M##_inner_y (std::size_t i, std::size_t j) const { return M##_inner_y_(i,j); } \
+            Complex M##_full_y  (std::size_t i, std::size_t j) const { return M##_full_y_(i,j);  }
+        
+        // Access the precomputed one-electron overlap matrices.
+        OneElectronMatrixAccessors(D)
+        OneElectronMatrixAccessors(S)
+        OneElectronMatrixAccessors(Mm1_tr)
+        OneElectronMatrixAccessors(Mm2)
+        
+        #define OneElectronMatrixArrayAccessors(M) \
+            SymBandMatrix<Complex> const & M##_inner_x (int L) const { return M##_inner_x_[L]; } \
+            SymBandMatrix<Complex> const & M##_full_x  (int L) const { return M##_full_x_ [L]; } \
+            SymBandMatrix<Complex> const & M##_inner_y (int L) const { return M##_inner_y_[L]; } \
+            SymBandMatrix<Complex> const & M##_full_y  (int L) const { return M##_full_y_ [L]; } \
+            Complex M##_inner_x (int L, std::size_t i, std::size_t j) const { return M##_inner_x_[L](i,j); } \
+            Complex M##_full_x  (int L, std::size_t i, std::size_t j) const { return M##_full_x_ [L](i,j); } \
+            Complex M##_inner_y (int L, std::size_t i, std::size_t j) const { return M##_inner_y_[L](i,j); } \
+            Complex M##_full_y  (int L, std::size_t i, std::size_t j) const { return M##_full_y_ [L](i,j); }
+        
+        // Access the precomputed scaled full integral moments of order L / -L-1.
+        OneElectronMatrixArrayAccessors(Mtr_L)
+        OneElectronMatrixArrayAccessors(Mtr_mLm1)
+        
+        #define OneElectronPartialMatrixAccessors(M) \
+            cArrayView M##_inner_x (int L = -1) const \
+            { \
+                if (L < 0) return M##_inner_x_; \
+                std::size_t mi_size = bspline_inner_x_.Nspline() * (2 * bspline_inner_x_.order() + 1) * (bspline_inner_x_.order() + 1); \
+                return cArrayView (M##_inner_x_, L * mi_size, mi_size); \
+            } \
+            cArrayView M##_inner_y (int L = -1) const \
+            { \
+                if (L < 0) return M##_inner_y_; \
+                std::size_t mi_size = bspline_inner_y_.Nspline() * (2 * bspline_inner_y_.order() + 1) * (bspline_inner_y_.order() + 1); \
+                return cArrayView (M##_inner_y_, L * mi_size, mi_size); \
+            } \
+            cArrayView M##_full_x (int L = -1) const \
+            { \
+                if (L < 0) return M##_full_x_; \
+                std::size_t mi_size = bspline_full_x_.Nspline() * (2 * bspline_full_x_.order() + 1) * (bspline_full_x_.order() + 1); \
+                return cArrayView (M##_full_x_, L * mi_size, mi_size); \
+            } \
+            cArrayView M##_full_y (int L = -1) const \
+            { \
+                if (L < 0) return M##_full_y_; \
+                std::size_t mi_size = bspline_full_y_.Nspline() * (2 * bspline_full_y_.order() + 1) * (bspline_full_y_.order() + 1); \
+                return cArrayView (M##_full_y_, L * mi_size, mi_size); \
+            }
+        
+        // Access the precomputed scaled partial overlap matrices of order L / -L-1.
+        OneElectronPartialMatrixAccessors(Mitr_L)
+        OneElectronPartialMatrixAccessors(Mitr_mLm1)
+        
+        // Return reference to the precomputed array of diagonal contributions to two-electron integrals.
+        cArray const & R_tr_dia_diag (unsigned i) const { return R_tr_dia_diag_[i]; }
+        
+        // Return reference to the precomputed matrix of two-electron integrals for given multipole.
+        BlockSymBandMatrix<Complex> const & R_tr_dia (unsigned i) const { return R_tr_dia_[i]; }
         
     private:
         
         // B-spline environment
-        Bspline const & bspline_inner_;
-        Bspline const & bspline_full_;
+        Bspline bspline_inner_x_, bspline_full_x_;
+        Bspline bspline_inner_y_, bspline_full_y_;
         
         // Gauss-Legendre integrator
-        GaussLegendre g_inner_;
-        GaussLegendre g_full_;
+        GaussLegendre g_inner_x_, g_inner_y_;
+        GaussLegendre g_full_x_, g_full_y_;
         
         // one-electron moment and overlap matrices
-        SymBandMatrix<Complex> D_inner_, S_inner_, Mm1_inner_, Mm1_tr_inner_, Mm2_inner_;
-        SymBandMatrix<Complex> D_full_, S_full_, Mm1_full_, Mm1_tr_full_, Mm2_full_;
-        
-        // inter-basis overlaps
-        RowMatrix<Complex> S12_, S21_;
+        SymBandMatrix<Complex> D_inner_x_, S_inner_x_, Mm1_inner_x_, Mm1_tr_inner_x_, Mm2_inner_x_;
+        SymBandMatrix<Complex> D_inner_y_, S_inner_y_, Mm1_inner_y_, Mm1_tr_inner_y_, Mm2_inner_y_;
+        SymBandMatrix<Complex> D_full_x_, S_full_x_, Mm1_full_x_, Mm1_tr_full_x_, Mm2_full_x_;
+        SymBandMatrix<Complex> D_full_y_, S_full_y_, Mm1_full_y_, Mm1_tr_full_y_, Mm2_full_y_;
         
         // one-electron full integral moments for various orders (used to calculate R-integrals)
-        std::vector<SymBandMatrix<Complex>> Mtr_L_inner_, Mtr_mLm1_inner_;
-        std::vector<SymBandMatrix<Complex>> Mtr_L_full_, Mtr_mLm1_full_;
+        std::vector<SymBandMatrix<Complex>> Mtr_L_inner_x_, Mtr_mLm1_inner_x_;
+        std::vector<SymBandMatrix<Complex>> Mtr_L_inner_y_, Mtr_mLm1_inner_y_;
+        std::vector<SymBandMatrix<Complex>> Mtr_L_full_x_, Mtr_mLm1_full_x_;
+        std::vector<SymBandMatrix<Complex>> Mtr_L_full_y_, Mtr_mLm1_full_y_;
         
         // partial one-electron integral moments for various orders (used to calculate R-integrals)
-        cArray Mitr_L_inner_, Mitr_mLm1_inner_;
-        cArray Mitr_L_full_, Mitr_mLm1_full_;
+        cArray Mitr_L_inner_x_, Mitr_mLm1_inner_x_;
+        cArray Mitr_L_inner_y_, Mitr_mLm1_inner_y_;
+        cArray Mitr_L_full_x_, Mitr_mLm1_full_x_;
+        cArray Mitr_L_full_y_, Mitr_mLm1_full_y_;
         
         // diagonal contributions to R_tr_dia
         cArrays R_tr_dia_diag_;
         
         // two-electron integral matrices
-        Array<BlockSymBandMatrix<Complex>> R_tr_dia_;
+        std::vector<BlockSymBandMatrix<Complex>> R_tr_dia_;
         
         // verbose output
         bool verbose_;
@@ -586,4 +617,4 @@ class RadialIntegrals
         int Nlambdas_;
 };
 
-#endif
+#endif // HEX_ECS_RADIAL_H

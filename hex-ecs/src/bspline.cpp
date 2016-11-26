@@ -112,113 +112,35 @@ void Bspline::B (int i, int iknot, int M, Complex const * const restrict x, Comp
     unsigned ithread = 0;
 #endif
     
-    //
-    // a) Use real arithmetic when using only real knots. Allow SIMD auto-vectorization.
-    //
+    // value of the parent B-splines of the requested B-spline
+    Complex * const restrict b = reinterpret_cast<Complex*>(work_[ithread].data());
     
-    if (i + order_ + 1 < Nreknot_)
+    // initialize zero-order B-splines
+    for (int n = 0; n <= order_; n++)
+    for (int m = 0; m < M; m++)
+        b[n * M + m] = (i + n == iknot ? 1. : 0.);
+    
+    // calculate higher orders
+    for (int ord = 1; ord <= order_; ord++)
     {
-        // number of needed SIMD vectors for M reals
-        int nvec = (M + simd_real_vec_size - 1) / simd_real_vec_size;
-        
-        // copy real parts of the evaluation points, pad by zeros
-        Real * const restrict rx = (Real*)assume_aligned(work_[ithread].data(), NumberArray<Real>::Alloc::alignment);
-        // --- v --- likely to autovectorize --- v ---
-        for (int m = 0; m < nvec * (int)simd_real_vec_size; m++)
-            rx[m] = (m < M ? x[m].real() : 0);
-        // --- ^ --- likely to autovectorize --- ^ ---
-        
-        // evaluations of the parent B-splines of the wanted B-spline
-        Real * const restrict b = (Real*)assume_aligned(rx + nvec * simd_real_vec_size, NumberArray<Real>::Alloc::alignment);
-        
-        // initialize all ancestral zero-order B-splines
-        for (int n = 0; n <= order_; n++)
+        // update splines
+        for (int n = 0; n <= order_ - ord; n++)
         {
-            // determine value of the zero-order B-spline B_n on interval (t[iknot],t[iknot+1])
-            Real val = (n + i == iknot ? 1. : 0.);
+            Complex invden1 = (t_[i+ord+n]   == t_[i+n]   ? 0.0_r : 1.0_r / (t_[i+ord+n]   - t_[i+n]));
+            Complex invden2 = (t_[i+ord+n+1] == t_[i+n+1] ? 0.0_r : 1.0_r / (t_[i+ord+n+1] - t_[i+n+1]));
             
-            // store the value at all points
-            for (int m = 0; m < nvec; m++)
-            {
-                Real * const restrict pb = (Real*)assume_aligned(b + (m + n * nvec) * simd_real_vec_size, NumberArray<Real>::Alloc::alignment);
-                
-                // --- v --- likely to autovectorize --- v ---
-                for (unsigned v = 0; v < simd_real_vec_size; v++)
-                    pb[v] = val;
-                // --- ^ --- likely to autovectorize --- ^ ---
-            }
-        }
-        
-        // precomputed denominators (used later)
-        Real * const restrict invden = b + (order_ + 1) * nvec * simd_real_vec_size;
-        
-        // real knots restricted pointer (for fast access)
-        Real const * const restrict rknots = rknots_.data();
-        
-        // calculate B-splines of higher orders
-        for (int ord = 1; ord <= order_; ord++)
-        {
-            // precompute denominators
-            for (int n = 0; n <= order_ - ord + 1; n++)
-                invden[n] = (rknots[i+ord+n] == rknots[i+n] ? 0. : 1. / (rknots[i+ord+n] - rknots_[i+n]));
+            Complex * const restrict pb  = b +  n      * M;
+            Complex * const restrict pbn = b + (n + 1) * M;
             
-            // evaluate B-splines from lower orders
-            for (int n = 0; n <= order_ - ord; n++)
-            for (int m = 0; m < nvec; m++)
-            {
-                Real * const restrict pb  = (Real*)assume_aligned(b  + (m +  n      * nvec) * simd_real_vec_size, NumberArray<Real>::Alloc::alignment);
-                Real * const restrict pbn = (Real*)assume_aligned(b  + (m + (n + 1) * nvec) * simd_real_vec_size, NumberArray<Real>::Alloc::alignment);
-                Real * const restrict pr  = (Real*)assume_aligned(rx +  m                   * simd_real_vec_size, NumberArray<Real>::Alloc::alignment);
-                
-                // --- v --- likely to autovectorize --- v ---
-                for (unsigned v = 0; v < simd_real_vec_size; v++)
-                    pb[v] = pb[v] * (pr[v] - rknots[i+n]) * invden[n] + pbn[v] * (rknots[i+ord+n+1] - pr[v]) * invden[n+1];
-                // --- ^ --- likely to autovectorize --- ^ ---
-            }
+            // for all evaluation points
+            for (int m = 0; m < M; m++)
+                pb[m] = pb[m] * (x[m] - t_[i+n]) * invden1 + pbn[m] * (t_[i+ord+n+1] - x[m]) * invden2;
         }
-        
-        // return the collected value of the requested B-spline
-        for (int m = 0; m < M; m++)
-            y[m] = b[m];
     }
     
-    //
-    // b) Use complex arithmetic otherwise.
-    //
-    
-    else
-    {
-        // value of the parent B-splines of the requested B-spline
-        Complex * const restrict b = reinterpret_cast<Complex*>(work_[ithread].data());
-        
-        // initialize zero-order B-splines
-        for (int n = 0; n <= order_; n++)
-        for (int m = 0; m < M; m++)
-            b[n * M + m] = (i + n == iknot ? 1. : 0.);
-        
-        // calculate higher orders
-        for (int ord = 1; ord <= order_; ord++)
-        {
-            // update splines
-            for (int n = 0; n <= order_ - ord; n++)
-            {
-                Complex invden1 = (t_[i+ord+n]   == t_[i+n]   ? 0.0_r : 1.0_r / (t_[i+ord+n]   - t_[i+n]));
-                Complex invden2 = (t_[i+ord+n+1] == t_[i+n+1] ? 0.0_r : 1.0_r / (t_[i+ord+n+1] - t_[i+n+1]));
-                
-                Complex * const restrict pb  = b +  n      * M;
-                Complex * const restrict pbn = b + (n + 1) * M;
-                
-                // for all evaluation points
-                for (int m = 0; m < M; m++)
-                    pb[m] = pb[m] * (x[m] - t_[i+n]) * invden1 + pbn[m] * (t_[i+ord+n+1] - x[m]) * invden2;
-            }
-        }
-        
-        // return the collected value of the requested B-spline
-        for (int m = 0; m < M; m++)
-            y[m] = b[m];
-    }
-
+    // return the collected value of the requested B-spline
+    for (int m = 0; m < M; m++)
+        y[m] = b[m];
 }
 
 void Bspline::dB (int i, int iknot, int n, Complex const * const restrict x, Complex * const restrict y) const
@@ -426,33 +348,48 @@ cArray Bspline::zip (const cArrayView coeff, const rArrayView xgrid, const rArra
 // ----------------------------------------------------------------------- //
 
 
-Bspline::Bspline (int order, rArrayView const & rknots, Real th, rArrayView const & cknots)
-    : rknots_(rknots),
-      cknots_(cknots),
-      t_(nullptr),
+Bspline::Bspline
+(
+    int order,
+    Real th,
+    rArrayView cknots1,
+    rArrayView rknots,
+    rArrayView cknots2
+)   : rknots_(rknots),
+      cknots1_(cknots1),
+      cknots2_(cknots2),
+      t_(),
       theta_(th),
       rotation_(Complex(cos(th),sin(th))),
-      R0_(rknots_.empty() ? 0 : rknots_.back()),
-      Rmax_(cknots_.empty() ? R0_ : cknots_.back()),
-      Nknot_(rknots.size() + cknots.size() - 1),
+      R1_(rknots_.empty() ? 0 : rknots_.front()),
+      R2_(rknots_.empty() ? 0 : rknots_.back()),
+      Rmin_(cknots1_.empty() ? R1_ : cknots1_.front()),
+      Rmax_(cknots2_.empty() ? R2_ : cknots2_.back()),
+      Nknot_(rknots.size() + (cknots1.empty() ? 0 : cknots1.size() - 1) + (cknots2.empty() ? 0 : cknots2.size() - 1)),
       Nreknot_(rknots.size()),
       Nspline_(Nknot_ > order + 1 ? Nknot_ - order - 1 : 0),
       Nintval_(Nknot_ > 1 ? Nknot_ - 1 : 0),
       order_(order)
 {
-    // real and complex knot counts; both include the knot R₀
-    int rknots_len = rknots.size();
-    int cknots_len = cknots.size();
+    // check connection of knots
+    if (not cknots1.empty() and not rknots.empty() and cknots1.back() != rknots.front())
+        HexException("Last knot of leading complex knots must be equal to the first real knot.");
+    if (not cknots2.empty() and not rknots.empty() and cknots2.front() != rknots.back())
+        HexException("First knot of trailing complex knots must be equal to the last real knot.");
+    if (rknots.empty() and not cknots1.empty() and not cknots2.empty() and cknots1.back() != cknots2.front())
+        HexException("First knot of trailing complex knots must be equal to the last knot of leading complex knots.");
     
-    // join the sequences; rotate the complex one
-    if (rknots_len + cknots_len > 0)
-    {
-        t_ = new Complex [rknots_len + cknots_len - 1];
-        for (int i = 0; i < rknots_len; i++)
-            t_[i] = rknots[i];
-        for (int i = 1; i < cknots_len; i++)
-            t_[i + rknots_len - 1] = rotate(cknots[i]);
-    }
+    // merge knots
+    rArray knots;
+    knots.append(cknots1);
+    if (not cknots1.empty()) knots.pop_back();
+    knots.append(rknots);
+    if (not rknots.empty()) knots.pop_back();
+    knots.append(cknots2);
+    
+    // rotate knots
+    for (Real t : knots)
+        t_.push_back(rotate(t));
     
     // allocate workspace for all threads
     unsigned nthreads = 1;
@@ -465,24 +402,6 @@ Bspline::Bspline (int order, rArrayView const & rknots, Real th, rArrayView cons
         work_.push_back(rArray(work_size_));
 }
 
-Bspline::Bspline (Bspline && bspline)
-    : rknots_(std::move(bspline.rknots_)),
-      cknots_(std::move(bspline.cknots_)),
-      t_(nullptr), theta_(bspline.theta_), rotation_(bspline.rotation_),
-      R0_(bspline.R0_), Rmax_(bspline.Rmax_), Nknot_(bspline.Nknot_),
-      Nreknot_(bspline.Nreknot_), Nspline_(bspline.Nspline_), Nintval_(bspline.Nintval_),
-      order_(bspline.order_), work_(std::move(bspline.work_))
-{
-    std::swap(t_, bspline.t_);
-}
-
-Bspline::~Bspline ()
-{
-    if (t_ != nullptr)
-        delete [] t_;
-    t_ = nullptr;
-}
-
 
 // ----------------------------------------------------------------------- //
 //  Others                                                                 //
@@ -491,20 +410,28 @@ Bspline::~Bspline ()
 
 int Bspline::knot (Complex x) const
 {
-    // get "lower" bound by bisection (will return the first equal or greater element)
-    Complex* iknot_notless = std::lower_bound
+    // empty grid contains no knots
+    if (t_.empty())
+        return -1;
+    
+    // boundary search first so that we don't need to consider it below
+    if (x.real() == t_.front().real()) return 0;
+    if (x.real() == t_.back().real())  return Nknot_ - 1;
+    
+    // is the point inside the grid at all?
+    if (x.real() < t_.front().real() or t_.back().real() < x.real())
+        return -1;
+    
+    // the point 'x' is now strictly inside the knot sequence 't_'
+    // - let's find the first greater knot by bisection
+    // - the wanted knot index is then one position to the left
+    return std::upper_bound
     (
-        t_,                     // search from here ...
-        t_ + Nknot_,            // ... to here (exclusively)
+        t_.begin(),             // search from here ...
+        t_.end(),               // ... to here (exclusively)
         x,                      // and compare with respect to this item
         Complex_realpart_less   // comparator using the real parts
-    );
-    
-    // check if this is a valid knot
-    if (iknot_notless != t_ /* x > 0 */ and iknot_notless != t_ + Nknot_ /* x < Rmax */)
-        return iknot_notless - t_ - 1;
-    else
-        return -1;
+    ) - t_.begin() - 1;
 }
 
 Complex Bspline::eval (const cArrayView coeff, Real x) const
@@ -564,10 +491,13 @@ std::size_t Bspline::hash () const
 {
     std::size_t seed = 0;
     
+    for (auto & i : cknots1_)
+        seed ^= *reinterpret_cast<typeinfo<Real>::inttype const*>(&i) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+    
     for (auto & i : rknots_)
         seed ^= *reinterpret_cast<typeinfo<Real>::inttype const*>(&i) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
     
-    for (auto & i : cknots_)
+    for (auto & i : cknots2_)
         seed ^= *reinterpret_cast<typeinfo<Real>::inttype const*>(&i) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
     
     for (unsigned i = 0; i < sizeof(theta_); i++)

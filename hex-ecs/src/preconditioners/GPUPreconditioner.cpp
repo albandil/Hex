@@ -287,9 +287,12 @@ void GPUCGPreconditioner::setup ()
         std::cout << std::endl << "Source:" << std::endl << source << std::endl;
         std::cout << std::endl << "Command line:" << std::endl << flags.str() << std::endl << std::endl;
         
-        char log [100000];
-        clGetProgramBuildInfo(program_, device_, CL_PROGRAM_BUILD_LOG, sizeof(log), log, nullptr);
+        std::size_t logsize;
+        clGetProgramBuildInfo(program_, device_, CL_PROGRAM_BUILD_LOG, 0, nullptr, &logsize);
+        char * log = new char [logsize];
+        clGetProgramBuildInfo(program_, device_, CL_PROGRAM_BUILD_LOG, logsize, log, nullptr);
         std::cout << "clGetProgramBuildInfo: log" << std::endl << log << std::endl;
+        delete [] log;
         
         HexException("Failed to initialize OpenCL.");
     }
@@ -378,7 +381,7 @@ void GPUCGPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Co
         // one-electron contribution
         //
         
-        for (unsigned ill = 0; ill < ang_->states().size(); ill++)
+        for (unsigned ill = 0; ill < ang_->states().size(); ill++) // TODO : MPI
         {
             // decode angular momenta
             int l1 = ang_->states()[ill].first;
@@ -411,7 +414,7 @@ void GPUCGPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Co
         }
         
         // two-electron contribution
-        for (int lambda = 0; lambda <= rad_->maxlambda(); lambda++)
+        for (int lambda = 0; lambda <= rad_->maxlambda(); lambda++) // TODO : MPI
         {
             // memory offset
             cl_int foffset = lambda * ang_->states().size() * ang_->states().size();
@@ -526,8 +529,8 @@ void GPUCGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArra
         // preconditioner matrices
         clArrayView<Complex> prec1a (Nspline_inner * Nspline_inner, prec_inner_[l1].invCl_invsqrtS.data().data());  prec1a.connect(context_, largeDataFlags_);
         clArrayView<Complex> prec2a (Nspline_inner * Nspline_inner, prec_inner_[l2].invCl_invsqrtS.data().data());  prec2a.connect(context_, largeDataFlags_);
-        clArrayView<Complex> Dl1 (Nspline_inner, prec_inner_[l1].Dl.data());                                       Dl1.connect(context_, smallDataFlags_);
-        clArrayView<Complex> Dl2 (Nspline_inner, prec_inner_[l2].Dl.data());                                       Dl2.connect(context_, smallDataFlags_);
+        clArrayView<Complex> Dl1 (Nspline_inner, prec_inner_[l1].Dl.data());                                        Dl1.connect(context_, smallDataFlags_);
+        clArrayView<Complex> Dl2 (Nspline_inner, prec_inner_[l2].Dl.data());                                        Dl2.connect(context_, smallDataFlags_);
         clArrayView<Complex> prec1b (Nspline_inner * Nspline_inner, prec_inner_[l1].invsqrtS_Cl.data().data());     prec1b.connect(context_, largeDataFlags_);
         clArrayView<Complex> prec2b (Nspline_inner * Nspline_inner, prec_inner_[l2].invsqrtS_Cl.data().data());     prec2b.connect(context_, largeDataFlags_);
         

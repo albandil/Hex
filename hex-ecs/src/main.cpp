@@ -36,23 +36,32 @@
 #include <string>
 #include <tuple>
 
+// --------------------------------------------------------------------------------- //
+
 #include <gsl/gsl_errno.h>
+
+// --------------------------------------------------------------------------------- //
 
 #ifdef _OPENMP
     #include <omp.h>
 #endif
 
+// --------------------------------------------------------------------------------- //
+
 #include "hex-arrays.h"
 #include "hex-misc.h"
 #include "hex-version.h"
+
+// --------------------------------------------------------------------------------- //
 
 #include "amplitudes.h"
 #include "ang.h"
 #include "bspline.h"
 #include "io.h"
 #include "parallel.h"
-#include "radial.h"
 #include "solver.h"
+
+// --------------------------------------------------------------------------------- //
 
 int main (int argc, char* argv[])
 {
@@ -166,8 +175,9 @@ int main (int argc, char* argv[])
         Bspline bspline_inner
         (
             inp.order,
-            inp.rknots,
             inp.ecstheta,
+            rArray{},
+            inp.rknots,
             inp.rknots_ext.empty() ? inp.rknots.back() + inp.cknots : rArray{ inp.rknots.back() }
         );
         
@@ -175,8 +185,9 @@ int main (int argc, char* argv[])
         Bspline bspline_full
         (
             inp.order,
-            inp.rknots_ext.empty() ? inp.rknots : concatenate(inp.rknots, inp.rknots.back() + inp.rknots_ext.slice(1, inp.rknots_ext.size())),
             inp.ecstheta,
+            rArray{},
+            inp.rknots_ext.empty() ? inp.rknots : concatenate(inp.rknots, inp.rknots.back() + inp.rknots_ext.slice(1, inp.rknots_ext.size())),
             inp.rknots_ext.empty() ? inp.rknots.back() + inp.cknots : inp.rknots.back() + inp.rknots_ext.back() + inp.cknots
         );
     
@@ -194,73 +205,6 @@ int main (int argc, char* argv[])
             return EXIT_SUCCESS;
         
         std::cout << std::endl;
-    
-    //
-    // TODO Map solution file between two B-spline bases.
-    //
-    
-        /*if (not cmd.map_solution.empty())
-        {
-            if (cmd.map_solution_target.empty())
-                HexException("The option --map-solution-target is required.");
-            
-            // read the target basis description
-            std::ifstream ifs (cmd.map_solution_target.c_str());
-            if (not ifs.good())
-                HexException("Failed to open target setup file \"%s\".", cmd.map_solution_target.c_str());
-            InputFile target (ifs);
-            ifs.close();
-            
-            // compose knot sequence
-            if (not inp.overlap_knots.empty())
-            {
-                rArray overlap_knots = target.rknots.back() + target.overlap_knots.slice(1, target.overlap_knots.size());
-                target.rknots.append(overlap_knots.begin(), overlap_knots.end());
-            }
-            
-            // prepare target basis
-            Bspline bspline_target
-            (
-                target.order,
-                target.rknots,
-                target.ecstheta,
-                target.rknots.back() + target.cknots
-            );
-            
-            // prepare one-electron radial integrals
-            RadialIntegrals rad (bspline_panel.front(), bspline_target, bspline_target, 0);
-            rad.verbose(false);
-            rad.setupOneElectronIntegrals(par, cmd);
-            
-            // factorize target overlap matrix
-            CsrMatrix<LU_int_t,Complex> tgtS = rad.S_proj().tocoo<LU_int_t>().tocsr();
-            std::shared_ptr<LUft<LU_int_t,Complex>> tgtSlu = tgtS.factorize();
-            
-            // multiply inter-basis overlaps by the inverse target overlap matrix
-            ColMatrix<Complex> matrix (bspline_target.Nspline(), bspline_panel.front().Nspline());
-            ColMatrix<Complex> S21 = rad.S12().T();
-            tgtSlu->solve
-            (
-                S21.data(),
-                matrix.data(),
-                bspline_panel.front().Nspline()
-            );
-            RowMatrix<Complex> rmatrix (matrix);
-            
-            // map all solutions
-            for (unsigned i = 0; i < cmd.map_solution.size(); i++)
-            {
-                // load the solution
-                cArray solution;
-                solution.hdfload(cmd.map_solution[i]);
-                
-                // map the solution
-                kron_dot(rmatrix, rmatrix, solution).hdfsave("mapped-" + cmd.map_solution[i]);
-                std::cout << "Solution \"" << cmd.map_solution[i] << "\" mapped to a new basis." << std::endl;
-            }
-            
-            return EXIT_SUCCESS;
-        }*/
     
     //
     // Zip solution file into VTK geometry if told so
@@ -299,12 +243,12 @@ int main (int argc, char* argv[])
             std::cout << "\t- inner basis" << std::endl;
             std::cout << "\t\t- number of splines: " << bspline_inner.Nspline() << std::endl;
             std::cout << "\t\t- real knots : " << bspline_inner.rknots().front() << " to " << bspline_inner.rknots().back() << std::endl;
-            std::cout << "\t\t- complex knots : " << bspline_inner.cknots().front() << " to " << bspline_inner.cknots().back() << std::endl;
+            std::cout << "\t\t- complex knots : " << bspline_inner.cknots2().front() << " to " << bspline_inner.cknots2().back() << std::endl;
         }
         std::cout << "\t- full basis" << std::endl;
         std::cout << "\t\t- number of splines: " << bspline_full.Nspline() << std::endl;
         std::cout << "\t\t- real knots : " << bspline_full.rknots().front() << " to " << bspline_full.rknots().back() << std::endl;
-        std::cout << "\t\t- complex knots : " << bspline_full.cknots().front() << " to " << bspline_full.cknots().back() << std::endl;
+        std::cout << "\t\t- complex knots : " << bspline_full.cknots2().front() << " to " << bspline_full.cknots2().back() << std::endl;
         std::cout << std::endl;
         
         // pick preconditioner according to the user preferences

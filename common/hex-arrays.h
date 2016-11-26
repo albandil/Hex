@@ -32,6 +32,8 @@
 #ifndef HEX_ARRAYS
 #define HEX_ARRAYS
 
+// --------------------------------------------------------------------------------- //
+
 #include <cassert>
 #include <cmath>
 #include <complex>
@@ -46,16 +48,22 @@
 #include <type_traits>
 #include <vector>
 
+// --------------------------------------------------------------------------------- //
+
 #include "hex-hdffile.h"
 #include "hex-memory.h"
 #include "hex-misc.h"
 #include "hex-numbers.h"
+
+// --------------------------------------------------------------------------------- //
 
 // Forward declaration of Array (unaligned array of items).
 template < class T, class Alloc_ = PlainAllocator<T> > class Array;
 
 // Forward declaration of NumberArray (aligned array of numbers -> SIMD).
 template < class T, class Alloc_ = AlignedAllocator<T,SIMD_VECTOR_BYTES> > class NumberArray;
+
+// --------------------------------------------------------------------------------- //
 
 /**
  * @brief Array view.
@@ -266,6 +274,8 @@ template <class T> class ArrayView
             return output;
         }
 };
+
+// --------------------------------------------------------------------------------- //
 
 /**
  * @brief A comfortable data array class.
@@ -569,6 +579,8 @@ template <class T, class Alloc_> class Array : public ArrayView<T>
             return *this;
         }
 };
+
+// --------------------------------------------------------------------------------- //
 
 /**
  * @brief A comfortable number array class.
@@ -1308,6 +1320,9 @@ template <class T, class Alloc_> class NumberArray : public Array<T, Alloc_>
         }
 };
 
+
+// --------------------------------------------------------------------------------- //
+
 /**
  * @brief Helper class returning either reference of new object.
  * 
@@ -1344,6 +1359,8 @@ template <class T> class TmpNumberArray
         ArrayView<T> view_;
         NumberArray<T> array_;
 };
+
+// --------------------------------------------------------------------------------- //
 
 template <class T> class BlockArray
 {
@@ -1513,10 +1530,16 @@ template <class T> class BlockArray
         std::string filename_;
 };
 
+// --------------------------------------------------------------------------------- //
+
 typedef BlockArray<Complex> cBlockArray;
+
+// --------------------------------------------------------------------------------- //
 
 // load array arithmetic operators
 #include "hex-arrithm.h"
+
+// --------------------------------------------------------------------------------- //
 
 /// Scalar product of two arrays.
 template <class T> T operator | (const ArrayView<T> a, const ArrayView<T> b)
@@ -2188,7 +2211,7 @@ template <class T> void smoothen (ArrayView<T> v)
     }
 }
 
-/// Convert ArrayView<T> to a string.
+/// Convert ArrayView to a string.
 template <class T> std::string to_string (const ArrayView<T> v, char sep = ' ')
 {
     std::ostringstream ss;
@@ -2208,4 +2231,6 @@ rArray threshold (const rArrayView a, double eps);
 /// Combine real and imaginary parts.
 cArray interleave (const rArrayView re, const rArrayView im);
 
-#endif
+// --------------------------------------------------------------------------------- //
+
+#endif // HEX_ARRAYS

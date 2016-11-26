@@ -132,7 +132,7 @@ void Amplitudes::extract ()
                 }
                 par_.syncsum(&valid_blocks, 1);
                 
-                if (/*valid_blocks != ang_.size()*/not reader.load(solution)) // TODO : OOC, and also multi-node
+                if (valid_blocks != ang_.size()/*not reader.load(solution)*/) // TODO : OOC
                 {
                     // complain only if the solution is allowed
                     // TODO
@@ -406,7 +406,7 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> &
     int Nspline_outer = Nspline_full - Nspline_inner; // B-spline count (outer basis)
     
     // compute final hydrogen orbital overlaps with B-spline basis
-    cArray Pf_overlaps = rad_.overlapP(bspline_inner_, rad_.gaussleg_inner(), T.nf, T.lf, weightEndDamp(bspline_inner_));
+    cArray Pf_overlaps = rad_.overlapP(bspline_inner_, rad_.gaussleg_inner_x(), T.nf, T.lf);
     
     // check that memory for this transition is allocated
     if (Lambda_Slp.find(T) == Lambda_Slp.end())
@@ -429,8 +429,8 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> &
     // the trend of the T-matrix.
     
     Real wavelength = special::constant::two_pi / kf[ie];
-    Real Rb   = (cmd_.extract_rho       > 0) ? cmd_.extract_rho       : bspline_full_.R0();
-    Real Ra   = (cmd_.extract_rho_begin > 0) ? cmd_.extract_rho_begin : Rb - wavelength; Ra = std::max(bspline_full_.R0() / 2, Ra);
+    Real Rb   = (cmd_.extract_rho       > 0) ? cmd_.extract_rho       : bspline_full_.R2();
+    Real Ra   = (cmd_.extract_rho_begin > 0) ? cmd_.extract_rho_begin : Rb - wavelength; Ra = std::max(bspline_full_.R2() / 2, Ra);
     int samples = (cmd_.extract_samples   > 0) ? cmd_.extract_samples   : 10;
     
     rArray grid;
@@ -445,8 +445,8 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> &
     if (Ra > Rb)
         HexException("Wrong order of radial extraction bounds, %g > %g.", Ra, Rb);
     
-    if (Rb > bspline_full_.R0())
-        HexException("Extraction radius too far, %g > %g.", Rb, bspline_full_.R0());
+    if (Rb > bspline_full_.R2())
+        HexException("Extraction radius too far, %g > %g.", Rb, bspline_full_.R2());
     
     // evaluate radial part for all evaluation radii
     for (int i = 0; i < samples; i++)
@@ -740,9 +740,9 @@ Chebyshev<double,Complex> Amplitudes::fcheb (cArrayView const & PsiSc, Real kmax
     Chebyshev<double,Complex> CB;
     
     // avoid calculation when the extraction radius is too far
-    if (rho > bspline_inner_.R0())
+    if (rho > bspline_inner_.R2())
     {
-        std::cout << "Warning: Extraction radius rho = " << rho << " is too far; the atomic real grid ends at R0 = " << bspline_inner_.R0() << std::endl;
+        std::cout << "Warning: Extraction radius rho = " << rho << " is too far; the atomic real grid ends at R0 = " << bspline_inner_.R2() << std::endl;
     }
     else   
     {

@@ -362,7 +362,6 @@ class Parallel
         
         /**
          * @brief Sum arrays to node.
-         * 
          */
         template <class T> void sum (T* array, std::size_t N, int owner = 0) const
         {

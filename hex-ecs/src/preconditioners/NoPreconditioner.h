@@ -29,8 +29,8 @@
 //                                                                                   //
 //  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
-#ifndef HEX_NOPRECONDITIONER_H
-#define HEX_NOPRECONDITIONER_H
+#ifndef HEX_ECS_NOPRECONDITIONER_H
+#define HEX_ECS_NOPRECONDITIONER_H
 
 // --------------------------------------------------------------------------------- //
 
@@ -134,9 +134,9 @@ class NoPreconditioner : public PreconditionerBase
         RadialIntegrals * rad_;
         
         // hydrogen orbitals B-spline overlaps and expansions (on inner basis)
-        std::vector<cArrays> Sp, Xp;
+        std::vector<cArrays> Spx, Xpx, Spy, Xpy;
 };
 
 // --------------------------------------------------------------------------------- //
 
-#endif
+#endif // HEX_ECS_NOPRECONDITIONER_H

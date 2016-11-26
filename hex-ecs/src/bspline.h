@@ -29,11 +29,15 @@
 //                                                                                   //
 //  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
-#ifndef HEX_BSPLINE
-#define HEX_BSPLINE
+#ifndef HEX_ECS_BSPLINE
+#define HEX_ECS_BSPLINE
+
+// --------------------------------------------------------------------------------- //
 
 #include "hex-arrays.h"
 #include "hex-misc.h"
+
+// --------------------------------------------------------------------------------- //
 
 /**
  * @brief B-spline environment.
@@ -58,18 +62,20 @@ class Bspline
          * @brief Constructor.
          * 
          * Setup the knot sequence, which will consist of two parts.
-         * @param order  B-spline order.
-         * @param rknots Real knot array (usually including R₀).
-         * @param th     ECS angle in radians.
-         * @param cknots To-be-complex knot array (including R₀ and Rmax).
+         * @param order   B-spline order.
+         * @param th      ECS angle in radians.
+         * @param cknots1 Leading complex-rotated knots.
+         * @param rknots  Real knot array.
+         * @param cknots2 Trailing complex-rotated knots.
          */
-        Bspline (int order, rArrayView const & rknots, Real th, rArrayView const & cknots);
-        
-        // move constructor
-        Bspline (Bspline && other);
-        
-        // destructor
-        ~Bspline ();
+        Bspline
+        (
+            int order,
+            Real th,
+            rArrayView cknots1,
+            rArrayView rknots,
+            rArrayView cknots2
+        );
         
         /**
          * @brief Evaluate B-spline.
@@ -136,9 +142,18 @@ class Bspline
          * 
          * @param r Real coordinate.
          */
-        inline Complex rotate (Real r) const
+        Complex rotate (Real r) const
         {
-            return (r <= R0_) ? r : R0_ + (r - R0_) * rotation_;
+            // leading complex part
+            if (r < R1_)
+                return R1_ + (r - R1_) * rotation_;
+            
+            // trailing complex part
+            if (r > R2_)
+                return R2_ + (r - R2_) * rotation_;
+            
+            // real part
+            return r;
         };
         
         /**
@@ -146,9 +161,18 @@ class Bspline
          * 
          * @param z Complex coordinate.
          */
-        inline Real unrotate (Complex z) const
+        Real unrotate (Complex z) const
         {
-            return (z.imag() == 0.) ? z.real() : R0_ + ((z - R0_) / rotation_).real();
+            // leading complex part
+            if (z.imag() < 0)
+                return R1_ + (z.real() - R1_) / rotation_.real();
+            
+            // trailing complex part
+            if (z.imag() > 0)
+                return R2_ + (z.real() - R2_) / rotation_.real();
+            
+            // real part
+            return z.real();
         };
         
         /**
@@ -179,7 +203,7 @@ class Bspline
         /**
          * @brief Get knot index for coordinate.
          * 
-         * Finds knot (interval @f$ \left< t_i,t_{i+1} \right> @f$) for 'x'.
+         * Finds knot (interval @f$ \left< t_i,t_{i+1} \right) @f$) for 'x'.
          * @param x Complex coordinate.
          */
         int knot (Complex x) const;
@@ -211,40 +235,56 @@ class Bspline
         // getters
         
         /// B-spline knot sequence.
-        inline cArrayView t () const { return cArrayView(Nknot_, t_); }
+        cArrayView t () const { return t_; }
         
         /// B-spline knot sequence.
-        inline Complex const & t (int i) const { return *(t_ + i); }
+        Complex const & t (int i) const { return t_[i]; }
         
         /// Number of B-splines.
-        inline int Nspline () const { return Nspline_; }
+        int Nspline () const { return Nspline_; }
         
         /// Number of knots.
-        inline int Nknot () const { return Nknot_; }
+        int Nknot () const { return Nknot_; }
         
         /// Number of real knots.
-        inline int Nreknot () const { return Nreknot_; }
+        int Nreknot () const { return Nreknot_; }
         
         /// B-spline order.
-        inline int order () const { return order_; }
+        int order () const { return order_; }
         
-        /// End of real grid.
-        inline Real R0 () const { return R0_; };
+        /// Index of knot between leading complex grid and real grid.
+        int iR1 () const { return cknots1_.empty() ? 0 : cknots1_.size() - 1; }
         
-        /// End of complex grid (real, unrotated).
-        inline Real Rmax () const { return Rmax_; };
+        /// Index of knot between real grid and trailing complex grid.
+        int iR2 () const { return cknots2_.empty() ? t_.size() - 1 : t_.size() - cknots2_.size(); }
+        
+        /// Beginning of the real grid.
+        Real R1 () const { return R1_; }
+        
+        /// End of the real grid.
+        Real R2 () const { return R2_; }
+        
+        /// Beginning of the grid (unrotated).
+        Real Rmin () const { return Rmin_; }
+        
+        /// End of the grid (unrotated).
+        Real Rmax () const { return Rmax_; };
         
         /// ECS rotation angle.
-        inline Real ECStheta () const { return theta_; }
+        Real ECStheta () const { return theta_; }
         
         /// real knots
-        inline rArray const & rknots () const { return rknots_; }
+        rArray const & rknots () const { return rknots_; }
         
         /// complex knots
-        inline rArray const & cknots () const { return cknots_; }
+        rArray const & cknots1 () const { return cknots1_; }
+        rArray const & cknots2 () const { return cknots2_; }
         
         /**
          * @brief Return (almost) unique identification for this B-spline object.
+         * 
+         * The identifier is calculated as a simple hash of the data contained
+         * in the object.
          */
         std::size_t hash () const;
         
@@ -254,10 +294,10 @@ class Bspline
         rArray rknots_;
         
         /// complex knots
-        rArray cknots_;
+        rArray cknots1_, cknots2_;
         
-        /// knot sequence
-        Complex * restrict t_;
+        /// knot sequence (rotated)
+        cArray t_;
         
         /// rotation angle (rad)
         Real theta_;
@@ -265,10 +305,16 @@ class Bspline
         /// ECS rotation factor
         Complex rotation_;
         
-        /// end of real grid
-        Real R0_;
+        /// beginning of the real grid
+        Real R1_;
         
-        /// end of complex grid
+        /// end of the real grid
+        Real R2_;
+        
+        /// beginning of the full grid
+        Real Rmin_;
+        
+        /// end of the full grid
         Real Rmax_;
         
         /// knot count
@@ -291,10 +337,8 @@ class Bspline
         
         /// Work max size
         static const std::size_t work_size_;
-        
-        /// Disallow implicit bitwise copy.
-        Bspline (Bspline const &) = delete;
-        Bspline const & operator= (Bspline const &) = delete;
 };
 
-#endif
+// --------------------------------------------------------------------------------- //
+
+#endif // HEX_ECS_BSPLINE

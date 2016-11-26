@@ -87,13 +87,13 @@ class CommandLine
             : writegrid(false), zipdata(), parallel(false), preconditioner("ILU"),
               droptol(1e-8), itinerary(StgNone), outofcore(false), cont(false), wholematrix(false), cache_all_radint(true), cache_own_radint(true),
               itertol(1e-8), prec_itertol(1e-8), parallel_precondition(false), gpu_large_data(false),
-              lightweight_full(false), lightweight_radial_cache(true), shared_scratch(false), reuse_dia_blocks(false),
+              lightweight_full(false), lightweight_radial_cache(false), shared_scratch(false), reuse_dia_blocks(false),
               kpa_simple_rad(false), ocl_platform(0), ocl_device(0), factorizer("umfpack"), groupsize(1),
               parallel_factorization(false), parallel_extraction(true), ilu_max_iter(10),
               carry_initial_guess(false), gpu_multiply(false), extract_extrapolate(false), extract_rho(-1), extract_rho_begin(-1), extract_samples(-1),
               refine_solution(false), map_solution(), map_solution_target(), ssor(-1), noluupdate(false), coupling_limit(1000),
-              gpu_host_multiply(false), mumps_outofcore(false), mumps_verbose(0), kpa_drop(-1), exact_rhs(true), write_intermediate_solutions(false),
-              fast_bessel(false), hyb_additional_levels(0), multigrid_depth(0), multigrid_coarse_prec(0), dom_panels(1), dom_overlap(1)
+              gpu_host_multiply(false), mumps_outofcore(false), mumps_verbose(0), kpa_drop(-1), write_intermediate_solutions(false),
+              fast_bessel(false), hyb_additional_levels(0), multigrid_depth(0), multigrid_coarse_prec(0), dom_panels(1)
         {
             // get command line options
             parse(argc, argv);
@@ -246,9 +246,6 @@ class CommandLine
         /// Whether to use drop tolerance for KPA preconditioner.
         Real kpa_drop;
         
-        /// Exact rhs.
-        bool exact_rhs;
-        
         /// Write intermediate solutions.
         bool write_intermediate_solutions;
         
@@ -266,9 +263,6 @@ class CommandLine
         
         /// Domain decomposition panels.
         int dom_panels;
-        
-        /// Domain decomposition overlap.
-        double dom_overlap;
 };
 
 /**

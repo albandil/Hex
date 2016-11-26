@@ -32,13 +32,15 @@
 #ifndef HEX_SYMBANDMATRIX_H
 #define HEX_SYMBANDMATRIX_H
 
-#include <bitset>
+// --------------------------------------------------------------------------------- //
 
 #include "hex-arrays.h"
 #include "hex-coomatrix.h"
 #include "hex-densematrix.h"
 #include "hex-hdffile.h"
 #include "hex-openmp.h"
+
+// --------------------------------------------------------------------------------- //
 
 /**
  * @brief Matrix parts.
@@ -67,6 +69,8 @@ class MatrixSelection
         static const Selection Upper       = 6; // = 0b110 = StrictUpper | Diagonal
         static const Selection Both        = 7; // = 0b111 = StrictLower | StrictUpper | Diagonal
 };
+
+// --------------------------------------------------------------------------------- //
 
 /**
  * @brief Symmetric diagonal matrix.
@@ -673,8 +677,12 @@ private:
     std::string name_;
 };
 
+// --------------------------------------------------------------------------------- //
+
 template <class DataT> NumberArray<DataT> operator | (SymBandMatrix<DataT> const & A, const ArrayView<DataT> v) { return A.dot(v); }
 template <class DataT> NumberArray<DataT> operator | (const ArrayView<DataT> v, SymBandMatrix<DataT> const & A) { return A.dot(v); }
+
+// --------------------------------------------------------------------------------- //
 
 template <class DataT> class BlockSymBandMatrix
 {
@@ -707,6 +715,12 @@ template <class DataT> class BlockSymBandMatrix
         // Constructors.
         //
         
+        BlockSymBandMatrix ()
+            : diskfile_(), inmemory_(true), blockcount_(0), blockhalfbw_(0), size_(0), halfbw_(0), data_()
+        {
+            // nothing
+        }
+        
         /**
          * @brief Main constructor.
          * 
@@ -715,7 +729,7 @@ template <class DataT> class BlockSymBandMatrix
          * @param blockstructure Vector of block positions; only upper part of the matrix (+ main diagonal) allowed.
          * @param name Name of the optional scratch disk file.
          */
-        BlockSymBandMatrix (int blockcount = 0, int blockhalfbw = 0, int size = 0, int halfbw = 0, bool inmemory = true, std::string name = "")
+        BlockSymBandMatrix (int blockcount, int blockhalfbw, int size, int halfbw, bool inmemory, std::string name)
             : diskfile_(name), inmemory_(inmemory), blockcount_(blockcount), blockhalfbw_(blockhalfbw), size_(size), halfbw_(halfbw), data_()
         {
             if (inmemory_)
@@ -1185,5 +1199,7 @@ template <class DataT> void kron_dot
         w[i * B.size() + j] = a * w[i * B.size() + j] + b * res;
     }
 }
+
+// --------------------------------------------------------------------------------- //
 
 #endif // HEX_SYMBANDMATRIX_H

@@ -278,31 +278,39 @@ void KPACGPreconditioner::setup ()
         }
         
     //
-    // Check presence of the atomic electron preconditioner
+    // Check presence of the preconditioner data
     //
         
         // status array indicating necessity to calculate the preconditioner matrix for given 'l'
-        Array<bool> done_atom (inp_->maxell + 1, true);
+        Array<bool> done_atom (inp_->maxell + 1, true), done_proj (inp_->maxell + 1, true);
         
         // "to compute matrices": link them to scratch disk files and check presence
         for (int l : comp_l)
         {
-            prec_inner_[l].hdflink(format("kpa-%d-%.4lx.hdf",l,rad_->bspline_inner().hash()).c_str());
-            prec_proj_ [l].hdflink(format("kpa-%d-%.4lx.hdf",l,rad_->bspline_inner().hash()).c_str());
-            done_atom[l] = prec_inner_[l].hdfcheck();
+            prec_atom_[l].hdflink(format("kpa-%d-%.4lx.hdf",l,rad_->bspline_inner_x().hash()).c_str());
+            prec_proj_[l].hdflink(format("kpa-%d-%.4lx.hdf",l,rad_->bspline_inner_y().hash()).c_str());
+            done_atom[l] = prec_atom_[l].hdfcheck();
+            done_atom[l] = prec_proj_[l].hdfcheck();
         }
         
         // "needed matrices": link them to scratch disk files and check presence, load if present
         for (int l : needed_l)
         {
-            prec_inner_[l].hdflink(format("kpa-%d-%.4lx.hdf",l,rad_->bspline_inner().hash()).c_str());
-            prec_proj_ [l].hdflink(format("kpa-%d-%.4lx.hdf",l,rad_->bspline_inner().hash()).c_str());
-            done_atom[l] = prec_inner_[l].hdfcheck();
+            prec_atom_[l].hdflink(format("kpa-%d-%.4lx.hdf",l,rad_->bspline_inner_x().hash()).c_str());
+            prec_proj_[l].hdflink(format("kpa-%d-%.4lx.hdf",l,rad_->bspline_inner_y().hash()).c_str());
+            done_atom[l] = prec_atom_[l].hdfcheck();
+            done_proj[l] = prec_proj_[l].hdfcheck();
             
             if (done_atom[l])
             {
                 std::cout << "\t- atomic preconditioner data for l = " << l
-                           << " present in \"" << prec_inner_[l].filename << "\"" << std::endl;
+                           << " present in \"" << prec_atom_[l].filename << "\"" << std::endl;
+            }
+            
+            if (done_proj[l])
+            {
+                std::cout << "\t- projectile preconditioner data for l = " << l
+                           << " present in \"" << prec_atom_[l].filename << "\"" << std::endl;
             }
         }
     
@@ -315,16 +323,16 @@ void KPACGPreconditioner::setup ()
             std::cout << std::endl << "\tPrepare preconditioner matrices for atomic grid" << std::endl;
             prepare
             (
-                prec_inner_, rad_->bspline_inner().Nspline(),
-                rad_->S_inner(), rad_->D_inner(), rad_->Mm1_tr_inner(), rad_->Mm2_inner(),
+                prec_atom_, rad_->bspline_inner_x().Nspline(),
+                rad_->S_inner_x(), rad_->D_inner_x(), rad_->Mm1_tr_inner_x(), rad_->Mm2_inner_x(),
                 done_atom, comp_l, needed_l
             );
             std::cout << std::endl << "\tPrepare preconditioner matrices for projectile grid" << std::endl;
             prepare
             (
-                prec_proj_, rad_->bspline_inner().Nspline(),
-                rad_->S_inner(), rad_->D_inner(), Complex(-inp_->Zp) * rad_->Mm1_tr_inner(), rad_->Mm2_inner(),
-                done_atom, comp_l, needed_l
+                prec_proj_, rad_->bspline_inner_y().Nspline(),
+                rad_->S_inner_y(), rad_->D_inner_y(), Complex(-inp_->Zp) * rad_->Mm1_tr_inner_y(), rad_->Mm2_inner_y(),
+                done_proj, comp_l, needed_l
             );
         }
     
@@ -353,11 +361,11 @@ void KPACGPreconditioner::CG_init (int iblock) const
     lock_kpa_access();
     {
         // update reference count
-        refcount_inner_[l1]++;
+        refcount_atom_[l1]++;
         refcount_proj_[l2]++;
         
         // load preconditioners from disk if needed
-        if (refcount_inner_[l1] == 1 and not prec_inner_[l1].hdfload())
+        if (refcount_atom_[l1] == 1 and not prec_atom_[l1].hdfload())
             HexException("Failed to read preconditioner matrix for l = %d.", l1);
         if (refcount_proj_[l2] == 1 and not prec_proj_[l2].hdfload())
             HexException("Failed to read preconditioner matrix for l = %d.", l2);
@@ -365,7 +373,7 @@ void KPACGPreconditioner::CG_init (int iblock) const
     unlock_kpa_access();
     
     // calculate workspace size
-    std::size_t size = rad_->bspline_inner().Nspline() * rad_->bspline_inner().Nspline();
+    std::size_t size = rad_->bspline_inner_x().Nspline() * rad_->bspline_inner_y().Nspline();
     
     // allocate thread workspace
     unsigned ithread = 0;
@@ -385,9 +393,9 @@ void KPACGPreconditioner::CG_mmul (int iblock, const cArrayView p, cArrayView q)
         int l2 = ang_->states()[iblock].second;
         
         // multiply 'p' by the diagonal block (except for the two-electron term)
-        kron_dot(0., q,  1., p, Complex(E_) * rad_->S_inner(), rad_->S_inner());
-        kron_dot(1., q, -1., p, Complex(0.5) * rad_->D_inner() - rad_->Mm1_tr_inner() + Complex(0.5*(l1+1)*l1) * rad_->Mm2_inner(), rad_->S_inner());
-        kron_dot(1., q, -1., p, rad_->S_inner(), Complex(0.5) * rad_->D_inner() + Complex(inp_->Zp) * rad_->Mm1_tr_inner() + Complex(0.5*(l2+1)*l2) * rad_->Mm2_inner());
+        kron_dot(0., q,  1., p, Complex(E_) * rad_->S_inner_x(), rad_->S_inner_y());
+        kron_dot(1., q, -1., p, Complex(0.5) * rad_->D_inner_x() - rad_->Mm1_tr_inner_x() + Complex(0.5*(l1+1)*l1) * rad_->Mm2_inner_x(), rad_->S_inner_y());
+        kron_dot(1., q, -1., p, rad_->S_inner_x(), Complex(0.5) * rad_->D_inner_y() + Complex(inp_->Zp) * rad_->Mm1_tr_inner_y() + Complex(0.5*(l2+1)*l2) * rad_->Mm2_inner_y());
         
         // multiply 'p' by the two-electron integrals
         for (int lambda = 0; lambda <= rad_->maxlambda(); lambda++)
@@ -417,7 +425,8 @@ void KPACGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z)
     int l2 = ang_->states()[iblock].second;
     
     // dimension of the matrices
-    std::size_t Nspline_inner = rad_->bspline_inner().Nspline();
+    std::size_t Nspline_inner_x = rad_->bspline_inner_x().Nspline();
+    std::size_t Nspline_inner_y = rad_->bspline_inner_y().Nspline();
     
     // get workspace
     int ithread = 0;
@@ -426,15 +435,15 @@ void KPACGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z)
 #endif
     
     // encapsulated memory chunks
-    ColMatrix<Complex> U (Nspline_inner, Nspline_inner, workspace_[ithread]);
-    RowMatrixView<Complex> R (Nspline_inner, Nspline_inner, r);
-    RowMatrixView<Complex> Z (Nspline_inner, Nspline_inner, z);
+    ColMatrix<Complex> U (Nspline_inner_x, Nspline_inner_y, workspace_[ithread]);
+    RowMatrixView<Complex> R (Nspline_inner_x, Nspline_inner_y, r);
+    RowMatrixView<Complex> Z (Nspline_inner_x, Nspline_inner_y, z);
     
     // first Kronecker product
     {
         // U = (AV)B
-        RowMatrixView<Complex> A (Nspline_inner, Nspline_inner, prec_inner_[l1].invCl_invsqrtS.data());
-        ColMatrixView<Complex> B (Nspline_inner, Nspline_inner, prec_proj_ [l2].invCl_invsqrtS.data());
+        RowMatrixView<Complex> A (Nspline_inner_x, Nspline_inner_x, prec_atom_[l1].invCl_invsqrtS.data());
+        ColMatrixView<Complex> B (Nspline_inner_y, Nspline_inner_y, prec_proj_[l2].invCl_invsqrtS.data());
         
         blas::gemm(1., A, R, 0., Z); // N³ operations
         blas::gemm(1., Z, B, 0., U); // N³ operations
@@ -442,15 +451,15 @@ void KPACGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z)
     
     // Divide elements by the diagonal; N² operations
     # pragma omp parallel for
-    for (std::size_t i = 0; i < Nspline_inner; i++) 
-    for (std::size_t j = 0; j < Nspline_inner; j++)
-        Z(i,j) = U(i,j) / (E_ - prec_inner_[l1].Dl[i] - prec_proj_[l2].Dl[j]);
+    for (std::size_t i = 0; i < Nspline_inner_x; i++) 
+    for (std::size_t j = 0; j < Nspline_inner_y; j++)
+        Z(i,j) = U(i,j) / (E_ - prec_atom_[l1].Dl[i] - prec_proj_[l2].Dl[j]);
     
     // second Kronecker product
     {
         // W = (AU)B
-        RowMatrixView<Complex> A (Nspline_inner, Nspline_inner, prec_inner_[l1].invsqrtS_Cl.data());
-        ColMatrixView<Complex> B (Nspline_inner, Nspline_inner, prec_proj_ [l2].invsqrtS_Cl.data());
+        RowMatrixView<Complex> A (Nspline_inner_x, Nspline_inner_x, prec_atom_[l1].invsqrtS_Cl.data());
+        ColMatrixView<Complex> B (Nspline_inner_y, Nspline_inner_y, prec_proj_[l2].invsqrtS_Cl.data());
         
         blas::gemm(1., A, Z, 0., U);    // N³ operations
         blas::gemm(1., U, B, 0., Z);    // N³ operations
@@ -467,14 +476,14 @@ void KPACGPreconditioner::CG_exit (int iblock) const
         int l2 = ang_->states()[iblock].second;
         
         // update reference count (allow drop only in out-of-core)
-        if (refcount_inner_[l1] > 1 or not cmd_->outofcore)
-            refcount_inner_[l1]--;
+        if (refcount_atom_[l1] > 1 or not cmd_->outofcore)
+            refcount_atom_[l1]--;
         if (refcount_proj_[l2] > 1 or not cmd_->outofcore)
             refcount_proj_[l2]--;
         
         // release memory
-        if (refcount_inner_[l1] == 0)
-            prec_inner_[l1].drop();
+        if (refcount_atom_[l1] == 0)
+            prec_atom_[l1].drop();
         if (refcount_proj_[l2] == 0)
             prec_proj_ [l2].drop();
     }
@@ -486,7 +495,7 @@ void KPACGPreconditioner::CG_exit (int iblock) const
 
 void KPACGPreconditioner::finish ()
 {
-    prec_inner_.clear();
+    prec_atom_.clear();
     CGPreconditioner::finish();
 }
 

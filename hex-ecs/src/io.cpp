@@ -36,17 +36,25 @@
 #include <string>
 #include <tuple>
 
+// --------------------------------------------------------------------------------- //
+
 #include "hex-arrays.h"
 #include "hex-cmdline.h"
 #include "hex-csrmatrix.h"
 #include "hex-matrix.h"
 
+// --------------------------------------------------------------------------------- //
+
 #include "io.h"
 #include "preconditioners.h"
+
+// --------------------------------------------------------------------------------- //
 
 #ifdef WITH_OPENCL
     #include <CL/cl.h>
 #endif
+
+// --------------------------------------------------------------------------------- //
 
 const std::string sample_input =
     "# This is a sample input file for the program hex-ecs.\n"
@@ -186,7 +194,6 @@ void CommandLine::parse (int argc, char* argv[])
                     "\t--stg-extract              (-c)  Only extract amplitudes (assumes that the solution files exist).                                                       \n"
                     "                                                                                                                                                          \n"
                     "Right-hand side                                                                                                                                           \n"
-                    "\t--exact-rhs                      Use a different variant of right-hand side (slower and should be almost the same as the default - faster - variant).   \n"
                     "\t--fast-bessel                    Use faster Bessel function evaluation routine (not the Steed/Barnett) when calculating RHS.                            \n"
                     "                                                                                                                                                          \n"
                     "Disk access                                                                                                                                               \n"
@@ -240,7 +247,6 @@ void CommandLine::parse (int argc, char* argv[])
                     "                                                                                                                                                          \n"
                     "Domain decomposition preconditioner                                                                                                                       \n"
                     "\t--dom-panels <number>            Number of domain decomposition panels along each axis.                                                                 \n"
-                    "\t--dom-overlap <number>           Domain decomposition panel overlap. 0 = no overlap. 1 = overlap of the size equal to the non-overlapped panel size.    \n"
                     "                                                                                                                                                          \n"
                     "Post-processing                                                                                                                                           \n"
                     "\t--no-parallel-extraction         Disallow parallel extraction of T-matrices (e.g. when the whole solution does not fit into the memory).                \n"
@@ -594,12 +600,6 @@ void CommandLine::parse (int argc, char* argv[])
                 ssor = std::stod(optargs[0]);
                 return true;
             },
-        "exact-rhs", "", 0, [&](std::vector<std::string> const & optargs) -> bool
-            {
-                // use exact RHS
-                exact_rhs = true;
-                return true;
-            },
         "fast-bessel", "", 0, [&](std::vector<std::string> const & optargs) -> bool
             {
                 // use faster Bessel function evaluation routine (not the Steed/Barnett) when calculating RHS
@@ -634,12 +634,6 @@ void CommandLine::parse (int argc, char* argv[])
             {
                 // domain decomposition panels
                 dom_panels = std::stoi(optargs[0]);
-                return true;
-            },
-        "dom-overlap", "", 1, [&](std::vector<std::string> const & optargs) -> bool
-            {
-                // domain decomposition panels
-                dom_overlap = std::stod(optargs[0]);
                 return true;
             },
         
@@ -1030,7 +1024,7 @@ void zip_solution
     GaussLegendre g_inner;
     
     // factorize the overlap matrix
-    CsrMatrix<LU_int_t,Complex> S_csr = r.S_inner().tocoo<LU_int_t>().tocsr();
+    CsrMatrix<LU_int_t,Complex> S_csr = r.S_inner_x().tocoo<LU_int_t>().tocsr();
     std::shared_ptr<LUft> S_lu;
     S_lu.reset(LUft::Choose(cmd.factorizer));
     S_lu->factorize(S_csr);
@@ -1039,12 +1033,12 @@ void zip_solution
     cArrays Xp1 (Nchan2), Sp1 (Nchan2), Xp2 (Nchan1), Sp2 (Nchan1);
     for (int n1 = l1 + 1; n1 <= l1 + Nchan2; n1++)
     {
-        Sp1[n1 - l1 - 1] = r.overlapP(bspline_inner, g_inner, n1, l1, weightEndDamp(bspline_inner));
+        Sp1[n1 - l1 - 1] = r.overlapP(bspline_inner, g_inner, n1, l1);
         Xp1[n1 - l1 - 1] = S_lu->solve(Sp1[n1 - l1 - 1]);
     }
     for (int n2 = l2 + 1; n2 <= l2 + Nchan1; n2++)
     {
-        Sp2[n2 - l2 - 1] = r.overlapP(bspline_inner, g_inner, n2, l2, weightEndDamp(bspline_inner));
+        Sp2[n2 - l2 - 1] = r.overlapP(bspline_inner, g_inner, n2, l2);
         Xp2[n2 - l2 - 1] = S_lu->solve(Sp2[n2 - l2 - 1]);
     }
     
@@ -1149,7 +1143,7 @@ void write_grid (Bspline const & bspline, std::string const & basename)
     // get atomic grid
     rArray knots = bspline.rknots();
     knots.pop_back();
-    knots.append(bspline.cknots());
+    knots.append(bspline.cknots2());
     
     // output file
     std::ofstream out (basename + ".vtk");

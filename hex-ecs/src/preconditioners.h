@@ -29,8 +29,8 @@
 //                                                                                   //
 //  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
-#ifndef HEX_PRECONDITIONERS
-#define HEX_PRECONDITIONERS
+#ifndef HEX_ECS_PRECONDITIONERS
+#define HEX_ECS_PRECONDITIONERS
 
 // --------------------------------------------------------------------------------- //
 
@@ -183,4 +183,4 @@ class PreconditionerBase
 
 // --------------------------------------------------------------------------------- //
 
-#endif // HEX_PRECONDITIONERS
+#endif // HEX_ECS_PRECONDITIONERS

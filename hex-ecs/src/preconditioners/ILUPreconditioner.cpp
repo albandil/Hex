@@ -163,8 +163,10 @@ void ILUCGPreconditioner::CG_init (int iblock) const
         int Nchan2 = Nchan_[iblock].second;
         
         // number of B-splines
-        LU_int_t Nspline_inner = rad_->bspline_inner().Nspline();
-        LU_int_t Nspline_outer = rad_->bspline_full().Nspline() - Nspline_inner;
+        LU_int_t Nspline_inner_x = rad_->bspline_inner_x().Nspline();
+        LU_int_t Nspline_inner_y = rad_->bspline_inner_y().Nspline();
+        LU_int_t Nspline_outer_x = rad_->bspline_full_x().Nspline() - Nspline_inner_x;
+        LU_int_t Nspline_outer_y = rad_->bspline_full_y().Nspline() - Nspline_inner_y;
         
         // angular block
         int iang = iblock * ang_->states().size() + iblock;
@@ -179,8 +181,8 @@ void ILUCGPreconditioner::CG_init (int iblock) const
         // add the A-block
         coo_block.resize
         (
-            Nspline_inner * Nspline_inner + (Nchan1 + Nchan2) * Nspline_outer,
-            Nspline_inner * Nspline_inner + (Nchan1 + Nchan2) * Nspline_outer
+            Nspline_inner_x * Nspline_inner_y + Nchan1 * Nspline_outer_x + Nchan2 * Nspline_outer_y,
+            Nspline_inner_x * Nspline_inner_y + Nchan1 * Nspline_outer_x + Nchan2 * Nspline_outer_y
         );
         
         if (not inp_->inner_only)
@@ -199,8 +201,8 @@ void ILUCGPreconditioner::CG_init (int iblock) const
                 CooMatrix<LU_int_t,Complex> B_coo_large
                 (
                     coo_block.rows(), coo_block.cols(),
-                    B_coo_small.i() + Nspline_inner * Nspline_inner + m * Nspline_outer,
-                    B_coo_small.j() + Nspline_inner * Nspline_inner + n * Nspline_outer,
+                    B_coo_small.i() + Nspline_inner_x * Nspline_inner_y + m * Nspline_outer_x,
+                    B_coo_small.j() + Nspline_inner_x * Nspline_inner_y + n * Nspline_outer_x,
                     B_coo_small.v()
                 );
                 coo_block += B_coo_large;
@@ -214,8 +216,8 @@ void ILUCGPreconditioner::CG_init (int iblock) const
                 CooMatrix<LU_int_t,Complex> B_coo_large
                 (
                     coo_block.rows(), coo_block.cols(),
-                    B_coo_small.i() + Nspline_inner * Nspline_inner + (Nchan1 + m) * Nspline_outer,
-                    B_coo_small.j() + Nspline_inner * Nspline_inner + (Nchan1 + n) * Nspline_outer,
+                    B_coo_small.i() + Nspline_inner_x * Nspline_inner_y + Nchan1 * Nspline_outer_x + m * Nspline_outer_y,
+                    B_coo_small.j() + Nspline_inner_x * Nspline_inner_y + Nchan1 * Nspline_outer_x + n * Nspline_outer_y,
                     B_coo_small.v()
                 );
                 coo_block += B_coo_large;
