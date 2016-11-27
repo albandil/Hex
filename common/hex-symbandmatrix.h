@@ -351,13 +351,6 @@ public:
      */
     NumberArray<DataT> upperSolve (const ArrayView<DataT> b) const;
     
-    /**
-     * @brief Kronecker product.
-     * 
-     * Compute Kronecker product with other matrix.
-     */
-    SymBandMatrix kron (SymBandMatrix const & B) const;
-
     //
     // HDF interface
     //
@@ -729,7 +722,7 @@ template <class DataT> class BlockSymBandMatrix
          * @param blockstructure Vector of block positions; only upper part of the matrix (+ main diagonal) allowed.
          * @param name Name of the optional scratch disk file.
          */
-        BlockSymBandMatrix (int blockcount, int blockhalfbw, int size, int halfbw, bool inmemory, std::string name)
+        BlockSymBandMatrix (int blockcount, int blockhalfbw, int size, int halfbw, bool inmemory = true, std::string name = "")
             : diskfile_(name), inmemory_(inmemory), blockcount_(blockcount), blockhalfbw_(blockhalfbw), size_(size), halfbw_(halfbw), data_()
         {
             if (inmemory_)
@@ -744,6 +737,12 @@ template <class DataT> class BlockSymBandMatrix
         
         /// Access to the memory buffer (maay be empty if data not in memory).
         NumberArray<DataT> const & data () const { return data_; }
+        
+        // Structure information.
+        std::size_t blockcount () const { return blockcount_; }
+        std::size_t blockhalfbw () const { return blockhalfbw_; }
+        std::size_t size () const { return size_; }
+        std::size_t halfbw () const { return halfbw_; }
         
         /**
          * @brief Access block.
@@ -770,6 +769,10 @@ template <class DataT> class BlockSymBandMatrix
          * Return the element [i * size + j, k * size + l].
          */
         DataT operator() (int i, int j, int k, int l) const
+        {
+            return data_[((std::min(i, k) * blockhalfbw_ + std::abs(i - k)) * size_ + std::min(j, l)) * halfbw_ + std::abs(j - l)];
+        }
+        DataT & operator() (int i, int j, int k, int l)
         {
             return data_[((std::min(i, k) * blockhalfbw_ + std::abs(i - k)) * size_ + std::min(j, l)) * halfbw_ + std::abs(j - l)];
         }
@@ -1158,6 +1161,43 @@ template <class DataT>
 SymBandMatrix<DataT> operator * (DataT z, SymBandMatrix<DataT> const & A)
 {
     return SymBandMatrix<DataT>(A.size(), A.halfbw(), z * A.data());
+}
+
+template <class DataT>
+BlockSymBandMatrix<DataT> kron
+(
+    SymBandMatrix<DataT> const & A,
+    SymBandMatrix<DataT> const & B
+)
+{
+    BlockSymBandMatrix<DataT> C (A.size(), A.halfbw(), B.size(), B.halfbw());
+    
+    for (std::size_t i = 0; i < A.size(); i++)
+    for (std::size_t u = 0; u < A.halfbw(); u++)
+    if (i + u < A.size())
+    for (std::size_t j = 0; j < B.size(); j++)
+    for (std::size_t v = 0; v < B.halfbw(); v++)
+    if (j + v < B.size())
+    {
+        C(i,j,i+u,j+v) = A(i,i+u) * B(j,j+v);
+    }
+    
+    return C;
+}
+
+template<class DataT>
+BlockSymBandMatrix<DataT> operator -
+(
+    BlockSymBandMatrix<DataT> const & A,
+    BlockSymBandMatrix<DataT> const & B
+)
+{
+    BlockSymBandMatrix<DataT> C (A.blockcount(), A.blockhalfbw(), A.size(), A.halfbw());
+    
+    for (std::size_t i = 0; i < A.blockcount() * A.blockhalfbw(); i++)
+        C.setBlock(i, A.getBlock(i) - B.getBlock(i));
+    
+    return C;
 }
 
 /**

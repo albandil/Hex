@@ -797,6 +797,82 @@ cArray RadialIntegrals::overlap (Bspline const & bspline, GaussLegendre const & 
     return res;
 }
 
+cArray RadialIntegrals::overlap
+(
+    Bspline const & bspline1, GaussLegendre const & g1,
+    Bspline const & bspline2, GaussLegendre const & g2,
+    C2CFunction funct
+) const
+{
+    // resulting overlap
+    cArray res (bspline1.Nspline() * bspline2.Nspline());
+    
+    // quadrature points per interval
+    int points = EXPANSION_QUADRATURE_POINTS;
+    
+    // evaluate quadrature nodes and weights
+    cArray xs ((bspline1.Nknot() - 1) * points), wxs ((bspline1.Nknot() - 1) * points);
+    for (int ixknot = 0; ixknot < bspline1.Nknot() - 1; ixknot++)
+        g1.scaled_nodes_and_weights(points, bspline1.t(ixknot), bspline1.t(ixknot+1), xs.data() + ixknot * points, wxs.data() + ixknot * points);
+    cArray ys ((bspline2.Nknot() - 1) * points), wys ((bspline2.Nknot() - 1) * points);
+    for (int iyknot = 0; iyknot < bspline2.Nknot() - 1; iyknot++)
+        g2.scaled_nodes_and_weights(points, bspline2.t(iyknot), bspline2.t(iyknot+1), ys.data() + iyknot * points, wys.data() + iyknot * points);
+    
+    // evaluate B-splines
+    cArray Bx (bspline1.Nspline() * (bspline1.order() + 1) * points);
+    for (int ixspline = 0; ixspline < bspline1.Nspline(); ixspline++)
+    for (int ixknot = ixspline; ixknot <= ixspline + bspline1.order() and ixknot < bspline1.Nknot() - 1; ixknot++)
+        bspline1.B(ixspline, ixknot, points, xs.data() + ixknot * points, Bx.data() + (ixspline * (bspline1.order() + 1) + ixknot - ixspline) * points);
+    cArray By (bspline2.Nspline() * (bspline2.order() + 1) * points);
+    for (int iyspline = 0; iyspline < bspline2.Nspline(); iyspline++)
+    for (int iyknot = iyspline; iyknot <= iyspline + bspline2.order() and iyknot < bspline2.Nknot() - 1; iyknot++)
+        bspline2.B(iyspline, iyknot, points, ys.data() + iyknot * points, By.data() + (iyspline * (bspline2.order() + 1) + iyknot - iyspline) * points);
+    
+    // evaluated function
+    cArray evalF (points * points);
+    
+    // for all knots
+    # pragma omp parallel for firstprivate(evalF)
+    for (int ixknot = 0; ixknot < bspline1.Nknot() - 1; ixknot++)
+    for (int iyknot = 0; iyknot < bspline2.Nknot() - 1; iyknot++)
+    {
+        // skip zero length intervals
+        if (bspline1.t(ixknot) == bspline1.t(ixknot+1) or bspline2.t(iyknot) == bspline2.t(iyknot+1))
+            continue;
+        
+        // evaluate the function (with weights) in quadrature points
+        for (int ixpoint = 0; ixpoint < points; ixpoint++)
+        for (int iypoint = 0; iypoint < points; iypoint++)
+        {
+            evalF[ixpoint * points + iypoint] =
+                funct(xs[ixknot * points + ixpoint], ys[iyknot * points + iypoint])
+                * wxs[ixknot * points + ixpoint]
+                * wys[ixknot * points + ixpoint];
+        }
+        
+        // for all relevant B-splines
+        for (int ixspline = std::max(ixknot - bspline1.order(), 0); ixspline < bspline1.Nspline() and ixspline <= ixknot; ixspline++)
+        for (int iyspline = std::max(iyknot - bspline2.order(), 0); iyspline < bspline2.Nspline() and iyspline <= iyknot; iyspline++)
+        {
+            // get pointer to the B-spline evaluations
+            Complex const * const Bxp = Bx.data() + (ixspline * (bspline1.order() + 1) + ixknot - ixspline) * points;
+            Complex const * const Byp = By.data() + (iyspline * (bspline2.order() + 1) + iyknot - iyspline) * points;
+            
+            // sum with weights
+            Complex sum = 0.;
+            for (int ixpoint = 0; ixpoint < points; ixpoint++)
+            for (int iypoint = 0; iypoint < points; iypoint++)
+                sum += evalF[ixpoint * points + iypoint] * Bxp[ixpoint] * Byp[iypoint];
+            
+            // store the overlap
+            # pragma omp critical
+            res[ixspline * bspline2.Nspline() + iyspline] += sum;
+        }
+    }
+    
+    return res;
+}
+
 cArray RadialIntegrals::overlapP (Bspline const & bspline, GaussLegendre const & g, int n, int l) const
 {
     // result
@@ -907,7 +983,7 @@ cArray RadialIntegrals::overlapj (Bspline const & bspline, GaussLegendre const &
                 else
                 {
                     // smooth damping in vicinity of the complex rotation point
-                    damp = 0.5 * (1.0 + std::tanh(0.5 * (bspline.t(bspline.iR2() - order).real() - bspline.t(iknot + 1).real())));
+                    damp = std::tanh(0.125 * (bspline.R2() - 5 - xs[ipoint].real()));
                 }
                 
                 // if the factor is numerical zero, do not evaluate the function at all, just fill zeros
