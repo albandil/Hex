@@ -87,7 +87,7 @@ class CommandLine
             : writegrid(false), zipdata(), parallel(false), preconditioner("ILU"),
               droptol(1e-8), itinerary(StgNone), outofcore(false), cont(false), wholematrix(false), cache_all_radint(true), cache_own_radint(true),
               itertol(1e-8), prec_itertol(1e-8), parallel_precondition(false), gpu_large_data(false),
-              lightweight_full(false), lightweight_radial_cache(true), shared_scratch(false), reuse_dia_blocks(false),
+              lightweight_full(false), lightweight_radial_cache(false), shared_scratch(false), reuse_dia_blocks(false),
               kpa_simple_rad(false), ocl_platform(0), ocl_device(0), factorizer("umfpack"), groupsize(1),
               parallel_factorization(false), parallel_extraction(true), ilu_max_iter(10),
               carry_initial_guess(false), gpu_multiply(false), extract_extrapolate(false), extract_rho(-1), extract_rho_begin(-1), extract_samples(-1),
