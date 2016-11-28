@@ -579,7 +579,6 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
             R_tr_dia_[lambda].hdfsave();
     }
     
-    
     // wait for completition of all processes
     par.wait();
     
