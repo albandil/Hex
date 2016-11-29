@@ -193,7 +193,15 @@ void Solver::solve ()
             
             // check if there is some precomputed solution on the disk
             SolutionIO reader (inp_.L, Spin, inp_.Pi, ni, li, mi, inp_.Etot[ie], ang_.states());
-            std::size_t size = reader.check();
+            std::size_t size = 0;
+            reader.check(SolutionIO::All, size);
+            
+            // sum partial sizes in distributed case
+            if (not cmd_.shared_scratch)
+            {
+                par_.mastersum(&size, 1, 0);
+                par_.bcast(0, &size, 1);
+            }
             
             // solution has the expected size
             if (size == Hsize and not cmd_.refine_solution)
