@@ -229,7 +229,7 @@ void KPACGPreconditioner::prepare
     }
     
     // wait for completition of diagonalization on other nodes
-    par_->wait();
+    par_->wait(); // FIXME : hangs when some nodes already have all needed KPA files
 
     // load all preconditioner matrices needed by this MPI node
 //     for (int l : needed_l)
