@@ -89,6 +89,8 @@ OPENMPILIBS  = $(shell mpicxx --showme:link)
 
 # ---------------------------------------------------------------------------- #
 # OpenCL (optional)                                                            #
+# - Use the flag -DOPENCL2 if you are sure that your implementation supports   #
+#   OpenCL 2.0+. This will avoid some deprecated functions.                    #
 # ---------------------------------------------------------------------------- #
 
 # OPENCLFLAGS = -DWITH_OPENCL
