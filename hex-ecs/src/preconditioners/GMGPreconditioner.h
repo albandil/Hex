@@ -48,23 +48,27 @@ class GMGPreconditioner : public NoPreconditioner
         // constructor
         GMGPreconditioner
         (
-            Parallel const & par,
-            InputFile const & inp,
-            AngularBasis const & ll,
-            Bspline const & bspline_inner,
-            Bspline const & bspline_full,
-            CommandLine const & cmd
+            CommandLine  const & cmd,
+            InputFile    const & inp,
+            Parallel     const & par,
+            AngularBasis const & ang,
+            Bspline const & bspline_x_inner,
+            Bspline const & bspline_x_full,
+            Bspline const & bspline_y_inner,
+            Bspline const & bspline_y_full
         );
         
         // sub-grid contructor
         GMGPreconditioner
         (
-            Parallel const & par,
-            InputFile const & inp,
-            AngularBasis const & ll,
-            Bspline const & bspline_inner,
-            Bspline const & bspline_full,
-            CommandLine const & cmd,
+            CommandLine  const & cmd,
+            InputFile    const & inp,
+            Parallel     const & par,
+            AngularBasis const & ang,
+            Bspline const & bspline_x_inner,
+            Bspline const & bspline_x_full,
+            Bspline const & bspline_y_inner,
+            Bspline const & bspline_y_full,
             int level
         );
         

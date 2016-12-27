@@ -61,20 +61,30 @@ NoPreconditioner::NoPreconditioner ()
 
 NoPreconditioner::NoPreconditioner
 (
-    Parallel const & par,
-    InputFile const & inp,
-    AngularBasis const & ll,
-    Bspline const & bspline_inner,
-    Bspline const & bspline_full,
-    CommandLine const & cmd
+    CommandLine  const & cmd,
+    InputFile    const & inp,
+    Parallel     const & par,
+    AngularBasis const & ang,
+    Bspline const & bspline_x_inner,
+    Bspline const & bspline_x_full,
+    Bspline const & bspline_y_inner,
+    Bspline const & bspline_y_full
 ) : PreconditionerBase(),
-    E_(0), cmd_(&cmd), par_(&par), inp_(&inp), ang_(&ll),
-    A_blocks_ (ll.states().size() * ll.states().size()),
-    B1_blocks_(ll.states().size() * ll.states().size()),
-    B2_blocks_(ll.states().size() * ll.states().size()),
-    Cu_blocks_(ll.states().size() * ll.states().size()),
-    Cl_blocks_(ll.states().size() * ll.states().size()),
-    rad_(new RadialIntegrals(bspline_inner, bspline_full, ll.maxlambda() + 1))
+    E_(0), cmd_(&cmd), par_(&par), inp_(&inp), ang_(&ang),
+    A_blocks_ (ang.states().size() * ang.states().size()),
+    B1_blocks_(ang.states().size() * ang.states().size()),
+    B2_blocks_(ang.states().size() * ang.states().size()),
+    Cu_blocks_(ang.states().size() * ang.states().size()),
+    Cl_blocks_(ang.states().size() * ang.states().size()),
+    rad_
+    (
+        new RadialIntegrals
+        (
+            bspline_x_inner, bspline_x_full,
+            bspline_y_inner, bspline_y_full,
+            ang.maxlambda() + 1
+        )
+    )
 {
     // nothing to do
 }

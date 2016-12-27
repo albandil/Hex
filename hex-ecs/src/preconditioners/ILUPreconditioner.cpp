@@ -56,14 +56,22 @@ std::string ILUCGPreconditioner::description () const
 
 ILUCGPreconditioner::ILUCGPreconditioner
 (
-    Parallel const & par,
-    InputFile const & inp,
-    AngularBasis const & ll,
-    Bspline const & bspline_inner,
-    Bspline const & bspline_full,
-    CommandLine const & cmd
-) : CGPreconditioner(par, inp, ll, bspline_inner, bspline_full, cmd),
-    data_(ll.states().size()), lu_(ll.states().size())
+    CommandLine  const & cmd,
+    InputFile    const & inp,
+    Parallel     const & par,
+    AngularBasis const & ang,
+    Bspline const & bspline_x_inner,
+    Bspline const & bspline_x_full,
+    Bspline const & bspline_y_inner,
+    Bspline const & bspline_y_full
+) : CGPreconditioner
+    (
+        cmd, inp, par, ang,
+        bspline_x_inner, bspline_x_full,
+        bspline_y_inner, bspline_y_full
+    ),
+    data_(ang.states().size()),
+    lu_(ang.states().size())
 {
 #ifdef _OPENMP
     omp_init_lock(&lu_lock_);

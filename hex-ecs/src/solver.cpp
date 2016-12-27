@@ -31,13 +31,17 @@
 
 #include "hex-hydrogen.h"
 
+// --------------------------------------------------------------------------------- //
+
 #include "solver.h"
+
+// --------------------------------------------------------------------------------- //
 
 Solver::Solver
 (
-    CommandLine & cmd,
-    InputFile const & inp,
-    Parallel const & par,
+    CommandLine        & cmd,
+    InputFile    const & inp,
+    Parallel     const & par,
     AngularBasis const & ang,
     Bspline const & bspline_inner,
     Bspline const & bspline_full
@@ -52,7 +56,13 @@ Solver::Solver
 void Solver::choose_preconditioner ()
 {
     // create the preconditioner
-    prec_ = PreconditionerBase::Choose(cmd_.preconditioner, par_, inp_, ang_, bspline_inner_, bspline_full_, cmd_);
+    prec_ = PreconditionerBase::Choose
+    (
+        cmd_.preconditioner,
+        cmd_, inp_,  par_, ang_,
+        bspline_inner_, bspline_full_,
+        bspline_inner_, bspline_full_
+    );
     
     // check success
     if (prec_ == nullptr)

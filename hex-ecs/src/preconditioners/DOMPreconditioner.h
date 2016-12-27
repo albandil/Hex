@@ -62,12 +62,14 @@ class DOMPreconditioner : public NoPreconditioner
         // constructor
         DOMPreconditioner
         (
-            Parallel const & par,
-            InputFile const & inp,
-            AngularBasis const & ll,
-            Bspline const & bspline_inner,
-            Bspline const & bspline_full,
-            CommandLine const & cmd
+            CommandLine  const & cmd,
+            InputFile    const & inp,
+            Parallel     const & par,
+            AngularBasis const & ang,
+            Bspline const & bspline_x_inner,
+            Bspline const & bspline_x_full,
+            Bspline const & bspline_y_inner,
+            Bspline const & bspline_y_full
         );
         
         // description of the preconditioner
@@ -85,18 +87,86 @@ class DOMPreconditioner : public NoPreconditioner
     
     protected:
         
-        // solutions on the sub-domains
-        typedef struct
+        // neighbour panels
+        enum Neighbours
         {
-            cArray r;               // original source
-            cArray z;               // solution
-            std::array<cArray,4> ssrc;  // surrogate sources from neighbour panels
-            std::array<cArray,4> outf;  // outgoing field to neighbour panels
+            Left   = 0,
+            Right  = 1,
+            Down   = 2,
+            Up     = 3,
+            nNbrs  = 4
+        };
+        
+        // get reverse direction for a given direction
+        int rev (int dir) const
+        {
+            switch (dir)
+            {
+                case Left  : return Right;
+                case Right : return Left;
+                case Down  : return Up;
+                case Up    : return Down;
+            };
+            
+            return nNbrs;
         }
-        PanelSolution;
+        
+        // solutions on the sub-domains
+        class PanelSolution
+        {
+            public:
+                
+                PanelSolution
+                (
+                    int order,
+                    Real theta,
+                    rArray cxspline1_inner, rArray rxspline_inner, rArray cxspline2_inner,
+                    rArray cyspline1_inner, rArray ryspline_inner, rArray cyspline2_inner,
+                    rArray cxspline1_full,  rArray rxspline_full,  rArray cxspline2_full,
+                    rArray cyspline1_full,  rArray ryspline_full,  rArray cyspline2_full,
+                    int Nang
+                );
+                
+                Bspline xspline_inner;  // inner x-axis B-spline basis
+                Bspline yspline_inner;  // inner y-axis B-spline basis
+                
+                Bspline xspline_full;   // full x-axis B-spline basis
+                Bspline yspline_full;   // full y-axis B-spline basis
+                
+                CsrMatrix<LU_int_t,Complex> SaF, SbF;   // overlaps of panel and full basis
+                CsrMatrix<LU_int_t,Complex> Saa, Sbb;   // panel B-spline self-overlap matrices
+                
+                std::shared_ptr<LUft> lu_Saa, lu_Sbb;   // LU decomposition of the panel overlaps
+                
+                cBlockArray r;  // original source
+                cBlockArray z;  // solution
+                
+                std::array<cBlockArray,nNbrs> ssrc;  // surrogate sources from neighbour panels
+                std::array<cBlockArray,nNbrs> outf;  // outgoing field to neighbour panels
+        };
         
         // find solution on a sub-domain
         void solvePanel (int n, std::vector<PanelSolution> & p, int i, int j) const;
+        
+        // construct the surrogate source for panel's boundary
+        cArray surrogateSource (PanelSolution * panel, int direction, PanelSolution * neighbour) const;
+        
+        // get knot sub-sequences
+        void knotSubsequence
+        (
+            int ipanel,
+            int npanels,
+            Bspline const & bspline,
+            rArray & rknots,
+            rArray & cknots1,
+            rArray & cknots2
+        ) const;
+        
+        // interpolate residual to sub-domains
+        void splitResidual (cBlockArray const & r, std::vector<PanelSolution> & p) const;
+        
+        // interpolate solution from sub-domains
+        void collectSolution (cBlockArray & z, std::vector<PanelSolution> & p) const;
 };
 
 // --------------------------------------------------------------------------------- //

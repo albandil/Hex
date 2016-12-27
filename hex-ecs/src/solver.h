@@ -57,9 +57,9 @@ class Solver
         /// Constructor.
         Solver
         (
-            CommandLine & cmd,
-            InputFile const & inp,
-            Parallel const & par,
+            CommandLine        & cmd,
+            InputFile    const & inp,
+            Parallel     const & par,
             AngularBasis const & ang,
             Bspline const & bspline_inner,
             Bspline const & bspline_full

@@ -1398,6 +1398,15 @@ template <class T> class BlockArray
             return arrays_.size();
         }
         
+        NumberArray<T> * begin () { return arrays_.begin(); }
+        NumberArray<T> * end () { return arrays_.end(); }
+        
+        NumberArray<T> const * begin () const { return arrays_.begin(); }
+        NumberArray<T> const * end () const { return arrays_.end(); }
+        
+        NumberArray<T> const * cbegin () const { return arrays_.cbegin(); }
+        NumberArray<T> const * cend () const { return arrays_.cend(); }
+        
         NumberArray<T> & operator[] (std::size_t i)
         {
             assert(i < arrays_.size());
