@@ -53,7 +53,7 @@
     #include <cmumps_c.h>
     #define MUMPS_STRUC_C CMUMPS_STRUC_C
     #define MUMPS_C cmumps_c
-    #define MUMPS_COMPLEX mumps_float_complex
+    #define MUMPS_COMPLEX mumps_complex
 #else
     #include <zmumps_c.h>
     #define MUMPS_STRUC_C ZMUMPS_STRUC_C

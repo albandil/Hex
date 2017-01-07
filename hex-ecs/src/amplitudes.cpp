@@ -132,7 +132,7 @@ void Amplitudes::extract ()
                 }
                 par_.syncsum(&valid_blocks, 1);
                 
-                if (/*valid_blocks != ang_.size()*/not reader.load(solution)) // TODO : OOC, and also multi-node
+                if (valid_blocks != ang_.size()/*not reader.load(solution)*/) // TODO : OOC
                 {
                     // complain only if the solution is allowed
                     // TODO

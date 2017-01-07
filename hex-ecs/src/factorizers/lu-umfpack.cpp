@@ -61,7 +61,7 @@ bool LUft_UMFPACK::valid () const
     return numeric_ != nullptr and size() > 0;
 }
 
-double LUft_UMFPACK::cond () const
+Real LUft_UMFPACK::cond () const
 {
     return info_[UMFPACK_RCOND];
 }
@@ -81,14 +81,21 @@ void LUft_UMFPACK::factorize (CsrMatrix<LU_int_t,Complex> const & matrix, LUftDa
     Control[UMFPACK_DROPTOL] = data.drop_tolerance;
     
     // diagnostic information
-    rArray Info (UMFPACK_INFO);
+    NumberArray<double> Info (UMFPACK_INFO);
     
     // matrix data
     LU_int_t m = matrix.rows();
     LU_int_t n = matrix.cols();
+#ifndef SINGLE
+    x_ = matrix.x();
+#else
+    x_.resize(0);
+    x_.reserve(matrix.x().size());
+    for (Complex x : matrix.x())
+	x_.push_back(std::complex<double>(x.real(), x.imag()));
+#endif
     p_ = matrix.p();
     i_ = matrix.i();
-    x_ = matrix.x();
     
     // analyze the sparse structure
     status = UMFPACK_SYMBOLIC_F
