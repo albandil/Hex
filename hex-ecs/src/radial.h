@@ -166,6 +166,22 @@ class RadialIntegrals
         SymBandMatrix<Complex> computeOverlapMatrix (Bspline const & bspline, CCFunction func) const;
         
         /**
+         * @brief Compute overlap matrix of two B-spline bases.
+         * 
+         * This function returns a matrix of B-spline overlaps across two bases.
+         * The overlap integrals are calculated only between the given bounds
+         * @c R_left and @c R_right (these are the real parts of the potentially
+         * complex coordinates). Both bounds must be aligned to some B-spline knot.
+         */
+        static CsrMatrix<LU_int_t,Complex> computeOverlapMatrix
+        (
+            Bspline const & bspline1,
+            Bspline const & bspline2,
+            Real R_left,
+            Real R_right
+        );
+        
+        /**
          * @brief Partial derivative overlap.
          * 
          * Compute derivative overlap of B-splines @f$ B_i @f$ and @f$ B_j @f$

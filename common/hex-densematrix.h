@@ -831,4 +831,28 @@ NumberArray<Type> operator * (ArrayView<Complex> v, RowMatrixView<Complex> const
     return w;
 }
 
+/**
+ * @brief General dense matrix transposition.
+ * 
+ * Transposes a dense matrix with given dimensions.
+ * 
+ * @param A Dense matrix elements array to transpose of length @c ldA0 x @c ldA.
+ * @param ldA0 Original leading dimension.
+ * @param ldA New leading dimensions.
+ */
+template <class Type>
+void transpose (ArrayView<Type> A, std::size_t ldA0, std::size_t ldA)
+{
+    // the matrix size must be divisible by the leading dimension
+    assert(A.size() == ldA * ldA0);
+    
+    // backup the original matrix
+    NumberArray<Type> A0 = A;
+    
+    // fill transposed elements
+    for (std::size_t i = 0; i < ldA0; i++)
+    for (std::size_t j = 0; j < ldA; j++)
+        A[i * ldA + j] = A0[j * ldA0 + i];
+}
+
 #endif // HEX_DENSEMATRIX_H

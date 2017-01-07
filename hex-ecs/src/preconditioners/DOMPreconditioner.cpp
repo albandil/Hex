@@ -36,7 +36,14 @@
 
 #include "radial.h"
 
+// --------------------------------------------------------------------------------- //
+
 #include "DOMPreconditioner.h"
+
+// --------------------------------------------------------------------------------- //
+
+/// DEBUG : fixed division into sub-panels
+int xpanels = 2, ypanels = 2;
 
 // --------------------------------------------------------------------------------- //
 
@@ -77,9 +84,6 @@ void DOMPreconditioner::update (Real E)
 
 void DOMPreconditioner::precondition (BlockArray<Complex> const & r, BlockArray<Complex> & z) const
 {
-    /// DEBUG : fixed division into sub-panels
-    int xpanels = 2, ypanels = 2;
-    
     // B-spline parameters
     int order = rad().bspline_inner_x().order();
     Real theta = rad().bspline_inner_x().ECStheta();
@@ -97,17 +101,52 @@ void DOMPreconditioner::precondition (BlockArray<Complex> const & r, BlockArray<
         knotSubsequence(ixpanel, xpanels, rad().bspline_inner_x(), rxknots, cxknots1, cxknots2);
         knotSubsequence(iypanel, ypanels, rad().bspline_inner_x(), ryknots, cyknots1, cyknots2);
         
+        if (ixpanel == 0) cxknots1.drop();
+        if (iypanel == 0) cyknots1.drop();
+        
+        std::cout << std::endl;
+        std::cout << "Sub-domain (" << ixpanel << "," << iypanel << ")" << std::endl;
+        std::cout << " cxknots1 = " << cxknots1 << std::endl;
+        std::cout << " rxknots  = " << rxknots  << std::endl;
+        std::cout << " cxknots2 = " << cxknots2 << std::endl;
+        std::cout << " cyknots1 = " << cyknots1 << std::endl;
+        std::cout << " ryknots  = " << ryknots  << std::endl;
+        std::cout << " cyknots2 = " << cyknots2 << std::endl;
+        
         // create the B-spline bases for the panel
         p.emplace_back
         (
             order,
             theta,
+            rad().bspline_inner_x(),
+            rad().bspline_inner_y(),
             cxknots1, rxknots, cxknots2,
             cyknots1, ryknots, cyknots2,
             cxknots1, rxknots, cxknots2,
             cyknots1, ryknots, cyknots2,
             ang_->states().size()
         );
+        
+        // get the current B-spline objects
+        Bspline const & xspline = p.back().xspline_inner;
+        Bspline const & yspline = p.back().yspline_inner;
+        
+        // calculate overlaps
+        p.back().SaF = RadialIntegrals::computeOverlapMatrix(xspline, rad().bspline_inner_x(), xspline.R1(), xspline.R2());
+        p.back().SbF = RadialIntegrals::computeOverlapMatrix(yspline, rad().bspline_inner_y(), yspline.R1(), yspline.R2());
+        p.back().Saa = RadialIntegrals::computeOverlapMatrix(xspline, xspline,  xspline.Rmin(), xspline.Rmax());
+        p.back().Sbb = RadialIntegrals::computeOverlapMatrix(yspline, yspline,  yspline.Rmin(), yspline.Rmax());
+        
+        p.back().SaF.write(format("SaF-%d-%d.mat", ixpanel, iypanel));
+        p.back().SbF.write(format("SbF-%d-%d.mat", ixpanel, iypanel));
+        p.back().Saa.write(format("Saa-%d-%d.mat", ixpanel, iypanel));
+        p.back().Sbb.write(format("Sbb-%d-%d.mat", ixpanel, iypanel));
+        
+        // factorize the square overlap matrices
+        p.back().lu_Saa.reset(LUft::Choose("lapack"));
+        p.back().lu_Sbb.reset(LUft::Choose("lapack"));
+        p.back().lu_Saa->factorize(p.back().Saa);
+        p.back().lu_Sbb->factorize(p.back().Sbb);
     }
     
     // interpolate the residual into sub-domains
@@ -257,6 +296,25 @@ void DOMPreconditioner::solvePanel (int n, std::vector<PanelSolution> & p, int i
         // nothing
     };
     
+    std::cout << "Solve panel " << i << "," << j << std::endl;
+    std::ofstream ofs (format("solve-%d-%d.vtk", i, j));
+    writeVTK_points
+    (
+        ofs,
+        Bspline::zip
+        (
+            pCentre->xspline_inner,
+            pCentre->yspline_inner,
+            chi[0],
+            linspace(pCentre->xspline_inner.Rmin(), pCentre->xspline_inner.Rmax(), 1001),
+            linspace(pCentre->yspline_inner.Rmin(), pCentre->yspline_inner.Rmax(), 1001)
+        ),
+        linspace(pCentre->xspline_inner.Rmin(), pCentre->xspline_inner.Rmax(), 1001),
+        linspace(pCentre->yspline_inner.Rmin(), pCentre->yspline_inner.Rmax(), 1001),
+        rArray{ 0. }
+    );
+    ofs.close();
+    
     // solve the system
     ConjugateGradients<Complex, cBlockArray, cBlockArray&> CG;
     CG.apply_preconditioner = apply_preconditioner;
@@ -312,7 +370,7 @@ void DOMPreconditioner::solvePanel (int n, std::vector<PanelSolution> & p, int i
     }
 }
 
-cArray DOMPreconditioner::surrogateSource (PanelSolution * panel, int direction, PanelSolution * neighbour) const
+void DOMPreconditioner::surrogateSource (PanelSolution * panel, int direction, PanelSolution * neighbour) const
 {
     if (direction == Left)
     {
@@ -378,14 +436,14 @@ cArray DOMPreconditioner::surrogateSource (PanelSolution * panel, int direction,
             
             // calculate the right-hand side
             cArray rhs (xspline.Nspline() * yspline.Nspline() + yspline.Nspline());
-            for (int i = neighbour->xspline_inner.iR2() - neighbour->xspline_inner.order() - 1; i < neighbour->xspline_inner.iR2(); j++)
+            for (int i = neighbour->xspline_inner.iR2() - neighbour->xspline_inner.order() - 1; i < neighbour->xspline_inner.iR2(); i++)
             for (int j = 0; j < neighbour->yspline_inner.Nspline(); j++)
             {
                 rhs[xspline.Nspline() * yspline.Nspline() + j] += neighbour->outf[Right][ill][j]
                     * neighbour->xspline_inner.bspline(i, neighbour->xspline_inner.iR2(), neighbour->xspline_inner.order(), neighbour->xspline_inner.R2());
             }
             
-            // factorize and solve
+            // factorize the block matrix and solve
             cArray solution (rhs.size());
             CsrMatrix<LU_int_t,Complex> A_csr = A_coo.tocsr();
             std::unique_ptr<LUft> A_lu;
@@ -434,21 +492,100 @@ void DOMPreconditioner::knotSubsequence (int i, int n, Bspline const & bspline, 
 
 void DOMPreconditioner::splitResidual (cBlockArray const & r, std::vector<PanelSolution> & panels) const
 {
-    for (int ixpanel = 0; ixpanel < 2; ixpanel++)
-    for (int iypanel = 0; iypanel < 2; iypanel++)
+    std::cout << std::endl;
+    std::cout << "Split residual" << std::endl;
+    
+    for (unsigned ill = 0; ill < r.size(); ill++)
+    {
+        std::ofstream out (format("res-%d.vtk", ill));
+        writeVTK_points
+        (
+            out,
+            rad().bspline_inner_x().zip
+            (
+                r[ill],
+                linspace(rad().bspline_inner_x().Rmin(), rad().bspline_inner_x().Rmax(), 1001),
+                linspace(rad().bspline_inner_y().Rmin(), rad().bspline_inner_y().Rmax(), 1001)
+            ),
+            linspace(rad().bspline_inner_x().Rmin(), rad().bspline_inner_x().Rmax(), 1001),
+            linspace(rad().bspline_inner_y().Rmin(), rad().bspline_inner_y().Rmax(), 1001),
+            rArray{ 0. }
+        );
+    }
+    
+    for (int ixpanel = 0; ixpanel < xpanels; ixpanel++)
+    for (int iypanel = 0; iypanel < ypanels; iypanel++)
     for (unsigned ill = 0; ill < r.size(); ill++)
     {
         PanelSolution & p = panels[ixpanel * 2 + iypanel];
+        unsigned Nxspline = p.xspline_inner.Nspline();
+        unsigned Nyspline = p.yspline_inner.Nspline();
+        unsigned order = p.xspline_full.order();
         
-        std::size_t N = p.xspline_inner.Nspline() * p.yspline_inner.Nspline();
+        std::cout << "Sub-domain (" << ixpanel << "," << iypanel << ")" << std::endl;
+/*
+        // (S x S) . r
+        cArray rab0 = kron_dot(p.SaF, p.SbF, r[ill]);
+        std::cout << "    r[" << ill << "].norm() = " << r[ill].norm() << std::endl;
+        std::cout << "    rab0.norm() = " << rab0.norm() << std::endl;
         
-        cArray rab0 = kron_dot(p.SaF, p.SbF, r[ill]), rab1(N), rab2(N);
-        p.lu_Sbb->solve(rab0, rab1, p.xspline_inner.Nspline());
-        transpose(rab1);
-        p.lu_Saa->solve(rab1, rab2, p.yspline_inner.Nspline());
-        transpose(rab2);
+        // (S⁻¹ x 1) . (S x S) . r
+        cArray rab1 (Nxspline * Nyspline);
+        p.lu_Saa->solve(rab0, rab1, Nyspline);
+        transpose(rab1, Nxspline, Nyspline);
+        std::cout << "    rab1.norm() = " << rab1.norm() << std::endl;
+        
+        // (S⁻¹ x S⁻¹) . (S x S) . r
+        cArray rab2 (Nxspline * Nyspline);
+        p.lu_Sbb->solve(rab1, rab2, Nxspline);
+        transpose(rab2, Nyspline, Nxspline);
+        std::cout << "    rab2.norm() = " << rab2.norm() << std::endl;
         
         p.r[ill] = rab2;
+        
+        std::ofstream out (format("splt-%d-%d-%d.vtk", ixpanel, iypanel, ill));
+        writeVTK_points
+        (
+            out,
+            p.xspline_inner.zip
+            (
+                p.r[ill],
+                linspace(p.xspline_inner.Rmin(), p.xspline_inner.Rmax(), 1001),
+                linspace(p.yspline_inner.Rmin(), p.yspline_inner.Rmax(), 1001)
+            ),
+            linspace(p.xspline_inner.Rmin(), p.xspline_inner.Rmax(), 1001),
+            linspace(p.yspline_inner.Rmin(), p.yspline_inner.Rmax(), 1001),
+            rArray{ 0. }
+        );
+*/
+        // allocate memory or erase the old residual
+        p.r[ill].resize(Nxspline * Nyspline);
+        p.r[ill].fill(0.);
+        
+        // copy only elements corresponding to the real-grid B-splines
+        for (unsigned ixspline = 0; ixspline < Nxspline; ixspline++)
+        for (unsigned iyspline = 0; iyspline < Nyspline; iyspline++)
+        {
+            // map global indices to panel
+            unsigned pxspline, pyspline;
+            if (p.mapToPanel(ixspline, iyspline, pxspline, pyspline))
+                p.r[ill][pxspline * Nyspline + iyspline] = r[ill][ixspline * rad().bspline_inner_y().Nspline() + iyspline];
+        }
+        
+        std::ofstream out2 (format("splt2-%d-%d-%d.vtk", ixpanel, iypanel, ill));
+        writeVTK_points
+        (
+            out2,
+            p.xspline_inner.zip
+            (
+                p.r[ill],
+                linspace(p.xspline_inner.Rmin(), p.xspline_inner.Rmax(), 1001),
+                linspace(p.yspline_inner.Rmin(), p.yspline_inner.Rmax(), 1001)
+            ),
+            linspace(p.xspline_inner.Rmin(), p.xspline_inner.Rmax(), 1001),
+            linspace(p.yspline_inner.Rmin(), p.yspline_inner.Rmax(), 1001),
+            rArray{ 0. }
+        );
     }
 }
 
@@ -461,6 +598,7 @@ DOMPreconditioner::PanelSolution::PanelSolution
 (
     int order,
     Real theta,
+    Bspline const & xspline, Bspline const & yspline,
     rArray cxspline1_inner, rArray rxspline_inner, rArray cxspline2_inner,
     rArray cyspline1_inner, rArray ryspline_inner, rArray cyspline2_inner,
     rArray cxspline1_full,  rArray rxspline_full,  rArray cxspline2_full,
@@ -472,11 +610,52 @@ DOMPreconditioner::PanelSolution::PanelSolution
     yspline_full (order, theta, cyspline1_full, ryspline_full, cyspline2_full),
     r (Nang), z (Nang)
 {
+    // allocate memory
     for (int nbr = 0; nbr < nNbrs; nbr++)
     {
         ssrc[nbr] = cBlockArray(Nang);
         outf[nbr] = cBlockArray(Nang);
     }
+    
+    // calculate panel-to-full real basis offset
+    xoffset = xspline.knot(xspline_inner.R1());
+    yoffset = yspline.knot(yspline_inner.R1());
+}
+
+bool DOMPreconditioner::PanelSolution::mapToPanel
+(
+    unsigned   ixspline, unsigned   iyspline,
+    unsigned & pxspline, unsigned & pyspline
+) const
+{
+    if (ixspline < xoffset)
+        return false;
+    
+    if (iyspline < yoffset)
+        return false;
+    
+    pxspline = ixspline - xoffset;
+    pyspline = iyspline - yoffset;
+    
+    if (pxspline >= xspline_inner.iR2() - xspline_inner.iR1())
+        return false;
+    
+    if (pyspline >= yspline_inner.iR2() - yspline_inner.iR1())
+        return false;
+    
+    return true;
+}
+
+bool DOMPreconditioner::PanelSolution::mapFromPanel
+(
+    unsigned & ixspline, unsigned & iyspline,
+    unsigned   pxspline, unsigned   pyspline
+) const
+{
+    pxspline = ixspline + xoffset;
+    pyspline = iyspline + yoffset;
+    
+    return true;
 }
 
 // --------------------------------------------------------------------------------- //

@@ -161,7 +161,7 @@ public:
      * %d\t%d\t%g\t%g
      * @endcode
      */
-    void write (const char* filename) const
+    void write (std::string filename) const
     {
         std::ofstream out (filename);
         out << "# Matrix " << m_ << " × " << n_ << " with " << x_.size() << " nonzero elements:\n\n";
@@ -172,10 +172,10 @@ public:
             
             for (IdxT idx = idx1; idx < idx2; idx++)
             {
-                out << irow << "\t" << i_[idx];
-                for (int icomp = 0; icomp < typeinfo<DataT>::ncmpt; icomp++)
-                    out << "\t" << typeinfo<DataT>::cmpt(icomp, x_[idx]);
-                out << "\n";
+                out << irow << '\t' << i_[idx];
+                for (unsigned icomp = 0; icomp < typeinfo<DataT>::ncmpt; icomp++)
+                    out << '\t' << typeinfo<DataT>::cmpt(icomp, x_[idx]);
+                out << '\n';
             }
         }
         out.close();
@@ -675,6 +675,43 @@ CsrMatrix<IdxT,DataT> operator * (CsrMatrix<IdxT,DataT> const & A, double r)
 {
     CsrMatrix<IdxT,DataT> C = A;
     return C *= r;
+}
+
+/**
+ * @brief Kronecker product.
+ * 
+ * Calculates the Kronecker product @f$ w = (A \otimes B) \cdot u @f$, or in
+ * components
+ * @f[
+ *     w_{i r_B + j} = A_{ik} B_{jl} u_{k c_B + l}
+ * @f]
+ * where @f$ u @f$ is a column vector and the matrices @f$ A @f$ and @f$ B @f$
+ * are of the CSR type. The dimensions of the matrices are @f$ r_A \times c_A @f$
+ * and @f$ r_B \times c_B @f$, respectively. The result is a column vector, again.
+ */
+template <class IdxT, class DataT>
+NumberArray<DataT> kron_dot (CsrMatrix<IdxT,DataT> const & A, CsrMatrix<IdxT,DataT> const & B, NumberArray<DataT> const & u)
+{
+    // dimensions
+    std::size_t rA = A.rows(), rB = B.rows();
+    std::size_t cA = A.cols(), cB = B.cols();
+    
+    // check input size
+    assert(u.size() == cA * cB);
+    
+    // V[col] = B U[col]
+    NumberArray<DataT> V (rB * cA);
+    for (std::size_t i = 0; i < cA; i++)
+        ArrayView<DataT>(V, i * rB, rB) = B.dot(ArrayView<DataT>(u, i * cB, cB));
+    transpose(V, rB, cA);
+    
+    // W = A V
+    NumberArray<DataT> W (rA * rB);
+    for (std::size_t i = 0; i < rB; i++)
+        ArrayView<DataT>(W, i * rA, rA) = A.dot(ArrayView<DataT>(u, i * cA, cA));
+    transpose(W, rA, rB);
+    
+    return W;
 }
 
 #endif // HEX_CSRMATRIX_H

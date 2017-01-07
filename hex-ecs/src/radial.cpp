@@ -35,14 +35,21 @@
 #include <cstdio>
 #include <cstring>
 
+// --------------------------------------------------------------------------------- //
+
 #include "hex-arrays.h"
+#include "hex-csrmatrix.h"
 #include "hex-special.h"
 #include "hex-symbandmatrix.h"
+
+// --------------------------------------------------------------------------------- //
 
 #include "bspline.h"
 #include "gauss.h"
 #include "parallel.h"
 #include "radial.h"
+
+// --------------------------------------------------------------------------------- //
 
 RadialIntegrals::RadialIntegrals
 (
@@ -337,6 +344,97 @@ SymBandMatrix<Complex> RadialIntegrals::computeOverlapMatrix
             return computeOverlapMatrixElement(bspline, g, i, j, weight);
         }
     );
+}
+
+CsrMatrix<LU_int_t, Complex> RadialIntegrals::computeOverlapMatrix
+(
+    Bspline const & bspline1,
+    Bspline const & bspline2,
+    Real R_left,
+    Real R_right
+)
+{
+    CooMatrix<LU_int_t, Complex> coo (bspline1.Nspline(), bspline2.Nspline());
+    
+    int points = (bspline1.order() + bspline2.order()) / 2 + 1;
+    
+    GaussLegendre g;
+    g.precompute_nodes_and_weights(points);
+    
+    cArray xs(points), ws(points), B1(points), B2(points);
+    
+    for (int i = 0; i < bspline1.Nspline(); i++)
+    for (int j = 0; j < bspline2.Nspline(); j++)
+    {
+        // Check that the two B-splines overlap. This happens when
+        // both B-splines start before the end of the other B-spline.
+        if
+        (
+            bspline1.t(i).real() < bspline2.t(j + bspline2.order() + 1).real() and
+            bspline2.t(j).real() < bspline1.t(i + bspline1.order() + 1).real()
+        )
+        {
+            // overlap integral
+            Complex v = 0;
+            
+            // starting knot of the other B-spline
+            int iknot = std::max(i, bspline1.knot(bspline2.t(j)));
+            int jknot = std::max(j, bspline2.knot(bspline1.t(i)));
+            
+            // integration bounds
+            Complex left = (bspline1.t(iknot).real() > bspline2.t(jknot).real() ? bspline1.t(iknot) : bspline2.t(jknot));
+            Complex right;
+            
+            // integrate on all knots
+            while (iknot <= i + bspline1.order() and jknot <= j + bspline2.order())
+            {
+                bool ishift = false, jshift = false;
+                
+                // get nearest right knot
+                if (bspline1.t(iknot + 1).real() == bspline2.t(jknot + 1).real())
+                {
+                    right = bspline1.t(iknot + 1);
+                    ishift = true;
+                    jshift = true;
+                }
+                else if (bspline1.t(iknot + 1).real() < bspline2.t(jknot + 1).real())
+                {
+                    right = bspline1.t(iknot + 1);
+                    ishift = true;
+                }
+                else /* (bspline1.t(iknot + 1).real() > bspline2.t(jknot + 1).real()) */
+                {
+                    right = bspline2.t(jknot + 1);
+                    jshift = true;
+                }
+                
+                // integrate the product of the two B-splines on the interval (left, right)
+                if (R_left <= left.real() and right.real() <= R_right)
+                {
+                    g.scaled_nodes_and_weights(points, left, right, &xs[0], &ws[0]);
+                    bspline1.B(i, iknot, points, &xs[0], &B1[0]);
+                    bspline2.B(j, jknot, points, &xs[0], &B2[0]);
+                    for (int ipt = 0; ipt < points; ipt++)
+                        v += B1[ipt] * B2[ipt] * ws[ipt];
+                }
+                
+                if (i == 75 and j == 76)
+                {
+                    std::cout << i << " " << j << " " << iknot << " " << jknot << " " << left << " " << right << " " << v << std::endl;
+                }
+                
+                // move on to the next interval
+                if (ishift) iknot++;
+                if (jshift) jknot++;
+                left = right;
+            }
+            
+            // store the element
+            coo.add(i, j, v);
+        }
+    }
+    
+    return coo.tocsr();
 }
 
 Complex RadialIntegrals::computeM_iknot

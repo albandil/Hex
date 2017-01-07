@@ -39,6 +39,10 @@
 
 // --------------------------------------------------------------------------------- //
 
+#include "hex-csrmatrix.h"
+
+// --------------------------------------------------------------------------------- //
+
 #include "NoPreconditioner.h"
 
 // --------------------------------------------------------------------------------- //
@@ -120,12 +124,25 @@ class DOMPreconditioner : public NoPreconditioner
                 (
                     int order,
                     Real theta,
+                    Bspline const & xspline, Bspline const & yspline,
                     rArray cxspline1_inner, rArray rxspline_inner, rArray cxspline2_inner,
                     rArray cyspline1_inner, rArray ryspline_inner, rArray cyspline2_inner,
                     rArray cxspline1_full,  rArray rxspline_full,  rArray cxspline2_full,
                     rArray cyspline1_full,  rArray ryspline_full,  rArray cyspline2_full,
                     int Nang
                 );
+                
+                bool mapToPanel
+                (
+                    unsigned   ixspline, unsigned   iyspline,
+                    unsigned & pxspline, unsigned & pyspline
+                ) const;
+                
+                bool mapFromPanel
+                (
+                    unsigned & ixspline, unsigned & iyspline,
+                    unsigned   pxspline, unsigned   pyspline
+                ) const;
                 
                 Bspline xspline_inner;  // inner x-axis B-spline basis
                 Bspline yspline_inner;  // inner y-axis B-spline basis
@@ -143,13 +160,16 @@ class DOMPreconditioner : public NoPreconditioner
                 
                 std::array<cBlockArray,nNbrs> ssrc;  // surrogate sources from neighbour panels
                 std::array<cBlockArray,nNbrs> outf;  // outgoing field to neighbour panels
+                
+                unsigned xoffset;   // x-offset of the real basis of panel
+                unsigned yoffset;   // y-offset of the real basis of panel
         };
         
         // find solution on a sub-domain
         void solvePanel (int n, std::vector<PanelSolution> & p, int i, int j) const;
         
         // construct the surrogate source for panel's boundary
-        cArray surrogateSource (PanelSolution * panel, int direction, PanelSolution * neighbour) const;
+        void surrogateSource (PanelSolution * panel, int direction, PanelSolution * neighbour) const;
         
         // get knot sub-sequences
         void knotSubsequence
