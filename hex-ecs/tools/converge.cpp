@@ -116,7 +116,7 @@ typedef struct
     int ni, li;
     double h;
     
-    bool adjust_Ra, adjust_R0, adjust_Rmax, adjust_nL, adjust_limit;
+    bool adjust_Ra, adjust_R0, adjust_Rmax, adjust_nL, adjust_limit, exchange;
 }
 calcdata;
 
@@ -189,8 +189,8 @@ std::vector<double> calculate (calcdata & c)
         ecsinp << "\n";
         ecsinp << "\n";
         ecsinp << "# Angular momenta.\n";
-        ecsinp << "# L  S  Pi nL limit\n";
-        ecsinp << "  " << c.L << "  *  " << c.Pi << "  " << c.nL << " " << c.limit << "\n";
+        ecsinp << "# L  S  Pi nL limit exchange\n";
+        ecsinp << "  " << c.L << "  *  " << c.Pi << "  " << c.nL << " " << c.limit << " " << c.exchange << "\n";
         ecsinp << "\n";
         ecsinp << "# Projectile charge.\n";
         ecsinp << "  -1\n";
@@ -463,6 +463,8 @@ int main (int argc, char* argv[])
         c.limit = read_param<int>(data, "limit");
         c.adjust_limit = read_param<int>(data, "adjust_limit");
         std::cout << "\tlimit = " << c.limit << " (adjust: " << c.adjust_limit << ")" << std::endl;
+	c.exchange = read_param<int>(data, "exchange");
+	std::cout << "\texchange = " << c.exchange << std::endl;
         
 //         //- initial and final state
         c.ni = read_param<int>(data, "ni");
