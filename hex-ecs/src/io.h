@@ -370,6 +370,9 @@ class InputFile
             
             // whether to calculate just the inner problem (decided from the knot sequence)
             bool inner_only;
+            
+            // keep only l1 <= l2; this is useful for large total angular momenta for reduction of the angular basis
+            bool exchange;
 };
 
 /**

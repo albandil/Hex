@@ -99,8 +99,21 @@ const std::string sample_input =
     "# --------------- Other conditions ----------------\n"
     "\n"
     "# Angular momenta.\n"
-    "# L  S  Pi nL limit\n"
-    "  0  *  0  4  -1\n"
+    "#   L  ... total orbital momentum\n"
+    "#   S  ... total spin\n"
+    "#   Pi ... total parity\n"
+    "#   nL, limit, exchange ... parameters controlling the number of coupled angular states\n"
+    "# The angular basis is composed of coupled angular states (l1,l2) and looks like this:\n"
+    "#     (Pi, L),     (Pi+1, L-1), ..., (L, Pi) \n"
+    "#     (Pi+1, L+1), (Pi+2, L),   ..., (L+1, Pi+1) \n"
+    "#     ...\n"
+    "# The number of columns is equal to L + Pi - 1. The number of rows is equal to nL + 1.\n"
+    "# When 'limit > 0' then all pairs with both l1 and l2 > limit are discarded.\n"
+    "# When 'exchange = 0' then all pairs with l1 > l2 are discarded.\n"
+    "# The options 'limit' and 'exchange' are useful for large angular momenta, where the projectile\n"
+    "# is distinguishable from the atomic electron.\n"
+    "# L   S   Pi  nL  limit exchange\n"
+    "  0   *   0   4   -1    1\n"
     "\n"
     "# Projectile charge (+/-1)\n"
     "  -1\n"
@@ -933,6 +946,9 @@ void InputFile::read (std::ifstream & inf)
     
     // single-electron angular momentum limit
     limit = ReadNext<int>(inf).val;
+    
+    // whether to include also l1 > l2, or only l1 <= l2
+    exchange = ReadNext<int>(inf).val;
     
     std::cout << "\tL = " << L << std::endl;
     std::cout << "\tS = " << Spin << std::endl;

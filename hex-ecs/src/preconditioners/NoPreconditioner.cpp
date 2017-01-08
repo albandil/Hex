@@ -859,7 +859,7 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
                     }
                     
                     // update element of the right-hand side
-                    if (inp_->Zp > 0)
+                    if (not inp_->exchange or inp_->Zp > 0)
                     {
                         chi_block[ispline] += -prefactor * contrib_direct;
                     }
@@ -868,7 +868,6 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
                         chi_block[ispline] += prefactor * (contrib_direct + Sign * contrib_exchange) / special::constant::sqrt_two;
                     }
                 }
-                
             }
             else
             {
