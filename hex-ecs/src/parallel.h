@@ -523,11 +523,11 @@ class Parallel
 #endif
         }
         
-        MPI_Comm groupcomm () const
+        void* groupcomm () const
         {
 #ifdef WITH_MPI
             if (active_)
-                return groupcomm_;
+                return (void*)(std::intptr_t)groupcomm_;
 #endif
             return MPI_Comm(0);
         }
