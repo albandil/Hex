@@ -581,7 +581,7 @@ void Amplitudes::computeTmat_ (Amplitudes::Transition T)
         par_.bcast(0, rad_S1);
         
         // symmetry factor
-        Real sf = (not inp_.exchange or inp_.Zp > 0 ? 1.0_r : special::constant::sqrt_half);
+        Real sf = (inp_.Zp > 0 ? 1.0_r : special::constant::sqrt_half);
         
         // compute T-matrices
         Tmat_Slp[T][ell].first = rad_S0 * 4.0_r * special::constant::pi / kf * std::pow(Complex(0.,1.), -ell)
