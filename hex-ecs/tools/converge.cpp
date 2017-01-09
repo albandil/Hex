@@ -190,7 +190,7 @@ std::vector<double> calculate (calcdata & c)
         ecsinp << "\n";
         ecsinp << "# Angular momenta.\n";
         ecsinp << "# L  S  Pi nL limit exchange\n";
-        ecsinp << "  " << c.L << "  *  " << c.Pi << "  " << c.nL << " " << c.limit << " " << c.exchange << "\n";
+        ecsinp << "  " << c.L << "  " << (c.exchange ? "*" : "0") << "  " << c.Pi << "  " << c.nL << " " << c.limit << " " << c.exchange << "\n";
         ecsinp << "\n";
         ecsinp << "# Projectile charge.\n";
         ecsinp << "  -1\n";
