@@ -680,7 +680,7 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
                         {
                             multipole *= x;
                             
-                            if (f2[lambda] != 0) contrib_exchange += f2[lambda] * rho_l2[ichan1][lambda] * M_mLm1_j[lambda][ixspline] / multipole;
+                            if (f2[lambda] != 0 and inp_->exchange) contrib_exchange += f2[lambda] * rho_l2[ichan1][lambda] * M_mLm1_j[lambda][ixspline] / multipole;
                         }
                     }
                     else if (ispline >= Nspline_inner * Nspline_inner + Nchan1 * Nspline_outer)
@@ -713,7 +713,7 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
                                 contrib_direct   += f1[0] * (M_mLm1_P[0][ixspline] * M_L_j[0][iyspline] / rad_->bspline_full().t(ixspline + order + 1) - M_L_P[0][ixspline] * M_mLm1_j[0][iyspline] / rad_->bspline_full().t(iyspline + order + 1));
                                 contrib_exchange += 0;
                             }
-                            if (ixspline < iyspline and f2[0] != 0)
+                            if (ixspline < iyspline and f2[0] != 0 and inp_->exchange)
                             {
                                 contrib_direct   += 0;
                                 contrib_exchange += f2[0] * (M_L_j[0][ixspline] * M_mLm1_P[0][iyspline] / rad_->bspline_full().t(iyspline + order + 1) - M_mLm1_j[0][ixspline] * M_L_P[0][iyspline] / rad_->bspline_full().t(ixspline + order + 1));
@@ -729,15 +729,13 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
                                 
                                 if (ixspline > iyspline)
                                 {
-                                    
-                                    contrib_direct   += f1[lambda] * M_mLm1_P[lambda][ixspline] * M_L_j[lambda][iyspline] * multipole1;
-                                    contrib_exchange += f2[lambda] * M_mLm1_j[lambda][ixspline] * M_L_P[lambda][iyspline] * multipole1;
+                                    /* always */        contrib_direct   += f1[lambda] * M_mLm1_P[lambda][ixspline] * M_L_j[lambda][iyspline] * multipole1;
+                                    if (inp_->exchange) contrib_exchange += f2[lambda] * M_mLm1_j[lambda][ixspline] * M_L_P[lambda][iyspline] * multipole1;
                                 }
                                 if (ixspline < iyspline)
                                 {
-                                    
-                                    contrib_direct   += f1[lambda] * M_L_P[lambda][ixspline] * M_mLm1_j[lambda][iyspline] * multipole2;
-                                    contrib_exchange += f2[lambda] * M_L_j[lambda][ixspline] * M_mLm1_P[lambda][iyspline] * multipole2;
+                                    /* always */        contrib_direct   += f1[lambda] * M_L_P[lambda][ixspline] * M_mLm1_j[lambda][iyspline] * multipole2;
+                                    if (inp_->exchange) contrib_exchange += f2[lambda] * M_L_j[lambda][ixspline] * M_mLm1_P[lambda][iyspline] * multipole2;
                                 }
                             }
                         }
@@ -771,16 +769,16 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
                                         Real dampfactor = damp(rx, ry, distance);
                                         
                                         // monopole contribution
-                                        if (rx > ry and li == l1 and l == l2) contrib_direct   += Bx * By * (1.0_r/rx - 1.0_r/ry) * Pix * jiy * dampfactor * wx * wy;
-                                        if (ry > rx and li == l2 and l == l1) contrib_exchange += Bx * By * (1.0_r/ry - 1.0_r/rx) * jix * Piy * dampfactor * wx * wy;
+                                        if (rx > ry and li == l1 and l == l2)                    contrib_direct   += Bx * By * (1.0_r/rx - 1.0_r/ry) * Pix * jiy * dampfactor * wx * wy;
+                                        if (ry > rx and li == l2 and l == l1 and inp_->exchange) contrib_exchange += Bx * By * (1.0_r/ry - 1.0_r/rx) * jix * Piy * dampfactor * wx * wy;
                                         
                                         // higher multipoles contribution
                                         Real multipole = 1 / rmax, rmin_over_rmax = rmin / rmax;
                                         for (int lambda = 1; lambda <= rad_->maxlambda(); lambda++)
                                         {
                                             multipole *= rmin_over_rmax;
-                                            if (f1[lambda] != 0) contrib_direct   += f1[lambda] * Bx * By * multipole * Pix * jiy * dampfactor * wx * wy;
-                                            if (f2[lambda] != 0) contrib_exchange += f2[lambda] * Bx * By * multipole * jix * Piy * dampfactor * wx * wy;
+                                            if (f1[lambda] != 0)                    contrib_direct   += f1[lambda] * Bx * By * multipole * Pix * jiy * dampfactor * wx * wy;
+                                            if (f2[lambda] != 0 and inp_->exchange) contrib_exchange += f2[lambda] * Bx * By * multipole * jix * Piy * dampfactor * wx * wy;
                                         }
                                     }
                                 }
@@ -814,16 +812,16 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
                                             Real dampfactor = damp(rx, ry, distance);
                                             
                                             // monopole contribution
-                                            if (rx > ry and li == l1 and l == l2) contrib_direct   += Bx * By * (1.0_r/rx - 1.0_r/ry) * Pix * jiy * dampfactor * wx * wy;
-                                            if (ry > rx and li == l2 and l == l1) contrib_exchange += Bx * By * (1.0_r/ry - 1.0_r/rx) * jix * Piy * dampfactor * wx * wy;
+                                            if (rx > ry and li == l1 and l == l2)                    contrib_direct   += Bx * By * (1.0_r/rx - 1.0_r/ry) * Pix * jiy * dampfactor * wx * wy;
+                                            if (ry > rx and li == l2 and l == l1 and inp_->exchange) contrib_exchange += Bx * By * (1.0_r/ry - 1.0_r/rx) * jix * Piy * dampfactor * wx * wy;
                                             
                                             // higher multipoles contribution
                                             Real multipole = 1 / rmax, rmin_over_rmax = rmin / rmax;
                                             for (int lambda = 1; lambda <= rad_->maxlambda(); lambda++)
                                             {
                                                 multipole *= rmin_over_rmax;
-                                                if (f1[lambda] != 0) contrib_direct   += f1[lambda] * Bx * By * multipole * Pix * jiy * dampfactor * wx * wy;
-                                                if (f2[lambda] != 0) contrib_exchange += f2[lambda] * Bx * By * multipole * jix * Piy * dampfactor * wx * wy;
+                                                if (f1[lambda] != 0)                    contrib_direct   += f1[lambda] * Bx * By * multipole * Pix * jiy * dampfactor * wx * wy;
+                                                if (f2[lambda] != 0 and inp_->exchange) contrib_exchange += f2[lambda] * Bx * By * multipole * jix * Piy * dampfactor * wx * wy;
                                             }
                                         }
                                     }
@@ -855,23 +853,22 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
                                             Real dampfactor = damp(rx, ry, distance);
                                             
                                             // monopole contribution
-                                            if (rx > ry and li == l1 and l == l2) contrib_direct   += Bx * By * (1.0_r/rx - 1.0_r/ry) * Pix * jiy * dampfactor * wx * wy;
-                                            if (ry > rx and li == l2 and l == l1) contrib_exchange += Bx * By * (1.0_r/ry - 1.0_r/rx) * jix * Piy * dampfactor * wx * wy;
+                                            if (rx > ry and li == l1 and l == l2)                    contrib_direct   += Bx * By * (1.0_r/rx - 1.0_r/ry) * Pix * jiy * dampfactor * wx * wy;
+                                            if (ry > rx and li == l2 and l == l1 and inp_->exchange) contrib_exchange += Bx * By * (1.0_r/ry - 1.0_r/rx) * jix * Piy * dampfactor * wx * wy;
                                             
                                             // higher multipoles contribution
                                             Real multipole = 1 / rmax, rmin_over_rmax = rmin / rmax;
                                             for (int lambda = 1; lambda <= rad_->maxlambda(); lambda++)
                                             {
                                                 multipole *= rmin_over_rmax;
-                                                if (f1[lambda] != 0) contrib_direct   += f1[lambda] * Bx * By * multipole * Pix * jiy * dampfactor * wx * wy;
-                                                if (f2[lambda] != 0) contrib_exchange += f2[lambda] * Bx * By * multipole * jix * Piy * dampfactor * wx * wy;
+                                                if (f1[lambda] != 0)                    contrib_direct   += f1[lambda] * Bx * By * multipole * Pix * jiy * dampfactor * wx * wy;
+                                                if (f2[lambda] != 0 and inp_->exchange) contrib_exchange += f2[lambda] * Bx * By * multipole * jix * Piy * dampfactor * wx * wy;
                                             }
                                         }
                                     }
                                 }
                             }
                         }
-                        
                     }
                     
                     // update element of the right-hand side
