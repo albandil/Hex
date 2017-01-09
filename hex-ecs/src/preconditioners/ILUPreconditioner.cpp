@@ -110,7 +110,7 @@ void ILUCGPreconditioner::reset_lu ()
             npcol = par_->groupsize() / nprow;
         }
         
-        superlu_gridinit(par_->groupcomm(), nprow, npcol, &grid_);
+        superlu_gridinit((MPI_Comm)par_->groupcomm(), nprow, npcol, &grid_);
     }
 #endif // WITH_SUPERLU_DIST
 }
