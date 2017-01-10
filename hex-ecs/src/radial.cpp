@@ -613,7 +613,7 @@ SymBandMatrix<Complex> RadialIntegrals::calc_R_tr_dia_block (unsigned int lambda
     int order = bspline_full_.order();
     
     // (i,k)-block data
-    SymBandMatrix<Complex> block_ik (Nspline, order + 1);
+    SymBandMatrix<Complex> block_ik (bspline_full_.Nspline(), order + 1);
     
     // for all elements in the symmetrical block : evaluate 2-D integral of Bi(1)Bj(2)V(1,2)Bk(1)Bl(2)
     for (int j = 0; j < Nspline; j++)
