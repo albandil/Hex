@@ -227,6 +227,7 @@ void CommandLine::parse (int argc, char* argv[])
                     "\t--parallel-factorization         Factorize multiple blocks simultaneously.                                                                              \n"
                     "\t--no-lu-update                   Do not recalculate LU factorization for different energies, use the first factorization for all of them.               \n"
                     "\t--ilu-max-iter <number>          Maximal number of iterations of the nested ILU preconditioner. When the number is exceeded, exception is thrown.       \n"
+                    "\t--scratch <path>                 Scratch directory for out-of-core factorizers (currently only MUMPS). Also read from the $SCRATCHDIR env variable.     \n"
                     "                                                                                                                                                          \n"
                     "KPA preconditioner                                                                                                                                        \n"
                     "\t--kpa-simple-rad           (-R)  Use simplified radial integral matrix for nested KPA iterations (experimental).                                        \n"
@@ -333,6 +334,12 @@ void CommandLine::parse (int argc, char* argv[])
                 // do not cache any two-electron radial integrals in memory at all
                 cache_own_radint = false;
                 cache_all_radint = false;
+                return true;
+            },
+        "scratch", "", 1, [&](std::vector<std::string> const & optargs) -> bool
+            {
+                // scratch directory for the out-of-core mode factorizers (currently MUMPS only)
+                scratch = optargs[0];
                 return true;
             },
         "out-of-core", "o", 0, [&](std::vector<std::string> const & optargs) -> bool

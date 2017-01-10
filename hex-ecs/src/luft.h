@@ -50,6 +50,7 @@ typedef struct
     int verbosity;
     int fortran_comm;
     int groupsize;
+    const char * ooc_dir;
     void * superlu_dist_grid;
 }
 LUftData;

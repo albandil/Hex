@@ -463,8 +463,8 @@ int main (int argc, char* argv[])
         c.limit = read_param<int>(data, "limit");
         c.adjust_limit = read_param<int>(data, "adjust_limit");
         std::cout << "\tlimit = " << c.limit << " (adjust: " << c.adjust_limit << ")" << std::endl;
-	c.exchange = read_param<int>(data, "exchange");
-	std::cout << "\texchange = " << c.exchange << std::endl;
+        c.exchange = read_param<int>(data, "exchange");
+        std::cout << "\texchange = " << c.exchange << std::endl;
         
 //         //- initial and final state
         c.ni = read_param<int>(data, "ni");

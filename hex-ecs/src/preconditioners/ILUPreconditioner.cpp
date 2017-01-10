@@ -229,6 +229,7 @@ void ILUCGPreconditioner::CG_init (int iblock) const
         // set up factorization data
         data_[iblock].drop_tolerance = cmd_->droptol;
         data_[iblock].groupsize = cmd_->groupsize;
+        data_[iblock].ooc_dir = cmd_->scratch.c_str();
 #ifdef WITH_SUPERLU_DIST
         if (cmd_->factorizer == "superlu_dist")
         {

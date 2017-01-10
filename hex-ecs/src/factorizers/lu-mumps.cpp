@@ -123,7 +123,7 @@ void LUft_MUMPS::factorize (CsrMatrix<LU_int_t,Complex> const & matrix, LUftData
         settings.ICNTL(4) = data.verbosity; // verbosity level (default: 2)
         settings.ICNTL(5) = 0; // COO format
         settings.ICNTL(22) = data.out_of_core; // OOC factorization
-        std::strcpy(settings.ooc_tmpdir, ".");
+        std::strcpy(settings.ooc_tmpdir, data.ooc_dir);
         std::strcpy(settings.ooc_prefix, "ooc_");
         settings.n = n_;
         settings.nz = nz;
