@@ -9,7 +9,7 @@
     <capability standardID='ivo://vamdc/std/VAMDC-TAP' xsi:type='tx:VamdcTap'>
         
         <interface xsi:type='vs:ParamHTTP'>
-            <accessURL use='base'>http://ilmandel.cc/~jacob/</accessURL>
+            <accessURL use='base'>http://utf.mff.cuni.cz/data/hex/</accessURL>
         </interface>
         
         <versionOfStandards>12.07</versionOfStandards>
@@ -31,21 +31,21 @@
     <!-- TAP service -->
     <capability standardID='ivo://ivoa.net/std/TAP' xsi:type='vr:Capability'>
         <interface xsi:type='vs:ParamHTTP'>
-            <accessURL use='base'>http://ilmandel.cc/~jacob/</accessURL>
+            <accessURL use='base'>http://utf.mff.cuni.cz/~benda/</accessURL>
         </interface>
     </capability>
     
     <!-- Capability service -->
     <capability standardID='ivo://ivoa.net/std/VOSI#capabilities' xsi:type='vr:Capability'>
         <interface xsi:type='vs:ParamHTTP'>
-            <accessURL use='base'>http://ilmandel.cc/~jacob/capabilities</accessURL>
+            <accessURL use='base'>http://utf.mff.cuni.cz/~benda/capabilities</accessURL>
         </interface>
     </capability>
     
     <!-- Availability service -->
     <capability standardID="ivo://ivoa.net/std/VOSI#availability" xsi:type='vr:Capability'>
         <interface xsi:type="vs:ParamHTTP">
-            <accessURL use="base">http://ilmandel.cc/~jacob/availability</accessURL>
+            <accessURL use="base">http://utf.mff.cuni.cz/~benda/availability</accessURL>
         </interface>
     </capability>
     

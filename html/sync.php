@@ -559,7 +559,8 @@
 //
 
     // Open the Hex database.
-    $db = new SQLite3 ('hex.db', SQLITE3_OPEN_READONLY);
+    include "hexdbdat.inc";
+    $db = new SQLite3 ($hexdbdat, SQLITE3_OPEN_READONLY);
     
     // Write all sections of the XSAMS file.
     $valid_species_data = writeSpeciesSection($db, $where_clause, $req_AtomStates, $req_Atoms, $req_Particles, $req_Species, $req_States);

@@ -1,3 +1,3 @@
 <?php
-	$hexdbexe="../hex-db/bin/hex-db";
+	$hexdbexe="bin/hex-db";
 ?>
