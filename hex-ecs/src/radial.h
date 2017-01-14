@@ -525,7 +525,13 @@ class RadialIntegrals
          * Calculate particular sub-matrix of the radial integrals matrix (with block indices "i" and "k")
          * and return it in a form of a dense array (copying structure of the overlap matrix).
          */
-        SymBandMatrix<Complex> calc_R_tr_dia_block (unsigned lambda, int i, int k, bool simple = false) const;
+        SymBandMatrix<Complex> calc_R_tr_dia_block
+        (
+            unsigned lambda,
+            int i, int k,
+            bool inner_only = true,
+            bool simple = false
+        ) const;
         
         /**
          * @brief Multiply vector by matrix of two-electron integrals.
