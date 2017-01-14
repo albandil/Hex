@@ -1,3 +1,3 @@
 <?php
-	$hexdbdat="../hex-db/hex.db";
+	$hexdbdat="bin/hex.db";
 ?>
