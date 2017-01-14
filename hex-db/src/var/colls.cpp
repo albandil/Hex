@@ -219,7 +219,7 @@ bool CollisionStrength::run (std::map<std::string,std::string> const & sdata)
     
     // write data
     for (std::size_t i = 0; i < scaled_energies.size(); i++)
-        table.write(scaled_energies[i]/efactor, (std::isfinite(ccs[i]) ? scaled_energies[i] * ccs[i] * lfactor * lfactor : 0.));
+        table.write(scaled_energies[i]/efactor, (std::isfinite(ccs[i]) ? scaled_energies[i] * ccs[i] : 0.));
     
     return true;
 }
