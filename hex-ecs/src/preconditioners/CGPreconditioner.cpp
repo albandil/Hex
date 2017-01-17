@@ -32,21 +32,28 @@
 #include <iostream>
 #include <cstdio>
 
+// --------------------------------------------------------------------------------- //
+
 #include "hex-arrays.h"
 #include "hex-itersolve.h"
 #include "hex-misc.h"
 
-#include "preconditioners.h"
+// --------------------------------------------------------------------------------- //
 
-const std::string CGPreconditioner::prec_name = "CG";
-const std::string CGPreconditioner::prec_description = 
-    "Block inversion using plain conjugate gradients. "
-    "Use --tolerance option to set the termination tolerance.";
+#include "CGPreconditioner.h"
+#include "HybPreconditioner.h"
+
+// --------------------------------------------------------------------------------- //
+
+std::string CGPreconditioner::description () const
+{
+    return "Block inversion using plain conjugate gradients. Use --tolerance option to set the termination tolerance.";
+}
 
 int CGPreconditioner::solve_block (int ill, const cArrayView r, cArrayView z) const
 {
     // shorthands
-    int Nspline_inner = rad_.bspline_inner().Nspline();
+    int Nspline_inner = rad_->bspline_inner().Nspline();
     
     // prepare the block-preconditioner for run
     this->CG_init(ill);
@@ -57,13 +64,13 @@ int CGPreconditioner::solve_block (int ill, const cArrayView r, cArrayView z) co
     // adjust max iterations for ILU-preconditioned blocks
     if (HybCGPreconditioner const * hp = dynamic_cast<HybCGPreconditioner const*>(this))
     {
-        if (hp->ilu_needed(ill) and cmd_.ilu_max_iter > 0)
-            max_iterations = cmd_.ilu_max_iter;
+        if (hp->ilu_needed(ill) and cmd_->ilu_max_iter > 0)
+            max_iterations = cmd_->ilu_max_iter;
     }
     else if (dynamic_cast<ILUCGPreconditioner const*>(this) != nullptr)
     {
-        if (cmd_.ilu_max_iter > 0)
-            max_iterations = cmd_.ilu_max_iter;
+        if (cmd_->ilu_max_iter > 0)
+            max_iterations = cmd_->ilu_max_iter;
     }
     
     // solve using the CG solver
@@ -72,21 +79,21 @@ int CGPreconditioner::solve_block (int ill, const cArrayView r, cArrayView z) co
     CG.verbose              = false;
     CG.apply_preconditioner = [&](const cArrayView a, cArrayView b)
                               {
-                                  par_.wait_g();
+                                  par_->wait_g();
                                   Timer timer;
                                   this->CG_prec(ill, a, b);
                                   us_prec_ += timer.microseconds();
                               };
     CG.matrix_multiply      = [&](const cArrayView a, cArrayView b)
                               {
-                                  par_.wait_g();
+                                  par_->wait_g();
                                   Timer timer;
                                   this->CG_mmul(ill, a, b);
                                   us_mmul_ += timer.microseconds();
                               };
     CG.scalar_product       = [&](const cArrayView a, const cArrayView b)
                               {
-                                  par_.wait_g();
+                                  par_->wait_g();
                                   Timer timer;
                                   Complex prod = this->CG_scalar_product(a, b);
                                   us_spro_ += timer.microseconds();
@@ -94,7 +101,7 @@ int CGPreconditioner::solve_block (int ill, const cArrayView r, cArrayView z) co
                               };
     CG.compute_norm         = [&](const cArrayView a)
                               {
-                                  par_.wait_g();
+                                  par_->wait_g();
                                   Timer timer;
                                   Real nrm = this->CG_compute_norm(a);
                                   us_norm_ += timer.microseconds();
@@ -102,7 +109,7 @@ int CGPreconditioner::solve_block (int ill, const cArrayView r, cArrayView z) co
                               };
     CG.axby                 = [&](Complex a, cArrayView x, Complex b, const cArrayView y)
                               {
-                                  par_.wait_g();
+                                  par_->wait_g();
                                   Timer timer;
                                   this->CG_axby_operation(a, x, b, y);
                                   us_axby_ += timer.microseconds();
@@ -115,7 +122,7 @@ int CGPreconditioner::solve_block (int ill, const cArrayView r, cArrayView z) co
                               {
                                   this->CG_constrain(r);
                               };
-    int n = CG.solve(r, z, cmd_.prec_itertol, 0, max_iterations);
+    int n = CG.solve(r, z, cmd_->prec_itertol, 0, max_iterations);
     
     if (n == max_iterations)
         HexException("Maximal number of iterations (%d) reached in the sub-preconditioner.", max_iterations);
@@ -132,45 +139,45 @@ void CGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArray<C
     us_axby_ = us_mmul_ = us_norm_ = us_prec_ = us_spro_ = 0;
     
     // apply SSOR
-    if (cmd_.ssor > 0)
+    if (cmd_->ssor > 0)
     {
         // working arrays
         cArrays y (r.size()), x (r.size());
         
         // forward SOR
-        for (int ill = 0; ill < (int)ang_.states().size(); ill++)
+        for (int ill = 0; ill < (int)ang_->states().size(); ill++)
         {
             // start with right-hand side
             y[ill] = r[ill];
             
             // subtract lower block diagonals for ill-th block row
             for (int illp = 0; illp < ill; illp++)
-            for (int lambda = 0; lambda <= rad_.maxlambda(); lambda++)
-            if (ang_.f(ill, illp, lambda) != 0)
-                rad_.R_tr_dia(lambda).dot(-ang_.f(ill, illp, lambda), y[illp], 1., y[ill], true);
+            for (int lambda = 0; lambda <= rad_->maxlambda(); lambda++)
+            if (ang_->f(ill, illp, lambda) != 0)
+                rad_->R_tr_dia(lambda).dot(-ang_->f(ill, illp, lambda), y[illp], 1., y[ill], true);
             
             // use (preconditioned) conjugate gradients to invert a diagonal block
             x[ill].resize(y[ill].size());
-            n_[ill] = solve_block(ill, cmd_.ssor * y[ill], x[ill]);
+            n_[ill] = solve_block(ill, cmd_->ssor * y[ill], x[ill]);
         }
         
         // normalize
-        for (int ill = 0; ill < (int)ang_.states().size(); ill++)
+        for (int ill = 0; ill < (int)ang_->states().size(); ill++)
         {
-            this->CG_mmul(ill, (2.0_r - cmd_.ssor) / cmd_.ssor * x[ill], y[ill]);
+            this->CG_mmul(ill, (2.0_r - cmd_->ssor) / cmd_->ssor * x[ill], y[ill]);
         }
         
         // backward SOR
-        for (int ill = (int)ang_.states().size() - 1; ill >= 0; ill--)
+        for (int ill = (int)ang_->states().size() - 1; ill >= 0; ill--)
         {
             // subtract upper block diagonals for ill-th block row
-            for (int illp = ill + 1; illp < (int)ang_.states().size(); illp++)
-            for (int lambda = 0; lambda <= rad_.maxlambda(); lambda++)
-            if (ang_.f(ill, illp, lambda) != 0)
-                rad_.R_tr_dia(lambda).dot(-ang_.f(ill, illp, lambda), y[illp], 1., y[ill], true);
+            for (int illp = ill + 1; illp < (int)ang_->states().size(); illp++)
+            for (int lambda = 0; lambda <= rad_->maxlambda(); lambda++)
+            if (ang_->f(ill, illp, lambda) != 0)
+                rad_->R_tr_dia(lambda).dot(-ang_->f(ill, illp, lambda), y[illp], 1., y[ill], true);
             
             // use (preconditioned) conjugate gradients to invert a diagonal block
-            n_[ill] += solve_block(ill, cmd_.ssor * y[ill], z[ill]);
+            n_[ill] += solve_block(ill, cmd_->ssor * y[ill], z[ill]);
         }
     }
     else
@@ -179,12 +186,12 @@ void CGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArray<C
         // NOTE : If the BLAS is multi-threaded, this will result in nested parallelism.
         //        Some combinations of system kernel and OpenMP implementation lead to system
         //        freeze. It can be avoided by using a serial BLAS.
-        # pragma omp parallel for schedule (dynamic, 1) if (cmd_.parallel_precondition && cmd_.groupsize == 1)
+        # pragma omp parallel for schedule (dynamic, 1) if (cmd_->parallel_precondition && cmd_->groupsize == 1)
 #endif
-        for (int ill = 0; ill < (int)ang_.states().size(); ill++) if (par_.isMyGroupWork(ill))
+        for (int ill = 0; ill < (int)ang_->states().size(); ill++) if (par_->isMyGroupWork(ill))
         {
             // load segment, if necessary
-            if (cmd_.outofcore)
+            if (cmd_->outofcore)
             {
                 const_cast<BlockArray<Complex>&>(r).hdfload(ill);
                 z.hdfload(ill);
@@ -194,7 +201,7 @@ void CGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArray<C
             n_[ill] = solve_block(ill, r[ill], z[ill]);
             
             // unload segment
-            if (cmd_.outofcore)
+            if (cmd_->outofcore)
             {
                 const_cast<BlockArray<Complex>&>(r)[ill].drop();
                 z.hdfsave(ill, true);
@@ -203,8 +210,8 @@ void CGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArray<C
     }
     
     // broadcast inner preconditioner iterations
-    par_.sync_m(n_.data(), 1, ang_.states().size());
-    par_.bcast_g(par_.igroup(), 0, n_.data(), ang_.states().size());
+    par_->sync_m(n_.data(), 1, ang_->states().size());
+    par_->bcast_g(par_->igroup(), 0, n_.data(), ang_->states().size());
     
     // inner preconditioner info (max and avg number of iterations)
     std::cout << " | ";
@@ -230,64 +237,64 @@ void CGPreconditioner::CG_mmul (int iblock, const cArrayView p, cArrayView q) co
 {
     std::memset(q.data(), 0, q.size() * sizeof(Complex));
     
-    std::size_t Nspline_inner = rad_.bspline_inner().Nspline();
-    std::size_t Nspline_full = rad_.bspline_full().Nspline();
+    std::size_t Nspline_inner = rad_->bspline_inner().Nspline();
+    std::size_t Nspline_full = rad_->bspline_full().Nspline();
     std::size_t Nspline_outer = Nspline_full - Nspline_inner;
-    std::size_t Nang = ang_.states().size();
+    std::size_t Nang = ang_->states().size();
     std::size_t iang = iblock * Nang + iblock;
     
-    if (cmd_.lightweight_full)
+    if (cmd_->lightweight_full)
     {
         dynamic_cast<NoPreconditioner const*>(this)->calc_A_block(iblock, iblock).dot
         (
             1.0_r, cArrayView(p, 0, Nspline_inner * Nspline_inner),
             1.0_r, cArrayView(q, 0, Nspline_inner * Nspline_inner),
-            !cmd_.parallel_precondition
+            !cmd_->parallel_precondition
         );
     }
     else
     {
-        if (cmd_.outofcore and cmd_.wholematrix) const_cast<BlockSymBandMatrix<Complex> &>(A_blocks_[iang]).hdfload();
+        if (cmd_->outofcore and cmd_->wholematrix) const_cast<BlockSymBandMatrix<Complex> &>(A_blocks_[iang]).hdfload();
         
         A_blocks_[iang].dot
         (
             1.0_r, cArrayView(p, 0, Nspline_inner * Nspline_inner),
             1.0_r, cArrayView(q, 0, Nspline_inner * Nspline_inner),
-            !cmd_.parallel_precondition
+            !cmd_->parallel_precondition
         );
         
-        if (cmd_.outofcore and cmd_.wholematrix) const_cast<BlockSymBandMatrix<Complex> &>(A_blocks_[iang]).drop();
+        if (cmd_->outofcore and cmd_->wholematrix) const_cast<BlockSymBandMatrix<Complex> &>(A_blocks_[iang]).drop();
     }
     
-    if (not inp_.inner_only)
+    if (not inp_->inner_only)
     {
         std::size_t Nchan1 = Nchan_[iblock].first;
         std::size_t Nchan2 = Nchan_[iblock].second;
         
-        # pragma omp parallel for if (!cmd_.parallel_precondition)
+        # pragma omp parallel for if (!cmd_->parallel_precondition)
         for (std::size_t m = 0; m < Nchan1; m++)
         for (std::size_t n = 0; n < Nchan1; n++)
         {
-            if (cmd_.outofcore) const_cast<SymBandMatrix<Complex>&>(B1_blocks_[iang][m * Nchan1 + n]).hdfload();
+            if (cmd_->outofcore) const_cast<SymBandMatrix<Complex>&>(B1_blocks_[iang][m * Nchan1 + n]).hdfload();
             B1_blocks_[iang][m * Nchan1 + n].dot
             (
                 1.0_r, cArrayView(p, Nspline_inner * Nspline_inner + n * Nspline_outer, Nspline_outer),
                 1.0_r, cArrayView(q, Nspline_inner * Nspline_inner + m * Nspline_outer, Nspline_outer)
             );
-            if (cmd_.outofcore) const_cast<SymBandMatrix<Complex>&>(B1_blocks_[iang][m * Nchan1 + n]).drop();
+            if (cmd_->outofcore) const_cast<SymBandMatrix<Complex>&>(B1_blocks_[iang][m * Nchan1 + n]).drop();
         }
         
-        # pragma omp parallel for if (!cmd_.parallel_precondition)
+        # pragma omp parallel for if (!cmd_->parallel_precondition)
         for (std::size_t m = 0; m < Nchan2; m++)
         for (std::size_t n = 0; n < Nchan2; n++)
         {
-            if (cmd_.outofcore) const_cast<SymBandMatrix<Complex>&>(B2_blocks_[iang][m * Nchan2 + n]).hdfload();
+            if (cmd_->outofcore) const_cast<SymBandMatrix<Complex>&>(B2_blocks_[iang][m * Nchan2 + n]).hdfload();
             B2_blocks_[iang][m * Nchan2 + n].dot
             (
                 1.0_r, cArrayView(p, Nspline_inner * Nspline_inner + (Nchan1 + n) * Nspline_outer, Nspline_outer),
                 1.0_r, cArrayView(q, Nspline_inner * Nspline_inner + (Nchan1 + m) * Nspline_outer, Nspline_outer)
             );
-            if (cmd_.outofcore) const_cast<SymBandMatrix<Complex>&>(B2_blocks_[iang][m * Nchan2 + n]).drop();
+            if (cmd_->outofcore) const_cast<SymBandMatrix<Complex>&>(B2_blocks_[iang][m * Nchan2 + n]).drop();
         }
         
         Cu_blocks_[iang].dot(1.0_r, p, 1.0_r, q);
@@ -315,15 +322,15 @@ Real CGPreconditioner::CG_compute_norm (const cArrayView a) const
     // compute norm (part will be computed by every process in group, result will be synchronized)
         
     // calculate number of elements every group's process will sum
-    std::size_t N = (a.size() + par_.groupsize() - 1) / par_.groupsize();
+    std::size_t N = (a.size() + par_->groupsize() - 1) / par_->groupsize();
     
     // calculate part of the norm
     Real norm2 = 0;
-    for (std::size_t i = par_.igroupproc() * N; i < (par_.igroupproc() + 1) * N and i < a.size(); i++)
+    for (std::size_t i = par_->igroupproc() * N; i < (par_->igroupproc() + 1) * N and i < a.size(); i++)
         norm2 += sqrabs(a[i]);
     
     // sum across group and return result
-    par_.syncsum_g(&norm2, 1);
+    par_->syncsum_g(&norm2, 1);
     return std::sqrt(norm2);
 }
     
@@ -334,15 +341,15 @@ Complex CGPreconditioner::CG_scalar_product (const cArrayView a, const cArrayVie
     assert(a.size() == b.size());
     
     // calculate number of elements every group's process will sum
-    std::size_t N = (a.size() + par_.groupsize() - 1) / par_.groupsize();
+    std::size_t N = (a.size() + par_->groupsize() - 1) / par_->groupsize();
     
     // calculate part of the norm
     Complex prod = 0;
-    for (std::size_t i = par_.igroupproc() * N; i < (par_.igroupproc() + 1) * N and i < a.size(); i++)
+    for (std::size_t i = par_->igroupproc() * N; i < (par_->igroupproc() + 1) * N and i < a.size(); i++)
         prod += a[i] * b[i];
     
     // sum across group and return result
-    par_.syncsum_g(&prod, 1);
+    par_->syncsum_g(&prod, 1);
     return prod;
 }
 
@@ -352,6 +359,13 @@ void CGPreconditioner::CG_axby_operation (Complex a, cArrayView x, Complex b, co
     
     assert(x.size() == y.size());
     
+    for (std::size_t i = 0; i < x.size(); i++)
+        x[i] = a * x[i] + b * y[i];
+    
+/*
+ * FIXME : Why is this SOOOO SLOOOOOW ?
+ * 
+
     // calculate number of elements each node should process
     std::size_t N = (x.size() + par_.groupsize() - 1) / par_.groupsize();
     
@@ -375,9 +389,19 @@ void CGPreconditioner::CG_axby_operation (Complex a, cArrayView x, Complex b, co
             end - begin             // number of elements to synchronize
         );
     }
+
+ *
+ *
+ */
 }
 
 void CGPreconditioner::CG_constrain (cArrayView r) const
 {
     // leave the resudual as it is
 }
+
+// --------------------------------------------------------------------------------- //
+
+addClassToParentRunTimeSelectionTable(PreconditionerBase, CGPreconditioner)
+
+// --------------------------------------------------------------------------------- //

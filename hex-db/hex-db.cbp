@@ -17,6 +17,7 @@
 					<Add option="-O2" />
 					<Add option="-Wall" />
 					<Add option="-std=c++11" />
+					<Add option="-fopenmp" />
 					<Add option="-DNDEBUG" />
 					<Add option="-DNO_LAPACK" />
 					<Add option="-DNO_HDF" />
@@ -26,6 +27,7 @@
 					<Add directory="src" />
 				</Compiler>
 				<Linker>
+					<Add option="-fopenmp" />
 					<Add library="../Win64/lib/libgsl-2.1.dll.a" />
 					<Add library="../Win64/lib/libsqlite3-3.11.1.dll.a" />
 				</Linker>
@@ -228,8 +230,20 @@
 		<Unit filename="src/interfaces.h">
 			<Option target="lib" />
 		</Unit>
+		<Unit filename="src/quantities.cpp">
+			<Option target="lib" />
+		</Unit>
+		<Unit filename="src/quantities.h">
+			<Option target="lib" />
+		</Unit>
 		<Unit filename="src/ui.cpp">
 			<Option target="exe" />
+		</Unit>
+		<Unit filename="src/utils.cpp">
+			<Option target="lib" />
+		</Unit>
+		<Unit filename="src/utils.h">
+			<Option target="lib" />
 		</Unit>
 		<Unit filename="src/var/asy.cpp">
 			<Option target="lib" />
@@ -274,15 +288,6 @@
 			<Option target="lib" />
 		</Unit>
 		<Unit filename="src/var/tmat.cpp">
-			<Option target="lib" />
-		</Unit>
-		<Unit filename="src/var/xcs.cpp">
-			<Option target="lib" />
-		</Unit>
-		<Unit filename="src/variables.cpp">
-			<Option target="lib" />
-		</Unit>
-		<Unit filename="src/variables.h">
 			<Option target="lib" />
 		</Unit>
 		<Unit filename="test/test-hexdb-lib-c.c">

@@ -48,14 +48,9 @@
 
 // --------------------------------------------------------------------------------- //
 
-createNewScatteringQuantity(DifferentialCrossSection);
+createNewScatteringQuantity(DifferentialCrossSection, "dcs")
 
 // --------------------------------------------------------------------------------- //
-
-std::string DifferentialCrossSection::name ()
-{
-    return "dcs";
-}
 
 std::string DifferentialCrossSection::description ()
 {

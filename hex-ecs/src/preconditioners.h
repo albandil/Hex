@@ -32,14 +32,23 @@
 #ifndef HEX_PRECONDITIONERS
 #define HEX_PRECONDITIONERS
 
+// --------------------------------------------------------------------------------- //
+
 #include <tuple>
+
+// --------------------------------------------------------------------------------- //
 
 #include "hex-arrays.h"
 #include "hex-matrix.h"
+#include "hex-rts.h"
+
+// --------------------------------------------------------------------------------- //
 
 #include "ang.h"
 #include "radial.h"
 #include "parallel.h"
+
+// --------------------------------------------------------------------------------- //
 
 /**
  * @brief Preconditioner template.
@@ -54,241 +63,124 @@ class PreconditionerBase
 {
     public:
         
-        /**
-         * @brief Virtual destructor.
-         * 
-         * To be overridden in derived classes.
-         */
-        virtual ~PreconditionerBase () {}
+        //
+        // Run-time selection mechanism (object factory).
+        //
         
-        /**
-         * @brief Name of the preconditioner.
-         * 
-         * The name is used in the command line option --preconditioner.
-         */
-        virtual std::string const & name () const = 0;
+            baseClassRunTimeSelectionDefinitions
+            (
+                PreconditionerBase,
+                (
+                    Parallel const & par,
+                    InputFile const & inp,
+                    AngularBasis const & ll,
+                    Bspline const & bspline_inner,
+                    Bspline const & bspline_full,
+                    CommandLine const & cmd
+                )
+            )
         
-        /**
-         * @brief Description of the preconditioner.
-         * 
-         * Simple documentation of the preconditioner.
-         */
-        virtual std::string const & description () const = 0;
+        //
+        // Class member functions.
+        //
         
-        /**
-         * @brief Initialize the preconditioner.
-         * 
-         * This function contains all computation intensive preparations
-         * for the preconditioner, e.g. computation of radial integrals.
-         * It may use only SMP environment.
-         */
-        virtual void setup () = 0;
-        
-        /**
-         * @brief Update the preconditioner for the next energy.
-         * 
-         * This function updates the preconditioner for another right hand side.
-         * It may use the MPI environment.
-         */
-        virtual void update (Real E) = 0;
-        
-        /**
-         * @brief Clean up memory etc.
-         * 
-         * This function is called when the preconditioner will no longer be used
-         * to release resources. To re-enable the same preconditioner then would require
-         * a new call to @ref setup.
-         */
-        virtual void finish () = 0;
-        
-        /**
-         * @brief Calculate the right-hand side.
-         */
-        virtual void rhs (BlockArray<Complex> & chi, int ie, int instate) const = 0;
-        
-        /**
-         * @brief Multiply by the matrix equation.
-         * 
-         * This function implements matrix multiplication by the matrix of
-         * the set of equations that is to be solved.
-         */
-        virtual void multiply (BlockArray<Complex> const & p, BlockArray<Complex> & q) const = 0;
-        
-        /**
-         * @brief Precondition the equation.
-         * 
-         * This function preconditions the equation, solving the preconditioner
-         * equation
-         * @f[
-         *       \mathbf{M}\mathbf{z} = \mathbf{r} \ .
-         * @f]
-         * It may use the MPI environment.
-         */
-        virtual void precondition (BlockArray<Complex> const & r, BlockArray<Complex> & z) const = 0;
+            /**
+             * @brief Dummy default constructor needed by the run-time selection.
+             */
+            PreconditionerBase () {}
+            
+            /**
+             * @brief Virtual destructor.
+             * 
+             * To be overridden in derived classes.
+             */
+            virtual ~PreconditionerBase () {}
+            
+            /**
+             * @brief Description of the preconditioner.
+             * 
+             * Simple documentation of the preconditioner.
+             */
+            virtual std::string description () const { return ""; }
+            
+            /**
+             * @brief Initialize the preconditioner.
+             * 
+             * This function contains all computation intensive preparations
+             * for the preconditioner, e.g. computation of radial integrals.
+             * It may use only SMP environment.
+             */
+            virtual void setup () {}
+            
+            /**
+             * @brief Update the preconditioner for the next energy.
+             * 
+             * This function updates the preconditioner for another right hand side.
+             * It may use the MPI environment.
+             */
+            virtual void update (Real E) {}
+            
+            /**
+             * @brief Clean up memory etc.
+             * 
+             * This function is called when the preconditioner will no longer be used
+             * to release resources. To re-enable the same preconditioner then would require
+             * a new call to @ref setup.
+             */
+            virtual void finish () {}
+            
+            /**
+             * @brief Calculate the right-hand side.
+             */
+            virtual void rhs (BlockArray<Complex> & chi, int ie, int instate) const {}
+            
+            /**
+             * @brief Multiply by the matrix equation.
+             * 
+             * This function implements matrix multiplication by the matrix of
+             * the set of equations that is to be solved.
+             */
+            virtual void multiply (BlockArray<Complex> const & p, BlockArray<Complex> & q, MatrixSelection::Selection tri = MatrixSelection::Both) const {}
+            
+            /**
+             * @brief Precondition the equation.
+             * 
+             * This function preconditions the equation, solving the preconditioner
+             * equation
+             * @f[
+             *       \mathbf{M}\mathbf{z} = \mathbf{r} \ .
+             * @f]
+             * It may use the MPI environment.
+             */
+            virtual void precondition (BlockArray<Complex> const & r, BlockArray<Complex> & z) const {}
 };
 
-class NoPreconditioner;
-class CGPreconditioner;
-class KPACGPreconditioner;
-class ILUCGPreconditioner;
-class GPUCGPreconditioner;
-class HybCGPreconditioner;
-class CoupledPreconditioner;
+// --------------------------------------------------------------------------------- //
 
-#include "preconditioners/NoPreconditioner.h"
-#include "preconditioners/CGPreconditioner.h"
-#include "preconditioners/KPAPreconditioner.h"
-#include "preconditioners/ILUPreconditioner.h"
-#include "preconditioners/GPUPreconditioner.h"
-#include "preconditioners/HybPreconditioner.h"
-#include "preconditioners/CoupledPreconditioner.h"
+#define preconditionerRunTimeSelectionDefinitions(TYPE,NAME) \
+    derivedClassRunTimeSelectionDefinitions \
+    ( \
+        PreconditionerBase, \
+        ( \
+            Parallel const & par, \
+            InputFile const & inp, \
+            AngularBasis const & ll, \
+            Bspline const & bspline_inner, \
+            Bspline const & bspline_full, \
+            CommandLine const & cmd \
+        ), \
+        TYPE, \
+        ( \
+            par, \
+            inp, \
+            ll, \
+            bspline_inner, \
+            bspline_full, \
+            cmd \
+        ), \
+        NAME \
+    )
 
-/**
- * @brief Preconditioner traits.
- * 
- * This class is used for accessing all available preconditioners. Preconditioner types and objects
- * are never accessed in any other way than by calling the member functions of this class or through
- * the pointer retrieved from the method "choose".
- * 
- * For this reason, addition of a new preconditioner is very simple. One just needs to derive the new
- * preconditioner class from PreconditionerBase, specify a name to be used on command line as static
- * attribute (see code below) and add the class name to the tuple AvailableTypes.
- * 
- * @code
- *     class MyNewPreconditioner
- *     {
- *         public:
- *             static const std::string name;
- * 
- *             // other compulsory methods
- *             // ...
- *     };
- * @endcode
- */
-class Preconditioners
-{
-    public:
-        
-        /**
-         * @brief List of available preconditioners.
-         * 
-         * First one (ILUCGPreconditioner at the moment) is considered default. This tuple is the only place that has to be modified
-         * when adding a new preconditioner to Hex-ECS (besides the obvious declaration and definition somewhere in reach, ideally
-         * in "preconditioners.h" and "preconditioners.cpp").
-         */
-        typedef std::tuple <
-            ILUCGPreconditioner         // Solve diagonal blocks by drop-tolerance incomplete LU factorization.
-            , NoPreconditioner          // No preconditioner.
-            , CGPreconditioner          // Solve diagonal blocks by non-preconditioned CG iterations.
-            , KPACGPreconditioner       // Solve diagonal blocks by separate electrons preconditioned CG iterations.
-            , HybCGPreconditioner       // Combine ILU and KPA.
-#ifdef WITH_OPENCL
-            , GPUCGPreconditioner       // KPA implemented on GPU.
-#endif
-#ifdef WITH_MUMPS
-            , CoupledPreconditioner     // Coupled solver.
-#endif
-        > AvailableTypes;
-        
-        /**
-         * @brief Number of available preconditioners.
-         */
-        static std::size_t size ()
-        {
-            return std::tuple_size<AvailableTypes>::value;
-        }
-        
-        /**
-         * @brief Return pointer to new preconditioner object.
-         * 
-         * The preconditioner index from CommandLine::preconditioner is used
-         * to choose the correct preconditioner.
-         */
-        //@{
-        template <int i = 0> static inline typename std::enable_if<(i < std::tuple_size<AvailableTypes>::value), PreconditionerBase*>::type choose
-        (
-            Parallel const & par,
-            InputFile const & inp,
-            AngularBasis const & ll,
-            Bspline const & bspline_inner,
-            Bspline const & bspline_full,
-            CommandLine const & cmd
-        )
-        {
-            // check if i-th preconditioner is the right one
-            // - Yes : return new pointer of its type
-            // - No : try the next preconditioner
-            return   (i == cmd.preconditioner)
-                   ? new typename std::tuple_element<i,AvailableTypes>::type (par, inp, ll, bspline_inner, bspline_full, cmd)
-                   : choose<i+1>(par, inp, ll, bspline_inner, bspline_full, cmd);
-        }
-        template <int i = 0> static inline typename std::enable_if<(i == std::tuple_size<AvailableTypes>::value), PreconditionerBase*>::type choose
-        (
-            Parallel const & par,
-            InputFile const & inp,
-            AngularBasis const & ll,
-            Bspline const & bspline_inner,
-            Bspline const & bspline_full,
-            CommandLine const & cmd
-        )
-        {
-            // we visited all available preconditioners without success : return NULL pointer
-            return nullptr;
-        }
-        //@}
-        
-        /**
-         * @brief Find preconditioner by name.
-         * 
-         * Return index of the corresponding preconditioner in AvailableTypes or (-1) if
-         * none such exists. "Corresponding preconditioner" is such type that has a static
-         * member
-         * @code
-         *     std::string name;
-         * @endcode
-         * equal to the argument of this function.
-         */
-        //@{
-        template <int i = 0> static inline typename std::enable_if<(i < std::tuple_size<AvailableTypes>::value),int>::type findByName (std::string name)
-        {
-            // check if i-th preconditioner is the right one
-            // - Yes : return new pointer of its type
-            // - No : try the next preconditioner
-            return (name == std::tuple_element<i,AvailableTypes>::type::prec_name) ? i : findByName<i+1>(name);
-        }
-        template <int i = 0> static inline typename std::enable_if<(i == std::tuple_size<AvailableTypes>::value),int>::type findByName (std::string name)
-        {
-            // we visited all available preconditioners without success : return invalid index (-1)
-            return -1;
-        }
-        //@}
-        
-        /**
-         * @brief Get name of the preconditioner.
-         */
-        //@{
-        template <int i = 0> static inline typename std::enable_if<(i < std::tuple_size<AvailableTypes>::value),std::string>::type name (unsigned idx)
-        {
-            return (i == idx) ? std::tuple_element<i,AvailableTypes>::type::prec_name : name<i+1>(idx);
-        }
-        template <int i = 0> static inline typename std::enable_if<(i == std::tuple_size<AvailableTypes>::value),std::string>::type name (unsigned idx)
-        {
-            return "";
-        }
-        //@}
-        
-        /**
-         * @brief Get description of the preconditioner.
-         */
-        //@{
-        template <int i = 0> static inline typename std::enable_if<(i < std::tuple_size<AvailableTypes>::value),std::string>::type description (unsigned idx)
-        {
-            return (i == idx) ? std::tuple_element<i,AvailableTypes>::type::prec_description : description<i+1>(idx);
-        }
-        template <int i = 0> static inline typename std::enable_if<(i == std::tuple_size<AvailableTypes>::value),std::string>::type description (unsigned idx)
-        {
-            return "";
-        }
-        //@}
-};
-#endif
+// --------------------------------------------------------------------------------- //
+
+#endif // HEX_PRECONDITIONERS

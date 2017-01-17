@@ -89,7 +89,7 @@ void RadialIntegrals::R_outer_integrand
         out[u] = values_i[u] * values_j[u] / in[u] * damp(0., in[u], R) * g_full_.quadMFP
         (
             this, &RadialIntegrals::R_inner_integrand,      // integrand pointers
-            points2, iknot, bspline_full_.t(iknot), in[u],     // integrator parameters
+            bspline_full_, points2, iknot, bspline_full_.t(iknot), in[u],     // integrator parameters
             k, l, L, iknot, iknotmax, in[u]     // integrand data
         );
     }
@@ -112,7 +112,7 @@ Complex RadialIntegrals::computeRtri
     return g_full_.quadMFP
     (
         this, &RadialIntegrals::R_outer_integrand,                      // integrand pointers
-        points, iknot, bspline_full_.t(iknot), bspline_full_.t(iknot+1),      // integrator parameters
+        bspline_full_, points, iknot, bspline_full_.t(iknot), bspline_full_.t(iknot+1),      // integrator parameters
         k, l, m, n, L, iknot, iknotmax    // integrand data
     );
 }

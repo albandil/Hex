@@ -32,6 +32,8 @@
 #ifndef HEX_SYMBANDMATRIX_H
 #define HEX_SYMBANDMATRIX_H
 
+#include <bitset>
+
 #include "hex-arrays.h"
 #include "hex-coomatrix.h"
 #include "hex-densematrix.h"
@@ -46,20 +48,25 @@
  * routines (if implemented). The multiplication is done, then, as if
  * the other parts were zero. For example
    @code
-       y = A.dot(x, strict_upper | strict_lower)
+       y = A.dot(x, MatrixSelection::StrictUpper | MatrixSelection::StrictLower);
    @endcode
  * will multiply vector @c x as if the diagonal of @c A were zero.
  */
-typedef enum {
-    none         = 0,  // b000,
-    strict_lower = 1,  // b001, strict_lower
-    strict_upper = 2,  // b010,                           strict_upper
-    strict_both  = 3,  // b011, strict_lower |            strict_upper
-    diagonal     = 4,  // b100,                diagonal
-    lower        = 5,  // b101, strict_lower | diagonal
-    upper        = 6,  // b110,                diagonal | strict_upper
-    both         = 7   // b111, strict_lower | diagonal | strict_upper
-} MatrixTriangle;
+class MatrixSelection
+{
+    public:
+        
+        typedef int Selection;
+        
+        static const Selection None        = 0; // = 0b000
+        static const Selection StrictLower = 1; // = 0b001
+        static const Selection StrictUpper = 2; // = 0b010
+        static const Selection StrictBoth  = 3; // = 0b011 = StrictLower | StrictUpper
+        static const Selection Diagonal    = 4; // = 0b100
+        static const Selection Lower       = 5; // = 0b101 = StrictLower | Diagonal
+        static const Selection Upper       = 6; // = 0b110 = StrictUpper | Diagonal
+        static const Selection Both        = 7; // = 0b111 = StrictLower | StrictUpper | Diagonal
+};
 
 /**
  * @brief Symmetric diagonal matrix.
@@ -293,14 +300,14 @@ public:
      * 
      * @param B Set of vectors to multiply as a column-major dense matrix.
      */
-    void dot (DataT a, const ArrayView<DataT> A, DataT b, ArrayView<DataT> B) const
+    void dot (DataT a, const ArrayView<DataT> A, DataT b, ArrayView<DataT> B, MatrixSelection::Selection tri = MatrixSelection::Both) const
     {
-        sym_band_dot(n_, d_, elems_, a, A, b, B);
+        sym_band_dot(n_, d_, elems_, a, A, b, B, tri);
     }
-    NumberArray<DataT> dot (const ArrayView<DataT> A) const
+    NumberArray<DataT> dot (const ArrayView<DataT> A, MatrixSelection::Selection tri = MatrixSelection::Both) const
     {
         NumberArray<DataT> B (A.size());
-        sym_band_dot(n_, d_, elems_, 1., A, 0., B);
+        sym_band_dot(n_, d_, elems_, 1., A, 0., B, tri);
         return B;
     }
     
@@ -316,7 +323,8 @@ public:
     (
         int n, int d, const ArrayView<DataT> M,
         DataT a, const ArrayView<DataT> A,
-        DataT b,       ArrayView<DataT> B
+        DataT b,       ArrayView<DataT> B,
+        MatrixSelection::Selection tri = MatrixSelection::Both
     );
     
     /**
@@ -563,7 +571,7 @@ public:
     NumberArray<DataT> toPaddedCols () const;
     
     /// Convert matrix part to CooMatrix.
-    template <class IdxT> CooMatrix<IdxT,DataT> tocoo (MatrixTriangle triangle = both) const
+    template <class IdxT> CooMatrix<IdxT,DataT> tocoo (MatrixSelection::Selection triangle = MatrixSelection::Both) const
     {
         NumberArray<IdxT> I, J;
         NumberArray<DataT> V;
@@ -584,15 +592,15 @@ public:
                 }
                 
                 // add this element to COO (upper triangle)
-                if ((d != 0) and (triangle & strict_upper))
+                if ((d != 0) and (triangle & MatrixSelection::StrictUpper))
                 {
                     I.push_back(i);
                     J.push_back(i+d);
                     V.push_back(*el);
                 }
                 
-                // add this element to COO (upper triangle)
-                if ((d != 0) and (triangle & strict_lower))
+                // add this element to COO (lower triangle)
+                if ((d != 0) and (triangle & MatrixSelection::StrictLower))
                 {
                     I.push_back(i+d);
                     J.push_back(i);
@@ -600,7 +608,7 @@ public:
                 }
                 
                 // main diagonal
-                if ((d == 0) and (triangle & diagonal))
+                if ((d == 0) and (triangle & MatrixSelection::Diagonal))
                 {
                     I.push_back(i);
                     J.push_back(i);
@@ -616,7 +624,7 @@ public:
     }
     
     /// Convert matrix part to RowMatrix.
-    RowMatrix<DataT> torow (MatrixTriangle triangle = both) const
+    RowMatrix<DataT> torow (MatrixSelection::Selection triangle = MatrixSelection::Both) const
     {
         RowMatrix<DataT> M (n_, n_);
         
@@ -629,15 +637,15 @@ public:
             if (i + d < n_)
             {
                 // main diagonal
-                if ((d == 0) and (triangle & diagonal))
+                if ((d == 0) and (triangle & MatrixSelection::Diagonal))
                     M(i,i) = *el;
                 
                 // upper triangle
-                if ((d != 0) and (triangle & strict_upper))
+                if ((d != 0) and (triangle & MatrixSelection::StrictUpper))
                     M(i,i+d) = *el;
                 
                 // lower triangle
-                if ((d != 0) and (triangle & strict_lower))
+                if ((d != 0) and (triangle & MatrixSelection::StrictLower))
                     M(i+d,i) = *el;
             }
             // move on to the next elements
@@ -824,7 +832,7 @@ template <class DataT> class BlockSymBandMatrix
          *          The result will be again of the same size.
          * @param parallelize Multiply by several blocks at once (OpenMP used).
          */
-        void dot (DataT a, const ArrayView<DataT> v, DataT b, ArrayView<DataT> w, bool parallelize = false) const
+        void dot (DataT a, const ArrayView<DataT> v, DataT b, ArrayView<DataT> w, bool parallelize = false, MatrixSelection::Selection tri = MatrixSelection::Both) const
         {
             // check vector size
             if (v.size() != blockcount_ * size_)
@@ -891,7 +899,8 @@ template <class DataT> class BlockSymBandMatrix
                             (
                                 size_, halfbw_, view,
                                 1., ArrayView<DataT>(v, i * size_, size_),
-                                0., product
+                                0., product,
+                                MatrixSelection::Both
                             );
                             
                             OMP_LOCK_LOCK(i);
@@ -906,35 +915,41 @@ template <class DataT> class BlockSymBandMatrix
                         // multiply by the other diagonals (both symmetries)
                         else
                         {
-                            SymBandMatrix<DataT>::sym_band_dot
-                            (
-                                size_, halfbw_, view,
-                                1., ArrayView<DataT>(v, (i + d) * size_, size_),
-                                0., product
-                            );
-                            
-                            OMP_LOCK_LOCK(i);
+                            if (tri & MatrixSelection::StrictUpper)
                             {
-                                # pragma omp simd
-                                for (std::size_t pos = 0; pos < size_; pos++)
-                                    w[i * size_ + pos] += a * product[pos];
+                                SymBandMatrix<DataT>::sym_band_dot
+                                (
+                                    size_, halfbw_, view,
+                                    1., ArrayView<DataT>(v, (i + d) * size_, size_),
+                                    0., product
+                                );
+                                
+                                OMP_LOCK_LOCK(i);
+                                {
+                                    # pragma omp simd
+                                    for (std::size_t pos = 0; pos < size_; pos++)
+                                        w[i * size_ + pos] += a * product[pos];
+                                }
+                                OMP_UNLOCK_LOCK(i);
                             }
-                            OMP_UNLOCK_LOCK(i);
                             
-                            SymBandMatrix<DataT>::sym_band_dot
-                            (
-                                size_, halfbw_, view,
-                                1., ArrayView<DataT>(v, i * size_, size_),
-                                0., product
-                            );
-                            
-                            OMP_LOCK_LOCK(i + d);
+                            if (tri & MatrixSelection::StrictLower)
                             {
-                                # pragma omp simd
-                                for (std::size_t pos = 0; pos < size_; pos++)
-                                    w[(i + d) * size_ + pos] += a * product[pos];
+                                SymBandMatrix<DataT>::sym_band_dot
+                                (
+                                    size_, halfbw_, view,
+                                    1., ArrayView<DataT>(v, i * size_, size_),
+                                    0., product
+                                );
+                                
+                                OMP_LOCK_LOCK(i + d);
+                                {
+                                    # pragma omp simd
+                                    for (std::size_t pos = 0; pos < size_; pos++)
+                                        w[(i + d) * size_ + pos] += a * product[pos];
+                                }
+                                OMP_UNLOCK_LOCK(i + d);
                             }
-                            OMP_UNLOCK_LOCK(i + d);
                         }
                     }
                 }

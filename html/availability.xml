@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<av:availability
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xmlns:av="http://www.ivoa.net/xml/VOSIAvailability/v1.0"
+  xmlns:vs="http://www.ivoa.net/xml/VODataService/v1.0"
+  xmlns:vr="http://www.ivoa.net/xml/VOResource/v1.0"
+  xmlns:xc="http://www.vamdc.org/xml/XSAMS-consumer/v1.0">
+  
+  <av:available>true</av:available>
+  <av:upSince>2017-01-01T00:00:00.000+00:00</av:upSince>
+  
+  <!-- <av:downAt>1.1.2015</av:downAt> -->
+  <!-- <av:backAt>1.1.2015</av:backAt> -->
+  
+  <av:note>Testing TAP service of Hex database.</av:note>
+  
+</av:availability>

@@ -51,8 +51,6 @@ RadialIntegrals::RadialIntegrals
 )
   : bspline_inner_(bspline_inner),
     bspline_full_ (bspline_full),
-    g_inner_(bspline_inner),
-    g_full_ (bspline_full),
     D_inner_     (bspline_inner.Nspline(), bspline_inner.order() + 1),
     S_inner_     (bspline_inner.Nspline(), bspline_inner.order() + 1),
     Mm1_inner_   (bspline_inner.Nspline(), bspline_inner.order() + 1),
@@ -565,7 +563,7 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
             if (i + d < Nspline_full)
             {
                 // calculate the block
-                SymBandMatrix<Complex> block = calc_R_tr_dia_block(lambda, i, i + d);
+                SymBandMatrix<Complex> block = calc_R_tr_dia_block(lambda, i, i + d, false);
                 
                 // write the finished block to disk
                 # pragma omp critical
@@ -580,7 +578,6 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
         if (R_tr_dia_[lambda].inmemory())
             R_tr_dia_[lambda].hdfsave();
     }
-    
     
     // wait for completition of all processes
     par.wait();
@@ -609,10 +606,10 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
         std::cout << std::endl;
 }
 
-SymBandMatrix<Complex> RadialIntegrals::calc_R_tr_dia_block (unsigned int lambda, int i, int k, bool simple) const
+SymBandMatrix<Complex> RadialIntegrals::calc_R_tr_dia_block (unsigned int lambda, int i, int k, bool inner_only, bool simple) const
 {
     // shorthands
-    int Nspline = bspline_inner_.Nspline(); // WARNING : Computing only inner-region integrals.
+    int Nspline = inner_only ? bspline_inner_.Nspline() : bspline_full_.Nspline();
     int order = bspline_full_.order();
     
     // (i,k)-block data
@@ -652,7 +649,7 @@ void RadialIntegrals::apply_R_matrix
     for (std::size_t k = i; k < Nspline and k <= i + order; k++)
     {
         // (i,k)-block data (= concatenated non-zero upper diagonals)
-        SymBandMatrix<Complex> block_ik = std::move ( calc_R_tr_dia_block(lambda, i, k, simple) );
+        SymBandMatrix<Complex> block_ik = std::move ( calc_R_tr_dia_block(lambda, i, k, true, simple) );
         
         // multiply source vector by this block
         block_ik.dot(1., cArrayView(src, k * Nspline, Nspline), 0., prod);
@@ -743,6 +740,7 @@ cArray RadialIntegrals::overlapP (Bspline const & bspline, GaussLegendre const &
     cArray xs (points), ws (points);
     
     // for all knots
+    # pragma omp parallel for firstprivate (points,xs,ws,evalB,evalP)
     for (int iknot = 0; iknot < bspline.Nknot() - 1; iknot++)
     {
         // skip zero length intervals
@@ -778,6 +776,7 @@ cArray RadialIntegrals::overlapP (Bspline const & bspline, GaussLegendre const &
                 sum += ws[ipoint] * evalP[ipoint] * evalB[ipoint];
             
             // store the overlap
+            # pragma omp critical
             res[ispline] += sum;
         }
     }
@@ -806,7 +805,7 @@ cArray RadialIntegrals::overlapj (Bspline const & bspline, GaussLegendre const &
     cArray evalB ((order + 1) * points), evalj (points * (maxell + 1));
     
     // for all knots
-    # pragma omp parallel for firstprivate (xs,ws,evalB,evalj)
+    # pragma omp parallel for firstprivate (points,xs,ws,evalB,evalj)
     for (int iknot = 0; iknot < Nknot - 1; iknot++)
     {
         // skip zero length intervals
@@ -859,6 +858,7 @@ cArray RadialIntegrals::overlapj (Bspline const & bspline, GaussLegendre const &
                         sum += ws[ipoint] * evalj[ipoint * (maxell + 1) + l] * evalB[(iknot - ispline) * points + ipoint];
                     
                     // store the overlap; keep the shape Nmomenta × Nspline × (maxl+1)
+                    # pragma omp critical
                     res[(ie * (maxell + 1) + l) * Nspline + ispline] += sum;
                 }
             }

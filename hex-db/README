@@ -24,7 +24,7 @@ Here is the list of the libraries with versions that were used:
                 http://www.gnu.org/software/gsl/
             Used for special functions and some others.
 
- * SQLite 3.8.8
+ * SQLite 3.15.0
             Obtainable from
                 http://www.sqlite.org/download.html
             Used for access to the database files.

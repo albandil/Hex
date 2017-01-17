@@ -46,14 +46,9 @@
 
 // --------------------------------------------------------------------------------- //
 
-createNewScatteringQuantity(TMatrix);
+createNewScatteringQuantity(TMatrix, "tmat")
 
 // --------------------------------------------------------------------------------- //
-
-std::string TMatrix::name ()
-{
-    return "tmat";
-}
 
 std::string TMatrix::description ()
 {

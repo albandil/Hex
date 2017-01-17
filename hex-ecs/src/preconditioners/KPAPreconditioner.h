@@ -32,17 +32,23 @@
 #ifndef HEX_KPAPRECONDITIONER_H
 #define HEX_KPAPRECONDITIONER_H
 
+// --------------------------------------------------------------------------------- //
+
 #include <deque>
 #include <set>
 #include <string>
 #include <vector>
 
+// --------------------------------------------------------------------------------- //
+
 #include "hex-arrays.h"
 #include "hex-matrix.h"
 
-#include "preconditioners.h"
+// --------------------------------------------------------------------------------- //
 
-#ifndef NO_LAPACK
+#include "CGPreconditioner.h"
+
+// --------------------------------------------------------------------------------- //
 
 /**
  * @brief KPA-preconditioned CG-preconditioner.
@@ -61,11 +67,8 @@ class KPACGPreconditioner : public virtual CGPreconditioner
 {
     public:
         
-        static const std::string prec_name;
-        static const std::string prec_description;
-        
-        virtual std::string const & name () const { return prec_name; }
-        virtual std::string const & description () const { return prec_description; }
+        // run-time selection mechanism
+        preconditionerRunTimeSelectionDefinitions(KPACGPreconditioner, "KPA")
         
         typedef struct sData
         {
@@ -94,6 +97,10 @@ class KPACGPreconditioner : public virtual CGPreconditioner
             std::string filename;
         } Data;
         
+        // default constructor needed by the RTS mechanism
+        KPACGPreconditioner () {}
+        
+        // constructor
         KPACGPreconditioner
         (
             Parallel const & par,
@@ -117,6 +124,9 @@ class KPACGPreconditioner : public virtual CGPreconditioner
             omp_destroy_lock(&lck_);
 #endif
         }
+        
+        // preconditioner description
+        virtual std::string description () const;
         
         // reuse parent definitions
         using CGPreconditioner::update;
@@ -168,6 +178,6 @@ class KPACGPreconditioner : public virtual CGPreconditioner
         mutable cArrays workspace_;
 };
 
-#endif
+// --------------------------------------------------------------------------------- //
 
 #endif

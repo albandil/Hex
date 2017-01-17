@@ -465,6 +465,17 @@ Bspline::Bspline (int order, rArrayView const & rknots, Real th, rArrayView cons
         work_.push_back(rArray(work_size_));
 }
 
+Bspline::Bspline (Bspline && bspline)
+    : rknots_(std::move(bspline.rknots_)),
+      cknots_(std::move(bspline.cknots_)),
+      t_(nullptr), theta_(bspline.theta_), rotation_(bspline.rotation_),
+      R0_(bspline.R0_), Rmax_(bspline.Rmax_), Nknot_(bspline.Nknot_),
+      Nreknot_(bspline.Nreknot_), Nspline_(bspline.Nspline_), Nintval_(bspline.Nintval_),
+      order_(bspline.order_), work_(std::move(bspline.work_))
+{
+    std::swap(t_, bspline.t_);
+}
+
 Bspline::~Bspline ()
 {
     if (t_ != nullptr)

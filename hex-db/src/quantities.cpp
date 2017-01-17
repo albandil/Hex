@@ -33,30 +33,26 @@
 
 // --------------------------------------------------------------------------------- //
 
-std::unique_ptr<std::vector<ScatteringQuantity*>> quantities;
+defineBaseClassRunTimeSelectionTable(ScatteringQuantity)
 
 // --------------------------------------------------------------------------------- //
 
-bool register_new_quantity (ScatteringQuantity* Q)
-{
-    if (quantities.get() == nullptr)
-        quantities.reset(new std::vector<ScatteringQuantity*>());
-    
-    quantities->push_back(Q);
-    return true;
-}
-
 ScatteringQuantity * get_quantity (std::string name)
 {
-    for (ScatteringQuantity * Q : *quantities)
-    {
-        if (Q->name() == name)
+    std::vector<ScatteringQuantity*>::iterator iter = std::find_if
+    (
+        ScatteringQuantity::RTS_Table->begin(),
+        ScatteringQuantity::RTS_Table->end(),
+        [&](ScatteringQuantity const * Q)
         {
-            return Q;
+            return Q->name() == name;
         }
-    }
+    );
     
-    return nullptr;
+    if (iter == ScatteringQuantity::RTS_Table->end())
+        return nullptr;
+    
+    return *iter;
 }
 
 // --------------------------------------------------------------------------------- //

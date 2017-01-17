@@ -34,6 +34,8 @@
 
 #ifdef WITH_MPI
 #include <mpi.h>
+#else
+#define MPI_Comm std::intptr_t
 #endif
 
 #include "hex-arrays.h"
@@ -208,6 +210,27 @@ class Parallel
         
         /// Return group size.
         int groupsize () const { return groupsize_; }
+        
+        /**
+         * @brief Broadcast array from owner to everyone.
+         */
+        template <class T> void bcast (int owner, T* data, std::size_t N) const
+        {
+#ifdef WITH_MPI
+            if (active_)
+            {
+                // owner : broadcast data
+                MPI_Bcast
+                (
+                    data,
+                    N * typeinfo<T>::ncmpt,
+                    typeinfo<T>::mpicmpttype(),
+                    owner,
+                    MPI_COMM_WORLD
+                );
+            }
+#endif
+        }
         
         /**
          * @brief Broadcast array from owner to everyone.
@@ -504,9 +527,9 @@ class Parallel
         {
 #ifdef WITH_MPI
             if (active_)
-                return groupcomm_;
+                return (void*)(std::intptr_t)groupcomm_;
 #endif
-            return nullptr;
+            return MPI_Comm(0);
         }
         
     private:

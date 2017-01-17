@@ -274,7 +274,7 @@ template <class Type, class Base> class ColMatrix : public Base
         ColMatrix (ColMatrix<Type> const & m)
             : Base(m.rows(), m.cols(), m.data()), ld_(m.ld()) { }
         explicit ColMatrix (RowMatrix<Type> const & m)
-            : Base(m.rows(), m.cols(), m.data()), ld_(m.cols()) { reorder_(); }
+            : Base(m.rows(), m.cols(), m.data()), ld_(m.rows()) { reorder_(); }
         
         /**
          * @brief Assignment operator.
@@ -411,7 +411,7 @@ template <class Type, class Base> class ColMatrix : public Base
             
             for (int irow = 0; irow < this->rows(); irow++)
             for (int icol = 0; icol < this->cols(); icol++)
-                new_data[icol * this->rows() + irow] = this->data_[irow * ld_ + icol];
+                new_data[icol * this->rows() + irow] = this->data_[irow * this->cols() + icol];
             
             this->data_ = new_data;
         }
@@ -442,7 +442,7 @@ template <class Type, class Base> class RowMatrix : public Base
         RowMatrix (RowMatrix<Type> const & m)
             : Base(m.rows(), m.cols(), m.data()), ld_(m.ld()) { }
         explicit RowMatrix (ColMatrix<Type> const & m)
-            : Base(m.rows(), m.cols(), m.data()), ld_(m.rows()) { reorder_(); }
+            : Base(m.rows(), m.cols(), m.data()), ld_(m.cols()) { reorder_(); }
         
         /**
          * @brief Assignment operator.
@@ -710,7 +710,7 @@ template <class Type, class Base> class RowMatrix : public Base
             
             for (int irow = 0; irow < this->rows_; irow++)
             for (int icol = 0; icol < this->cols_; icol++)
-                new_data[irow * this->cols_ + icol] = this->data_[icol * ld_ + irow];
+                new_data[irow * this->cols_ + icol] = this->data_[icol * this->rows() + irow];
             
             this->data_ = new_data;
         }

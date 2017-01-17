@@ -48,14 +48,9 @@
 
 // --------------------------------------------------------------------------------- //
 
-createNewScatteringQuantity(CompleteCrossSection);
+createNewScatteringQuantity(CompleteCrossSection, "ccs")
 
 // --------------------------------------------------------------------------------- //
-
-std::string CompleteCrossSection::name ()
-{
-    return "ccs";
-}
 
 std::string CompleteCrossSection::description ()
 {
@@ -281,6 +276,13 @@ void hex_complete_cross_section_
         {
             rArrayView(*N,ccs) += interpolate_real(E_data[ell], E_data[ell] * sigma_data[ell], rArrayView(*N,energies), gsl_interp_akima) / rArrayView(*N,energies);
         }
+    }
+    
+    // erase data for energies below threshold
+    for (int i = 0; i < *N; i++)
+    {
+        if (energies[i] < 1./(*ni * *ni) - 1./(*nf * *nf))
+            ccs[i] = 0;
     }
 }
 

@@ -32,16 +32,23 @@
 #ifndef HEX_HYBPRECONDITIONER_H
 #define HEX_HYBPRECONDITIONER_H
 
+// --------------------------------------------------------------------------------- //
+
 #include <set>
 #include <string>
 #include <vector>
 
+// --------------------------------------------------------------------------------- //
+
 #include "hex-arrays.h"
 #include "hex-matrix.h"
 
-#include "preconditioners.h"
+// --------------------------------------------------------------------------------- //
 
-#ifndef NO_LAPACK
+#include "ILUPreconditioner.h"
+#include "KPAPreconditioner.h"
+
+// --------------------------------------------------------------------------------- //
 
 /**
  * @brief Hybrid preconditioner.
@@ -54,12 +61,13 @@ class HybCGPreconditioner : public ILUCGPreconditioner, public KPACGPrecondition
 {
     public:
         
-        static const std::string prec_name;
-        static const std::string prec_description;
+        // run-time selection mechanism
+        preconditionerRunTimeSelectionDefinitions(HybCGPreconditioner, "HYB")
         
-        virtual std::string const & name () const { return prec_name; }
-        virtual std::string const & description () const { return prec_description; }
+        // default constructor needed by the RTS mechanism
+        HybCGPreconditioner () {}
         
+        // constructor
         HybCGPreconditioner
         (
             Parallel const & par,
@@ -74,6 +82,9 @@ class HybCGPreconditioner : public ILUCGPreconditioner, public KPACGPrecondition
         {
             // nothing more to do
         }
+        
+        // preconditioner description
+        virtual std::string description () const;
         
         // reuse parent definitions
         using CGPreconditioner::multiply;
@@ -95,6 +106,6 @@ class HybCGPreconditioner : public ILUCGPreconditioner, public KPACGPrecondition
         bool ilu_needed (int iblock) const;
 };
 
-#endif
+// --------------------------------------------------------------------------------- //
 
 #endif

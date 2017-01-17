@@ -65,6 +65,10 @@ class Bspline
          */
         Bspline (int order, rArrayView const & rknots, Real th, rArrayView const & cknots);
         
+        // move constructor
+        Bspline (Bspline && other);
+        
+        // destructor
         ~Bspline ();
         
         /**
@@ -287,6 +291,10 @@ class Bspline
         
         /// Work max size
         static const std::size_t work_size_;
+        
+        /// Disallow implicit bitwise copy.
+        Bspline (Bspline const &) = delete;
+        Bspline const & operator= (Bspline const &) = delete;
 };
 
 #endif

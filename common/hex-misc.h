@@ -621,8 +621,12 @@ class OutputTable
                     break;
             }
             
+            // buffer the item
+            std::ostringstream oss;
+            oss << item;
+            
             // write the item
-            out_ << item;
+            out_ << oss.str();
             
             // write the rest of the items
             write<i+1>(p...);

@@ -47,19 +47,9 @@
 
 // --------------------------------------------------------------------------------- //
 
-createNewScatteringQuantity(StokesParameters);
+createNewScatteringQuantity(StokesParameters, "stokes")
 
 // --------------------------------------------------------------------------------- //
-
-
-//
-// StokesParameters members
-//
-
-std::string StokesParameters::name ()
-{
-    return "stokes";
-}
 
 std::string StokesParameters::description ()
 {

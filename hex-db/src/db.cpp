@@ -77,7 +77,7 @@ void hex_initialize_ (const char* dbname)
     st.exec();
     
     // sort quantities' classes in order of their dependencies
-    std::vector<std::size_t> position (quantities->size(), quantities->size());
+    std::vector<std::size_t> position (ScatteringQuantity::RTS_Table->size(), ScatteringQuantity::RTS_Table->size());
     std::size_t next_position = 0;
     int u = 0;
     while
@@ -85,21 +85,21 @@ void hex_initialize_ (const char* dbname)
         std::any_of
         (
             position.begin(), position.end(),
-            [](std::size_t pos) { return pos == quantities->size(); }
+            [](std::size_t pos) { return pos == ScatteringQuantity::RTS_Table->size(); }
         )
     )
     {
         // get next quantity with undecided position
-        for (std::size_t i = 0; i < quantities->size(); i++) if (position[i] > next_position)
+        for (std::size_t i = 0; i < ScatteringQuantity::RTS_Table->size(); i++) if (position[i] > next_position)
         {
             // get dependencies
-            std::vector<std::string> deps = (*quantities)[i]->dependencies();
+            std::vector<std::string> deps = (*ScatteringQuantity::RTS_Table)[i]->dependencies();
             
             // check that all dependencies are already in place
             bool depsOK = true;
-            for (std::size_t j = 0; j < quantities->size(); j++)
+            for (std::size_t j = 0; j < ScatteringQuantity::RTS_Table->size(); j++)
             {
-                if (std::find(deps.begin(), deps.end(), (*quantities)[j]->name()) == deps.end())
+                if (std::find(deps.begin(), deps.end(), (*ScatteringQuantity::RTS_Table)[j]->name()) == deps.end())
                     continue;
                 
                 if (position[j] > next_position)
@@ -119,13 +119,13 @@ void hex_initialize_ (const char* dbname)
     }
     
     // create sorted vector of pointers
-    std::unique_ptr<std::vector<ScatteringQuantity*>> new_quantities (new std::vector<ScatteringQuantity*>(quantities->size()));
-    for (std::size_t i = 0; i < quantities->size(); i++)
-        (*new_quantities)[position[i]] = (*quantities)[i];
-    quantities.swap(new_quantities);
+    std::unique_ptr<std::vector<ScatteringQuantity*>> new_quantities (new std::vector<ScatteringQuantity*>(ScatteringQuantity::RTS_Table->size()));
+    for (std::size_t i = 0; i < ScatteringQuantity::RTS_Table->size(); i++)
+        (*new_quantities)[position[i]] = (*ScatteringQuantity::RTS_Table)[i];
+    ScatteringQuantity::RTS_Table.swap(new_quantities);
     
     // initialize the quantities
-    for (ScatteringQuantity * Q : *quantities)
+    for (ScatteringQuantity * Q : *ScatteringQuantity::RTS_Table)
     {
         if (not Q->initialize(db))
         {
@@ -138,7 +138,7 @@ void hex_new () { hex_new_(); }
 void hex_new_ ()
 {
     // create tables
-    for (ScatteringQuantity * Q : *quantities)
+    for (ScatteringQuantity * Q : *ScatteringQuantity::RTS_Table)
     {
         if (not Q->createTable())
         {
@@ -252,7 +252,7 @@ void hex_update () { hex_update_(); }
 void hex_update_ ()
 {
     std::cout << "Updating database (this may take a few minutes)..." << std::endl;
-    for (ScatteringQuantity * Q : *quantities)
+    for (ScatteringQuantity * Q : *ScatteringQuantity::RTS_Table)
     {
         if (not Q->updateTable())
         {
@@ -350,13 +350,13 @@ int hex_run
         // pointer to the correct "Variable" object
         auto var = std::find_if
         (
-            quantities->begin(),
-            quantities->end(),
+            ScatteringQuantity::RTS_Table->begin(),
+            ScatteringQuantity::RTS_Table->end(),
             [&](ScatteringQuantity * q){ return q->name() == varname; }
         );
         
         // get a pointer from the dictionary
-        if (var == quantities->end())
+        if (var == ScatteringQuantity::RTS_Table->end())
         {
             // this should never happen
             HexException("Quantity \"%s\" not available.", varname.c_str());

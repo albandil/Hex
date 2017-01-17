@@ -150,7 +150,7 @@ int main (int argc, char* argv[])
             table.setAlignment(OutputTable::left, OutputTable::left);
             table.setWidth(20,40);
             table.write("(name)", "(description)");
-            for (ScatteringQuantity * Q : *quantities)
+            for (ScatteringQuantity * Q : *ScatteringQuantity::RTS_Table)
                 table.write(Q->name(), Q->description());
             
             std::exit(EXIT_SUCCESS);
@@ -159,12 +159,12 @@ int main (int argc, char* argv[])
         {
             auto it = std::find_if
             (
-                quantities->begin(),
-                quantities->end(),
+                ScatteringQuantity::RTS_Table->begin(),
+                ScatteringQuantity::RTS_Table->end(),
                 [ & ](ScatteringQuantity* & it) -> bool { return it->name() == opts[0]; }
             );
             
-            if (it == quantities->end())
+            if (it == ScatteringQuantity::RTS_Table->end())
             {
                 std::cout << "No such quantity \"" << opts[0] << "\"" << std::endl;
             }
@@ -235,7 +235,7 @@ int main (int argc, char* argv[])
         /* default*/ [ & ](std::string arg, Args opts) -> bool
         {
             // try to find it in the variable ids
-            for (ScatteringQuantity * var : *quantities)
+            for (ScatteringQuantity * var : *ScatteringQuantity::RTS_Table)
             {
                 if (var->name() == arg)
                 {
@@ -246,7 +246,7 @@ int main (int argc, char* argv[])
             }
             
             // try to find it in the variable dependencies
-            for (ScatteringQuantity * var : *quantities)
+            for (ScatteringQuantity * var : *ScatteringQuantity::RTS_Table)
             {
                 // scan the dependencies for 'arg'
                 bool this_arg_is_needed = false;

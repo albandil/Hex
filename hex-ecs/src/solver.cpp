@@ -52,7 +52,7 @@ Solver::Solver
 void Solver::choose_preconditioner ()
 {
     // create the preconditioner
-    prec_ = Preconditioners::choose(par_, inp_, ang_, bspline_inner_, bspline_full_, cmd_);
+    prec_ = PreconditionerBase::Choose(cmd_.preconditioner, par_, inp_, ang_, bspline_inner_, bspline_full_, cmd_);
     
     // check success
     if (prec_ == nullptr)
@@ -193,7 +193,15 @@ void Solver::solve ()
             
             // check if there is some precomputed solution on the disk
             SolutionIO reader (inp_.L, Spin, inp_.Pi, ni, li, mi, inp_.Etot[ie], ang_.states());
-            std::size_t size = reader.check();
+            std::size_t size = 0;
+            reader.check(SolutionIO::All, size);
+            
+            // sum partial sizes in distributed case
+            if (not cmd_.shared_scratch)
+            {
+                par_.mastersum(&size, 1, 0);
+                par_.bcast(0, &size, 1);
+            }
             
             // solution has the expected size
             if (size == Hsize and not cmd_.refine_solution)

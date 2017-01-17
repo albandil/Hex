@@ -47,14 +47,9 @@
 
 // --------------------------------------------------------------------------------- //
 
-createNewScatteringQuantity(SpinAsymmetry);
+createNewScatteringQuantity(SpinAsymmetry, "asy")
 
 // --------------------------------------------------------------------------------- //
-
-std::string SpinAsymmetry::name ()
-{
-    return "asy";
-}
 
 std::string SpinAsymmetry::description ()
 {

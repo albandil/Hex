@@ -80,10 +80,6 @@ class GaussLegendre : public GaussLegendreData
 {
     public:
         
-        // constructor
-        GaussLegendre(Bspline const & bspline)
-            : bspline_(bspline) {}
-            
         /**
          * @brief Get Gauss-Legendre quadrature points and weights in interval.
          * 
@@ -118,14 +114,14 @@ class GaussLegendre : public GaussLegendreData
          */
         template <class Functor, class... Data> Complex quad
         (
-            Functor f,
+            Functor f, Bspline const & bspline,
             int points, int iknot, Complex x1, Complex x2,
             Data... data
         ) const
         {
             // check boundaries
-            if (x1.real() < bspline_.t(iknot).real() or bspline_.t(iknot+1).real() < x1.real() or
-                x2.real() < bspline_.t(iknot).real() or bspline_.t(iknot+1).real() < x2.real())
+            if (x1.real() < bspline.t(iknot).real() or bspline.t(iknot+1).real() < x1.real() or
+                x2.real() < bspline.t(iknot).real() or bspline.t(iknot+1).real() < x2.real())
             {
                 HexException("[quad] Error: boundaries not for this iknot!");
             }
@@ -158,14 +154,14 @@ class GaussLegendre : public GaussLegendreData
          */
         template <class ClassPtr, class Functor, class... Data> Complex quadMFP
         (
-            ClassPtr ptr, Functor f,
+            ClassPtr ptr, Functor f, Bspline const & bspline,
             int points, int iknot, Complex x1, Complex x2,
             Data... data
         ) const
         {
             // check boundaries
-            if (x1.real() < bspline_.t(iknot).real() or bspline_.t(iknot+1).real() < x1.real() or
-                x2.real() < bspline_.t(iknot).real() or bspline_.t(iknot+1).real() < x2.real())
+            if (x1.real() < bspline.t(iknot).real() or bspline.t(iknot+1).real() < x1.real() or
+                x2.real() < bspline.t(iknot).real() or bspline.t(iknot+1).real() < x2.real())
             {
                 HexException("[quad] Error: boundaries not for this iknot!");
             }
@@ -184,11 +180,6 @@ class GaussLegendre : public GaussLegendreData
             
             return result;
         }
-        
-    private:
-
-        // B-spline environment
-        Bspline const & bspline_;
 };
 
 #endif

@@ -55,7 +55,7 @@
 
 // --------------------------------------------------------------------------------- //
 
-createNewScatteringQuantity(IntegralCrossSection);
+createNewScatteringQuantity(IntegralCrossSection, "ics")
 
 // --------------------------------------------------------------------------------- //
 
@@ -85,6 +85,13 @@ void db_ioncs (sqlite3_context* pdb, int n, sqlite3_value** val)
     // convert text data to binary array
     cArray coeffs;
     coeffs.fromBlob(blob);
+    
+    // some blobs can be empty
+    if (coeffs.empty())
+    {
+        sqlite3_result_double(pdb, 0.0);
+        return;
+    }
     
     // construct Chebyshev approximation object from the data
     Chebyshev<double,Complex> CB(coeffs, 0, 1);
@@ -140,11 +147,6 @@ void db_interpolate (sqlite3_context* pdb, int n, sqlite3_value** val)
 }
 
 // --------------------------------------------------------------------------------- //
-
-std::string IntegralCrossSection::name ()
-{
-    return "ics";
-}
 
 std::string IntegralCrossSection::description ()
 {

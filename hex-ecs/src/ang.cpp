@@ -34,7 +34,7 @@
 #include "ang.h"
 
 AngularBasis::AngularBasis (InputFile const & inp)
-    : L_(inp.L), S_(0), Pi_(inp.Pi), maxell_(inp.maxell), maxlambda_(inp.L + 2 * inp.levels)
+    : L_(inp.L), S_(0), Pi_(inp.Pi), maxell_(inp.maxell), maxlambda_(inp.L + inp.Pi + 2 * inp.levels)
 {
     std::cout << "Setting up the coupled angular states..." << std::endl;
     
@@ -50,7 +50,7 @@ AngularBasis::AngularBasis (InputFile const & inp)
         for (int l1 = ell; l1 <= sum - ell; l1++)
         {
             int l2 = sum - l1;
-            if (std::abs(l1 - l2) <= inp.L and inp.L <= l1 + l2)
+            if ((l1 <= l2 or inp.exchange) and std::abs(l1 - l2) <= inp.L and inp.L <= l1 + l2 and (inp.limit < 0 or std::min(l1, l2) <= inp.limit))
             {
                 std::cout << "(" << l1 << "," << l2 << ") ";
                 states_.push_back(std::make_pair(l1, l2));

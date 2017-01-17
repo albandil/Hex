@@ -46,14 +46,9 @@
 
 // --------------------------------------------------------------------------------- //
 
-createNewScatteringQuantity(TotalCrossSection);
+createNewScatteringQuantity(TotalCrossSection, "tcs")
 
 // --------------------------------------------------------------------------------- //
-
-std::string TotalCrossSection::name ()
-{
-    return "tcs";
-}
 
 std::string TotalCrossSection::description ()
 {

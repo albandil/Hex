@@ -29,15 +29,20 @@
 //                                                                                   //
 //  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
-#ifdef WITH_MUMPS
+#include "hex-csrmatrix.h"
 
-#include "preconditioners.h"
+// --------------------------------------------------------------------------------- //
 
-const std::string CoupledPreconditioner::prec_name = "coupled";
-const std::string CoupledPreconditioner::prec_description = "Coupled preconditioner that uses LU decomposition "
+#include "CoupledPreconditioner.h"
+
+// --------------------------------------------------------------------------------- //
+
+std::string CoupledPreconditioner::description () const
+{
+    return "Coupled preconditioner that uses LU decomposition "
     "of a matrix composed of all diagonal and selected off-diagonal blocks. This is just a testing feature "
-    "and is likely to severely exceed your RAM. Usage of '--lu mumps' is more or less mandatory, and even that "
-    "may prove insufficient.";
+    "and is likely to severely exceed your RAM.";
+}
 
 void CoupledPreconditioner::update (Real E)
 {
@@ -52,8 +57,30 @@ void CoupledPreconditioner::update (Real E)
     CsrMatrix<LU_int_t, Complex> csr;
     // TODO
     
+    // set up factorization data
+    LUftData data;
+    data.drop_tolerance = cmd_->droptol;
+#ifdef WITH_SUPERLU_DIST
+    if (cmd_->factorizer == "superlu_dist")
+    {
+        // TODO : setup grid
+    }
+#endif
+#ifdef WITH_MUMPS
+    if (cmd_->factorizer == "mumps")
+    {
+        data.out_of_core = cmd_->mumps_outofcore;
+        data.verbosity = cmd_->mumps_verbose;
+    #ifdef WITH_MPI
+        data.fortran_comm = MPI_Comm_c2f((ompi_communicator_t*) par_->groupcomm());
+    #else
+        data.fortran_comm = 0;
+    #endif
+    }
+#endif
+    
     // factorize
-    lu_ = csr.factorize_mumps(0, (void*)std::intptr_t(cmd_.mumps_outofcore + 2 * cmd_.mumps_verbose));
+    lu_->factorize(csr, data);
 }
 
 void CoupledPreconditioner::precondition (BlockArray<Complex> const & r, BlockArray<Complex> & z) const
@@ -84,4 +111,8 @@ void CoupledPreconditioner::finish ()
     NoPreconditioner::finish();
 }
 
-#endif // WITH_MUMPS
+// --------------------------------------------------------------------------------- //
+
+addClassToParentRunTimeSelectionTable(PreconditionerBase, CoupledPreconditioner)
+
+// --------------------------------------------------------------------------------- //

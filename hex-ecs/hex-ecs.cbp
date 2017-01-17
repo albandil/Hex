@@ -13,8 +13,8 @@
 				<Option compiler="gcc" />
 				<Compiler>
 					<Add option="-O3" />
-					<Add option="-std=c++11" />
 					<Add option="-Wall" />
+					<Add option="-std=c++11" />
 					<Add option="-fcx-limited-range" />
 					<Add option="-fexceptions" />
 					<Add option="-fopenmp" />
@@ -28,17 +28,18 @@
 					<Add directory="../Win64/include/suitesparse" />
 					<Add directory="../common" />
 					<Add directory="src" />
+					<Add directory="../Win64/include/mumps" />
 				</Compiler>
 				<Linker>
 					<Add option="-s" />
 					<Add option="-fopenmp" />
-					<Add library="..\Win64\lib\libgsl-2.1.dll.a" />
-					<Add library="..\Win64\lib\libmsmpi-v7.dll.a" />
-					<Add library="..\Win64\lib\libopenblas-0.2.15.dll.a" />
-					<Add library="..\Win64\lib\libumfpack-5.7.4.dll.a" />
+					<Add library="../Win64/lib/libgsl-2.1.dll.a" />
+					<Add library="../Win64/lib/libmsmpi-v7.dll.a" />
+					<Add library="../Win64/lib/libopenblas-0.2.15.dll.a" />
+					<Add library="../Win64/lib/libumfpack-5.7.4.dll.a" />
 					<Add library="gfortran" />
-					<Add library="..\Win64\lib\libopencl-2.1.dll.a" />
-					<Add library="..\Win64\lib\libmumps-5.0.1.dll.a" />
+					<Add library="../Win64/lib/libopencl-2.1.dll.a" />
+					<Add library="../Win64/lib/libmumps-5.0.2.dll.a" />
 				</Linker>
 			</Target>
 		</Build>
@@ -62,8 +63,6 @@
 		<Unit filename="../common/hex-hydrogen.h" />
 		<Unit filename="../common/hex-interpolate.h" />
 		<Unit filename="../common/hex-itersolve.h" />
-		<Unit filename="../common/hex-luft.cpp" />
-		<Unit filename="../common/hex-luft.h" />
 		<Unit filename="../common/hex-matrix.cpp" />
 		<Unit filename="../common/hex-matrix.h" />
 		<Unit filename="../common/hex-memory.h" />
@@ -86,17 +85,32 @@
 		<Unit filename="src/bspline.h" />
 		<Unit filename="src/clarrays.h" />
 		<Unit filename="src/doc.h" />
+		<Unit filename="src/factorizers/lu-lapack.cpp" />
+		<Unit filename="src/factorizers/lu-lapack.h" />
+		<Unit filename="src/factorizers/lu-mumps.cpp" />
+		<Unit filename="src/factorizers/lu-mumps.h" />
+		<Unit filename="src/factorizers/lu-pardiso.cpp" />
+		<Unit filename="src/factorizers/lu-pardiso.h" />
+		<Unit filename="src/factorizers/lu-scalapack.cpp" />
+		<Unit filename="src/factorizers/lu-scalapack.h" />
+		<Unit filename="src/factorizers/lu-superlu-dist.cpp" />
+		<Unit filename="src/factorizers/lu-superlu-dist.h" />
+		<Unit filename="src/factorizers/lu-superlu.cpp" />
+		<Unit filename="src/factorizers/lu-superlu.h" />
+		<Unit filename="src/factorizers/lu-umfpack.cpp" />
+		<Unit filename="src/factorizers/lu-umfpack.h" />
 		<Unit filename="src/gauss.cpp" />
 		<Unit filename="src/gauss.h" />
 		<Unit filename="src/io.cpp" />
 		<Unit filename="src/io.h" />
+		<Unit filename="src/luft.cpp" />
+		<Unit filename="src/luft.h" />
 		<Unit filename="src/main.cpp" />
 		<Unit filename="src/parallel.h" />
+		<Unit filename="src/preconditioners.cpp" />
 		<Unit filename="src/preconditioners.h" />
 		<Unit filename="src/preconditioners/CGPreconditioner.cpp" />
 		<Unit filename="src/preconditioners/CGPreconditioner.h" />
-		<Unit filename="src/preconditioners/CoupledPreconditioner.cpp" />
-		<Unit filename="src/preconditioners/CouplexPreconditioner.h" />
 		<Unit filename="src/preconditioners/GPUPreconditioner.cpp" />
 		<Unit filename="src/preconditioners/GPUPreconditioner.h" />
 		<Unit filename="src/preconditioners/HybPreconditioner.cpp" />

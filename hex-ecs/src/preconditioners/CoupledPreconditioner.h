@@ -32,33 +32,23 @@
 #ifndef HEX_ECS_COUPLED_PRECONDITIONER_H
 #define HEX_ECS_COUPLED_PRECONDITIONER_H
 
-#ifdef WITH_MUMPS
+// --------------------------------------------------------------------------------- //
 
-#ifdef SINGLE
-    #include <cmumps_c.h>
-#else
-    #include <zmumps_c.h>
-#endif
+#include "NoPreconditioner.h"
 
-#include "preconditioners.h"
+// --------------------------------------------------------------------------------- //
 
-/**
- * @brief CG iteration-based preconditioner.
- * 
- * This class adds some preconditioning capabilities to its base class
- * NoPreconditioner. The preconditioning is done by diagonal block solution
- * using the conjugate gradients solver (which itself is non-preconditioned).
- */
 class CoupledPreconditioner : public NoPreconditioner
 {
     public:
         
-        static const std::string prec_name;
-        static const std::string prec_description;
+        // run-time selection mechanism
+        preconditionerRunTimeSelectionDefinitions(CoupledPreconditioner, "coupled")
         
-        virtual std::string const & name () const { return prec_name; }
-        virtual std::string const & description () const { return prec_description; }
+        // default constructor needed by the RTS mechanism
+        CoupledPreconditioner () {}
         
+        // constructor
         CoupledPreconditioner
         (
             Parallel const & par,
@@ -69,10 +59,13 @@ class CoupledPreconditioner : public NoPreconditioner
             CommandLine const & cmd
         ) : NoPreconditioner(par, inp, ll, bspline_inner, bspline_full, cmd) {}
         
+        // preconditioner description
+        virtual std::string description () const;
+        
         // reuse parent definitions
-        virtual void setup () { NoPreconditioner::setup(); }
-        virtual void rhs (BlockArray<Complex> & chi, int ienergy, int instate) const { NoPreconditioner::rhs(chi, ienergy, instate); }
-        virtual void multiply (BlockArray<Complex> const & p, BlockArray<Complex> & q) const { NoPreconditioner::multiply(p, q); }
+        using NoPreconditioner::setup;
+        using NoPreconditioner::rhs;
+        using NoPreconditioner::multiply;
         
         // declare own definitions
         virtual void update (Real E);
@@ -82,12 +75,15 @@ class CoupledPreconditioner : public NoPreconditioner
     protected:
     
         // LU factorization data.
-        std::shared_ptr<LUft<LU_int_t,Complex>> lu_;
+        LUftData data_;
+        
+        // LU factorization.
+        std::shared_ptr<LUft> lu_;
         
         // Workspace used for the solution.
         mutable cArray X;
 };
 
-#endif // WITH_MUMPS
+// --------------------------------------------------------------------------------- //
 
 #endif // HEX_ECS_COUPLED_PRECONDITIONER_H
