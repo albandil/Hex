@@ -125,14 +125,14 @@ void Amplitudes::extract ()
                 SolutionIO reader (inp_.L, Spin, inp_.Pi, ni, li, mi, inp_.Etot[ie], ang_);
                 BlockArray<Complex> solution (ang_.size(), true, "sol");
                 std::size_t valid_blocks = 0;
-                for (unsigned ill = 0; ill < ang_.size(); ill++) if (par_.isMyGroupWork(ill) and par_.IamGroupMaster())
+                for (unsigned ill = 0; ill < ang_.size(); ill++) if (par_.isMyGroupWork(ill) and (not cmd_.shared_scratch or par_.IamGroupMaster()))
                 {
                     if (reader.load(solution, ill))
                         valid_blocks++;
                 }
                 par_.syncsum(&valid_blocks, 1);
                 
-                if (valid_blocks != ang_.size()/*not reader.load(solution)*/) // TODO : OOC
+                if (valid_blocks != ang_.size())
                 {
                     // complain only if the solution is allowed
                     // TODO

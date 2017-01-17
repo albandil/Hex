@@ -14,12 +14,12 @@ int main (void)
     // create some data-file
     FILE* sql = fopen("batch-c.sql", "w");
     fprintf(sql, "BEGIN TRANSACTION;\n");
-    fprintf(sql, "INSERT OR REPLACE INTO \"tmat\" VALUES (1,0,0,1,0,0,0,0,0.65,0,1.370592e+01,1.210727e+01,0,0);\n");
-    fprintf(sql, "INSERT OR REPLACE INTO \"tmat\" VALUES (1,0,0,1,0,0,0,1,0.65,0,-1.050670e+00,2.758337e+01,0,0);\n");
-    fprintf(sql, "INSERT OR REPLACE INTO \"tmat\" VALUES (1,0,0,1,0,0,0,0,0.75,0,1.231381e+01,9.205694e+00,0,0);\n");
-    fprintf(sql, "INSERT OR REPLACE INTO \"tmat\" VALUES (1,0,0,1,0,0,0,1,0.75,0,8.642624e-01,2.568767e+01,0,0);\n");
-    fprintf(sql, "INSERT OR REPLACE INTO \"tmat\" VALUES (1,0,0,1,0,0,0,0,0.85,0,1.096124e+01,9.684800e+00,0,0);\n");
-    fprintf(sql, "INSERT OR REPLACE INTO \"tmat\" VALUES (1,0,0,1,0,0,0,1,0.85,0,2.304937e+00,2.392586e+01,0,0);\n");
+    fprintf(sql, "INSERT OR REPLACE INTO \"tmat\" VALUES (1,0,0,1,0,0,0,0,0.65,0,1.370592e+01,1.210727e+01);\n");
+    fprintf(sql, "INSERT OR REPLACE INTO \"tmat\" VALUES (1,0,0,1,0,0,0,1,0.65,0,-1.050670e+00,2.758337e+01);\n");
+    fprintf(sql, "INSERT OR REPLACE INTO \"tmat\" VALUES (1,0,0,1,0,0,0,0,0.75,0,1.231381e+01,9.205694e+00);\n");
+    fprintf(sql, "INSERT OR REPLACE INTO \"tmat\" VALUES (1,0,0,1,0,0,0,1,0.75,0,8.642624e-01,2.568767e+01);\n");
+    fprintf(sql, "INSERT OR REPLACE INTO \"tmat\" VALUES (1,0,0,1,0,0,0,0,0.85,0,1.096124e+01,9.684800e+00);\n");
+    fprintf(sql, "INSERT OR REPLACE INTO \"tmat\" VALUES (1,0,0,1,0,0,0,1,0.85,0,2.304937e+00,2.392586e+01);\n");
     fprintf(sql, "COMMIT;\n");
     fclose(sql);
     

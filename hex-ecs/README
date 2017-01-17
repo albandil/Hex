@@ -23,11 +23,10 @@ Makefile and the library link is removed from LIBRARY variable in Makefile.
 Here is the list of the libraries with versions that were used:
 
  * OpenMPI 1.8.3 or Microsoft MPI v6
-            Optional, can be eluded by -DNO_MPI.
-            Used for distributed parallellization (hex-ecs --mpi).
+            Optional. Used for distributed parallellization (hex-ecs --mpi).
 
  * UMFPACK 5.7.1
-            Needed, obtainable as a part of SuiteSparse 4.4.3 from 
+            Needed, obtainable as a part of SuiteSparse 4.4.4 from 
                 http://www.cise.ufl.edu/research/sparse/SuiteSparse/
             Used for solution of sparse linear systems.
 

@@ -15,6 +15,10 @@ CXX ?= g++
 TARGET ?= release
 
 # global compiler flags
+#
+#    Single precision: -DSINGLE
+#    Double precision: -fcx-limited-range (optional)
+#
 CFLAGS ?= -fopenmp -Wall -mtune=native -march=native -fcx-limited-range -Wno-unknown-pragmas
 LFLAGS ?= -fopenmp -lstdc++
 

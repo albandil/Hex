@@ -110,7 +110,7 @@ void ILUCGPreconditioner::reset_lu ()
             npcol = par_->groupsize() / nprow;
         }
         
-        superlu_gridinit(par_->groupcomm(), nprow, npcol, &grid_);
+        superlu_gridinit((MPI_Comm)par_->groupcomm(), nprow, npcol, &grid_);
     }
 #endif // WITH_SUPERLU_DIST
 }
@@ -229,6 +229,7 @@ void ILUCGPreconditioner::CG_init (int iblock) const
         // set up factorization data
         data_[iblock].drop_tolerance = cmd_->droptol;
         data_[iblock].groupsize = cmd_->groupsize;
+        data_[iblock].ooc_dir = cmd_->scratch.c_str();
 #ifdef WITH_SUPERLU_DIST
         if (cmd_->factorizer == "superlu_dist")
         {
@@ -241,7 +242,11 @@ void ILUCGPreconditioner::CG_init (int iblock) const
             data_[iblock].out_of_core = cmd_->mumps_outofcore;
             data_[iblock].verbosity = cmd_->mumps_verbose;
     #ifdef WITH_MPI
+        #ifdef _WIN32
+            data_[iblock].fortran_comm = MPI_Comm_c2f((MPI_Fint)(std::intptr_t) par_->groupcomm());
+        #else
             data_[iblock].fortran_comm = MPI_Comm_c2f((ompi_communicator_t*) par_->groupcomm());
+        #endif
     #else
             data_[iblock].fortran_comm = 0;
     #endif

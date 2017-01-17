@@ -99,8 +99,21 @@ const std::string sample_input =
     "# --------------- Other conditions ----------------\n"
     "\n"
     "# Angular momenta.\n"
-    "# L  S  Pi nL limit\n"
-    "  0  *  0  4  -1\n"
+    "#   L  ... total orbital momentum\n"
+    "#   S  ... total spin\n"
+    "#   Pi ... total parity\n"
+    "#   nL, limit, exchange ... parameters controlling the number of coupled angular states\n"
+    "# The angular basis is composed of coupled angular states (l1,l2) and looks like this:\n"
+    "#     (Pi, L),     (Pi+1, L-1), ..., (L, Pi) \n"
+    "#     (Pi+1, L+1), (Pi+2, L),   ..., (L+1, Pi+1) \n"
+    "#     ...\n"
+    "# The number of columns is equal to L + Pi - 1. The number of rows is equal to nL + 1.\n"
+    "# When 'limit > 0' then all pairs with both l1 and l2 > limit are discarded.\n"
+    "# When 'exchange = 0' then all pairs with l1 > l2 are discarded.\n"
+    "# The options 'limit' and 'exchange' are useful for large angular momenta, where the projectile\n"
+    "# is distinguishable from the atomic electron.\n"
+    "# L   S   Pi  nL  limit exchange\n"
+    "  0   *   0   4   -1    1\n"
     "\n"
     "# Projectile charge (+/-1)\n"
     "  -1\n"
@@ -214,6 +227,7 @@ void CommandLine::parse (int argc, char* argv[])
                     "\t--parallel-factorization         Factorize multiple blocks simultaneously.                                                                              \n"
                     "\t--no-lu-update                   Do not recalculate LU factorization for different energies, use the first factorization for all of them.               \n"
                     "\t--ilu-max-iter <number>          Maximal number of iterations of the nested ILU preconditioner. When the number is exceeded, exception is thrown.       \n"
+                    "\t--scratch <path>                 Scratch directory for out-of-core factorizers (currently only MUMPS). Also read from the $SCRATCHDIR env variable.     \n"
                     "                                                                                                                                                          \n"
                     "KPA preconditioner                                                                                                                                        \n"
                     "\t--kpa-simple-rad           (-R)  Use simplified radial integral matrix for nested KPA iterations (experimental).                                        \n"
@@ -320,6 +334,12 @@ void CommandLine::parse (int argc, char* argv[])
                 // do not cache any two-electron radial integrals in memory at all
                 cache_own_radint = false;
                 cache_all_radint = false;
+                return true;
+            },
+        "scratch", "", 1, [&](std::vector<std::string> const & optargs) -> bool
+            {
+                // scratch directory for the out-of-core mode factorizers (currently MUMPS only)
+                scratch = optargs[0];
                 return true;
             },
         "out-of-core", "o", 0, [&](std::vector<std::string> const & optargs) -> bool
@@ -933,6 +953,9 @@ void InputFile::read (std::ifstream & inf)
     
     // single-electron angular momentum limit
     limit = ReadNext<int>(inf).val;
+    
+    // whether to include also l1 > l2, or only l1 <= l2
+    exchange = ReadNext<int>(inf).val;
     
     std::cout << "\tL = " << L << std::endl;
     std::cout << "\tS = " << Spin << std::endl;
