@@ -395,8 +395,11 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> &
     // final projectile momenta
     rArray kf = sqrt(inp_.Etot + 1.0_r/(T.nf*T.nf) + (T.mf-T.mi) * inp_.B);
     
+    // get maximal energy of the channels that will be kept in the outer region
+        Real channel_max_E = (cmd_.channel_max_E > -1 ? cmd_.channel_max_E : 0.5 * inp_.Etot[ie]);
+    
     // maximal principal quantum number for this total energy
-    int max_n = (inp_.Etot[ie] >= 0 ? 0 : 1.0_r / std::sqrt(-inp_.Etot[ie]));
+    int max_n = (channel_max_E >= 0 ? 0 : 1.0_r / std::sqrt(-2 * channel_max_E));
     
     // shorthands
     unsigned Nenergy = kf.size();               // energy count

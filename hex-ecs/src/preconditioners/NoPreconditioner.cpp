@@ -179,8 +179,11 @@ void NoPreconditioner::update (Real E)
     // update energy
     E_ = E;
     
+    // get maximal energy of the channels that will be kept in the outer region
+    Real channel_max_E = (cmd_->channel_max_E > -1 ? cmd_->channel_max_E : E_);
+    
     // get maximal asymptotic principal quantum number
-    max_n_ = (E_ >= 0 ? 0 : 1.0 / std::sqrt(-2 * E_));
+    max_n_ = (channel_max_E >= 0 ? 0 : 1.0 / std::sqrt(-2 * channel_max_E));
     
     // update number of asymptotic channels
     Nchan_.clear();

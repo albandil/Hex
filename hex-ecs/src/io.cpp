@@ -198,6 +198,9 @@ void CommandLine::parse (int argc, char* argv[])
                     "\t--stg-integ-solve          (-b)  Only calculate integrals and the solution.                                                                             \n"
                     "\t--stg-extract              (-c)  Only extract amplitudes (assumes that the solution files exist).                                                       \n"
                     "                                                                                                                                                          \n"
+                    "Extended grid parameters                                                                                                                                  \n"
+                    "\t--channel-max-E <number>         Maximal energy (Ry) of states considered in the outer region.                                                          \n"
+                    "                                                                                                                                                          \n"
                     "Right-hand side                                                                                                                                           \n"
                     "\t--exact-rhs                      Use a different variant of right-hand side (slower and should be almost the same as the default - faster - variant).   \n"
                     "\t--fast-bessel                    Use faster Bessel function evaluation routine (not the Steed/Barnett) when calculating RHS.                            \n"
@@ -441,6 +444,12 @@ void CommandLine::parse (int argc, char* argv[])
             {
                 // write intermediate solutions
                 write_intermediate_solutions = true;
+                return true;
+            },
+        "channel-max-E", "", 1, [&](std::vector<std::string> const & optargs) -> bool
+            {
+                // maximal energy of states unsed in the outer region (-> a.u.)
+                channel_max_E = 0.5 * (std::stod(optargs[0]) - 1);
                 return true;
             },
         "kpa-simple-rad", "R", 0, [&](std::vector<std::string> const & optargs) -> bool

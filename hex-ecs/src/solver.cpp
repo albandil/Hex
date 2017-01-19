@@ -119,8 +119,11 @@ void Solver::solve ()
         if (not inp_.inner_only and inp_.Etot[ie] >= 0)
             HexException("Projectile basis extension cannot be used for energies above ionization.");
         
+        // get maximal energy of the channels that will be kept in the outer region
+        Real channel_max_E = (cmd_.channel_max_E > -1 ? cmd_.channel_max_E : 0.5 * inp_.Etot[ie]);
+        
         // get maximal asymptotic principal quantum number
-        int max_n = (inp_.Etot[ie] >= 0 ? 0 : 1.0 / std::sqrt(-inp_.Etot[ie]));
+        int max_n = (channel_max_E >= 0 ? 0 : 1.0 / std::sqrt(-2 * channel_max_E));
         
         // get asymptotical bound states for each of the angular momentum pairs
         bstates_.clear();
