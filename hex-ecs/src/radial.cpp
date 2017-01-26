@@ -64,12 +64,9 @@ RadialIntegrals::RadialIntegrals
     verbose_(true),
     Nlambdas_(Nlambdas)
 {
-    // maximal number of evaluation points (quadrature rule)
-    int npts = std::max(EXPANSION_QUADRATURE_POINTS, bspline_inner_.order() + Nlambdas + 1);
-    
     // precompute Gaussian weights
-    g_inner_.precompute_nodes_and_weights(npts);
-    g_full_ .precompute_nodes_and_weights(npts);
+    g_inner_.precompute_nodes_and_weights(EXPANSION_QUADRATURE_POINTS);
+    g_full_ .precompute_nodes_and_weights(EXPANSION_QUADRATURE_POINTS);
 }
 
 cArray RadialIntegrals::computeMi (Bspline const & bspline, GaussLegendre const & g, int a) const

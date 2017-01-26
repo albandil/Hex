@@ -49,14 +49,14 @@ class GaussLegendreData
          * @param vx     On return, the Gauss-Legendre nodes (nonnegative half of them).
          * @param vw     On return, the corresponding Gauss-Legendre weights.
          */
-        void gauss_nodes_and_weights (int points, const Real*& vx, const Real*& vw) const;
+        static void gauss_nodes_and_weights (int points, const Real*& vx, const Real*& vw);
         
         /**
          * @brief Precalculate nodes and weights so that the retrieval is fast and thread-safe.
          * 
          * Uses the GSL routine \c gsl_integration_glfixed_table_alloc.
          */
-        void precompute_nodes_and_weights (int points) const;
+        static void precompute_nodes_and_weights (int points);
     
     private:
         
