@@ -23,6 +23,13 @@ CFLAGS ?= -fopenmp -Wall -mtune=native -march=native -fcx-limited-range -Wno-unk
 LFLAGS ?= -fopenmp -lstdc++
 
 # ---------------------------------------------------------------------------- #
+# OpenMPI environment (optional)                                               #
+# ---------------------------------------------------------------------------- #
+
+OPENMPIFLAGS = -DWITH_MPI $(shell mpicxx --showme:compile)
+OPENMPILIBS  = $(shell mpicxx --showme:link)
+
+# ---------------------------------------------------------------------------- #
 # BLAS & LAPACK                                                                #
 #                                                                              #
 # The macro DISABLE_PARALLEL_PRECONDITION will inhibit nested parallelism      #
@@ -85,13 +92,6 @@ GSLFLAGS = $(shell gsl-config --cflags)
 GSLLIBS = $(shell gsl-config --libs)
 
 # ---------------------------------------------------------------------------- #
-# OpenMPI environment (optional)                                               #
-# ---------------------------------------------------------------------------- #
-
-OPENMPIFLAGS = -DWITH_MPI $(shell mpicxx --showme:compile)
-OPENMPILIBS  = $(shell mpicxx --showme:link)
-
-# ---------------------------------------------------------------------------- #
 # OpenCL (optional)                                                            #
 # ---------------------------------------------------------------------------- #
 
@@ -99,7 +99,7 @@ OPENMPILIBS  = $(shell mpicxx --showme:link)
 # OPENCLLIBS = -lOpenCL
 
 # ---------------------------------------------------------------------------- #
-# PNG++ (optional)                                                             #
+# PNG++ (optional, for debugging purposes)                                     #
 # ---------------------------------------------------------------------------- #
 
 # PNGPPFLAGS = -DWITH_PNG -I../libs
