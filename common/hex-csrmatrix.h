@@ -161,7 +161,7 @@ public:
      * %d\t%d\t%g\t%g
      * @endcode
      */
-    void write (const char* filename) const
+    void write (std::string filename) const
     {
         std::ofstream out (filename);
         out << "# Matrix " << m_ << " × " << n_ << " with " << x_.size() << " nonzero elements:\n\n";

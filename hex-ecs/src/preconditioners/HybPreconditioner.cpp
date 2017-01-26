@@ -48,11 +48,9 @@ bool HybCGPreconditioner::ilu_needed (int iblock) const
     int l1 = ang_->states()[iblock].first;
     int l2 = ang_->states()[iblock].second;
     
-    // shift the maximal principal quantum number to be solver by ILU
-    int max_n = max_n_ + cmd_->hyb_additional_levels;
-    
-    // number of channels when r1 -> inf (i.e. second electron is bound)
-    return (inp_->Zp < 0 and max_n > l1) or max_n > l2;
+    // ILU is needed whenever there are some asymptotic channels for this angular block
+    return not Xp_[0][l1].empty()
+        or not Xp_[1][l2].empty();
 }
 
 void HybCGPreconditioner::setup ()

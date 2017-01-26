@@ -6,7 +6,7 @@
 //                    / /   / /    \_\      / /  \ \                                 //
 //                                                                                   //
 //                                                                                   //
-//  Copyright (c) 2016, Jakub Benda, Charles University in Prague                    //
+//  Copyright (c) 2017, Jakub Benda, Charles University in Prague                    //
 //                                                                                   //
 // MIT License:                                                                      //
 //                                                                                   //
@@ -35,6 +35,7 @@
 
 #include "hex-arrays.h"
 #include "hex-csrmatrix.h"
+#include "hex-densematrix.h"
 #include "hex-misc.h"
 #include "hex-openmp.h"
 
@@ -93,6 +94,206 @@ void NoPreconditioner::setup ()
 {
     rad_->setupOneElectronIntegrals(*par_, *cmd_);
     rad_->setupTwoElectronIntegrals(*par_, *cmd_);
+    
+    int Nspline_inner = rad_->bspline_inner().Nspline();
+    
+    //
+    // diagonalize the overlap matrix
+    //
+    
+        std::cout << "Setting up the hydrogen eigenstates..." << std::endl << std::endl;
+        
+        cArray D (Nspline_inner);
+        ColMatrix<Complex> CR (Nspline_inner, Nspline_inner);
+        ColMatrix<Complex> invCR (Nspline_inner, Nspline_inner);
+        ColMatrix<Complex> invsqrtS (Nspline_inner, Nspline_inner);
+        
+        std::cout << "\t- overlap matrix diagonalization" << std::endl;
+        Timer timer;
+        
+        ColMatrix<Complex> S = rad_->S_inner().torow().T();
+        S.diagonalize(D, nullptr, &CR);
+        CR.invert(invCR);
+        
+        // Now S = CR * (D * CR⁻¹)
+        std::cout << "\t\t- time: " << timer.nice_time() << std::endl;
+        for (std::size_t i = 0; i < Nspline_inner * Nspline_inner; i++)
+            invCR.data()[i] *= D[i % Nspline_inner];
+        
+        // S = S - CR * invCR
+        blas::gemm(-1., CR, invCR, 1., S);
+        std::cout << "\t\t- residual: " << S.data().norm() << std::endl;
+        
+        // compute √S⁻¹
+        for (std::size_t i = 0; i < Nspline_inner * Nspline_inner; i++)
+            invCR.data()[i] /= std::pow(D.data()[i % Nspline_inner], 1.5);
+        blas::gemm(1., CR, invCR, 0., invsqrtS);
+        
+        std::cout << std::endl;
+    
+    //
+    // calculate the eigenstates of the inner one-electron hamiltonian
+    // (these will be used in the asymptotic expansion in the outer region)
+    //
+    
+        std::array<std::vector<int>,2> ells;
+        
+        // allocate space for the eigenvectors of the atomic electron
+        for (std::pair<int,int> ll : ang_->states()) ells[0].push_back(ll.first);
+        std::sort(ells[0].begin(), ells[0].end());
+        ells[0].resize(std::unique(ells[0].begin(), ells[0].end()) - ells[0].begin());
+        Hl_[0].resize(ells[0].back() + 1);
+        
+        // allocate space for the eigenvectors of the projectile particle
+        for (std::pair<int,int> ll : ang_->states()) ells[1].push_back(ll.second);
+        std::sort(ells[1].begin(), ells[1].end());
+        ells[1].resize(std::unique(ells[1].begin(), ells[1].end()) - ells[1].begin());
+        Hl_[1].resize(ells[1].back() + 1);
+        
+        // allocate space for the atomic eigenvectors used in the asymptotic expansion
+        Xp_[0].resize(ells[0].back() + 1);  Xp_[0].fill(cArrays());
+        Sp_[0].resize(ells[0].back() + 1);  Sp_[0].fill(cArrays());
+        Xp_[1].resize(ells[1].back() + 1);  Xp_[1].fill(cArrays());
+        Sp_[1].resize(ells[1].back() + 1);  Sp_[1].fill(cArrays());
+        
+        // diagonalize the one-electron hamiltonians for both the atomic and projectile particle
+        for (int i = 0; i < 2; i++)
+        {
+            // particle charge (first is electron, second is either electron or positron)
+            Real Z = (i == 0 ? -1.0 : inp_->Zp);
+            
+            // for all one-electron angular momenta needed by this particle and MPI group
+            bool written = false;
+            for (int l : ells[i]) if (not cmd_->shared_scratch or (par_->isMyGroupWork(l) and par_->IamGroupMaster()))
+            {
+                // compose name of the file containing the hamiltonian data
+                Hl_[i][l].hdflink(format("Hl%+g-%d-%.4x.hdf", Z, l, rad_->bspline_inner().hash()).c_str());
+                
+                // check if the file already exists
+                if (Hl_[i][l].hdfcheck())
+                    continue;
+                
+                written = true;
+                std::cout << "\t- one-electron Hamiltonian factorization (Z = " << Z << ", l = " << l << ")" << std::endl;
+                timer.reset();
+                
+                // compose the symmetrical one-electron hamiltonian
+                ColMatrix<Complex> tHl = (Complex(0.5) * rad_->D_inner() + Complex(Z) * rad_->Mm1_tr_inner() + Complex(0.5*l*(l+1)) * rad_->Mm2_inner()).torow().T();
+                
+                // symmetrically transform by inverse square root of the overlap matrix, tHl <- invsqrtS * tHl * invsqrtS
+                blas::gemm(1., invsqrtS, tHl, 0., S);
+                blas::gemm(1., S, invsqrtS, 0., tHl);
+                
+                // diagonalize the transformed matrix
+                tHl.diagonalize(D, nullptr, &CR);
+                CR.invert(invCR);
+                
+                // store the preconditioner data
+                Hl_[i][l].Dl = D;
+                Hl_[i][l].invsqrtS_Cl = RowMatrix<Complex>(Nspline_inner, Nspline_inner);
+                Hl_[i][l].invCl_invsqrtS = RowMatrix<Complex>(Nspline_inner, Nspline_inner);
+                blas::gemm(1., invsqrtS, CR, 0., Hl_[i][l].invsqrtS_Cl);
+                blas::gemm(1., invCR, invsqrtS, 0., Hl_[i][l].invCl_invsqrtS);
+                
+                // Now Hl = ClR * D * ClR⁻¹
+                std::cout << "\t\t- time: " << timer.nice_time() << std::endl;
+                for (std::size_t i = 0; i < Nspline_inner * Nspline_inner; i++)
+                    invCR.data()[i] *= D[i % Nspline_inner];
+                
+                // Hl <- Hl - CR * invCR
+                blas::gemm(-1., CR, invCR, 1., tHl);
+                std::cout << "\t\t- residual: " << tHl.data().norm() << std::endl;
+                
+                // normalize the eigenvectors
+                Hl_[i][l].Cl = ColMatrix<Complex>(Hl_[i][l].invsqrtS_Cl);
+                /*for (int c = 0; c < Nspline_inner; c++)
+                {
+                    Complex sqrnorm = (Hl_[i][l].Cl.col(c) | rad_->S_inner().dot(Hl_[i][l].Cl.col(c)));
+                    Hl_[i][l].Cl.col(c) /= std::sqrt(sqrnorm);
+                }*/
+                
+                // write to disk and abandon for now
+                Hl_[i][l].hdfsave();
+                Hl_[i][l].drop();
+            }
+            if (written)
+            {
+                std::cout << std::endl;
+            }
+        }
+        
+        // wait for all processes so that all Hlxxx files get written
+        par_->wait();
+    
+    //
+    // load the requested one-electron eigenstates from disk files
+    //
+    
+        for (int i = 0; i < 2; i++)
+        {
+            // particle charge (first is electron, second is either electron or positron)
+            Real Z = (i == 0 ? -1.0 : inp_->Zp);
+            
+            // for all one-electron angular momenta needed by this particle and MPI group
+            bool written = false;
+            for (int l : ells[i])
+            {
+                // load the factorization file
+                if (not Hl_[i][l].hdfload())
+                    HexException("Failed to load one-electron factorization file for Z = %g, l = %d.", Z, l);
+                
+                written = true;
+                std::cout << "\t- one-electron Hamiltonian loaded (Z = " << Z << ", l = " << l << ")" << std::endl;
+                
+                // get sorted energies (ascending real parts)
+                std::vector<int> indices (Nspline_inner);
+                std::iota(indices.begin(), indices.end(), 0);
+                std::sort(indices.begin(), indices.end(), [=](int a, int b){ return Hl_[i][l].Dl[a].real() < Hl_[i][l].Dl[b].real(); });
+                
+                // get maximal element that has accurate bound state energy
+                int max_nr = 0;
+                for (int nr = 0; nr < Nspline_inner; nr++)
+                {
+                    Real E = Hl_[i][l].Dl[indices[nr]].real();
+                    Real E0 = -0.5 / ((nr + l + 1) * (nr + l + 1));
+                    
+                    if (E < 0 and std::abs(E0 - E) < 1e-3 * std::abs(E0))
+                        max_nr = nr;
+                    else
+                        break;
+                }
+                if (max_nr > 0)
+                {
+                    std::cout << "\t\t- bound states with energy within 0.1 % from exact value: " << l + 1 << " <= n <= " << max_nr + l + 1 << std::endl;
+                }
+                
+                // get all valid asymptotic states
+                for (int nr = 0; nr < Nspline_inner; nr++)
+                {
+                    if (Hl_[i][l].Dl[indices[nr]].real() <= 0.5 * inp_->channel_max_E)
+                    {
+                        Xp_[i][l].push_back(Hl_[i][l].Cl.col(indices[nr]));
+                        Sp_[i][l].push_back(rad_->S_inner().dot(Xp_[i][l][nr]));
+                    }
+                    else
+                    {
+                        // there will be no more states (the energy rises with 'nr')
+                        break;
+                    }
+                }
+                if (Xp_[i][l].size() >= 1)
+                {
+                    std::cout << "\t\t- eigenstates used in asymptotic (outer) domain: " << l + 1 << " <= n <= " << l + Xp_[i][l].size() << std::endl;
+                }
+                
+                // unload the factorization file
+                Hl_[i][l].drop();
+            }
+            if (written)
+            {
+                std::cout << std::endl;
+            }
+        }
 }
 
 BlockSymBandMatrix<Complex> NoPreconditioner::calc_A_block (int ill, int illp, bool twoel) const
@@ -179,36 +380,10 @@ void NoPreconditioner::update (Real E)
     // update energy
     E_ = E;
     
-    // get maximal energy of the channels that will be kept in the outer region
-    Real channel_max_E = (cmd_->channel_max_E > -1 ? cmd_->channel_max_E : E_);
-    
-    // get maximal asymptotic principal quantum number
-    max_n_ = (channel_max_E >= 0 ? 0 : 1.0 / std::sqrt(-2 * channel_max_E));
-    
-    // update number of asymptotic channels
-    Nchan_.clear();
-    for (int ill = 0; ill < Nang; ill++)
-    {
-        int l1 = ang_->states()[ill].first;
-        int l2 = ang_->states()[ill].second;
-        
-        // number of channels when r1 -> inf (i.e. second electron is bound)
-        int Nchan1 = (inp_->Zp > 0 ? 0 : std::max(0, max_n_ - l2));
-        
-        // number of channels when r2 -> inf (i.e. first electron is bound)
-        int Nchan2 = std::max(0, max_n_ - l1);
-        
-        Nchan_.push_back(std::make_pair(Nchan1, Nchan2));
-    }
+    std::cout << "\tUpdate the common preconditioner base" << std::endl;
     
     std::cout << "\tPrecompute matrix blocks ... " << std::flush;
     Timer t;
-    
-    // LU-factorize the overlap matrix
-    CsrMatrix<LU_int_t,Complex> csr_S = rad_->S_full().tocoo<LU_int_t>().tocsr();
-    std::shared_ptr<LUft> lu_S;
-    lu_S.reset(LUft::Choose("lapack"));
-    lu_S->factorize(csr_S);
     
     // outer one-electron overlap matrix
     SymBandMatrix<Complex> S_outer (Nspline_outer, order + 1);
@@ -221,6 +396,21 @@ void NoPreconditioner::update (Real E)
     // outer one-electron centrifugal moment matrix
     SymBandMatrix<Complex> Mm2_outer (Nspline_outer, order + 1);
     Mm2_outer.populate([&](int m, int n) { return rad_->Mm2_full()(Nspline_inner + m, Nspline_inner + n); });
+    
+    // inner one-electron multipole moment matrices
+    std::vector<SymBandMatrix<Complex>> Mtr_L_inner;
+    for (int lambda = 0; lambda <= rad_->maxlambda(); lambda++)
+    {
+        Mtr_L_inner.push_back(SymBandMatrix<Complex>(Nspline_inner, order + 1));
+        Mtr_L_inner.back().populate
+        (
+            [ & ] (int m, int n)
+            {
+                return rad_->Mtr_L_inner(lambda)(m, n)
+                     * special::pow_int(rad_->bspline_full().t(std::min(m,n) + order + 1).real(), lambda);
+            }
+        );
+    }
     
     // outer one-electron multipole moment matrices
     std::vector<SymBandMatrix<Complex>> Mtr_mLm1_outer;
@@ -235,6 +425,17 @@ void NoPreconditioner::update (Real E)
                      * special::pow_int(rad_->bspline_full().t(Nspline_inner + std::min(m,n) + order + 1).real(), -lambda-1);
             }
         );
+    }
+    
+    // calculate number of asymptotic channels (i.e. bound states of the other particle)
+    Nchan_.resize(Nang);
+    for (int ill = 0; ill < Nang; ill++)
+    {
+        int l1 = ang_->states()[ill].first;
+        int l2 = ang_->states()[ill].second;
+        
+        Nchan_[ill].first  = Xp_[1][l2].size();
+        Nchan_[ill].second = Xp_[0][l1].size();
     }
     
     // setup blocks
@@ -253,37 +454,7 @@ void NoPreconditioner::update (Real E)
         int Nchan1p = Nchan_[illp].first;   // # r1 -> inf, l2p bound
         int Nchan2p = Nchan_[illp].second;  // # r2 -> inf, l1p bound
         
-        // calculate all missing hydrogen overlaps
-        while (Sp.size() <= (unsigned)mmax(l1,l2,l1p,l2p)) Sp.push_back(cArrays());
-        while (Xp.size() <= (unsigned)mmax(l1,l2,l1p,l2p)) Xp.push_back(cArrays());
-        while (Sp[l1] .size() < (unsigned)Nchan2 ) Sp[l1] .push_back(cArray());
-        while (Sp[l2] .size() < (unsigned)Nchan1 ) Sp[l2] .push_back(cArray());
-        while (Sp[l1p].size() < (unsigned)Nchan2p) Sp[l1p].push_back(cArray());
-        while (Sp[l2p].size() < (unsigned)Nchan1p) Sp[l2p].push_back(cArray());
-        while (Xp[l1] .size() < (unsigned)Nchan2 ) Xp[l1] .push_back(cArray());
-        while (Xp[l2] .size() < (unsigned)Nchan1 ) Xp[l2] .push_back(cArray());
-        while (Xp[l1p].size() < (unsigned)Nchan2p) Xp[l1p].push_back(cArray());
-        while (Xp[l2p].size() < (unsigned)Nchan1p) Xp[l2p].push_back(cArray());
-        for (int n = 0; n < Nchan2; n++) if (Sp[l1][n].empty())
-        {
-            Sp[l1][n] = rad_->overlapP(rad_->bspline_full(), rad_->gaussleg_full(), l1 + n + 1, l1, weightEndDamp(rad_->bspline_full()));
-            Xp[l1][n] = lu_S->solve(Sp[l1][n]);
-        }
-        for (int n = 0; n < Nchan1; n++) if (Sp[l2][n].empty())
-        {
-            Sp[l2][n] = rad_->overlapP(rad_->bspline_full(), rad_->gaussleg_full(), l2 + n + 1, l2, weightEndDamp(rad_->bspline_full()));
-            Xp[l2][n] = lu_S->solve(Sp[l2][n]);
-        }
-        for (int n = 0; n < Nchan2p; n++) if (Sp[l1p][n].empty())
-        {
-            Sp[l1p][n] = rad_->overlapP(rad_->bspline_full(), rad_->gaussleg_full(), l1p + n + 1, l1p, weightEndDamp(rad_->bspline_full()));
-            Xp[l1p][n] = lu_S->solve(Sp[l1p][n]);
-        }
-        for (int n = 0; n < Nchan1p; n++) if (Sp[l2p][n].empty())
-        {
-            Sp[l2p][n] = rad_->overlapP(rad_->bspline_full(), rad_->gaussleg_full(), l2p + n + 1, l2p, weightEndDamp(rad_->bspline_full()));
-            Xp[l2p][n] = lu_S->solve(Sp[l2p][n]);
-        }
+//         std::cout << ill << " " << illp << " " << Nchan1 << " " << Nchan2 << " " << Nchan1p << " " << Nchan2p << std::endl;
         
         // initialize diagonal block of the inner problem
         // - do not precompute off-diagonal blocks in lightweight mode
@@ -305,7 +476,7 @@ void NoPreconditioner::update (Real E)
         // setup stretched inner-outer problem
         if (not inp_->inner_only)
         {
-            // outer problem matrix : r2 -> inf, l1 bound
+            // outer problem matrix : r2 -> inf, r1 bound
             B2_blocks_[ill * Nang + illp].resize(Nchan2 * Nchan2p);
             for (int m = 0; m < Nchan2; m++)
             for (int n = 0; n < Nchan2p; n++)
@@ -322,7 +493,7 @@ void NoPreconditioner::update (Real E)
                 
                 // channel-offdiagonal contribution
                 for (int lambda = 1; lambda <= rad_->maxlambda(); lambda++) if (ang_->f(ill,illp,lambda) != 0.0_r)
-                    subblock += Complex(inp_->Zp * ang_->f(ill,illp,lambda) * special::hydro_rho(l1 + m + 1, l1, l1p + n + 1, l1p, lambda)) * Mtr_mLm1_outer[lambda];
+                    subblock += inp_->Zp * ang_->f(ill,illp,lambda) * (Xp_[0][l1p][n] | Mtr_L_inner[lambda].dot(Xp_[0][l1][m])) * Mtr_mLm1_outer[lambda];
                 
                 // use the block
                 B2_blocks_[ill * Nang + illp][m * Nchan2p + n].hdflink(format("blk-B2-%d-%d-%d-%d.ooc", ill, illp, m, n));
@@ -332,9 +503,11 @@ void NoPreconditioner::update (Real E)
                     B2_blocks_[ill * Nang + illp][m * Nchan2p + n].hdfsave();
                     B2_blocks_[ill * Nang + illp][m * Nchan2p + n].drop();
                 }
+                
+//                 std::cout << "B2_blocks_[" << ill << "][" << illp << "][" << m << "][" << n << "].norm() = " << B2_blocks_[ill * Nang + illp][m * Nchan2p + n].data().norm() << std::endl;
             }
             
-            // outer problem matrix : r1 -> inf, l2 bound
+            // outer problem matrix : r1 -> inf, r2 bound
             B1_blocks_[ill * Nang + illp].resize(Nchan1 * Nchan1p);
             for (int m = 0; m < Nchan1; m++)
             for (int n = 0; n < Nchan1p; n++)
@@ -351,7 +524,7 @@ void NoPreconditioner::update (Real E)
                 
                 // channel-offdiagonal contribution
                 for (int lambda = 1; lambda <= rad_->maxlambda(); lambda++) if (ang_->f(ill,illp,lambda) != 0.0_r)
-                    subblock += Complex(inp_->Zp * ang_->f(ill,illp,lambda) * special::hydro_rho(l2 + m + 1, l2, l2p + n + 1, l2p, lambda)) * Mtr_mLm1_outer[lambda];
+                    subblock += inp_->Zp * ang_->f(ill,illp,lambda) * (Xp_[1][l2p][n] | Mtr_L_inner[lambda].dot(Xp_[1][l1][m])) * Mtr_mLm1_outer[lambda];
                 
                 // use the block
                 B1_blocks_[ill * Nang + illp][m * Nchan1p + n].hdflink(format("blk-B1-%d-%d-%d-%d.ooc", ill, illp, m, n));
@@ -361,6 +534,8 @@ void NoPreconditioner::update (Real E)
                     B1_blocks_[ill * Nang + illp][m * Nchan1p + n].hdfsave();
                     B1_blocks_[ill * Nang + illp][m * Nchan1p + n].drop();
                 }
+                
+//                 std::cout << "B1_blocks_[" << ill << "][" << illp << "][" << m << "][" << n << "].norm() = " << B1_blocks_[ill * Nang + illp][m * Nchan1p + n].data().norm() << std::endl;
             }
             
             // transition area r2 > r1, upper : psi_kl expressed in terms of F_nl for 'l' out of inner area
@@ -395,8 +570,10 @@ void NoPreconditioner::update (Real E)
                     elem += inp_->Zp * ang_->f(ill,illp,lambda) * multipole * rad_->Mtr_L_full(lambda)(i,k) * rad_->Mtr_mLm1_full(lambda)(j,l);
                 }
                 
-                Cu_blocks_[ill * Nang + illp].add(row, col, Xp[l1p][n][k] * elem);
+                Cu_blocks_[ill * Nang + illp].add(row, col, Xp_[0][l1p][n][k] * elem);
             }
+            
+//             std::cout << "Cu_blocks_[" << ill << "][" << illp << "].norm() = " << Cu_blocks_[ill * Nang + illp].v().norm() << std::endl;
             
             // transition area r1 > r2, upper : psi_kl expressed in terms of F_nk for 'k' out of inner area
             for (int i = 0; i < Nspline_inner; i++)
@@ -430,8 +607,10 @@ void NoPreconditioner::update (Real E)
                     elem += inp_->Zp * ang_->f(ill,illp,lambda) * multipole * rad_->Mtr_mLm1_full(lambda)(i,k) * rad_->Mtr_L_full(lambda)(j,l);
                 }
                 
-                Cu_blocks_[ill * Nang + illp].add(row, col, Xp[l2p][n][l] * elem);
+                Cu_blocks_[ill * Nang + illp].add(row, col, Xp_[1][l2p][n][l] * elem);
             }
+            
+//             std::cout << "Cu_blocks_[" << ill << "][" << illp << "].norm() = " << Cu_blocks_[ill * Nang + illp].v().norm() << std::endl;
             
             // transition area r2 > r1, lower : F_nl expressed in terms of psi_kl for 'l' out of outer area
             for (int m = 0; m < Nchan2; m++)
@@ -457,11 +636,13 @@ void NoPreconditioner::update (Real E)
                 for (int lambda = 1; lambda <= rad_->maxlambda(); lambda++) if (ang_->f(ill,illp,lambda) != 0)
                 {
                     Real multipole = special::pow_int(1/r2, lambda + 1);
-                    elem += inp_->Zp * ang_->f(ill,illp,lambda) * multipole * rad_->Mtr_mLm1_full(lambda)(j,l) * (Real)special::hydro_rho(m + l1 + 1, l1, n + l1p + 1, l1p, lambda);
+                    elem += inp_->Zp * ang_->f(ill,illp,lambda) * multipole * rad_->Mtr_mLm1_full(lambda)(j,l) * (Xp_[0][l1p][n] | Mtr_L_inner[lambda].dot(Xp_[0][l1][m]));
                 }
                 
-                Cl_blocks_[ill * Nang + illp].add(row, col, Sp[l1p][n][k] * elem);
+                Cl_blocks_[ill * Nang + illp].add(row, col, Sp_[0][l1p][n][k] * elem);
             }
+            
+            std::cout << "Cl_blocks_[" << ill << "][" << illp << "].norm() = " << Cl_blocks_[ill * Nang + illp].v().norm() << std::endl;
             
             // transition area r1 > r2, lower : F_nk expressed in terms of psi_kl for 'k' out of outer area
             for (int m = 0; m < Nchan1; m++)
@@ -487,11 +668,13 @@ void NoPreconditioner::update (Real E)
                 for (int lambda = 1; lambda <= rad_->maxlambda(); lambda++) if (ang_->f(ill,illp,lambda) != 0)
                 {
                     Real multipole = special::pow_int(1/r1, lambda + 1);
-                    elem += inp_->Zp * ang_->f(ill,illp,lambda) * multipole * rad_->Mtr_mLm1_full(lambda)(i,k) * (Real)special::hydro_rho(m + l2 + 1, l2, n + l2p + 1, l2p, lambda);
+                    elem += inp_->Zp * ang_->f(ill,illp,lambda) * multipole * rad_->Mtr_mLm1_full(lambda)(i,k) * (Xp_[1][l2p][n] | Mtr_L_inner[lambda].dot(Xp_[1][l2][m]));
                 }
                 
-                Cl_blocks_[ill * Nang + illp].add(row, col, Sp[l2p][n][l] * elem);
+                Cl_blocks_[ill * Nang + illp].add(row, col, Sp_[1][l2p][n][l] * elem);
             }
+            
+            std::cout << "Cl_blocks_[" << ill << "][" << illp << "].norm() = " << Cl_blocks_[ill * Nang + illp].v().norm() << std::endl;
         }
     }
     
@@ -531,8 +714,25 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
     if (not std::isfinite(ji_expansion_full.norm()))
         HexException("Unable to expand Riccati-Bessel function in B-splines!");
     
+    // read the appropriate bound pseudo-state
+    cArray Xp = Hl_[0][li].readPseudoState(ni - li - 1);
+    
     // (anti)symmetrization
     Real Sign = ((ang_->S() + ang_->Pi()) % 2 == 0) ? 1. : -1.;
+    
+    // inner region multipole matrix
+    std::vector<SymBandMatrix<Complex>> Mtr_L_inner;
+    for (int lambda = 0; lambda <= rad_->maxlambda(); lambda++)
+    {
+        Mtr_L_inner.push_back(SymBandMatrix<Complex>(Nspline_inner, order + 1));
+        Mtr_L_inner.back().populate
+        (
+            [ & ] (int m, int n)
+            {
+                return rad_->Mtr_L_inner(lambda)(m, n) * special::pow_int(rad_->bspline_full().t(std::min(m,n) + order + 1).real(), lambda);
+            }
+        );
+    }
     
     // for all segments constituting the RHS
     for (unsigned ill = 0; ill < ang_->states().size(); ill++) if (par_->isMyGroupWork(ill))
@@ -597,13 +797,14 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
                     rad_->bspline_full().B(ixspline, ixknot, points, &xs[ixknot * points], &B_x[(ixspline * (order + 1) + ixknot - ixspline) * points]);
                 
                 // precompute radial functions and Riccati-Bessel functions
-                rArray Pi_x ((rad_->bspline_full().Nreknot() - 1) * points);
-                rArray ji_x ((rad_->bspline_full().Nreknot() - 1) * points);
+                //rArray Pi_x ((rad_->bspline_full().Nreknot() - 1) * points);
+                rArray Pi_x = realpart(rad_->bspline_inner().zip(Xp, realpart(xs)));
+                rArray ji_x (xs.size());
                 # pragma omp parallel for
                 for (unsigned ix = 0; ix < xs.size(); ix++)
                 {
-                    gsl_sf_result Pi;
-                    Pi_x[ix] = (gsl_sf_hydrogenicR_e(ni, li, 1., xs[ix].real(), &Pi) == GSL_EUNDRFLW ? 0. : xs[ix].real() * Pi.val);
+                    //gsl_sf_result Pi;
+                    //Pi_x[ix] = (gsl_sf_hydrogenicR_e(ni, li, 1., xs[ix].real(), &Pi) == GSL_EUNDRFLW ? 0. : xs[ix].real() * Pi.val);
                     ji_x[ix] = special::ric_j(l, ki[0] * xs[ix].real());
                 }
                 
@@ -654,13 +855,15 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
                 {
                     rho_l2[ichan1].resize(rad_->maxlambda() + 1);
                     for (int lambda = 1; lambda <= rad_->maxlambda(); lambda++)
-                        rho_l2[ichan1][lambda] = special::hydro_rho(ichan1 + l2 + 1, l2, ni, li, lambda);
+                        rho_l2[ichan1][lambda] = (Xp_[1][l2][ichan1] | Mtr_L_inner[lambda].dot(Xp_[1][li][ni - li - 1]));
+                        //rho_l2[ichan1][lambda] = special::hydro_rho(ichan1 + l2 + 1, l2, ni, li, lambda);
                 }
                 for (int ichan2 = 0; ichan2 < Nchan2; ichan2++)
                 {
                     rho_l1[ichan2].resize(rad_->maxlambda() + 1);
                     for (int lambda = 1; lambda <= rad_->maxlambda(); lambda++)
-                        rho_l1[ichan2][lambda] = special::hydro_rho(ichan2 + l1 + 1, l1, ni, li, lambda);
+                        rho_l1[ichan2][lambda] = (Xp_[0][l1][ichan2] | Mtr_L_inner[lambda].dot(Xp_[0][li][ni - li - 1]));
+                        //rho_l1[ichan2][lambda] = special::hydro_rho(ichan2 + l1 + 1, l1, ni, li, lambda);
                 }
                 
                 // for all B-spline pairs (elements of the right-hand side)
@@ -893,6 +1096,7 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
         
         // use the calculated block
         chi[ill] = chi_block;
+        std::cout << "chi[" << ill << "].norm() = " << chi_block.norm() << std::endl;
         
         // optionally transfer to disk
         if (not chi.inmemory())
@@ -1134,6 +1338,8 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
             
             q[ill].drop();
         }
+        
+        std::cout << "p[" << ill << "].norm() = " << p[ill].norm() << " -> q[" << ill << "].norm() = " << q[ill].norm() << std::endl;
     }
 }
 
@@ -1149,6 +1355,9 @@ void NoPreconditioner::finish ()
     B2_blocks_.resize(0);
     Cu_blocks_.resize(0);
     Cl_blocks_.resize(0);
+    
+    Xp_[0].resize(0);  Sp_[0].resize(0);
+    Xp_[1].resize(0);  Sp_[1].resize(0);
 }
 
 // --------------------------------------------------------------------------------- //

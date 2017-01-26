@@ -357,6 +357,9 @@ class InputFile
             // weak magnetic field in atomic units (involved only perturbatively)
             Real B;
             
+            // maximal energy (Ry) of states included in the asymptotic (outer) region
+            Real channel_max_E;
+            
             // real B-spline knots
             rArray rknots;
             

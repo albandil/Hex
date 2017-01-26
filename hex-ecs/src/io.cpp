@@ -96,6 +96,9 @@ const std::string sample_input =
     "  1  -1\n"
     "  *\n"
     "\n"
+    "# Maximal energy (Ry) of states included in the asymptotic (outer) region.\n"
+    "  -1\n"
+    "\n"
     "# --------------- Other conditions ----------------\n"
     "\n"
     "# Angular momenta.\n"
@@ -928,6 +931,9 @@ void InputFile::read (std::ifstream & inf)
         outstates.push_back(std::make_tuple(nfs[f].val,lf,0));
     }
     
+    // - asymptotic channel max energy
+    channel_max_E = ReadNext<Real>(inf).val;
+    
     // print info
     std::cout << "\t[n l m]: ";
     for (auto state : outstates)
@@ -937,7 +943,9 @@ void InputFile::read (std::ifstream & inf)
                   << std::get<1>(state)
                   << " *] ";
     }
-    std::cout << std::endl;
+    std::cout << "\n" << std::endl;
+    
+    std::cout << "Asymptotic channels with energy up to " << channel_max_E << " Ry." << std::endl;
     
     //
     // load total quantum numbers etc.

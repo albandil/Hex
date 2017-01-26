@@ -6,7 +6,7 @@
 //                    / /   / /    \_\      / /  \ \                                 //
 //                                                                                   //
 //                                                                                   //
-//  Copyright (c) 2016, Jakub Benda, Charles University in Prague                    //
+//  Copyright (c) 2017, Jakub Benda, Charles University in Prague                    //
 //                                                                                   //
 // MIT License:                                                                      //
 //                                                                                   //
@@ -35,6 +35,7 @@
 // --------------------------------------------------------------------------------- //
 
 #include "preconditioners.h"
+#include "hldata.h"
 
 // --------------------------------------------------------------------------------- //
 
@@ -89,6 +90,8 @@ class NoPreconditioner : public PreconditionerBase
         // internal routines
         BlockSymBandMatrix<Complex> calc_A_block (int ill, int illp, bool twoel = true) const;
         RadialIntegrals const & rad () const { return *rad_; }
+        std::array<Array<cArrays>,2> const & Xp () const { return Xp_; }
+        std::array<Array<cArrays>,2> const & Sp () const { return Sp_; }
         
     protected:
         
@@ -127,14 +130,17 @@ class NoPreconditioner : public PreconditionerBase
         // maximal bound state principal quantum number for given energy
         int max_n_;
         
-        // number of channels when r1 -> inf and r2 -> inf, respectively
+        // number of channels considered when r1 -> inf and r2 -> inf, respectively
         std::vector<std::pair<int,int>> Nchan_;
         
         // radial integrals for the solution
         RadialIntegrals * rad_;
         
-        // hydrogen orbitals B-spline overlaps and expansions (on inner basis)
-        std::vector<cArrays> Sp, Xp;
+        // eigenstates (epansions) of the inner one-electron hamiltonian for all relevant angular momenta and their overlaps
+        std::array<Array<cArrays>,2> Xp_, Sp_;
+        
+        // one-electron hamiltonian data (for atomic electron and the projectile)
+        mutable std::array<std::vector<HlData>,2> Hl_;
 };
 
 // --------------------------------------------------------------------------------- //

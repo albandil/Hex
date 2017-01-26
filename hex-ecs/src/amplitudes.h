@@ -242,6 +242,9 @@ class Amplitudes
         Chebyshev<double,Complex> fcheb (cArrayView const & PsiSc, Real kmax, int l1, int l2);
         void computeSigmaIon_ (Transition T);
         
+        cArray readProjPseudoStateEnergies (int lf) const;
+        cArray readAtomPseudoState (int lf, int ichan) const;
+        
         // B-spline environment
         Bspline const & bspline_inner_;
         Bspline const & bspline_full_;

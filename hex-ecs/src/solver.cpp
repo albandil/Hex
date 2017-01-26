@@ -30,7 +30,7 @@
 //  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
 #include "hex-hydrogen.h"
-
+#include "preconditioners/NoPreconditioner.h"
 #include "solver.h"
 
 Solver::Solver
@@ -119,12 +119,6 @@ void Solver::solve ()
         if (not inp_.inner_only and inp_.Etot[ie] >= 0)
             HexException("Projectile basis extension cannot be used for energies above ionization.");
         
-        // get maximal energy of the channels that will be kept in the outer region
-        Real channel_max_E = (cmd_.channel_max_E > -1 ? cmd_.channel_max_E : 0.5 * inp_.Etot[ie]);
-        
-        // get maximal asymptotic principal quantum number
-        int max_n = (channel_max_E >= 0 ? 0 : 1.0 / std::sqrt(-2 * channel_max_E));
-        
         // get asymptotical bound states for each of the angular momentum pairs
         bstates_.clear();
         for (unsigned ill = 0; ill < ang_.states().size(); ill++)
@@ -132,13 +126,15 @@ void Solver::solve ()
             int l1 = ang_.states()[ill].first;
             int l2 = ang_.states()[ill].second;
             
-            // store all principal quantum numbers for given l₁ or l₂ and the total energy
+            NoPreconditioner const * const p = dynamic_cast<NoPreconditioner*>(prec_);
+            
+            // store all principal quantum numbers for given l1 or l2
             bstates_.push_back
             (
                 std::make_pair
                 (
-                    l2 + 1 > max_n or inp_.Zp > 0 ? iArray{} : linspace(l2 + 1, max_n, max_n - l2),
-                    l1 + 1 > max_n                ? iArray{} : linspace(l1 + 1, max_n, max_n - l1)
+                    linspace<int>(l2 + 1, l2 + p->Xp()[1][l2].size(), p->Xp()[1][l2].size()),
+                    linspace<int>(l1 + 1, l1 + p->Xp()[0][l1].size(), p->Xp()[0][l1].size())
                 )
             );
         }

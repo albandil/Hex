@@ -6,7 +6,7 @@
 //                    / /   / /    \_\      / /  \ \                                 //
 //                                                                                   //
 //                                                                                   //
-//  Copyright (c) 2016, Jakub Benda, Charles University in Prague                    //
+//  Copyright (c) 2017, Jakub Benda, Charles University in Prague                    //
 //                                                                                   //
 // MIT License:                                                                      //
 //                                                                                   //
@@ -37,18 +37,26 @@
 #include <ctime>
 #include <vector>
 
+// --------------------------------------------------------------------------------- //
+
 #include "hex-arrays.h"
 #include "hex-chebyshev.h"
 #include "hex-clenshawcurtis.h"
+#include "hex-hdffile.h"
 #include "hex-hydrogen.h"
 #include "hex-matrix.h"
 #include "hex-misc.h"
 #include "hex-special.h"
 #include "hex-version.h"
 
+// --------------------------------------------------------------------------------- //
+
 #include "amplitudes.h"
 #include "bspline.h"
+#include "hldata.h"
 #include "radial.h"
+
+// --------------------------------------------------------------------------------- //
 
 // Extrapolate uniformly sampled function y(x) = a/x + b.
 Complex inv_power_extrapolate (rArray X, cArrayView Y)
@@ -69,6 +77,8 @@ Complex inv_power_extrapolate (rArray X, cArrayView Y)
     return b;
 }
 
+// --------------------------------------------------------------------------------- //
+
 Amplitudes::Amplitudes
 (
     Bspline const & bspline_inner,
@@ -81,7 +91,8 @@ Amplitudes::Amplitudes
     rad_(bspline_inner, bspline_full, 0),
     inp_(inp), par_(par), cmd_(cmd), ang_(ang)
 {
-    // nothing to do
+    rad_.verbose(false);
+    rad_.setupOneElectronIntegrals(par, cmd);
 }
 
 void Amplitudes::extract ()
@@ -390,16 +401,65 @@ void Amplitudes::writeICS_files ()
     fS1.close();
 }
 
+cArray Amplitudes::readProjPseudoStateEnergies (int l) const
+{
+    std::string filename = format("Hl%+g-%d-%.4x.hdf", inp_.Zp, l, rad_.bspline_inner().hash());
+    
+    HDFFile datafile (filename, HDFFile::readonly);
+    if (not datafile.valid())
+        HexException("File %s with the one-electron eigenstates was not found. Run the solver again to regenerate it.", filename.c_str());
+    
+    int N = datafile.size("Dl") / 2;
+    if (N != rad_.bspline_inner().Nspline())
+        HexException("File %s is not compatible with the current basis. You should delete it.", filename.c_str());
+    
+    cArray energies (N);
+    if (not datafile.read("Dl", &energies[0], N))
+        HexException("File %s does not contain the requested dataset \"Dl\".", filename.c_str());
+    
+    std::sort(energies.begin(), energies.end(), Complex_realpart_less);
+    energies.resize(std::find_if(energies.begin(), energies.end(), [&](Complex E){ return E.real() > 0.5 * inp_.channel_max_E; }) - energies.begin());
+    
+    return energies;
+}
+
+cArray Amplitudes::readAtomPseudoState (int l, int ichan) const
+{
+    std::string filename = format("Hl-1-%d-%.4x.hdf", l, rad_.bspline_inner().hash());
+    
+    HDFFile datafile (filename, HDFFile::readonly);
+    if (not datafile.valid())
+        HexException("File %s with the one-electron eigenstates was not found. Run the solver again to regenerate it.", filename.c_str());
+    
+    int N = datafile.size("Dl") / 2;
+    if (N != rad_.bspline_inner().Nspline())
+        HexException("File %s is not compatible with the current basis. You should delete it.", filename.c_str());
+    if (ichan >= N)
+        HexException("File %s contains only %d (<= %d) channels.", filename.c_str(), N, ichan);
+    
+    cArray energies (N);
+    if (not datafile.read("Dl", &energies[0], N))
+        HexException("File %s does not contain the requested dataset \"Dl\".", filename.c_str());
+    
+    iArray indices (N);
+    std::iota(indices.begin(), indices.end(), 0);
+    std::sort(indices.begin(), indices.end(), [&](int i, int j){ return energies[i].real() < energies[j].real(); });
+    
+    std::cout << "pseudostate energy: " << energies[indices[ichan]] << std::endl;
+    
+    unsigned Nspline_inner = rad_.bspline_inner().Nspline();
+    
+    cArray data (Nspline_inner);
+    if (not datafile.read("Cl", &data[0], Nspline_inner, indices[ichan] * Nspline_inner))
+        HexException("Failed to read the pseudostate l = %d, ichan = %d from the dataset \"Cl\" in file %s.", l, ichan, filename.c_str());
+    
+    return data;
+}
+
 void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> & solution, int ie, int Spin)
 {
     // final projectile momenta
     rArray kf = sqrt(inp_.Etot + 1.0_r/(T.nf*T.nf) + (T.mf-T.mi) * inp_.B);
-    
-    // get maximal energy of the channels that will be kept in the outer region
-        Real channel_max_E = (cmd_.channel_max_E > -1 ? cmd_.channel_max_E : 0.5 * inp_.Etot[ie]);
-    
-    // maximal principal quantum number for this total energy
-    int max_n = (channel_max_E >= 0 ? 0 : 1.0_r / std::sqrt(-2 * channel_max_E));
     
     // shorthands
     unsigned Nenergy = kf.size();               // energy count
@@ -407,9 +467,6 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> &
     int Nspline_inner = bspline_inner_.Nspline(); // B-spline count (inner basis)
     int Nspline_full  = bspline_full_ .Nspline(); // B-spline count (combined basis)
     int Nspline_outer = Nspline_full - Nspline_inner; // B-spline count (outer basis)
-    
-    // compute final hydrogen orbital overlaps with B-spline basis
-    cArray Pf_overlaps = rad_.overlapP(bspline_inner_, rad_.gaussleg_inner(), T.nf, T.lf, weightEndDamp(bspline_inner_));
     
     // check that memory for this transition is allocated
     if (Lambda_Slp.find(T) == Lambda_Slp.end())
@@ -425,6 +482,33 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> &
     // skip impact energies with undefined outgoing momentum
     if (not std::isfinite(kf[ie]) or kf[ie] == 0.)
         return;
+    
+    //
+    // Channel information.
+    //  - Get number of allowed asymptotic channels for the atomic particle
+    //    (= number of allowed bound states of the projectile particle).
+    //  - Read the appropriate projectile channel function for the final state (nf,lf,*).
+    //
+    
+    cArray Ed, Xp, Sp;
+    
+    if (inp_.inner_only)
+    {
+        Xp = readAtomPseudoState(T.lf, T.nf - T.lf - 1);
+        write_array
+        (
+            linspace(0., 100., 1001),
+            rad_.bspline_inner().zip(Xp, linspace(0., 100., 1001)),
+            "pstate.dat"
+        );
+        Sp = rad_.S_inner().dot(Xp);
+//         std::cout << "Sp.norm() = " << Sp.norm() << std::endl;
+    }
+    else
+    {
+        Ed = readProjPseudoStateEnergies(T.lf);
+//         std::cout << "Ed.size() = " << Ed.size() << std::endl;
+    }
     
     // The extracted T-matrix oscillates and slowly radially converges.
     // If we are far enough and only oscillations are left, we can average several uniformly spaced
@@ -504,31 +588,25 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> &
                 );
                 
                 // calculate radial integral
-                lambda = (Pf_overlaps | PsiSc | Wj[ell]);
+                lambda = (Sp | PsiSc | Wj[ell]);
             }
             else
             {
-                // number of final bound channels for r1 -> inf and r2 -> inf
-                int Nchan1 = std::max(max_n - ang_[ill].second, 0);
-                int Nchan2 = std::max(max_n - ang_[ill].first, 0);
                 
-                // index of final bound channel for r2 -> inf
-                int ichan2 = T.nf - T.lf - 1;
+                // change view to row-major dense matrix
+                cArrayView PsiScFf
+                (
+                    solution[ill],  // data
+                    Nspline_inner * Nspline_inner + (Ed.size() + T.nf - T.lf - 1) * Nspline_outer, // offset
+                    Nspline_outer   // elements
+                );
                 
-                // does the channel exist?
-                if (0 <= ichan2 and ichan2 < Nchan2)
-                {
-                    // change view to row-major dense matrix
-                    cArrayView PsiScFf
-                    (
-                        solution[ill],  // data
-                        Nspline_inner * Nspline_inner + (Nchan1 + ichan2) * Nspline_outer, // offset
-                        Nspline_outer   // elements
-                    );
-                    
-                    // calculate radial integral
-                    lambda = (PsiScFf | Wj[ell].slice(Nspline_inner, Nspline_full));
-                }
+                std::cout << "solution[" << ill << "].norm() = " << solution[ill].slice(0, Nspline_inner * Nspline_inner).norm() << std::endl;
+                std::cout << "solution[" << ill << "].norm() = " << solution[ill].norm() << std::endl;
+                std::cout << "PsiScFf.norm() = " << PsiScFf.norm() << std::endl;
+                
+                // calculate radial integral
+                lambda = (PsiScFf | Wj[ell].slice(Nspline_inner, Nspline_full));
             }
             
             // update the stored value

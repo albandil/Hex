@@ -249,11 +249,11 @@ void GPUCGPreconditioner::setup ()
     
     // create context and command queue
     context_ = clCreateContext(nullptr, 1, &device_, nullptr, nullptr, nullptr);
-#ifdef CL_VERSION_2_0
-    queue_ = clCreateCommandQueueWithProperties(context_, device_, nullptr, nullptr);
-#else
+//#ifdef CL_VERSION_2_0
+//    queue_ = clCreateCommandQueueWithProperties(context_, device_, nullptr, nullptr);
+//#else
     queue_ = clCreateCommandQueue(context_, device_, 0, nullptr);
-#endif
+//#endif
     
     // setup compile flags
     std::ostringstream flags;
@@ -524,12 +524,12 @@ void GPUCGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArra
         this->CG_init(ill);
         
         // preconditioner matrices
-        clArrayView<Complex> prec1a (Nspline_inner * Nspline_inner, prec_inner_[l1].invCl_invsqrtS.data().data());  prec1a.connect(context_, largeDataFlags_);
-        clArrayView<Complex> prec2a (Nspline_inner * Nspline_inner, prec_inner_[l2].invCl_invsqrtS.data().data());  prec2a.connect(context_, largeDataFlags_);
-        clArrayView<Complex> Dl1 (Nspline_inner, prec_inner_[l1].Dl.data());                                       Dl1.connect(context_, smallDataFlags_);
-        clArrayView<Complex> Dl2 (Nspline_inner, prec_inner_[l2].Dl.data());                                       Dl2.connect(context_, smallDataFlags_);
-        clArrayView<Complex> prec1b (Nspline_inner * Nspline_inner, prec_inner_[l1].invsqrtS_Cl.data().data());     prec1b.connect(context_, largeDataFlags_);
-        clArrayView<Complex> prec2b (Nspline_inner * Nspline_inner, prec_inner_[l2].invsqrtS_Cl.data().data());     prec2b.connect(context_, largeDataFlags_);
+        clArrayView<Complex> prec1a (Nspline_inner * Nspline_inner, Hl_[0][l1].invCl_invsqrtS.data().data());  prec1a.connect(context_, largeDataFlags_);
+        clArrayView<Complex> prec2a (Nspline_inner * Nspline_inner, Hl_[1][l2].invCl_invsqrtS.data().data());  prec2a.connect(context_, largeDataFlags_);
+        clArrayView<Complex> Dl1 (Nspline_inner, Hl_[0][l1].Dl.data());                                        Dl1.connect(context_, smallDataFlags_);
+        clArrayView<Complex> Dl2 (Nspline_inner, Hl_[1][l2].Dl.data());                                        Dl2.connect(context_, smallDataFlags_);
+        clArrayView<Complex> prec1b (Nspline_inner * Nspline_inner, Hl_[0][l1].invsqrtS_Cl.data().data());     prec1b.connect(context_, largeDataFlags_);
+        clArrayView<Complex> prec2b (Nspline_inner * Nspline_inner, Hl_[1][l2].invsqrtS_Cl.data().data());     prec2b.connect(context_, largeDataFlags_);
         
         // allocation (and upload) of an OpenCL array
         auto new_opencl_array = [&](std::size_t n, std::string name) -> clArray<Complex>
