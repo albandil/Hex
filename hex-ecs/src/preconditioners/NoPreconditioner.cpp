@@ -580,6 +580,9 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
                 // quadrature degree
                 int points = order + li + l + 1;
                 
+                // prepare quadrature nodes and weights
+                rad_->gaussleg_full().precompute_nodes_and_weights(points);
+                
                 // precompute quadrature nodes and weights
                 cArray xs ((rad_->bspline_full().Nreknot() - 1) * points), xws ((rad_->bspline_full().Nreknot() - 1) * points);
                 # pragma omp parallel for
