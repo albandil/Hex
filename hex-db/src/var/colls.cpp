@@ -74,8 +74,7 @@ std::vector<std::pair<std::string,std::string>> CollisionStrength::params ()
         {"lf", "Final atomic orbital quantum number."},
         {"mf", "Final atomic magnetic quantum number."},
         {"S", "Total spin of atomic + projectile electron."},
-        {"Ei", "Projectile impact energy (Rydberg)."},
-        {"ell", "Partial wave."}
+        {"Ei", "Projectile impact energy (Rydberg)."}
     };
 }
 
@@ -110,25 +109,35 @@ bool CollisionStrength::run (std::map<std::string,std::string> const & sdata)
 {
     // manage units
     double efactor = change_units(Eunits, eUnit_Ry);
-//     double lfactor = change_units(lUnit_au, Lunits);
+    double lfactor = change_units(lUnit_au, Lunits);
     
     // scattering event parameters
     int ni = Conv<int>(sdata, "ni", name());
     int li = Conv<int>(sdata, "li", name());
-    int mi0= Conv<int>(sdata, "mi", name());
     int nf = Conv<int>(sdata, "nf", name());
     int lf = Conv<int>(sdata, "lf", name());
-    int mf0= Conv<int>(sdata, "mf", name());
-    int  S = Conv<int>(sdata, "S", name());
-    int ell = Conv<int>(sdata, "ell", name());
     
-    // use mi >= 0; if mi < 0, flip both signs
-    int mi = (mi0 < 0 ? -mi0 : mi0);
-    int mf = (mi0 < 0 ? -mf0 : mf0);
+    // initial magnetic quantum number
+    int mi = 0; bool all_mi = false;
+    if (sdata.find("mi") == sdata.end() or sdata.at("mi") == "*")
+        all_mi = true;
+    else
+        mi = Conv<int>(sdata, "mi", name());
+    
+    // final magnetic quantum number
+    int mf = 0; bool all_mf = false;
+    if (sdata.find("mf") == sdata.end() or sdata.at("mf") == "*")
+        all_mf = true;
+    else
+        mf = Conv<int>(sdata, "mf", name());
+    
+    // check if we have the optional pw list
+    iArray pws;
+    if (sdata.find("pws") != sdata.end())
+        pws = Conv<iArray>(sdata, "pws", name());
     
     // energies and cross sections
-    double E, sigma;
-    rArray energies, E_arr, sigma_arr;
+    rArray energies;
     
     // get energy / energies
     try
@@ -142,87 +151,75 @@ bool CollisionStrength::run (std::map<std::string,std::string> const & sdata)
         energies = readStandardInput<double>();
     }
     
-    // compose query
-    sqlitepp::statement st (session());
-    st << "SELECT Ei, sigma FROM 'ics' "
-            "WHERE ni = :ni "
-            "  AND li = :li "
-            "  AND mi = :mi "
-            "  AND nf = :nf "
-            "  AND lf = :lf "
-            "  AND mf = :mf "
-            "  AND ell = :ell  "
-            "  AND  S = :S  "
-            "ORDER BY Ei ASC",
-        sqlitepp::into(E), sqlitepp::into(sigma),
-        sqlitepp::use(ni), sqlitepp::use(li), sqlitepp::use(mi),
-        sqlitepp::use(nf), sqlitepp::use(lf), sqlitepp::use(mf),
-        sqlitepp::use(ell), sqlitepp::use(S);
+    // energies in Rydbergs
+    rArray scaled_energies = energies * efactor;
     
-    // retrieve data
-    while (st.exec())
+    // complete cross section array
+    rArray ccs (energies.size()), sum_ccs (energies.size());
+    
+    // resize arrays if all energies are requested
+    if (energies[0] < 0)
     {
-        E_arr.push_back(E);
-        sigma_arr.push_back(sigma);
+        int N;
+        
+        // get number of energies
+        hex_complete_cross_section(ni, li, mi, nf, lf, mf, energies.size(), energies.data(), nullptr, &N, pws.size(), pws.empty() ? nullptr : pws.data());
+        
+        // resize
+        scaled_energies.resize(N);
+        ccs.resize(N);
+        if (N > 0)
+            scaled_energies[0] = -1;
+        
+        // get list of energies
+        hex_complete_cross_section(ni, li, mi, nf, lf, mf, scaled_energies.size(), scaled_energies.data(), nullptr, &N, pws.size(), pws.empty() ? nullptr : pws.data());
+    }
+    
+    // retrieve requested energies
+    if (scaled_energies.size() > 0)
+    {
+        // sum all cross sections from the initial state to all final magnetic sub-levels
+        sum_ccs.resize(ccs.size());
+        for (int mi0 = -li; mi0 <= li; mi0++)
+        for (int mf0 = -lf; mf0 <= lf; mf0++)
+        {
+            if ((all_mi or mi0 == mi) and (all_mf or mf0 == mf))
+                hex_complete_cross_section(ni, li, mi0, nf, lf, mf0, scaled_energies.size(), scaled_energies.data(), ccs.data(), nullptr, pws.size(), pws.empty() ? nullptr : pws.data());
+            sum_ccs += ccs;
+            ccs.fill(0);
+        }
+        ccs = sum_ccs;
+        
+        // average initial state
+        if (all_mi)
+            ccs /= (2. * li + 1.);
     }
     
     // write header
     std::cout << logo("#") <<
-        "# Collision strength (dimensionless) for\n"
-        "#     ni = " << ni << ", li = " << li << ", mi = " << mi << ",\n" <<
-        "#     nf = " << nf << ", lf = " << lf << ", mf = " << mf << ",\n" <<
-        "#     ell = " << ell << ", S = " << S << "\n" <<
+        "# Collision strengths in " << unit_name(Lunits) << " for\n" <<
+        "#     ni = " << ni << ", li = " << li << ", mi = " << (all_mi ? "*" : std::to_string(mi)) << ",\n" <<
+        "#     nf = " << nf << ", lf = " << lf << ", mf = " << (all_mf ? "*" : std::to_string(mf)) << ",\n";
+    if (not pws.empty())
+    {
+        std::cout <<
+        "#     limited to partial waves ell = " << pws << "\n";
+    }
+        std::cout <<
         "# ordered by energy in " << unit_name(Eunits) << "\n" <<
         "# \n";
     OutputTable table;
-    table.setWidth(15, 15, 15);
+    table.setWidth(15, 15);
     table.setAlignment(OutputTable::left);
-    table.write("# E        ", "omega    ");
+    table.write("# E        ", "Omega    ");
     table.write("# ---------", "---------");
     
-    // terminate if no data
-    if (E_arr.size() == 0)
-        return true;
+    if (scaled_energies.size() == 0)
+        std::cout << "#\n# The database contains no relevant data." << std::endl;
     
-    if (energies[0] < 0.)
-    {
-        // negative energy indicates full output
-        for (std::size_t i = 0; i < E_arr.size(); i++)
-        {
-            // kinematic variables to unscale the cross sections
-            double ki = std::sqrt(E_arr[i]);
-            double kf = std::sqrt(E_arr[i] - 1./(ni*ni) + 1./(nf*nf));
-            double cs_prefactor = kf / ki * (2*S+1) / 4.;
-            
-            // compute collisions strengths
-            double Omega = E_arr[i] * (2*li+1) * sigma_arr[i] / cs_prefactor;
-            
-            // print collisions strengths
-            table.write(E_arr[i] / efactor, Omega);
-        }
-    }
-    else
-    {
-        // threshold for ionization
-        double Eion = 1./(ni*ni);
-        
-        // kinematic variables to unscale the cross sections
-        rArray ki = sqrt(energies);
-        rArray kf = sqrt(energies - 1./(ni*ni) + 1./(nf*nf));
-        rArray cs_prefactor = kf / ki * (2*S+1) / 4.;
-        
-        // interpolate
-        rArray interp = (efactor * energies.front() < Eion) ? 
-            interpolate_real(E_arr, sigma_arr, energies * efactor, gsl_interp_linear) :
-            interpolate_real(E_arr, sigma_arr, energies * efactor, gsl_interp_cspline);
-        
-        // compute collision strength
-        rArray omegas = energies * efactor * (2*li+1) * interp / cs_prefactor;
-        
-        // output
-        for (std::size_t i = 0; i < energies.size(); i++)
-            table.write(energies[i], omegas[i]);
-    }
+    // write data
+    for (std::size_t i = 0; i < scaled_energies.size(); i++)
+        table.write(scaled_energies[i]/efactor, (std::isfinite(ccs[i]) ? scaled_energies[i] * ccs[i] : 0.));
     
     return true;
 }

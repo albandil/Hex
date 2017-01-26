@@ -86,6 +86,14 @@ void LUft_UMFPACK::factorize (CsrMatrix<LU_int_t,Complex> const & matrix, LUftDa
     // matrix data
     LU_int_t m = matrix.rows();
     LU_int_t n = matrix.cols();
+#ifndef SINGLE
+    x_ = matrix.x();
+#else
+    x_.resize(0);
+    x_.reserve(matrix.x().size());
+    for (Complex x : matrix.x())
+	x_.push_back(std::complex<double>(x.real(), x.imag()));
+#endif
     p_ = matrix.p();
     i_ = matrix.i();
 #ifndef SINGLE

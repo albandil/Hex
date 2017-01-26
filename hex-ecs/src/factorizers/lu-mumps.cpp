@@ -50,7 +50,7 @@ LUft_MUMPS::~LUft_MUMPS ()
     if (settings.job != MUMPS_NOACTION)
     {
         settings.job = MUMPS_FINISH;
-        zmumps_c(&settings);
+        MUMPS_C(&settings);
     }
 }
 

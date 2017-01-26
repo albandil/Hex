@@ -146,7 +146,7 @@ std::vector<double> calculate (calcdata & c)
     oss1 << oss.str() << "/ics-L" << c.L << "-S1-Pi" << c.Pi << ".dat";
     
     // maximal principal quantum number
-    int max_n = 1.0 / std::sqrt(-c.E);
+    int max_n = (c.E < 0 ? 1.0 / std::sqrt(-c.E) : 10);
     
     std::ifstream singlet (oss0.str()), triplet (oss1.str());
     if (not singlet.is_open() or not triplet.is_open())
@@ -339,6 +339,9 @@ void converge_energy (calcdata & c)
             // increase the length of the inner grid
             pcs = c.pcs;
             c.Ra += step;
+	    double cgrid = c.Rmax - c.R0;
+	    c.R0 = std::max(c.Ra, c.R0);
+	    c.Rmax = c.R0 + cgrid;
             calculate(c);
         }
         while (cs_difference(pcs, c.pcs) > tolerance);
