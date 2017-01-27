@@ -162,8 +162,6 @@ void ILUCGPreconditioner::CG_init (int iblock) const
         int Nchan1 = Nchan_[iblock].first;
         int Nchan2 = Nchan_[iblock].second;
         
-        std::cout << "Nchan: " << Nchan1 << " " << Nchan2 << std::endl;
-        
         // number of B-splines
         LU_int_t Nspline_inner = rad_->bspline_inner().Nspline();
         LU_int_t Nspline_outer = rad_->bspline_full().Nspline() - Nspline_inner;
@@ -206,7 +204,6 @@ void ILUCGPreconditioner::CG_init (int iblock) const
                     B_coo_small.v()
                 );
                 coo_block += B_coo_large;
-                std::cout << "B_coo_large.norm() = " << B_coo_large.v().norm() << std::endl;
             }
             for (int m = 0; m < Nchan2; m++)
             for (int n = 0; n < Nchan2; n++)
@@ -222,7 +219,6 @@ void ILUCGPreconditioner::CG_init (int iblock) const
                     B_coo_small.v()
                 );
                 coo_block += B_coo_large;
-                std::cout << "B_coo_large.norm() = " << B_coo_large.v().norm() << std::endl;
             }
         }
         
@@ -309,11 +305,6 @@ void ILUCGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z)
     
     // precondition by LU
     lu_[iblock]->solve(r, z, 1);
-    
-    LU_int_t Nspline_inner = rad_->bspline_inner().Nspline();
-    LU_int_t Nspline_outer = rad_->bspline_full().Nspline() - Nspline_inner;
-    std::cout << "[ILU] " << r.slice(0, Nspline_inner*Nspline_inner).norm() << " -> " << z.slice(0, Nspline_inner*Nspline_inner).norm() << std::endl;
-    std::cout << "r.norm() = " << r.slice(Nspline_inner*Nspline_inner, r.size()).norm() << ", z.norm() = " << z.slice(Nspline_inner*Nspline_inner, z.size()).norm() << std::endl;
     
     if (cmd_->factorizer == "mumps")
     {

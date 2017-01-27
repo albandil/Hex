@@ -173,7 +173,7 @@ public:
             for (IdxT idx = idx1; idx < idx2; idx++)
             {
                 out << irow << "\t" << i_[idx];
-                for (int icomp = 0; icomp < typeinfo<DataT>::ncmpt; icomp++)
+                for (unsigned icomp = 0; icomp < typeinfo<DataT>::ncmpt; icomp++)
                     out << "\t" << typeinfo<DataT>::cmpt(icomp, x_[idx]);
                 out << "\n";
             }

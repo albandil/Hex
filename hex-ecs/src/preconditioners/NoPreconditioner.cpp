@@ -108,7 +108,7 @@ void NoPreconditioner::setup ()
         ColMatrix<Complex> invCR (Nspline_inner, Nspline_inner);
         ColMatrix<Complex> invsqrtS (Nspline_inner, Nspline_inner);
         
-        std::cout << "\t- overlap matrix diagonalization" << std::endl;
+        std::cout << "\t- inner region basis overlap matrix diagonalization" << std::endl;
         Timer timer;
         
         ColMatrix<Complex> S = rad_->S_inner().torow().T();
@@ -174,7 +174,7 @@ void NoPreconditioner::setup ()
                     continue;
                 
                 written = true;
-                std::cout << "\t- one-electron Hamiltonian factorization (Z = " << Z << ", l = " << l << ")" << std::endl;
+                std::cout << "\t- inner region one-electron Hamiltonian matrix diagonalization (Z = " << Z << ", l = " << l << ")" << std::endl;
                 timer.reset();
                 
                 // compose the symmetrical one-electron hamiltonian
@@ -188,7 +188,7 @@ void NoPreconditioner::setup ()
                 tHl.diagonalize(D, nullptr, &CR);
                 CR.invert(invCR);
                 
-                // store the preconditioner data
+                // store the KPA preconditioner data
                 Hl_[i][l].Dl = D;
                 Hl_[i][l].invsqrtS_Cl = RowMatrix<Complex>(Nspline_inner, Nspline_inner);
                 Hl_[i][l].invCl_invsqrtS = RowMatrix<Complex>(Nspline_inner, Nspline_inner);
@@ -204,13 +204,9 @@ void NoPreconditioner::setup ()
                 blas::gemm(-1., CR, invCR, 1., tHl);
                 std::cout << "\t\t- residual: " << tHl.data().norm() << std::endl;
                 
-                // normalize the eigenvectors
+                // copy the eigenvectors as columns
+                // - already normalized by xGEEV to "Euclidean norm equal to 1 and largest component real"
                 Hl_[i][l].Cl = ColMatrix<Complex>(Hl_[i][l].invsqrtS_Cl);
-                /*for (int c = 0; c < Nspline_inner; c++)
-                {
-                    Complex sqrnorm = (Hl_[i][l].Cl.col(c) | rad_->S_inner().dot(Hl_[i][l].Cl.col(c)));
-                    Hl_[i][l].Cl.col(c) /= std::sqrt(sqrnorm);
-                }*/
                 
                 // write to disk and abandon for now
                 Hl_[i][l].hdfsave();
@@ -240,10 +236,10 @@ void NoPreconditioner::setup ()
             {
                 // load the factorization file
                 if (not Hl_[i][l].hdfload())
-                    HexException("Failed to load one-electron factorization file for Z = %g, l = %d.", Z, l);
+                    HexException("Failed to load one-electron diagonalization file for Z = %g, l = %d.", Z, l);
                 
                 written = true;
-                std::cout << "\t- one-electron Hamiltonian loaded (Z = " << Z << ", l = " << l << ")" << std::endl;
+                std::cout << "\t- one-electron Hamiltonian data loaded (Z = " << Z << ", l = " << l << ")" << std::endl;
                 
                 // get sorted energies (ascending real parts)
                 std::vector<int> indices (Nspline_inner);
@@ -251,7 +247,7 @@ void NoPreconditioner::setup ()
                 std::sort(indices.begin(), indices.end(), [=](int a, int b){ return Hl_[i][l].Dl[a].real() < Hl_[i][l].Dl[b].real(); });
                 
                 // get maximal element that has accurate bound state energy
-                int max_nr = 0;
+                int max_nr = -1;
                 for (int nr = 0; nr < Nspline_inner; nr++)
                 {
                     Real E = Hl_[i][l].Dl[indices[nr]].real();
@@ -262,7 +258,7 @@ void NoPreconditioner::setup ()
                     else
                         break;
                 }
-                if (max_nr > 0)
+                if (max_nr >= 0)
                 {
                     std::cout << "\t\t- bound states with energy within 0.1 % from exact value: " << l + 1 << " <= n <= " << max_nr + l + 1 << std::endl;
                 }
@@ -454,8 +450,6 @@ void NoPreconditioner::update (Real E)
         int Nchan1p = Nchan_[illp].first;   // # r1 -> inf, l2p bound
         int Nchan2p = Nchan_[illp].second;  // # r2 -> inf, l1p bound
         
-//         std::cout << ill << " " << illp << " " << Nchan1 << " " << Nchan2 << " " << Nchan1p << " " << Nchan2p << std::endl;
-        
         // initialize diagonal block of the inner problem
         // - do not precompute off-diagonal blocks in lightweight mode
         if (not cmd_->lightweight_full or ill == illp)
@@ -503,8 +497,6 @@ void NoPreconditioner::update (Real E)
                     B2_blocks_[ill * Nang + illp][m * Nchan2p + n].hdfsave();
                     B2_blocks_[ill * Nang + illp][m * Nchan2p + n].drop();
                 }
-                
-//                 std::cout << "B2_blocks_[" << ill << "][" << illp << "][" << m << "][" << n << "].norm() = " << B2_blocks_[ill * Nang + illp][m * Nchan2p + n].data().norm() << std::endl;
             }
             
             // outer problem matrix : r1 -> inf, r2 bound
@@ -534,8 +526,6 @@ void NoPreconditioner::update (Real E)
                     B1_blocks_[ill * Nang + illp][m * Nchan1p + n].hdfsave();
                     B1_blocks_[ill * Nang + illp][m * Nchan1p + n].drop();
                 }
-                
-//                 std::cout << "B1_blocks_[" << ill << "][" << illp << "][" << m << "][" << n << "].norm() = " << B1_blocks_[ill * Nang + illp][m * Nchan1p + n].data().norm() << std::endl;
             }
             
             // transition area r2 > r1, upper : psi_kl expressed in terms of F_nl for 'l' out of inner area
@@ -573,8 +563,6 @@ void NoPreconditioner::update (Real E)
                 Cu_blocks_[ill * Nang + illp].add(row, col, Xp_[0][l1p][n][k] * elem);
             }
             
-//             std::cout << "Cu_blocks_[" << ill << "][" << illp << "].norm() = " << Cu_blocks_[ill * Nang + illp].v().norm() << std::endl;
-            
             // transition area r1 > r2, upper : psi_kl expressed in terms of F_nk for 'k' out of inner area
             for (int i = 0; i < Nspline_inner; i++)
             for (int j = 0; j < Nspline_inner; j++) // *
@@ -610,8 +598,6 @@ void NoPreconditioner::update (Real E)
                 Cu_blocks_[ill * Nang + illp].add(row, col, Xp_[1][l2p][n][l] * elem);
             }
             
-//             std::cout << "Cu_blocks_[" << ill << "][" << illp << "].norm() = " << Cu_blocks_[ill * Nang + illp].v().norm() << std::endl;
-            
             // transition area r2 > r1, lower : F_nl expressed in terms of psi_kl for 'l' out of outer area
             for (int m = 0; m < Nchan2; m++)
             for (int n = 0; n < Nchan2p; n++)
@@ -642,8 +628,6 @@ void NoPreconditioner::update (Real E)
                 Cl_blocks_[ill * Nang + illp].add(row, col, Sp_[0][l1p][n][k] * elem);
             }
             
-            std::cout << "Cl_blocks_[" << ill << "][" << illp << "].norm() = " << Cl_blocks_[ill * Nang + illp].v().norm() << std::endl;
-            
             // transition area r1 > r2, lower : F_nk expressed in terms of psi_kl for 'k' out of outer area
             for (int m = 0; m < Nchan1; m++)
             for (int n = 0; n < Nchan1p; n++)
@@ -673,8 +657,6 @@ void NoPreconditioner::update (Real E)
                 
                 Cl_blocks_[ill * Nang + illp].add(row, col, Sp_[1][l2p][n][l] * elem);
             }
-            
-            std::cout << "Cl_blocks_[" << ill << "][" << illp << "].norm() = " << Cl_blocks_[ill * Nang + illp].v().norm() << std::endl;
         }
     }
     
@@ -714,8 +696,8 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
     if (not std::isfinite(ji_expansion_full.norm()))
         HexException("Unable to expand Riccati-Bessel function in B-splines!");
     
-    // read the appropriate bound pseudo-state
-    cArray Xp = Hl_[0][li].readPseudoState(ni - li - 1);
+    // get the initial bound pseudo-state B-spline expansion
+    cArray Xp = Hl_[0][li].readPseudoState(li, ni - li - 1);
     
     // (anti)symmetrization
     Real Sign = ((ang_->S() + ang_->Pi()) % 2 == 0) ? 1. : -1.;
@@ -797,16 +779,11 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
                     rad_->bspline_full().B(ixspline, ixknot, points, &xs[ixknot * points], &B_x[(ixspline * (order + 1) + ixknot - ixspline) * points]);
                 
                 // precompute radial functions and Riccati-Bessel functions
-                //rArray Pi_x ((rad_->bspline_full().Nreknot() - 1) * points);
                 rArray Pi_x = realpart(rad_->bspline_inner().zip(Xp, realpart(xs)));
                 rArray ji_x (xs.size());
                 # pragma omp parallel for
                 for (unsigned ix = 0; ix < xs.size(); ix++)
-                {
-                    //gsl_sf_result Pi;
-                    //Pi_x[ix] = (gsl_sf_hydrogenicR_e(ni, li, 1., xs[ix].real(), &Pi) == GSL_EUNDRFLW ? 0. : xs[ix].real() * Pi.val);
                     ji_x[ix] = special::ric_j(l, ki[0] * xs[ix].real());
-                }
                 
                 // damping distance
                 Real distance = rad_->bspline_full().R0();
@@ -822,7 +799,8 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
                     # pragma omp parallel for
                     for (int ispline = 0; ispline < (int)Nspline_full; ispline++)
                     {
-                        for (int iknot = ispline; iknot < std::min(ispline + order + 1, rad_->bspline_full().Nreknot() - 1); iknot++) if (rad_->bspline_full().t(iknot).real() != rad_->bspline_full().t(iknot + 1).real())
+                        for (int iknot = ispline; iknot < std::min(ispline + order + 1, rad_->bspline_full().Nreknot() - 1); iknot++)
+                        if (rad_->bspline_full().t(iknot).real() != rad_->bspline_full().t(iknot + 1).real())
                         {
                             for (int ipoint = 0; ipoint < points; ipoint++)
                             {
@@ -873,7 +851,7 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
                     // contributions to the element of the right-hand side
                     Complex contrib_direct = 0, contrib_exchange = 0;
                     
-                    // get B-spline indices
+                    // determine inner/outer region
                     if (ispline >= Nspline_inner * Nspline_inner and ispline < Nspline_inner * Nspline_inner + Nchan1 * Nspline_outer)
                     {
                         // r1 > Ra, r2 < Ra
@@ -886,7 +864,8 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
                         {
                             multipole *= x;
                             
-                            if (f2[lambda] != 0 and inp_->exchange) contrib_exchange += f2[lambda] * rho_l2[ichan1][lambda] * M_mLm1_j[lambda][ixspline] / multipole;
+                            if (f2[lambda] != 0 and inp_->exchange)
+                                contrib_exchange += f2[lambda] * rho_l2[ichan1][lambda] * M_mLm1_j[lambda][ixspline] / multipole;
                         }
                     }
                     else if (ispline >= Nspline_inner * Nspline_inner + Nchan1 * Nspline_outer)
@@ -901,10 +880,11 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
                         {
                             multipole *= y;
                             
-                            if (f1[lambda] != 0) contrib_direct += f1[lambda] * rho_l1[ichan2][lambda] * M_mLm1_j[lambda][iyspline] / multipole;
+                            if (f1[lambda] != 0)
+                                contrib_direct += f1[lambda] * rho_l1[ichan2][lambda] * M_mLm1_j[lambda][iyspline] / multipole;
                         }
                     }
-                    else /* if (ispline < Nspline_inner * Nspline_inner) */
+                    else /* i.e. ispline < Nspline_inner * Nspline_inner */
                     {
                         // r1 < Ra, r2 < Ra
                         int ixspline = ispline / Nspline_inner;
@@ -1007,8 +987,7 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
                                             Complex Bx = B_x[(ixspline * (order + 1) + ixknot - ixspline) * points + ix];
                                             Complex By = B_y[iy];
                                             Real Pix = Pi_x[ixknot * points + ix];
-                                            gsl_sf_result piy;
-                                            Real Piy = (gsl_sf_hydrogenicR_e(ni, li, 1., ry, &piy) == GSL_EUNDRFLW ? 0. : ry * piy.val);
+                                            Real Piy = rad_->bspline_inner().eval(Xp, ry).real();
                                             Real jix = ji_x[ixknot * points + ix];
                                             Real jiy = special::ric_j(l, ki[0] * ry);
                                             Complex wx = xws[ixknot * points + ix];
@@ -1048,8 +1027,7 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
                                             Complex Bx = B_x[(ixspline * (order + 1) + ixknot - ixspline) * points + ix];
                                             Complex By = B_y[iy];
                                             Real Pix = Pi_x[ixknot * points + ix];
-                                            gsl_sf_result piy;
-                                            Real Piy = (gsl_sf_hydrogenicR_e(ni, li, 1., ry, &piy) == GSL_EUNDRFLW ? 0. : ry * piy.val);
+                                            Real Piy = rad_->bspline_inner().eval(Xp, ry).real();
                                             Real jix = ji_x[ixknot * points + ix];
                                             Real jiy = special::ric_j(l, ki[0] * ry);
                                             Complex wx = xws[ixknot * points + ix];
@@ -1096,7 +1074,6 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
         
         // use the calculated block
         chi[ill] = chi_block;
-        std::cout << "chi[" << ill << "].norm() = " << chi_block.norm() << std::endl;
         
         // optionally transfer to disk
         if (not chi.inmemory())
@@ -1338,8 +1315,6 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
             
             q[ill].drop();
         }
-        
-        std::cout << "p[" << ill << "].norm() = " << p[ill].norm() << " -> q[" << ill << "].norm() = " << q[ill].norm() << std::endl;
     }
 }
 

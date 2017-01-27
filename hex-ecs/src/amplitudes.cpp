@@ -495,19 +495,11 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> &
     if (inp_.inner_only)
     {
         Xp = readAtomPseudoState(T.lf, T.nf - T.lf - 1);
-        write_array
-        (
-            linspace(0., 100., 1001),
-            rad_.bspline_inner().zip(Xp, linspace(0., 100., 1001)),
-            "pstate.dat"
-        );
         Sp = rad_.S_inner().dot(Xp);
-//         std::cout << "Sp.norm() = " << Sp.norm() << std::endl;
     }
     else
     {
         Ed = readProjPseudoStateEnergies(T.lf);
-//         std::cout << "Ed.size() = " << Ed.size() << std::endl;
     }
     
     // The extracted T-matrix oscillates and slowly radially converges.
@@ -600,10 +592,6 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> &
                     Nspline_inner * Nspline_inner + (Ed.size() + T.nf - T.lf - 1) * Nspline_outer, // offset
                     Nspline_outer   // elements
                 );
-                
-                std::cout << "solution[" << ill << "].norm() = " << solution[ill].slice(0, Nspline_inner * Nspline_inner).norm() << std::endl;
-                std::cout << "solution[" << ill << "].norm() = " << solution[ill].norm() << std::endl;
-                std::cout << "PsiScFf.norm() = " << PsiScFf.norm() << std::endl;
                 
                 // calculate radial integral
                 lambda = (PsiScFf | Wj[ell].slice(Nspline_inner, Nspline_full));
