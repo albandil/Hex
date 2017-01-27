@@ -836,15 +836,13 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
                 {
                     rho_l2[ichan1].resize(rad_->maxlambda() + 1);
                     for (int lambda = 1; lambda <= rad_->maxlambda(); lambda++)
-                        rho_l2[ichan1][lambda] = (Xp_[1][l2][ichan1] | Mtr_L_inner[lambda].dot(Xp_[1][li][ni - li - 1]));
-                        //rho_l2[ichan1][lambda] = special::hydro_rho(ichan1 + l2 + 1, l2, ni, li, lambda);
+                        rho_l2[ichan1][lambda] = (Xp_[1][l2][ichan1] | Mtr_L_inner[lambda].dot(Xp));
                 }
                 for (int ichan2 = 0; ichan2 < Nchan2; ichan2++)
                 {
                     rho_l1[ichan2].resize(rad_->maxlambda() + 1);
                     for (int lambda = 1; lambda <= rad_->maxlambda(); lambda++)
-                        rho_l1[ichan2][lambda] = (Xp_[0][l1][ichan2] | Mtr_L_inner[lambda].dot(Xp_[0][li][ni - li - 1]));
-                        //rho_l1[ichan2][lambda] = special::hydro_rho(ichan2 + l1 + 1, l1, ni, li, lambda);
+                        rho_l1[ichan2][lambda] = (Xp_[0][l1][ichan2] | Mtr_L_inner[lambda].dot(Xp));
                 }
                 
                 // for all B-spline pairs (elements of the right-hand side)
