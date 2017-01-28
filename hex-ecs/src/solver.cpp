@@ -6,7 +6,7 @@
 //                    / /   / /    \_\      / /  \ \                                 //
 //                                                                                   //
 //                                                                                   //
-//  Copyright (c) 2016, Jakub Benda, Charles University in Prague                    //
+//  Copyright (c) 2017, Jakub Benda, Charles University in Prague                    //
 //                                                                                   //
 // MIT License:                                                                      //
 //                                                                                   //
@@ -30,8 +30,9 @@
 //  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
 #include "hex-hydrogen.h"
-#include "preconditioners/NoPreconditioner.h"
 #include "solver.h"
+
+// --------------------------------------------------------------------------------- //
 
 Solver::Solver
 (
@@ -115,10 +116,6 @@ void Solver::solve ()
                   << (computations_done == 0 ? 0 : iterations_done / computations_done)
                   << " CG iterations per energy)" << std::endl;
         
-        // check applicability of the projectile basis extension
-        if (not inp_.inner_only and inp_.Etot[ie] >= 0)
-            HexException("Projectile basis extension cannot be used for energies above ionization.");
-        
         // get asymptotical bound states for each of the angular momentum pairs
         bstates_.clear();
         for (unsigned ill = 0; ill < ang_.states().size(); ill++)
@@ -126,15 +123,16 @@ void Solver::solve ()
             int l1 = ang_.states()[ill].first;
             int l2 = ang_.states()[ill].second;
             
-            NoPreconditioner const * const p = dynamic_cast<NoPreconditioner*>(prec_);
+            // get number of bound states for each particle at this energy
+            std::pair<int,int> bstates = prec_->bstates(std::max(inp_.Etot[ie], inp_.channel_max_E), l1, l2);
             
             // store all principal quantum numbers for given l1 or l2
             bstates_.push_back
             (
                 std::make_pair
                 (
-                    linspace<int>(l2 + 1, l2 + p->Xp()[1][l2].size(), p->Xp()[1][l2].size()),
-                    linspace<int>(l1 + 1, l1 + p->Xp()[0][l1].size(), p->Xp()[0][l1].size())
+                    linspace<int>(l1 + 1, l1 + bstates.first,  bstates.first),
+                    linspace<int>(l2 + 1, l2 + bstates.second, bstates.second)
                 )
             );
         }

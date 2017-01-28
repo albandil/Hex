@@ -417,10 +417,7 @@ cArray Amplitudes::readProjPseudoStateEnergies (int l) const
     if (not datafile.read("Dl", &energies[0], N))
         HexException("File %s does not contain the requested dataset \"Dl\".", filename.c_str());
     
-    std::sort(energies.begin(), energies.end(), Complex_realpart_less);
-    energies.resize(std::find_if(energies.begin(), energies.end(), [&](Complex E){ return E.real() > 0.5 * inp_.channel_max_E; }) - energies.begin());
-    
-    return energies;
+    return 2.0 * energies; // a.u. -> Ry
 }
 
 cArray Amplitudes::readAtomPseudoState (int l, int ichan) const
@@ -444,8 +441,6 @@ cArray Amplitudes::readAtomPseudoState (int l, int ichan) const
     iArray indices (N);
     std::iota(indices.begin(), indices.end(), 0);
     std::sort(indices.begin(), indices.end(), [&](int i, int j){ return energies[i].real() < energies[j].real(); });
-    
-    std::cout << "pseudostate energy: " << energies[indices[ichan]] << std::endl;
     
     unsigned Nspline_inner = rad_.bspline_inner().Nspline();
     
@@ -483,24 +478,9 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> &
     if (not std::isfinite(kf[ie]) or kf[ie] == 0.)
         return;
     
-    //
-    // Channel information.
-    //  - Get number of allowed asymptotic channels for the atomic particle
-    //    (= number of allowed bound states of the projectile particle).
-    //  - Read the appropriate projectile channel function for the final state (nf,lf,*).
-    //
-    
-    cArray Ed, Xp, Sp;
-    
-    if (inp_.inner_only)
-    {
-        Xp = readAtomPseudoState(T.lf, T.nf - T.lf - 1);
-        Sp = rad_.S_inner().dot(Xp);
-    }
-    else
-    {
-        Ed = readProjPseudoStateEnergies(T.lf);
-    }
+    // read the appropriate projectile channel function for the final state (nf,lf,*)
+    cArray Xp = readAtomPseudoState(T.lf, T.nf - T.lf - 1);
+    cArray Sp = rad_.S_inner().dot(Xp);
     
     // The extracted T-matrix oscillates and slowly radially converges.
     // If we are far enough and only oscillations are left, we can average several uniformly spaced
@@ -565,8 +545,18 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> &
             if (ang_[ill].first != T.lf)
                 continue;
             
-            // get angular momentum
+            // get projectile angular momentum
             int ell = ang_[ill].second;
+            
+            // calculate number of exchange scattering channels that are stored in the solution file
+            int nProjE = 0;
+            cArray Ed = readProjPseudoStateEnergies(ell);
+            Real maxEtot = std::max(inp_.channel_max_E, inp_.max_Etot);
+            for (Complex E : Ed)
+            {
+                if (E.real() <= maxEtot)
+                    nProjE++;
+            }
             
             Complex lambda = 0;
             if (inp_.inner_only)
@@ -589,7 +579,7 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> &
                 cArrayView PsiScFf
                 (
                     solution[ill],  // data
-                    Nspline_inner * Nspline_inner + (Ed.size() + T.nf - T.lf - 1) * Nspline_outer, // offset
+                    Nspline_inner * Nspline_inner + (nProjE + T.nf - T.lf - 1) * Nspline_outer, // offset
                     Nspline_outer   // elements
                 );
                 

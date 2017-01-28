@@ -117,7 +117,7 @@ void NoPreconditioner::setup ()
         
         // Now S = CR * (D * CR⁻¹)
         std::cout << "\t\t- time: " << timer.nice_time() << std::endl;
-        for (std::size_t i = 0; i < Nspline_inner * Nspline_inner; i++)
+        for (std::size_t i = 0; i < (std::size_t)Nspline_inner * (std::size_t)Nspline_inner; i++)
             invCR.data()[i] *= D[i % Nspline_inner];
         
         // S = S - CR * invCR
@@ -125,7 +125,7 @@ void NoPreconditioner::setup ()
         std::cout << "\t\t- residual: " << S.data().norm() << std::endl;
         
         // compute √S⁻¹
-        for (std::size_t i = 0; i < Nspline_inner * Nspline_inner; i++)
+        for (std::size_t i = 0; i < (std::size_t)Nspline_inner * (std::size_t)Nspline_inner; i++)
             invCR.data()[i] /= std::pow(D.data()[i % Nspline_inner], 1.5);
         blas::gemm(1., CR, invCR, 0., invsqrtS);
         
@@ -150,11 +150,13 @@ void NoPreconditioner::setup ()
         ells[1].resize(std::unique(ells[1].begin(), ells[1].end()) - ells[1].begin());
         Hl_[1].resize(ells[1].back() + 1);
         
-        // allocate space for the atomic eigenvectors used in the asymptotic expansion
+        // allocate (and clean) space for the atomic eigenvectors used in the asymptotic expansion
         Xp_[0].resize(ells[0].back() + 1);  Xp_[0].fill(cArrays());
         Sp_[0].resize(ells[0].back() + 1);  Sp_[0].fill(cArrays());
+        Eb_[0].resize(ells[0].back() + 1);  Eb_[0].fill(cArray());
         Xp_[1].resize(ells[1].back() + 1);  Xp_[1].fill(cArrays());
         Sp_[1].resize(ells[1].back() + 1);  Sp_[1].fill(cArrays());
+        Eb_[1].resize(ells[1].back() + 1);  Eb_[1].fill(cArray());
         
         // diagonalize the one-electron hamiltonians for both the atomic and projectile particle
         for (int i = 0; i < 2; i++)
@@ -197,7 +199,7 @@ void NoPreconditioner::setup ()
                 
                 // Now Hl = ClR * D * ClR⁻¹
                 std::cout << "\t\t- time: " << timer.nice_time() << std::endl;
-                for (std::size_t i = 0; i < Nspline_inner * Nspline_inner; i++)
+                for (std::size_t i = 0; i < (std::size_t)Nspline_inner * (std::size_t)Nspline_inner; i++)
                     invCR.data()[i] *= D[i % Nspline_inner];
                 
                 // Hl <- Hl - CR * invCR
@@ -266,10 +268,18 @@ void NoPreconditioner::setup ()
                 // get all valid asymptotic states
                 for (int nr = 0; nr < Nspline_inner; nr++)
                 {
-                    if (Hl_[i][l].Dl[indices[nr]].real() <= 0.5 * inp_->channel_max_E)
+                    // bound energy of the state (a.u. -> Ry)
+                    Complex Eb = 2.0_r * Hl_[i][l].Dl[indices[nr]];
+                    
+                    // maximal bound state energy allowed in the asymptotic expantion (or at least the bound energy allowed by impact channels)
+                    Real Em = std::max(inp_->channel_max_E, inp_->max_Etot);
+                    
+                    // add all requested channels
+                    if (Eb.real() <= Em)
                     {
                         Xp_[i][l].push_back(Hl_[i][l].Cl.col(indices[nr]));
                         Sp_[i][l].push_back(rad_->S_inner().dot(Xp_[i][l][nr]));
+                        Eb_[i][l].push_back(Eb);
                     }
                     else
                     {
@@ -290,6 +300,35 @@ void NoPreconditioner::setup ()
                 std::cout << std::endl;
             }
         }
+}
+
+std::pair<int,int> NoPreconditioner::bstates (Real E, int l1, int l2) const
+{
+    std::pair<int,int> nstates = { 0, 0 };
+    
+    if (l1 < (int)Eb_[0].size())
+    {
+        for (Complex Eb : Eb_[0][l1])
+        {
+            if (Eb.real() <= E)
+            {
+                nstates.first++;
+            }
+        }
+    }
+    
+    if (l2 < (int)Eb_[1].size())
+    {
+        for (Complex Eb : Eb_[1][l2])
+        {
+            if (Eb.real() <= E)
+            {
+                nstates.second++;
+            }
+        }
+    }
+    
+    return nstates;
 }
 
 BlockSymBandMatrix<Complex> NoPreconditioner::calc_A_block (int ill, int illp, bool twoel) const
@@ -430,8 +469,10 @@ void NoPreconditioner::update (Real E)
         int l1 = ang_->states()[ill].first;
         int l2 = ang_->states()[ill].second;
         
-        Nchan_[ill].first  = Xp_[1][l2].size();
-        Nchan_[ill].second = Xp_[0][l1].size();
+        std::pair<int,int> Nbound = bstates(E, l1, l2);
+        
+        Nchan_[ill].first  = Nbound.second;
+        Nchan_[ill].second = Nbound.first;
     }
     
     // setup blocks
@@ -834,12 +875,14 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
                 cArrays rho_l1 (Nchan2), rho_l2 (Nchan1);
                 for (int ichan1 = 0; ichan1 < Nchan1; ichan1++)
                 {
+                    // this is needed only for exchange contribution
                     rho_l2[ichan1].resize(rad_->maxlambda() + 1);
                     for (int lambda = 1; lambda <= rad_->maxlambda(); lambda++)
                         rho_l2[ichan1][lambda] = (Xp_[1][l2][ichan1] | Mtr_L_inner[lambda].dot(Xp));
                 }
                 for (int ichan2 = 0; ichan2 < Nchan2; ichan2++)
                 {
+                    // this is needed only for direct contribution
                     rho_l1[ichan2].resize(rad_->maxlambda() + 1);
                     for (int lambda = 1; lambda <= rad_->maxlambda(); lambda++)
                         rho_l1[ichan2][lambda] = (Xp_[0][l1][ichan2] | Mtr_L_inner[lambda].dot(Xp));
@@ -1332,8 +1375,13 @@ void NoPreconditioner::finish ()
     Cu_blocks_.resize(0);
     Cl_blocks_.resize(0);
     
-    Xp_[0].resize(0);  Sp_[0].resize(0);
-    Xp_[1].resize(0);  Sp_[1].resize(0);
+    Xp_[0].resize(0);
+    Sp_[0].resize(0);
+    Eb_[0].resize(0);
+    
+    Xp_[1].resize(0);
+    Sp_[1].resize(0);
+    Eb_[1].resize(0);
 }
 
 // --------------------------------------------------------------------------------- //

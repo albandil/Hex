@@ -73,7 +73,7 @@ const std::string sample_input =
     "#\n"
     "# a) Real knots of the basis that is common to atomic and projectile electron.\n"
     "  L  0.0  0.0   4\n"
-    "  G  0.1 10.0  0.1  1.1\n"
+    "  G  0.1 10.0  0.1  1.01\n"
     "  L   11  100  90\n"
     " -1\n"
     "# b) Real knots that are exclusive to the projectile, if any. (Start from zero.)\n"
@@ -999,6 +999,22 @@ void InputFile::read (std::ifstream & inf)
     std::cout << std::endl << "Total projectile + atom energies [Ry]" << std::endl;
     std::cout << "\tcount: "     << Etot.size()  << std::endl;
     std::cout << "\tfull list: " << Etot         << std::endl;
+    
+    // check that all energies are allowed by the asymptotic expansion
+    if (not inner_only and not Etot.empty())
+    {
+        max_Etot = *std::max_element(Etot.begin(), Etot.end());
+        
+        if (max_Etot > channel_max_E)
+        {
+            std::cout << std::endl;
+            std::cout << "Warning: The maximal asymptotic channel energy Easy = " << channel_max_E << " Ry " << std::endl;
+            std::cout << "         is too low to cover all possible open channels for the given maximum total" << std::endl;
+            std::cout << "         energy Etot = " << max_Etot << " Ry. Program will use all energetically allowed" << std::endl;
+            std::cout << "         asymptotic channels in cases with Etot > Easy." << std::endl;
+
+        }
+    }
     
     //
     // load some other optional data

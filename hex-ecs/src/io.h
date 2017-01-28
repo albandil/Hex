@@ -372,6 +372,9 @@ class InputFile
             // total energies for which to solve the system
             rArray Etot;
             
+            // maximal total energy
+            Real max_Etot;
+            
             // initial and final atomic states
             std::vector<std::tuple<int,int,int>> instates, outstates;
             

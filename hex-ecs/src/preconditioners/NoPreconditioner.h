@@ -82,6 +82,7 @@ class NoPreconditioner : public PreconditionerBase
         // member functions
         virtual void setup ();
         virtual void update (Real E);
+        virtual std::pair<int,int> bstates (Real E, int l1, int l2) const;
         virtual void finish ();
         virtual void rhs (BlockArray<Complex> & chi, int ienergy, int instate) const;
         virtual void multiply (BlockArray<Complex> const & p, BlockArray<Complex> & q, MatrixSelection::Selection tri = MatrixSelection::Both) const;
@@ -90,8 +91,6 @@ class NoPreconditioner : public PreconditionerBase
         // internal routines
         BlockSymBandMatrix<Complex> calc_A_block (int ill, int illp, bool twoel = true) const;
         RadialIntegrals const & rad () const { return *rad_; }
-        std::array<Array<cArrays>,2> const & Xp () const { return Xp_; }
-        std::array<Array<cArrays>,2> const & Sp () const { return Sp_; }
         
     protected:
         
@@ -136,8 +135,11 @@ class NoPreconditioner : public PreconditionerBase
         // radial integrals for the solution
         RadialIntegrals * rad_;
         
-        // eigenstates (epansions) of the inner one-electron hamiltonian for all relevant angular momenta and their overlaps
+        // eigenstates (expansions) of the inner one-electron hamiltonian for all relevant angular momenta and their overlaps
         std::array<Array<cArrays>,2> Xp_, Sp_;
+        
+        // eigen-energies (in Ry) of the pseudostates contained in Xp_ for each angular momentum
+        std::array<cArrays,2> Eb_;
         
         // one-electron hamiltonian data (for atomic electron and the projectile)
         mutable std::array<std::vector<HlData>,2> Hl_;
