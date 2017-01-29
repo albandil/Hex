@@ -557,7 +557,7 @@ void NoPreconditioner::update (Real E)
                 
                 // channel-offdiagonal contribution
                 for (int lambda = 1; lambda <= rad_->maxlambda(); lambda++) if (ang_->f(ill,illp,lambda) != 0.0_r)
-                    subblock += inp_->Zp * ang_->f(ill,illp,lambda) * (Xp_[1][l2p][n] | Mtr_L_inner[lambda].dot(Xp_[1][l1][m])) * Mtr_mLm1_outer[lambda];
+                    subblock += inp_->Zp * ang_->f(ill,illp,lambda) * (Xp_[1][l2p][n] | Mtr_L_inner[lambda].dot(Xp_[1][l2][m])) * Mtr_mLm1_outer[lambda];
                 
                 // use the block
                 B1_blocks_[ill * Nang + illp][m * Nchan1p + n].hdflink(format("blk-B1-%d-%d-%d-%d.ooc", ill, illp, m, n));
