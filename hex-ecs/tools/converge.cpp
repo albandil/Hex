@@ -50,17 +50,18 @@ std::vector<std::string> hex_ecs_args;
 template <class T> T read_param
 (
     std::map<std::string,std::vector<std::string>> const & data,
-    std::string keyword
+    std::string keyword,
+    T def = T(0)
 )
 {
     if (data.find(keyword) == data.end())
     {
-        return T(0);
+        return def;
     }
     
     if (data.at(keyword).empty())
     {
-        return T(0);
+        return def;
     }
     
     if (data.at(keyword).size() > 1)
@@ -114,7 +115,7 @@ typedef struct
     double Ra, R0, Rmax;
     int L, Pi, nL, limit;
     int ni, li;
-    double h;
+    double h, Easy;
     
     bool adjust_Ra, adjust_R0, adjust_Rmax, adjust_nL, adjust_limit, exchange;
 }
@@ -187,6 +188,8 @@ std::vector<double> calculate (calcdata & c)
         for (int n = 1; n <= max_n; n++)
             ecsinp << "  *";
         ecsinp << "\n";
+        ecsinp << "# Asymptotic state maximal energy.\n";
+        ecsinp << c.Easy << "\n";
         ecsinp << "\n";
         ecsinp << "# Angular momenta.\n";
         ecsinp << "# L  S  Pi nL limit exchange\n";
@@ -488,6 +491,10 @@ int main (int argc, char* argv[])
         //- threshold for cross sections considered in the convergence check
         cs_threshold = read_param<double>(data, "cs_threshold");
         std::cout << "\tcs_threshold = " << cs_threshold << std::endl;
+        
+        //- asymptotic energy for channel reduction
+        c.Easy = read_param<double>(data, "easy", -1);
+	std::cout << "\teasy = " << c.Easy << std::endl;
         
         //- total energies
         for (double E : read_param_vector<double>(data, "E"))
