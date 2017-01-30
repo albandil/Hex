@@ -34,6 +34,7 @@
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
+#include <iomanip>
 #include <map>
 #include <numeric>
 #include <sstream>
@@ -45,7 +46,7 @@
 double tolerance = 5e-3;
 double cs_threshold = 1e-10;
 
-std::vector<std::string> hex_ecs_args;
+std::vector<std::string> hex_ecs_args, headers;
 
 template <class T> T read_param
 (
@@ -211,8 +212,8 @@ std::vector<double> calculate (calcdata & c)
         cmd << "( cd " << oss.str() << " ; ";
         for (std::string const & s : hex_ecs_args)
             cmd << s << " ";
-//         if (igrid <= 200)
-//             cmd << "--lu umfpack "; // override
+        if (igrid <= 200)
+            cmd << "--lu pardiso "; // override
         cmd << "2>&1 > ecs.log )";
         if (std::system(cmd.str().c_str()) != 0)
         {
@@ -231,10 +232,17 @@ std::vector<double> calculate (calcdata & c)
     }
     
     // get last line from the cross section files
-    std::string pcs_singlet, pcs_triplet;
+    std::string pcs_singlet, pcs_triplet, header, splitter;
     std::string s;
-    while (std::getline(singlet, s)) pcs_singlet = s;
-    while (std::getline(triplet, s)) pcs_triplet = s;
+    while (std::getline(singlet, s)) { header = splitter; splitter = pcs_singlet; pcs_singlet = s; }
+    while (std::getline(triplet, s)) { header = splitter; splitter = pcs_triplet; pcs_triplet = s; }
+    
+    // split header
+    headers.clear();
+    std::istringstream iss_header (header);
+    iss_header >> splitter; // drop comment
+    iss_header >> splitter; // drop energy header
+    while (iss_header >> splitter) headers.push_back(splitter);
     
     double x;
     
@@ -257,31 +265,44 @@ std::vector<double> calculate (calcdata & c)
 
 double cs_difference (std::vector<double> const & A, std::vector<double> const & B)
 {
+    double sumA = std::accumulate(A.begin(), A.end(), 0.0);
+    double sumB = std::accumulate(B.begin(), B.end(), 0.0);
+
+    std::cout << "\t\t       ";
+    for (std::size_t i = 0; i < A.size(); i++)
+    if (std::min(A[i],B[i]) > cs_threshold * 0.5 * (sumA + sumB))
+    {
+        std::cout << std::setw(15) << std::left << headers[i];
+    }
+    std::cout << std::endl;
+
     std::cout << "\t\told cs:";
     for (std::size_t i = 0; i < A.size(); i++)
+    if (std::min(A[i],B[i]) > cs_threshold * 0.5 * (sumA + sumB))
     {
-        std::cout << "\t" << A[i];
+        std::cout << std::setw(15) << std::left << A[i];
     }
     std::cout << std::endl;
     
     std::cout << "\t\tnew cs:";
     for (std::size_t i = 0; i < B.size(); i++)
+    if (std::min(A[i],B[i]) > cs_threshold * 0.5 * (sumA + sumB))
     {
-        std::cout << "\t" << B[i];
+        std::cout << std::setw(15) << std::left << B[i];
     }
     std::cout << std::endl;
     
     double max_rel_diff = 0;
     
-    double suma = std::accumulate(B.begin(), B.end(), 0.0);
-    
-    std::cout << "\t\tdelta:";
+    std::cout << "\t\tdelta :";
     for (std::size_t i = 0; i < A.size(); i++)
     {
-        double rel_diff = std::abs(B[i] - A[i]) / B[i];
-        std::cout << "\t" << rel_diff;
-        if (std::abs(B[i]) > cs_threshold * suma)
+        double rel_diff = 2.0 * std::abs(B[i] - A[i]) / (A[i] + B[i]);
+        if (std::min(A[i],B[i]) > 0.5 * cs_threshold * (sumA + sumB))
+        {
+            std::cout << std::setw(15) << std::left << rel_diff;
             max_rel_diff = std::max(max_rel_diff, rel_diff);
+        }
     }
     std::cout << std::endl;
     

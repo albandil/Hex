@@ -64,9 +64,12 @@ RadialIntegrals::RadialIntegrals
     verbose_(true),
     Nlambdas_(Nlambdas)
 {
-    // precompute Gaussian weights
-    g_inner_.precompute_nodes_and_weights(EXPANSION_QUADRATURE_POINTS);
-    g_full_ .precompute_nodes_and_weights(EXPANSION_QUADRATURE_POINTS);
+    // determine the needed order of Gauss-Legendre quadrature
+    unsigned pts = std::max(EXPANSION_QUADRATURE_POINTS, bspline_inner.order() + Nlambdas + 2);
+    
+    // precompute the nodes and weights
+    g_inner_.precompute_nodes_and_weights(pts);
+    g_full_ .precompute_nodes_and_weights(pts);
 }
 
 cArray RadialIntegrals::computeMi (Bspline const & bspline, GaussLegendre const & g, int a) const
