@@ -99,6 +99,7 @@ void NoPreconditioner::setup ()
     
     //
     // diagonalize the overlap matrix
+    // FIXME: Only factorize if necessary (i.e. when some Hl files are missing).
     //
     
         std::cout << "Setting up the hydrogen eigenstates..." << std::endl << std::endl;
@@ -164,14 +165,18 @@ void NoPreconditioner::setup ()
             // particle charge (first is electron, second is either electron or positron)
             Real Z = (i == 0 ? -1.0 : inp_->Zp);
             
-            // for all one-electron angular momenta needed by this particle and MPI group
+            // for all one-electron angular momenta
             bool written = false;
-            for (int l : ells[i]) if (not cmd_->shared_scratch or (par_->isMyGroupWork(l) and par_->IamGroupMaster()))
+            for (int l : ells[i])
             {
                 // compose name of the file containing the hamiltonian data
                 Hl_[i][l].hdflink(format("Hl%+g-%d-%.4x.hdf", Z, l, rad_->bspline_inner().hash()).c_str());
                 
-                // check if the file already exists
+                // do not calculate if this work is supposed to be done by someone else
+                if (cmd_->shared_scratch and (par_->isMyGroupWork(l) or par_->IamGroupMaster()))
+                    continue;
+                
+                // check if the file already exists; skip calculation in that case
                 if (Hl_[i][l].hdfcheck())
                     continue;
                 
