@@ -173,7 +173,7 @@ void NoPreconditioner::setup ()
                 Hl_[i][l].hdflink(format("Hl%+g-%d-%.4x.hdf", Z, l, rad_->bspline_inner().hash()).c_str());
                 
                 // do not calculate if this work is supposed to be done by someone else
-                if (cmd_->shared_scratch and (par_->isMyGroupWork(l) or par_->IamGroupMaster()))
+                if (cmd_->shared_scratch and not (par_->isMyGroupWork(l) and par_->IamGroupMaster()))
                     continue;
                 
                 // check if the file already exists; skip calculation in that case
