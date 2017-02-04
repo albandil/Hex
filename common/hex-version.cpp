@@ -49,7 +49,7 @@ std::string logo (std::string esc)
         "%s     /  ___  /   | |/_/    / /\\ \\      \n"
         "%s    / /   / /    \\_\\      / /  \\ \\   \n"
         "%s                                         \n"
-        "%s             UK MFF (c) 2016             \n"
+        "%s             UK MFF (c) 2017             \n"
         "%s                                         \n"
 #ifdef _LONGINT
         "%s       version: 2.01 %s ILP64\n"
