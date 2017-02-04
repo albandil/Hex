@@ -115,7 +115,7 @@ template <class ...Params> [[noreturn]] void TerminateWithException (const char*
     print_stack_trace();
     
     // exit the program
-    std::terminate();
+    std::exit(EXIT_FAILURE);
 }
 
 /**

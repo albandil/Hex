@@ -203,7 +203,7 @@ class Bspline
         /**
          * @brief Get knot index for coordinate.
          * 
-         * Finds knot (interval @f$ \left< t_i,t_{i+1} \right) @f$) for 'x'.
+         * Finds knot (interval @f$ \langle t_i,t_{i+1} \rangle @f$) for 'x'.
          * @param x Complex coordinate.
          */
         int knot (Complex x) const;

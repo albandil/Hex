@@ -6,7 +6,7 @@
 //                    / /   / /    \_\      / /  \ \                                 //
 //                                                                                   //
 //                                                                                   //
-//  Copyright (c) 2016, Jakub Benda, Charles University in Prague                    //
+//  Copyright (c) 2017, Jakub Benda, Charles University in Prague                    //
 //                                                                                   //
 // MIT License:                                                                      //
 //                                                                                   //
@@ -125,13 +125,6 @@ void Solver::solve ()
                   << (computations_done == 0 ? 0 : iterations_done / computations_done)
                   << " CG iterations per energy)" << std::endl;
         
-        // check applicability of the projectile basis extension
-        if (not inp_.inner_only and inp_.Etot[ie] >= 0)
-            HexException("Projectile basis extension cannot be used for energies above ionization.");
-        
-        // get maximal asymptotic principal quantum number
-        int max_n = (inp_.Etot[ie] >= 0 ? 0 : 1.0 / std::sqrt(-inp_.Etot[ie]));
-        
         // get asymptotical bound states for each of the angular momentum pairs
         bstates_.clear();
         for (unsigned ill = 0; ill < ang_.states().size(); ill++)
@@ -139,13 +132,16 @@ void Solver::solve ()
             int l1 = ang_.states()[ill].first;
             int l2 = ang_.states()[ill].second;
             
-            // store all principal quantum numbers for given l₁ or l₂ and the total energy
+            // get number of bound states for each particle at this energy
+            std::pair<int,int> bstates = prec_->bstates(std::max(inp_.Etot[ie], inp_.channel_max_E), l1, l2);
+            
+            // store all principal quantum numbers for given l1 or l2
             bstates_.push_back
             (
                 std::make_pair
                 (
-                    l2 + 1 > max_n or inp_.Zp > 0 ? iArray{} : linspace(l2 + 1, max_n, max_n - l2),
-                    l1 + 1 > max_n                ? iArray{} : linspace(l1 + 1, max_n, max_n - l1)
+                    linspace<int>(l1 + 1, l1 + bstates.first,  bstates.first),
+                    linspace<int>(l2 + 1, l2 + bstates.second, bstates.second)
                 )
             );
         }
@@ -203,7 +199,15 @@ void Solver::solve ()
             
             // check if there is some precomputed solution on the disk
             SolutionIO reader (inp_.L, Spin, inp_.Pi, ni, li, mi, inp_.Etot[ie], ang_.states());
-            std::size_t size = reader.check();
+            std::size_t size = 0;
+            reader.check(SolutionIO::All, size);
+            
+            // sum partial sizes in distributed case
+            if (not cmd_.shared_scratch)
+            {
+                par_.mastersum(&size, 1, 0);
+                par_.bcast(0, &size, 1);
+            }
             
             // solution has the expected size
             if (size == Hsize and not cmd_.refine_solution)

@@ -6,7 +6,7 @@
 //                    / /   / /    \_\      / /  \ \                                 //
 //                                                                                   //
 //                                                                                   //
-//  Copyright (c) 2015, Jakub Benda, Charles University in Prague                    //
+//  Copyright (c) 2017, Jakub Benda, Charles University in Prague                    //
 //                                                                                   //
 // MIT License:                                                                      //
 //                                                                                   //
@@ -29,36 +29,59 @@
 //                                                                                   //
 //  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
-#include <string>
+#ifndef HEX_ECS_HLDATA_H
+#define HEX_ECS_HLDATA_H
 
-#include "hex-misc.h"
+// --------------------------------------------------------------------------------- //
 
-#ifndef GIT_COMMIT
-#define GIT_COMMIT ""
-#endif
+#include "hex-densematrix.h"
 
-char const * commit_hash = GIT_COMMIT;
+// --------------------------------------------------------------------------------- //
 
-std::string logo (std::string esc)
+/**
+ * @brief One-electron diagonalization data.
+ * 
+ * This data structure is used to manage the one-electron eigenstates and some other data.
+ * It is used by @ref NoPreconditioner to construct extended matrix of the system
+ * and to calculate the right-hand side, by @ref KPAPreconditioner to precondition the
+ * system by solution of the independent electrons and by the @ref Amplitudes class
+ * to extract the scattering T-matrix.
+ */
+class HlData
 {
-    return format
-    (
-        "%s                                         \n"
-        "%s       / /   / /    __    \\ \\  / /     \n"
-        "%s      / /__ / /   / _ \\    \\ \\/ /     \n"
-        "%s     /  ___  /   | |/_/    / /\\ \\      \n"
-        "%s    / /   / /    \\_\\      / /  \\ \\   \n"
-        "%s                                         \n"
-        "%s             UK MFF (c) 2017             \n"
-        "%s                                         \n"
-#ifdef _LONGINT
-        "%s       version: 2.01 %s ILP64\n"
-#else
-        "%s         version: 2.01 %s\n"
+    public:
+        
+        /// Link the structure to a disk file.
+        void hdflink (const char * file);
+        
+        /// Check that the file exists and can be opened for reading.
+        bool hdfcheck (const char * file = nullptr) const;
+        
+        /// Try to load data from a disk file.
+        bool hdfload (const char * file = nullptr);
+        
+        /// Save data to disk.
+        bool hdfsave (const char * file = nullptr) const;
+        
+        /// Read a pseudo bound state.
+        cArray readPseudoState (unsigned l, unsigned ichan) const;
+        
+        /// Release memory.
+        void drop ();
+        
+        /// One-electron hamiltonian eigenvalues.
+        cArray Dl;
+        
+        /// One-electron hamiltonian eigenvectors.
+        ColMatrix<Complex> Cl;
+        
+        /// Other combinations, used by @ref KPAPreconditioner only.
+        RowMatrix<Complex> invCl_invsqrtS, invsqrtS_Cl;
+        
+        /// Filename.
+        std::string filename;
+};
+
+// --------------------------------------------------------------------------------- //
+
 #endif
-        "%s                                         \n",
-        esc.c_str(),esc.c_str(),esc.c_str(),esc.c_str(),
-        esc.c_str(),esc.c_str(),esc.c_str(),esc.c_str(),
-        esc.c_str(),commit_hash,esc.c_str()
-    );
-}

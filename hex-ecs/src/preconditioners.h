@@ -118,9 +118,26 @@ class PreconditionerBase
              * @brief Update the preconditioner for the next energy.
              * 
              * This function updates the preconditioner for another right hand side.
-             * It may use the MPI environment.
+             * It may use the MPI environment. The energy is in Ry.
              */
             virtual void update (Real E) {}
+            
+            /**
+             * @brief Get the number of allowed bound states.
+             * 
+             * Returns the number of energetically allowed bound states of the first and second
+             * particle with specific angular momenta. This is necessary because it determines
+             * the size of the solution vector.
+             * 
+             * This function can be called only after a call to the @ref setup function,
+             * where it is assumed that the initialization of these numbers takes place.
+             * 
+             * The energy is in Ry.
+             */
+            virtual std::pair<int,int> bstates (Real E, int l1, int l2) const
+            {
+                return std::make_pair(0,0);
+            }
             
             /**
              * @brief Clean up memory etc.

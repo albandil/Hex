@@ -132,7 +132,7 @@ void hex_scattering_amplitude_
     double * angles, double * result
 )
 {
-    ScatteringQuantity * TMat = dynamic_cast<ScatteringAmplitude*>(get_quantity("tmat"));
+    ScatteringQuantity * TMat = get_quantity("tmat");
     
     cArrayView results(*N,reinterpret_cast<Complex*>(result));
     results.fill(0.);

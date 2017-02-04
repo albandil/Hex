@@ -50,7 +50,6 @@
 		<Unit filename="../common/hex-hydrogen.cpp" />
 		<Unit filename="../common/hex-hydrogen.h" />
 		<Unit filename="../common/hex-interpolate.h" />
-		<Unit filename="../common/hex-luft.cpp" />
 		<Unit filename="../common/hex-memory.h" />
 		<Unit filename="../common/hex-misc.cpp" />
 		<Unit filename="../common/hex-misc.h" />

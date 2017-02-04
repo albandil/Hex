@@ -15,8 +15,19 @@ CXX ?= g++
 TARGET ?= release
 
 # global compiler flags
+#
+#    Single precision: -DSINGLE
+#    Double precision: -fcx-limited-range (optional)
+#
 CFLAGS ?= -fopenmp -Wall -mtune=native -march=native -fcx-limited-range -Wno-unknown-pragmas
 LFLAGS ?= -fopenmp -lstdc++
+
+# ---------------------------------------------------------------------------- #
+# OpenMPI environment (optional)                                               #
+# ---------------------------------------------------------------------------- #
+
+OPENMPIFLAGS = -DWITH_MPI $(shell mpicxx --showme:compile)
+OPENMPILIBS  = $(shell mpicxx --showme:link)
 
 # ---------------------------------------------------------------------------- #
 # BLAS & LAPACK                                                                #
@@ -81,13 +92,6 @@ GSLFLAGS = $(shell gsl-config --cflags)
 GSLLIBS = $(shell gsl-config --libs)
 
 # ---------------------------------------------------------------------------- #
-# OpenMPI environment (optional)                                               #
-# ---------------------------------------------------------------------------- #
-
-OPENMPIFLAGS = -DWITH_MPI $(shell mpicxx --showme:compile)
-OPENMPILIBS  = $(shell mpicxx --showme:link)
-
-# ---------------------------------------------------------------------------- #
 # OpenCL (optional)                                                            #
 # - Use the flag -DOPENCL2 if you are sure that your implementation supports   #
 #   OpenCL 2.0+. This will avoid some deprecated functions.                    #
@@ -97,7 +101,7 @@ OPENMPILIBS  = $(shell mpicxx --showme:link)
 # OPENCLLIBS = -lOpenCL
 
 # ---------------------------------------------------------------------------- #
-# PNG++ (optional)                                                             #
+# PNG++ (optional, for debugging purposes)                                     #
 # ---------------------------------------------------------------------------- #
 
 # PNGPPFLAGS = -DWITH_PNG -I../libs
@@ -140,7 +144,7 @@ COMMON_OBJECTS = $(patsubst %,obj/$(BASECXX)/common/%.o,$(COMMON_FILES))
 COMMON_DEPS    = $(patsubst %,obj/$(BASECXX)/common/%.dep,$(COMMON_FILES))
 
 # source files specific to hex-ecs
-HEX_ECS_FILES   = amplitudes ang gauss bspline io luft main preconditioners radial slater solver \
+HEX_ECS_FILES   = amplitudes ang gauss bspline hldata io luft main preconditioners radial slater solver \
                   factorizers/lu-umfpack factorizers/lu-mumps factorizers/lu-superlu factorizers/lu-lapack \
                   factorizers/lu-superlu-dist factorizers/lu-pardiso factorizers/lu-scalapack \
                   preconditioners/NoPreconditioner preconditioners/CGPreconditioner \

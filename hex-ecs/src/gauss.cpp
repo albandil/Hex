@@ -46,7 +46,7 @@ std::vector<std::pair<Real*,Real*>> GaussLegendreData::data_ = {
     std::make_pair(nullptr, nullptr)   // n = 1
 };
 
-void GaussLegendreData::precompute_nodes_and_weights (int points) const
+void GaussLegendreData::precompute_nodes_and_weights (int points)
 {
     # pragma omp critical
     for (int n = data_.size(); n <= points; n++)
@@ -77,13 +77,13 @@ void GaussLegendreData::precompute_nodes_and_weights (int points) const
     }
 }
 
-void GaussLegendreData::gauss_nodes_and_weights (int points, const Real* & vx, const Real* & vw) const
+void GaussLegendreData::gauss_nodes_and_weights (int points, const Real* & vx, const Real* & vw)
 {
     // enforce at least second order rule
     if (points < 2)
         HexException("[gauss_nodes_and_weights] Nor implemented for orders less than 2. Your input: %d.", points);
     
-    // first of all generate any missing data
+    // do not recalculate the missing data (potentially not thread safe)
     if (points >= (int)data_.size())
         HexException("[gauss_nodes_and_weights] Not enough precomputed data; requested order = %d, available = %d", points, data_.size());
     

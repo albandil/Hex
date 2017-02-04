@@ -6,7 +6,7 @@
 //                    / /   / /    \_\      / /  \ \                                 //
 //                                                                                   //
 //                                                                                   //
-//  Copyright (c) 2016, Jakub Benda, Charles University in Prague                    //
+//  Copyright (c) 2017, Jakub Benda, Charles University in Prague                    //
 //                                                                                   //
 // MIT License:                                                                      //
 //                                                                                   //
@@ -100,7 +100,7 @@ RadialIntegrals::RadialIntegrals
     Nlambdas_(Nlambdas)
 {
     // maximal number of evaluation points (quadrature rule)
-    int npts = std::max(EXPANSION_QUADRATURE_POINTS, bspline_inner_x_.order() + Nlambdas + 1);
+    int npts = std::max(EXPANSION_QUADRATURE_POINTS, bspline_inner_x_.order() + Nlambdas + 2);
     
     // precompute Gaussian weights
     g_inner_x_.precompute_nodes_and_weights(npts);
@@ -730,7 +730,7 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
             if (i + d < Nspline_full_x)
             {
                 // calculate the block
-                SymBandMatrix<Complex> block = calc_R_tr_dia_block(lambda, i, i + d);
+                SymBandMatrix<Complex> block = calc_R_tr_dia_block(lambda, i, i + d, false);
                 
                 // write the finished block to disk
                 # pragma omp critical
@@ -745,7 +745,6 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
         if (R_tr_dia_[lambda].inmemory())
             R_tr_dia_[lambda].hdfsave();
     }
-    
     
     // wait for completition of all processes
     par.wait();
@@ -774,11 +773,10 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
         std::cout << std::endl;
 }
 
-SymBandMatrix<Complex> RadialIntegrals::calc_R_tr_dia_block (unsigned int lambda, int i, int k, bool simple) const
+SymBandMatrix<Complex> RadialIntegrals::calc_R_tr_dia_block (unsigned int lambda, int i, int k, bool inner_only, bool simple) const
 {
     // shorthands
-    int Nspline_full_y  = bspline_full_y_.Nspline();
-    int Nspline_inner_y = bspline_inner_y_.Nspline(); // WARNING : Computing only inner-region integrals.
+    int Nspline = inner_only ? bspline_inner_y_.Nspline() : bspline_full_y_.Nspline();
     int order = bspline_full_y_.order();
     
     // (i,k)-block data
@@ -819,7 +817,7 @@ void RadialIntegrals::apply_R_matrix
     for (std::size_t k = i; k < Nxspline and k <= i + order; k++)
     {
         // (i,k)-block data (= concatenated non-zero upper diagonals)
-        SymBandMatrix<Complex> block_ik = std::move ( calc_R_tr_dia_block(lambda, i, k, simple) );
+        SymBandMatrix<Complex> block_ik = std::move ( calc_R_tr_dia_block(lambda, i, k, true, simple) );
         
         // multiply source vector by this block
         block_ik.dot(1., cArrayView(src, k * Nyspline, Nyspline), 0., prod);

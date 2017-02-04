@@ -34,6 +34,7 @@
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
+#include <iomanip>
 #include <map>
 #include <numeric>
 #include <sstream>
@@ -45,22 +46,23 @@
 double tolerance = 5e-3;
 double cs_threshold = 1e-10;
 
-std::vector<std::string> hex_ecs_args;
+std::vector<std::string> hex_ecs_args, headers;
 
 template <class T> T read_param
 (
     std::map<std::string,std::vector<std::string>> const & data,
-    std::string keyword
+    std::string keyword,
+    T def = T(0)
 )
 {
     if (data.find(keyword) == data.end())
     {
-        return T(0);
+        return def;
     }
     
     if (data.at(keyword).empty())
     {
-        return T(0);
+        return def;
     }
     
     if (data.at(keyword).size() > 1)
@@ -114,9 +116,9 @@ typedef struct
     double Ra, R0, Rmax;
     int L, Pi, nL, limit;
     int ni, li;
-    double h;
+    double h, Easy;
     
-    bool adjust_Ra, adjust_R0, adjust_Rmax, adjust_nL, adjust_limit;
+    bool adjust_Ra, adjust_R0, adjust_Rmax, adjust_nL, adjust_limit, exchange;
 }
 calcdata;
 
@@ -145,7 +147,7 @@ std::vector<double> calculate (calcdata & c)
     oss1 << oss.str() << "/ics-L" << c.L << "-S1-Pi" << c.Pi << ".dat";
     
     // maximal principal quantum number
-    int max_n = 1.0 / std::sqrt(-c.E);
+    int max_n = (c.E < 0 ? 1.0 / std::sqrt(-c.E) : 10);
     
     std::ifstream singlet (oss0.str()), triplet (oss1.str());
     if (not singlet.is_open() or not triplet.is_open())
@@ -187,10 +189,12 @@ std::vector<double> calculate (calcdata & c)
         for (int n = 1; n <= max_n; n++)
             ecsinp << "  *";
         ecsinp << "\n";
+        ecsinp << "# Asymptotic state maximal energy.\n";
+        ecsinp << c.Easy << "\n";
         ecsinp << "\n";
         ecsinp << "# Angular momenta.\n";
-        ecsinp << "# L  S  Pi nL limit\n";
-        ecsinp << "  " << c.L << "  *  " << c.Pi << "  " << c.nL << " " << c.limit << "\n";
+        ecsinp << "# L  S  Pi nL limit exchange\n";
+        ecsinp << "  " << c.L << "  " << (c.exchange ? "*" : "0") << "  " << c.Pi << "  " << c.nL << " " << c.limit << " " << c.exchange << "\n";
         ecsinp << "\n";
         ecsinp << "# Projectile charge.\n";
         ecsinp << "  -1\n";
@@ -208,8 +212,8 @@ std::vector<double> calculate (calcdata & c)
         cmd << "( cd " << oss.str() << " ; ";
         for (std::string const & s : hex_ecs_args)
             cmd << s << " ";
-//         if (igrid <= 200)
-//             cmd << "--lu umfpack "; // override
+        if (igrid <= 200)
+            cmd << "--lu pardiso "; // override
         cmd << "2>&1 > ecs.log )";
         if (std::system(cmd.str().c_str()) != 0)
         {
@@ -228,10 +232,17 @@ std::vector<double> calculate (calcdata & c)
     }
     
     // get last line from the cross section files
-    std::string pcs_singlet, pcs_triplet;
+    std::string pcs_singlet, pcs_triplet, header, splitter;
     std::string s;
-    while (std::getline(singlet, s)) pcs_singlet = s;
-    while (std::getline(triplet, s)) pcs_triplet = s;
+    while (std::getline(singlet, s)) { header = splitter; splitter = pcs_singlet; pcs_singlet = s; }
+    while (std::getline(triplet, s)) { header = splitter; splitter = pcs_triplet; pcs_triplet = s; }
+    
+    // split header
+    headers.clear();
+    std::istringstream iss_header (header);
+    iss_header >> splitter; // drop comment
+    iss_header >> splitter; // drop energy header
+    while (iss_header >> splitter) headers.push_back(splitter);
     
     double x;
     
@@ -254,31 +265,44 @@ std::vector<double> calculate (calcdata & c)
 
 double cs_difference (std::vector<double> const & A, std::vector<double> const & B)
 {
+    double sumA = std::accumulate(A.begin(), A.end(), 0.0);
+    double sumB = std::accumulate(B.begin(), B.end(), 0.0);
+
+    std::cout << "\t\t       ";
+    for (std::size_t i = 0; i < A.size(); i++)
+    if (std::min(A[i],B[i]) > cs_threshold * 0.5 * (sumA + sumB))
+    {
+        std::cout << std::setw(15) << std::left << headers[i];
+    }
+    std::cout << std::endl;
+
     std::cout << "\t\told cs:";
     for (std::size_t i = 0; i < A.size(); i++)
+    if (std::min(A[i],B[i]) > cs_threshold * 0.5 * (sumA + sumB))
     {
-        std::cout << "\t" << A[i];
+        std::cout << std::setw(15) << std::left << A[i];
     }
     std::cout << std::endl;
     
     std::cout << "\t\tnew cs:";
     for (std::size_t i = 0; i < B.size(); i++)
+    if (std::min(A[i],B[i]) > cs_threshold * 0.5 * (sumA + sumB))
     {
-        std::cout << "\t" << B[i];
+        std::cout << std::setw(15) << std::left << B[i];
     }
     std::cout << std::endl;
     
     double max_rel_diff = 0;
     
-    double suma = std::accumulate(B.begin(), B.end(), 0.0);
-    
-    std::cout << "\t\tdelta:";
+    std::cout << "\t\tdelta :";
     for (std::size_t i = 0; i < A.size(); i++)
     {
-        double rel_diff = std::abs(B[i] - A[i]) / B[i];
-        std::cout << "\t" << rel_diff;
-        if (std::abs(B[i]) > cs_threshold * suma)
+        double rel_diff = 2.0 * std::abs(B[i] - A[i]) / (A[i] + B[i]);
+        if (std::min(A[i],B[i]) > 0.5 * cs_threshold * (sumA + sumB))
+        {
+            std::cout << std::setw(15) << std::left << rel_diff;
             max_rel_diff = std::max(max_rel_diff, rel_diff);
+        }
     }
     std::cout << std::endl;
     
@@ -318,6 +342,9 @@ void converge_energy (calcdata & c)
             // increase the length of the inner grid
             pcs = c.pcs;
             c.Ra += step;
+	    double cgrid = c.Rmax - c.R0;
+	    c.R0 = std::max(c.Ra, c.R0);
+	    c.Rmax = c.R0 + cgrid;
             calculate(c);
         }
         while (cs_difference(pcs, c.pcs) > tolerance);
@@ -463,6 +490,8 @@ int main (int argc, char* argv[])
         c.limit = read_param<int>(data, "limit");
         c.adjust_limit = read_param<int>(data, "adjust_limit");
         std::cout << "\tlimit = " << c.limit << " (adjust: " << c.adjust_limit << ")" << std::endl;
+        c.exchange = read_param<int>(data, "exchange");
+        std::cout << "\texchange = " << c.exchange << std::endl;
         
 //         //- initial and final state
         c.ni = read_param<int>(data, "ni");
@@ -483,6 +512,10 @@ int main (int argc, char* argv[])
         //- threshold for cross sections considered in the convergence check
         cs_threshold = read_param<double>(data, "cs_threshold");
         std::cout << "\tcs_threshold = " << cs_threshold << std::endl;
+        
+        //- asymptotic energy for channel reduction
+        c.Easy = read_param<double>(data, "easy", -1);
+	std::cout << "\teasy = " << c.Easy << std::endl;
         
         //- total energies
         for (double E : read_param_vector<double>(data, "E"))

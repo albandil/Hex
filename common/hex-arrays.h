@@ -1221,7 +1221,7 @@ template <class T, class Alloc_> class NumberArray : public Array<T, Alloc_>
             // analyze: find compressible segments
             for (std::size_t i = 0; i < size(); i++)
             {
-                if ((*this)[i] == 0.0_r)
+                if ((*this)[i] == T(0))
                 {
                     // another consecutive zero
                     zero_counter++;

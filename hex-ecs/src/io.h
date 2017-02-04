@@ -92,8 +92,9 @@ class CommandLine
               parallel_factorization(false), parallel_extraction(true), ilu_max_iter(10),
               carry_initial_guess(false), gpu_multiply(false), extract_extrapolate(false), extract_rho(-1), extract_rho_begin(-1), extract_samples(-1),
               refine_solution(false), map_solution(), map_solution_target(), ssor(-1), noluupdate(false), coupling_limit(1000),
-              gpu_host_multiply(false), mumps_outofcore(false), mumps_verbose(0), kpa_drop(-1), write_intermediate_solutions(false),
-              fast_bessel(false), hyb_additional_levels(0), multigrid_depth(0), multigrid_coarse_prec(0), dom_panels(1)
+              gpu_host_multiply(false), mumps_outofcore(false), mumps_verbose(0), kpa_drop(-1), exact_rhs(true), write_intermediate_solutions(false),
+              fast_bessel(false), hyb_additional_levels(0), multigrid_depth(0), multigrid_coarse_prec(0), dom_panels(1), dom_overlap(1),
+              scratch(std::getenv("SCRATCHDIR") ? std::getenv("SCRATCHDIR") : "."), channel_max_E(-1)
         {
             // get command line options
             parse(argc, argv);
@@ -263,6 +264,15 @@ class CommandLine
         
         /// Domain decomposition panels.
         int dom_panels;
+        
+        /// Domain decomposition overlap.
+        Real dom_overlap;
+        
+        /// Scratch directory for out-of-core data.
+        std::string scratch;
+
+        /// Maximal energy of the states included in outer region.
+        Real channel_max_E;
 };
 
 /**
@@ -344,6 +354,9 @@ class InputFile
             // weak magnetic field in atomic units (involved only perturbatively)
             Real B;
             
+            // maximal energy (Ry) of states included in the asymptotic (outer) region
+            Real channel_max_E;
+            
             // real B-spline knots
             rArray rknots;
             
@@ -356,6 +369,9 @@ class InputFile
             // total energies for which to solve the system
             rArray Etot;
             
+            // maximal total energy
+            Real max_Etot;
+            
             // initial and final atomic states
             std::vector<std::tuple<int,int,int>> instates, outstates;
             
@@ -364,6 +380,9 @@ class InputFile
             
             // whether to calculate just the inner problem (decided from the knot sequence)
             bool inner_only;
+            
+            // keep only l1 <= l2; this is useful for large total angular momenta for reduction of the angular basis
+            bool exchange;
 };
 
 /**
@@ -380,8 +399,11 @@ class SolutionIO
         SolutionIO (int L, int S, int Pi, int ni, int li, int mi, Real E, std::vector<std::pair<int,int>> const & ang, std::string prefix = "psi")
             : L_(L), S_(S), Pi_(Pi), ni_(ni), li_(li), mi_(mi), E_(E), ang_(ang), prefix_(prefix) {}
         
+        /// All blocks flag.
+        static const int All = -1;
+        
         /// Get name of the solution file.
-        std::string name (int ill = -1) const
+        std::string name (int ill = SolutionIO::All) const
         {
             if (ill == -1)
                 return format("%s-%g-%d-%d-%d-%d-%d-%d.hdf", prefix_.c_str(), E_ + 1, L_, S_, Pi_, ni_, li_, mi_);
@@ -389,11 +411,11 @@ class SolutionIO
                 return format("%s-%g-%d-%d-%d-%d-%d-%d-(%d,%d).hdf", prefix_.c_str(), E_ + 1, L_, S_, Pi_, ni_, li_, mi_, ang_[ill].first, ang_[ill].second);
         }
         
-        /// Check that the file exists, return size.
-        std::size_t check (int ill = -1) const
+        /// Check that the file exists.
+        bool check (int ill, std::size_t & total_size) const
         {
             // look for specific solution segment file
-            if (ill >= 0)
+            if (ill != SolutionIO::All)
             {
                 HDFFile fsingle (name(ill), HDFFile::readonly);
                 return fsingle.valid() ? fsingle.size("array")/2 : 0;
@@ -408,10 +430,15 @@ class SolutionIO
             }
             
             // calculate total size
-            std::size_t total_size = std::accumulate(size.begin(), size.end(), 0);
+            total_size = std::accumulate(size.begin(), size.end(), 0);
             
-            // check that all blocks existed: either return sum of sizes, or zero
-            return std::find(size.begin(), size.end(), 0) == size.end() ? total_size : 0;
+            // check that all blocks existed
+            return std::find(size.begin(), size.end(), 0) == size.end();
+        }
+        bool check (int ill = SolutionIO::All) const
+        {
+            std::size_t total_size = 0;
+            return check(ill, total_size);
         }
         
         /**
@@ -422,7 +449,7 @@ class SolutionIO
          * is not written and 'false' is returned. Otherwise the function returns 'true'
          * and fills the contents of the array with the read data.
          */
-        bool load (BlockArray<Complex> & solution, int ill = -1)
+        bool load (BlockArray<Complex> & solution, int ill = SolutionIO::All)
         {
             // check that the requested files are present
             if (not check(ill))
@@ -430,7 +457,7 @@ class SolutionIO
             
             // select segments
             iArray segments_to_load = { ill };
-            if (ill == -1)
+            if (ill == SolutionIO::All)
                 segments_to_load = linspace<int>(0, solution.size() - 1, solution.size());
             
             // for all blocks to load
@@ -491,11 +518,11 @@ class SolutionIO
          * (substituted by position & length information). The function
          * return 'true' when write was successful, 'false' otherwise.
          */
-        bool save (BlockArray<Complex> const & solution, int ill = -1) const
+        bool save (BlockArray<Complex> const & solution, int ill = SolutionIO::All) const
         {
             // select segments
             iArray segments_to_save = { ill };
-            if (ill == -1)
+            if (ill == SolutionIO::All)
                 segments_to_save = linspace<int>(0, solution.size() - 1, solution.size());
             
             // for all segments

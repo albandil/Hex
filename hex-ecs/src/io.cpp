@@ -81,7 +81,7 @@ const std::string sample_input =
     "#\n"
     "# a) Real knots of the basis that is common to atomic and projectile electron.\n"
     "  L  0.0  0.0   4\n"
-    "  G  0.1 10.0  0.1  1.1\n"
+    "  G  0.1 10.0  0.1  1.01\n"
     "  L   11  100  90\n"
     " -1\n"
     "# b) Real knots that are exclusive to the projectile, if any. (Start from zero.)\n"
@@ -104,11 +104,27 @@ const std::string sample_input =
     "  1  -1\n"
     "  *\n"
     "\n"
+    "# Maximal energy (Ry) of states included in the asymptotic (outer) region.\n"
+    "  -1\n"
+    "\n"
     "# --------------- Other conditions ----------------\n"
     "\n"
     "# Angular momenta.\n"
-    "# L  S  Pi nL limit\n"
-    "  0  *  0  4  -1\n"
+    "#   L  ... total orbital momentum\n"
+    "#   S  ... total spin\n"
+    "#   Pi ... total parity\n"
+    "#   nL, limit, exchange ... parameters controlling the number of coupled angular states\n"
+    "# The angular basis is composed of coupled angular states (l1,l2) and looks like this:\n"
+    "#     (Pi, L),     (Pi+1, L-1), ..., (L, Pi) \n"
+    "#     (Pi+1, L+1), (Pi+2, L),   ..., (L+1, Pi+1) \n"
+    "#     ...\n"
+    "# The number of columns is equal to L + Pi - 1. The number of rows is equal to nL + 1.\n"
+    "# When 'limit > 0' then all pairs with both l1 and l2 > limit are discarded.\n"
+    "# When 'exchange = 0' then all pairs with l1 > l2 are discarded.\n"
+    "# The options 'limit' and 'exchange' are useful for large angular momenta, where the projectile\n"
+    "# is distinguishable from the atomic electron.\n"
+    "# L   S   Pi  nL  limit exchange\n"
+    "  0   *   0   4   -1    1\n"
     "\n"
     "# Projectile charge (+/-1)\n"
     "  -1\n"
@@ -193,6 +209,9 @@ void CommandLine::parse (int argc, char* argv[])
                     "\t--stg-integ-solve          (-b)  Only calculate integrals and the solution.                                                                             \n"
                     "\t--stg-extract              (-c)  Only extract amplitudes (assumes that the solution files exist).                                                       \n"
                     "                                                                                                                                                          \n"
+                    "Extended grid parameters                                                                                                                                  \n"
+                    "\t--channel-max-E <number>         Maximal energy (Ry) of states considered in the outer region.                                                          \n"
+                    "                                                                                                                                                          \n"
                     "Right-hand side                                                                                                                                           \n"
                     "\t--fast-bessel                    Use faster Bessel function evaluation routine (not the Steed/Barnett) when calculating RHS.                            \n"
                     "                                                                                                                                                          \n"
@@ -221,6 +240,7 @@ void CommandLine::parse (int argc, char* argv[])
                     "\t--parallel-factorization         Factorize multiple blocks simultaneously.                                                                              \n"
                     "\t--no-lu-update                   Do not recalculate LU factorization for different energies, use the first factorization for all of them.               \n"
                     "\t--ilu-max-iter <number>          Maximal number of iterations of the nested ILU preconditioner. When the number is exceeded, exception is thrown.       \n"
+                    "\t--scratch <path>                 Scratch directory for out-of-core factorizers (currently only MUMPS). Also read from the $SCRATCHDIR env variable.     \n"
                     "                                                                                                                                                          \n"
                     "KPA preconditioner                                                                                                                                        \n"
                     "\t--kpa-simple-rad           (-R)  Use simplified radial integral matrix for nested KPA iterations (experimental).                                        \n"
@@ -328,6 +348,12 @@ void CommandLine::parse (int argc, char* argv[])
                 cache_all_radint = false;
                 return true;
             },
+        "scratch", "", 1, [&](std::vector<std::string> const & optargs) -> bool
+            {
+                // scratch directory for the out-of-core mode factorizers (currently MUMPS only)
+                scratch = optargs[0];
+                return true;
+            },
         "out-of-core", "o", 0, [&](std::vector<std::string> const & optargs) -> bool
             {
                 // use full out-of-core functionality: store also diagonal blocks (and factorizations) on disk
@@ -427,6 +453,12 @@ void CommandLine::parse (int argc, char* argv[])
             {
                 // write intermediate solutions
                 write_intermediate_solutions = true;
+                return true;
+            },
+        "channel-max-E", "", 1, [&](std::vector<std::string> const & optargs) -> bool
+            {
+                // maximal energy of states unsed in the outer region (-> a.u.)
+                channel_max_E = 0.5 * (std::stod(optargs[0]) - 1);
                 return true;
             },
         "kpa-simple-rad", "R", 0, [&](std::vector<std::string> const & optargs) -> bool
@@ -893,6 +925,9 @@ void InputFile::read (std::ifstream & inf)
         outstates.push_back(std::make_tuple(nfs[f].val,lf,0));
     }
     
+    // - asymptotic channel max energy
+    channel_max_E = ReadNext<Real>(inf).val;
+    
     // print info
     std::cout << "\t[n l m]: ";
     for (auto state : outstates)
@@ -902,7 +937,9 @@ void InputFile::read (std::ifstream & inf)
                   << std::get<1>(state)
                   << " *] ";
     }
-    std::cout << std::endl;
+    std::cout << "\n" << std::endl;
+    
+    std::cout << "Asymptotic channels with energy up to " << channel_max_E << " Ry." << std::endl;
     
     //
     // load total quantum numbers etc.
@@ -927,6 +964,9 @@ void InputFile::read (std::ifstream & inf)
     
     // single-electron angular momentum limit
     limit = ReadNext<int>(inf).val;
+    
+    // whether to include also l1 > l2, or only l1 <= l2
+    exchange = ReadNext<int>(inf).val;
     
     std::cout << "\tL = " << L << std::endl;
     std::cout << "\tS = " << Spin << std::endl;
@@ -953,6 +993,22 @@ void InputFile::read (std::ifstream & inf)
     std::cout << std::endl << "Total projectile + atom energies [Ry]" << std::endl;
     std::cout << "\tcount: "     << Etot.size()  << std::endl;
     std::cout << "\tfull list: " << Etot         << std::endl;
+    
+    // check that all energies are allowed by the asymptotic expansion
+    if (not inner_only and not Etot.empty())
+    {
+        max_Etot = *std::max_element(Etot.begin(), Etot.end());
+        
+        if (max_Etot > channel_max_E)
+        {
+            std::cout << std::endl;
+            std::cout << "Warning: The maximal asymptotic channel energy Easy = " << channel_max_E << " Ry " << std::endl;
+            std::cout << "         is too low to cover all possible open channels for the given maximum total" << std::endl;
+            std::cout << "         energy Etot = " << max_Etot << " Ry. Program will use all energetically allowed" << std::endl;
+            std::cout << "         asymptotic channels in cases with Etot > Easy." << std::endl;
+
+        }
+    }
     
     //
     // load some other optional data

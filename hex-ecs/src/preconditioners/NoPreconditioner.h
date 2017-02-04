@@ -6,7 +6,7 @@
 //                    / /   / /    \_\      / /  \ \                                 //
 //                                                                                   //
 //                                                                                   //
-//  Copyright (c) 2016, Jakub Benda, Charles University in Prague                    //
+//  Copyright (c) 2017, Jakub Benda, Charles University in Prague                    //
 //                                                                                   //
 // MIT License:                                                                      //
 //                                                                                   //
@@ -35,6 +35,7 @@
 // --------------------------------------------------------------------------------- //
 
 #include "preconditioners.h"
+#include "hldata.h"
 
 // --------------------------------------------------------------------------------- //
 
@@ -83,6 +84,7 @@ class NoPreconditioner : public PreconditionerBase
         // member functions
         virtual void setup ();
         virtual void update (Real E);
+        virtual std::pair<int,int> bstates (Real E, int l1, int l2) const;
         virtual void finish ();
         virtual void rhs (BlockArray<Complex> & chi, int ienergy, int instate) const;
         virtual void multiply (BlockArray<Complex> const & p, BlockArray<Complex> & q, MatrixSelection::Selection tri = MatrixSelection::Both) const;
@@ -129,14 +131,20 @@ class NoPreconditioner : public PreconditionerBase
         // maximal bound state principal quantum number for given energy
         int max_n_;
         
-        // number of channels when r1 -> inf and r2 -> inf, respectively
+        // number of channels considered when r1 -> inf and r2 -> inf, respectively
         std::vector<std::pair<int,int>> Nchan_;
         
         // radial integrals for the solution
         RadialIntegrals * rad_;
         
-        // hydrogen orbitals B-spline overlaps and expansions (on inner basis)
-        std::vector<cArrays> Spx, Xpx, Spy, Xpy;
+        // eigenstates (expansions) of the inner one-electron hamiltonian for all relevant angular momenta and their overlaps
+        std::array<Array<cArrays>,2> Xp_, Sp_;
+        
+        // eigen-energies (in Ry) of the pseudostates contained in Xp_ for each angular momentum
+        std::array<cArrays,2> Eb_;
+        
+        // one-electron hamiltonian data (for atomic electron and the projectile)
+        mutable std::array<std::vector<HlData>,2> Hl_;
 };
 
 // --------------------------------------------------------------------------------- //

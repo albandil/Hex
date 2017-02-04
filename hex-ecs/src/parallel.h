@@ -214,6 +214,27 @@ class Parallel
         /**
          * @brief Broadcast array from owner to everyone.
          */
+        template <class T> void bcast (int owner, T* data, std::size_t N) const
+        {
+#ifdef WITH_MPI
+            if (active_)
+            {
+                // owner : broadcast data
+                MPI_Bcast
+                (
+                    data,
+                    N * typeinfo<T>::ncmpt,
+                    typeinfo<T>::mpicmpttype(),
+                    owner,
+                    MPI_COMM_WORLD
+                );
+            }
+#endif
+        }
+        
+        /**
+         * @brief Broadcast array from owner to everyone.
+         */
         template <class T> void bcast (int owner, NumberArray<T> & data) const
         {
 #ifdef WITH_MPI
@@ -501,11 +522,11 @@ class Parallel
 #endif
         }
         
-        MPI_Comm groupcomm () const
+        void* groupcomm () const
         {
 #ifdef WITH_MPI
             if (active_)
-                return groupcomm_;
+                return (void*)(std::intptr_t)groupcomm_;
 #endif
             return MPI_Comm(0);
         }

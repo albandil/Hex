@@ -436,24 +436,17 @@ int Bspline::knot (Complex x) const
 
 Complex Bspline::eval (const cArrayView coeff, Real x) const
 {
+    // map real coordinate to complex contour
     Complex z = rotate(x);
     
     // get knot index
     int iknot = knot(z);
     
-    // get bounding B-splines
-    int leftspline = iknot-order_;
-    int rightspline = iknot;
-    
-    // evaluate B-splines
-    cArray evB(Nspline_);
-    for (int ispline = leftspline; ispline <= rightspline; ispline++)
-        evB[ispline] = bspline(ispline,iknot,order_,z);
-    
-    // sum expansion
+    // evaluate the B-spline expansion
     Complex result = 0.;
-    for (int ispline = leftspline; ispline <= rightspline; ispline++)
-        result += coeff[ispline] * evB[ispline];
+    for (int ispline = std::max(0, iknot - order_); ispline <= std::min(iknot, Nspline_ - 1); ispline++)
+        result += coeff[ispline] * bspline(ispline, iknot, order_, z);
+    
     return result;
 }
 
@@ -467,9 +460,9 @@ Complex Bspline::eval (const cArrayView coeff, Real x, Real y) const
     int yknot = knot(z);
     
     // get bounding B-splines
-    int leftxspline = xknot-order_;
+    int leftxspline = xknot - order_;
     int rightxspline = xknot;
-    int leftyspline = yknot-order_;
+    int leftyspline = yknot - order_;
     int rightyspline = yknot;
     
     // evaluate B-splines

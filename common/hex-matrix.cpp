@@ -363,3 +363,4 @@ CsrMatrix<LU_int_t,Complex> CooMatrix<LU_int_t,Complex>::tocsr () const
     
     return CsrMatrix<LU_int_t,Complex> (m_, n_, Ap, Ai, Ax);
 }
+

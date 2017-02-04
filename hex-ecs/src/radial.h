@@ -6,7 +6,7 @@
 //                    / /   / /    \_\      / /  \ \                                 //
 //                                                                                   //
 //                                                                                   //
-//  Copyright (c) 2016, Jakub Benda, Charles University in Prague                    //
+//  Copyright (c) 2017, Jakub Benda, Charles University in Prague                    //
 //                                                                                   //
 // MIT License:                                                                      //
 //                                                                                   //
@@ -53,7 +53,6 @@
 
 // --------------------------------------------------------------------------------- //
 
-// This is a hard-coded number of points for Gauss-Legendre quadrature of the radial functions.
 #define EXPANSION_QUADRATURE_POINTS 20
 
 // --------------------------------------------------------------------------------- //

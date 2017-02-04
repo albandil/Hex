@@ -70,33 +70,6 @@ class KPACGPreconditioner : public virtual CGPreconditioner
         // run-time selection mechanism
         preconditionerRunTimeSelectionDefinitions(KPACGPreconditioner, "KPA")
         
-        typedef struct sData
-        {
-            /// Link the structure to a disk file.
-            void hdflink (const char * file);
-            
-            /// Check that the file exists and can be opened for reading.
-            bool hdfcheck (const char * file = nullptr) const;
-            
-            /// Try to load data from a disk file.
-            bool hdfload (const char * file = nullptr);
-            
-            /// Save data to disk.
-            bool hdfsave (const char * file = nullptr) const;
-            
-            /// Release memory.
-            void drop ();
-            
-            /// One-electron hamiltonian diagonalization.
-            RowMatrix<Complex> invCl_invsqrtS, invsqrtS_Cl;
-            
-            /// Diagonal parts of one-electron hamiltonians.
-            cArray Dl;
-            
-            /// Filename.
-            std::string filename;
-        } Data;
-        
         // default constructor needed by the RTS mechanism
         KPACGPreconditioner () {}
         
@@ -117,8 +90,6 @@ class KPACGPreconditioner : public virtual CGPreconditioner
                 bspline_x_inner, bspline_x_full,
                 bspline_y_inner, bspline_y_full
             ),
-            prec_atom_(inp.maxell + 1),
-            prec_proj_(inp.maxell + 1),
             refcount_atom_(inp.maxell + 1, 0),
             refcount_proj_(inp.maxell + 1, 0)
         {
@@ -156,27 +127,12 @@ class KPACGPreconditioner : public virtual CGPreconditioner
         
     protected:
         
-        // internal setup routine
-        void prepare
-        (
-            std::vector<Data> & prec,
-            std::size_t Nspline,
-            SymBandMatrix<Complex> const & mS,
-            SymBandMatrix<Complex> const & mD,
-            SymBandMatrix<Complex> const & mMm1_tr,
-            SymBandMatrix<Complex> const & mMm2,
-            Array<bool> done,
-            std::set<int> comp_l,
-            std::set<int> needed_l
-        );
-        
         // internal concurrent access lock
         void lock_kpa_access () const;
         void unlock_kpa_access () const;
         
         // preconditioner data
-        mutable std::vector<Data> prec_atom_, prec_proj_;
-        mutable std::vector<unsigned> refcount_atom_, refcount_proj_;
+        mutable iArray refcount_atom_, refcount_proj_;
         
         // memory access lock
 #ifdef _OPENMP
