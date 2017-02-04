@@ -6,7 +6,7 @@
 //                    / /   / /    \_\      / /  \ \                                 //
 //                                                                                   //
 //                                                                                   //
-//  Copyright (c) 2016, Jakub Benda, Charles University in Prague                    //
+//  Copyright (c) 2017, Jakub Benda, Charles University in Prague                    //
 //                                                                                   //
 // MIT License:                                                                      //
 //                                                                                   //
@@ -29,23 +29,33 @@
 //                                                                                   //
 //  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
-#ifndef HEX_MOMENTS
-#define HEX_MOMENTS
+#ifndef HEX_ECS_RADIAL_H
+#define HEX_ECS_RADIAL_H
+
+// --------------------------------------------------------------------------------- //
 
 #include <cmath>
 #include <functional>
 #include <vector>
 
+// --------------------------------------------------------------------------------- //
+
 #include "hex-arrays.h"
 #include "hex-symbandmatrix.h"
 #include "hex-special.h"
+
+// --------------------------------------------------------------------------------- //
 
 #include "bspline.h"
 #include "gauss.h"
 #include "io.h"
 #include "parallel.h"
 
+// --------------------------------------------------------------------------------- //
+
 #define EXPANSION_QUADRATURE_POINTS 20
+
+// --------------------------------------------------------------------------------- //
 
 /**
  * Potential suppressing factor. 

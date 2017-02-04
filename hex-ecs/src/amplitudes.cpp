@@ -551,7 +551,7 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> &
             // calculate number of exchange scattering channels that are stored in the solution file
             int nProjE = 0;
             cArray Ed = readProjPseudoStateEnergies(ell);
-            Real maxEtot = std::max(inp_.channel_max_E, inp_.max_Etot);
+            Real maxEtot = std::max(inp_.channel_max_E, inp_.Etot[ie]);
             for (Complex E : Ed)
             {
                 if (E.real() <= maxEtot)

@@ -474,7 +474,7 @@ void NoPreconditioner::update (Real E)
         int l1 = ang_->states()[ill].first;
         int l2 = ang_->states()[ill].second;
         
-        std::pair<int,int> Nbound = bstates(E, l1, l2);
+        std::pair<int,int> Nbound = bstates(2*E, l1, l2);
         
         Nchan_[ill].first  = Nbound.second;
         Nchan_[ill].second = Nbound.first;

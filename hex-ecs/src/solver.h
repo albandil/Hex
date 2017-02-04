@@ -6,7 +6,7 @@
 //                    / /   / /    \_\      / /  \ \                                 //
 //                                                                                   //
 //                                                                                   //
-//  Copyright (c) 2016, Jakub Benda, Charles University in Prague                    //
+//  Copyright (c) 2017, Jakub Benda, Charles University in Prague                    //
 //                                                                                   //
 // MIT License:                                                                      //
 //                                                                                   //
@@ -32,15 +32,23 @@
 #ifndef HEX_ECS_SOLVER_H
 #define HEX_ECS_SOLVER_H
 
+// --------------------------------------------------------------------------------- //
+
 #include <vector>
 
+// --------------------------------------------------------------------------------- //
+
 #include "hex-itersolve.h"
+
+// --------------------------------------------------------------------------------- //
 
 #include "ang.h"
 #include "bspline.h"
 #include "io.h"
 #include "parallel.h"
 #include "preconditioners.h"
+
+// --------------------------------------------------------------------------------- //
 
 class Solver
 {
@@ -126,5 +134,7 @@ class Solver
         /// Asymptotic bound channels for every angular momentum state (l₁,l₂) and r₁- or r₂-asymptotics.
         std::vector<std::pair<iArray,iArray>> bstates_;
 };
+
+// --------------------------------------------------------------------------------- //
 
 #endif // HEX_ECS_SOLVER_H

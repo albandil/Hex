@@ -6,7 +6,7 @@
 //                    / /   / /    \_\      / /  \ \                                 //
 //                                                                                   //
 //                                                                                   //
-//  Copyright (c) 2016, Jakub Benda, Charles University in Prague                    //
+//  Copyright (c) 2017, Jakub Benda, Charles University in Prague                    //
 //                                                                                   //
 // MIT License:                                                                      //
 //                                                                                   //
@@ -35,13 +35,19 @@
 #include <cstdio>
 #include <cstring>
 
+// --------------------------------------------------------------------------------- //
+
 #include "hex-arrays.h"
 #include "hex-special.h"
+
+// --------------------------------------------------------------------------------- //
 
 #include "bspline.h"
 #include "gauss.h"
 #include "parallel.h"
 #include "radial.h"
+
+// --------------------------------------------------------------------------------- //
 
 RadialIntegrals::RadialIntegrals
 (

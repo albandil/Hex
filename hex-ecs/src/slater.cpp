@@ -6,7 +6,7 @@
 //                    / /   / /    \_\      / /  \ \                                 //
 //                                                                                   //
 //                                                                                   //
-//  Copyright (c) 2016, Jakub Benda, Charles University in Prague                    //
+//  Copyright (c) 2017, Jakub Benda, Charles University in Prague                    //
 //                                                                                   //
 // MIT License:                                                                      //
 //                                                                                   //
@@ -36,14 +36,22 @@
 #include <vector>
 #include <tuple>
 
+// --------------------------------------------------------------------------------- //
+
 #include <gsl/gsl_sf.h>
+
+// --------------------------------------------------------------------------------- //
 
 #include "hex-arrays.h"
 #include "hex-special.h"
 
+// --------------------------------------------------------------------------------- //
+
 #include "bspline.h"
 #include "gauss.h"
 #include "radial.h"
+
+// --------------------------------------------------------------------------------- //
 
 void RadialIntegrals::R_inner_integrand
 (
@@ -222,15 +230,20 @@ Complex RadialIntegrals::computeR
         // shorthand
         std::size_t O = order + 1;
         
-        // retrieve diagonal contribution
+        // locate the diagonal contribution in R_tr_dia_diag_
+        std::size_t idx;
         if (a <= b and a <= c and a <= d)
-            Rtr_Labcd_diag = R_tr_dia_diag_[lambda][((a * O + (b-a)) * O + (c-a)) * O + (d-a)];
+            idx = ((a * O + (b-a)) * O + (c-a)) * O + (d-a);
         else if (b <= a and b <= c and b <= d)
-            Rtr_Labcd_diag = R_tr_dia_diag_[lambda][((b * O + (a-b)) * O + (d-b)) * O + (c-b)];
+            idx = ((b * O + (a-b)) * O + (d-b)) * O + (c-b);
         else if (c <= a and c <= b and c <= d)
-            Rtr_Labcd_diag = R_tr_dia_diag_[lambda][((c * O + (b-c)) * O + (a-c)) * O + (d-c)];
+            idx = ((c * O + (b-c)) * O + (a-c)) * O + (d-c);
         else // (d <= a and d <= b and d <= c)
-            Rtr_Labcd_diag = R_tr_dia_diag_[lambda][((d * O + (a-d)) * O + (b-d)) * O + (c-d)];
+            idx = ((d * O + (a-d)) * O + (b-d)) * O + (c-d);
+        
+        // retrieve the diagonal contribution (if available)
+        if (idx < R_tr_dia_diag_[lambda].size())
+            Rtr_Labcd_diag = R_tr_dia_diag_[lambda][idx];
     }
 /*
     // The following "simple" alternative does not perform very well -> commented out.
