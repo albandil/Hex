@@ -53,60 +53,31 @@
 
 RadialIntegrals::RadialIntegrals
 (
-    Bspline const & bspline_inner,
-    Bspline const & bspline_full,
-    int Nlambdas
-) : RadialIntegrals
-(
-    bspline_inner, bspline_full,
-    bspline_inner, bspline_full,
-    Nlambdas
-)
-{
-    // nothing
-}
-
-RadialIntegrals::RadialIntegrals
-(
-    Bspline const & bspline_inner_x,
-    Bspline const & bspline_full_x,
-    Bspline const & bspline_inner_y,
-    Bspline const & bspline_full_y,
+    Bspline const & bspline_x,
+    Bspline const & bspline_y,
     int Nlambdas
 )
-  : bspline_inner_x_(bspline_inner_x), bspline_full_x_ (bspline_full_x),
-    bspline_inner_y_(bspline_inner_y), bspline_full_y_ (bspline_full_y),
-    D_inner_x_     (bspline_inner_x.Nspline(), bspline_inner_x.order() + 1),
-    S_inner_x_     (bspline_inner_x.Nspline(), bspline_inner_x.order() + 1),
-    Mm1_inner_x_   (bspline_inner_x.Nspline(), bspline_inner_x.order() + 1),
-    Mm1_tr_inner_x_(bspline_inner_x.Nspline(), bspline_inner_x.order() + 1),
-    Mm2_inner_x_   (bspline_inner_x.Nspline(), bspline_inner_x.order() + 1),
-    D_inner_y_     (bspline_inner_y.Nspline(), bspline_inner_y.order() + 1),
-    S_inner_y_     (bspline_inner_y.Nspline(), bspline_inner_y.order() + 1),
-    Mm1_inner_y_   (bspline_inner_y.Nspline(), bspline_inner_y.order() + 1),
-    Mm1_tr_inner_y_(bspline_inner_y.Nspline(), bspline_inner_y.order() + 1),
-    Mm2_inner_y_   (bspline_inner_y.Nspline(), bspline_inner_y.order() + 1),
-    D_full_x_      (bspline_full_x .Nspline(), bspline_full_x .order() + 1),
-    S_full_x_      (bspline_full_x .Nspline(), bspline_full_x .order() + 1),
-    Mm1_full_x_    (bspline_full_x .Nspline(), bspline_full_x .order() + 1),
-    Mm1_tr_full_x_ (bspline_full_x .Nspline(), bspline_full_x .order() + 1),
-    Mm2_full_x_    (bspline_full_x .Nspline(), bspline_full_x .order() + 1),
-    D_full_y_      (bspline_full_y .Nspline(), bspline_full_y .order() + 1),
-    S_full_y_      (bspline_full_y .Nspline(), bspline_full_y .order() + 1),
-    Mm1_full_y_    (bspline_full_y .Nspline(), bspline_full_y .order() + 1),
-    Mm1_tr_full_y_ (bspline_full_y .Nspline(), bspline_full_y .order() + 1),
-    Mm2_full_y_    (bspline_full_y .Nspline(), bspline_full_y .order() + 1),
+  : bspline_x_(bspline_x),
+    bspline_y_(bspline_y),
+    D_x_     (bspline_x.Nspline(), bspline_x.order() + 1),
+    S_x_     (bspline_x.Nspline(), bspline_x.order() + 1),
+    Mm1_x_   (bspline_x.Nspline(), bspline_x.order() + 1),
+    Mm1_tr_x_(bspline_x.Nspline(), bspline_x.order() + 1),
+    Mm2_x_   (bspline_x.Nspline(), bspline_x.order() + 1),
+    D_y_     (bspline_y.Nspline(), bspline_y.order() + 1),
+    S_y_     (bspline_y.Nspline(), bspline_y.order() + 1),
+    Mm1_y_   (bspline_y.Nspline(), bspline_y.order() + 1),
+    Mm1_tr_y_(bspline_y.Nspline(), bspline_y.order() + 1),
+    Mm2_y_   (bspline_y.Nspline(), bspline_y.order() + 1),
     verbose_(true),
     Nlambdas_(Nlambdas)
 {
     // maximal number of evaluation points (quadrature rule)
-    int npts = std::max(EXPANSION_QUADRATURE_POINTS, bspline_inner_x_.order() + Nlambdas + 2);
+    int npts = std::max(EXPANSION_QUADRATURE_POINTS, bspline_x_.order() + Nlambdas + 2);
     
     // precompute Gaussian weights
-    g_inner_x_.precompute_nodes_and_weights(npts);
-    g_inner_y_.precompute_nodes_and_weights(npts);
-    g_full_x_ .precompute_nodes_and_weights(npts);
-    g_full_y_ .precompute_nodes_and_weights(npts);
+    g_x_.precompute_nodes_and_weights(npts);
+    g_y_.precompute_nodes_and_weights(npts);
 }
 
 cArray RadialIntegrals::computeMi (Bspline const & bspline, GaussLegendre const & g, int a) const
@@ -517,28 +488,28 @@ void RadialIntegrals::setupOneElectronIntegrals (Parallel const & par, CommandLi
 void RadialIntegrals::setupOneElectronIntegrals (bool shared_scratch, bool IamMaster)
 {
     // inner basis one-electron integrals
-    #define SetupOneElectronIntegrals(REG,AXIS) \
-        std::size_t hash_##REG##_##AXIS = bspline_##REG##_##AXIS##_.hash(); \
+    #define SetupOneElectronIntegrals(AXIS) \
+        std::size_t hash_##AXIS = bspline_##AXIS##_.hash(); \
         \
-        D_##REG##_##AXIS##_     .hdflink(format("rad-D-%.4lx.hdf",      hash_##REG##_##AXIS)); \
-        S_##REG##_##AXIS##_     .hdflink(format("rad-S-%.4lx.hdf",      hash_##REG##_##AXIS)); \
-        Mm1_##REG##_##AXIS##_   .hdflink(format("rad-Mm1-%.4lx.hdf",    hash_##REG##_##AXIS)); \
-        Mm1_tr_##REG##_##AXIS##_.hdflink(format("rad-Mm1_tr-%.4lx.hdf", hash_##REG##_##AXIS)); \
-        Mm2_##REG##_##AXIS##_   .hdflink(format("rad-Mm2-%.4lx.hdf",    hash_##REG##_##AXIS)); \
+        D_##AXIS##_     .hdflink(format("rad-D-%.4lx.hdf",      hash_##AXIS)); \
+        S_##AXIS##_     .hdflink(format("rad-S-%.4lx.hdf",      hash_##AXIS)); \
+        Mm1_##AXIS##_   .hdflink(format("rad-Mm1-%.4lx.hdf",    hash_##AXIS)); \
+        Mm1_tr_##AXIS##_.hdflink(format("rad-Mm1_tr-%.4lx.hdf", hash_##AXIS)); \
+        Mm2_##AXIS##_   .hdflink(format("rad-Mm2-%.4lx.hdf",    hash_##AXIS)); \
         \
-        D_##REG##_##AXIS##_     .populate([=](int m, int n) -> Complex { return computeD(bspline_##REG##_##AXIS##_, g_##REG##_##AXIS##_,     m, n              ); }); \
-        S_##REG##_##AXIS##_     .populate([=](int m, int n) -> Complex { return computeM(bspline_##REG##_##AXIS##_, g_##REG##_##AXIS##_,  0, m, n, false, false); }); \
-        Mm1_##REG##_##AXIS##_   .populate([=](int m, int n) -> Complex { return computeM(bspline_##REG##_##AXIS##_, g_##REG##_##AXIS##_, -1, m, n, false, false); }); \
-        Mm1_tr_##REG##_##AXIS##_.populate([=](int m, int n) -> Complex { return computeM(bspline_##REG##_##AXIS##_, g_##REG##_##AXIS##_, -1, m, n, true,  false); }); \
-        Mm2_##REG##_##AXIS##_   .populate([=](int m, int n) -> Complex { return computeM(bspline_##REG##_##AXIS##_, g_##REG##_##AXIS##_, -2, m, n, false, false); }); \
+        D_##AXIS##_     .populate([=](int m, int n) -> Complex { return computeD(bspline_##AXIS##_, g_##AXIS##_,     m, n              ); }); \
+        S_##AXIS##_     .populate([=](int m, int n) -> Complex { return computeM(bspline_##AXIS##_, g_##AXIS##_,  0, m, n, false, false); }); \
+        Mm1_##AXIS##_   .populate([=](int m, int n) -> Complex { return computeM(bspline_##AXIS##_, g_##AXIS##_, -1, m, n, false, false); }); \
+        Mm1_tr_##AXIS##_.populate([=](int m, int n) -> Complex { return computeM(bspline_##AXIS##_, g_##AXIS##_, -1, m, n, true,  false); }); \
+        Mm2_##AXIS##_   .populate([=](int m, int n) -> Complex { return computeM(bspline_##AXIS##_, g_##AXIS##_, -2, m, n, false, false); }); \
         \
         if (not shared_scratch or IamMaster) \
         { \
-            D_##REG##_##AXIS##_     .hdfsave(); \
-            S_##REG##_##AXIS##_     .hdfsave(); \
-            Mm1_##REG##_##AXIS##_   .hdfsave(); \
-            Mm1_tr_##REG##_##AXIS##_.hdfsave(); \
-            Mm2_##REG##_##AXIS##_   .hdfsave(); \
+            D_##AXIS##_     .hdfsave(); \
+            S_##AXIS##_     .hdfsave(); \
+            Mm1_##AXIS##_   .hdfsave(); \
+            Mm1_tr_##AXIS##_.hdfsave(); \
+            Mm2_##AXIS##_   .hdfsave(); \
         }
     
     if (verbose_)
@@ -546,10 +517,8 @@ void RadialIntegrals::setupOneElectronIntegrals (bool shared_scratch, bool IamMa
     
     Timer t;
     
-    SetupOneElectronIntegrals(inner,x)
-    SetupOneElectronIntegrals(inner,y)
-    SetupOneElectronIntegrals(full,x)
-    SetupOneElectronIntegrals(full,y)
+    SetupOneElectronIntegrals(x)
+    SetupOneElectronIntegrals(y)
     
     if (verbose_)
         std::cout << "done in " << t.nice_time() << std::endl << std::endl;
@@ -558,11 +527,9 @@ void RadialIntegrals::setupOneElectronIntegrals (bool shared_scratch, bool IamMa
 void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLine const & cmd)
 {
     // shorthands
-    int order = bspline_inner_x_.order();
-    int Nspline_inner_x = bspline_inner_x_.Nspline();
-    int Nspline_inner_y = bspline_inner_y_.Nspline();
-    int Nspline_full_x  = bspline_full_x_ .Nspline();
-    int Nspline_full_y  = bspline_full_y_ .Nspline();
+    int order = bspline_x_.order();
+    int Nspline_x  = bspline_x_ .Nspline();
+    int Nspline_y  = bspline_y_ .Nspline();
     
     // set number of two-electron integrals
     R_tr_dia_.resize(Nlambdas_);
@@ -571,26 +538,18 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
         std::cout << "Precomputing partial integral moments (lambda = 0 .. " << Nlambdas_ - 1 << ")" << std::endl;
     
     // partial moments sizes
-    std::size_t mi_size_inner_x = Nspline_inner_x * (2 * order + 1) * (order + 1);
-    std::size_t mi_size_inner_y = Nspline_inner_y * (2 * order + 1) * (order + 1);
-    std::size_t mi_size_full_x  = Nspline_full_x  * (2 * order + 1) * (order + 1);
-    std::size_t mi_size_full_y  = Nspline_full_y  * (2 * order + 1) * (order + 1);
+    std::size_t mi_size_x = Nspline_x * (2 * order + 1) * (order + 1);
+    std::size_t mi_size_y = Nspline_y * (2 * order + 1) * (order + 1);
     
     // resize partial moments arrays
-    Mitr_L_inner_x_   .resize(Nlambdas_ * mi_size_inner_x);  Mitr_L_full_x_   .resize(Nlambdas_ * mi_size_full_x); 
-    Mitr_L_inner_y_   .resize(Nlambdas_ * mi_size_inner_y);  Mitr_L_full_y_   .resize(Nlambdas_ * mi_size_full_y); 
-    Mitr_mLm1_inner_x_.resize(Nlambdas_ * mi_size_inner_x);  Mitr_mLm1_full_x_.resize(Nlambdas_ * mi_size_full_x);
-    Mitr_mLm1_inner_y_.resize(Nlambdas_ * mi_size_inner_y);  Mitr_mLm1_full_y_.resize(Nlambdas_ * mi_size_full_y);
+    Mitr_L_x_   .resize(Nlambdas_ * mi_size_x);
+    Mitr_L_y_   .resize(Nlambdas_ * mi_size_y);
     
     // resize full moments arrays, initialize with empty matrices
-    Mtr_L_inner_x_ .resize(Nlambdas_, SymBandMatrix<Complex>(Nspline_inner_x, order + 1));
-    Mtr_L_inner_y_ .resize(Nlambdas_, SymBandMatrix<Complex>(Nspline_inner_y, order + 1));
-    Mtr_L_full_x_  .resize(Nlambdas_, SymBandMatrix<Complex>(Nspline_full_x, order + 1));
-    Mtr_L_full_y_  .resize(Nlambdas_, SymBandMatrix<Complex>(Nspline_full_y, order + 1));
-    Mtr_mLm1_inner_x_ .resize(Nlambdas_, SymBandMatrix<Complex>(Nspline_inner_x, order + 1));
-    Mtr_mLm1_inner_y_ .resize(Nlambdas_, SymBandMatrix<Complex>(Nspline_inner_y, order + 1));
-    Mtr_mLm1_full_x_  .resize(Nlambdas_, SymBandMatrix<Complex>(Nspline_full_x, order + 1));
-    Mtr_mLm1_full_y_  .resize(Nlambdas_, SymBandMatrix<Complex>(Nspline_full_y, order + 1));
+    Mtr_L_x_ .resize(Nlambdas_, SymBandMatrix<Complex>(Nspline_x, order + 1));
+    Mtr_L_y_ .resize(Nlambdas_, SymBandMatrix<Complex>(Nspline_y, order + 1));
+    Mtr_mLm1_x_ .resize(Nlambdas_, SymBandMatrix<Complex>(Nspline_x, order + 1));
+    Mtr_mLm1_y_ .resize(Nlambdas_, SymBandMatrix<Complex>(Nspline_y, order + 1));
     
     // resize two-electron integrals array
     R_tr_dia_diag_.resize(Nlambdas_);
@@ -598,32 +557,20 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
     // for all multipole moments
     for (int lambda = 0; lambda < Nlambdas_; lambda++)
     {
-        // calculate inner basis partial integral moments
-        cArrayView(Mitr_L_inner_x_,    lambda * mi_size_inner_x, mi_size_inner_x) = computeMi(bspline_inner_x_, g_inner_x_,   lambda  );
-        cArrayView(Mitr_L_inner_y_,    lambda * mi_size_inner_y, mi_size_inner_y) = computeMi(bspline_inner_y_, g_inner_y_,   lambda  );
-        cArrayView(Mitr_mLm1_inner_x_, lambda * mi_size_inner_x, mi_size_inner_x) = computeMi(bspline_inner_x_, g_inner_x_,  -lambda-1);
-        cArrayView(Mitr_mLm1_inner_y_, lambda * mi_size_inner_y, mi_size_inner_y) = computeMi(bspline_inner_y_, g_inner_y_,  -lambda-1);
+        // calculate partial integral moments
+        cArrayView(Mitr_L_x_,    lambda * mi_size_x, mi_size_x) = computeMi(bspline_x_, g_x_,   lambda  );
+        cArrayView(Mitr_L_y_,    lambda * mi_size_y, mi_size_y) = computeMi(bspline_y_, g_y_,   lambda  );
+        cArrayView(Mitr_mLm1_x_, lambda * mi_size_x, mi_size_x) = computeMi(bspline_x_, g_x_,  -lambda-1);
+        cArrayView(Mitr_mLm1_y_, lambda * mi_size_y, mi_size_y) = computeMi(bspline_y_, g_y_,  -lambda-1);
         
-        // calculate inner basis full integral moments
-        Mtr_L_inner_x_[lambda]   .populate([&](int i, int j) -> Complex { return computeM(bspline_inner_x_, g_inner_x_,  lambda,   i, j, true, true); });
-        Mtr_L_inner_y_[lambda]   .populate([&](int i, int j) -> Complex { return computeM(bspline_inner_y_, g_inner_y_,  lambda,   i, j, true, true); });
-        Mtr_mLm1_inner_x_[lambda].populate([&](int i, int j) -> Complex { return computeM(bspline_inner_x_, g_inner_x_, -lambda-1, i, j, true, true); });
-        Mtr_mLm1_inner_y_[lambda].populate([&](int i, int j) -> Complex { return computeM(bspline_inner_y_, g_inner_y_, -lambda-1, i, j, true, true); });
-        
-        // calculate full basis partial integral moments
-        cArrayView(Mitr_L_full_x_,    lambda * mi_size_full_x, mi_size_full_x) = computeMi(bspline_full_x_, g_full_x_,  lambda  );
-        cArrayView(Mitr_L_full_y_,    lambda * mi_size_full_y, mi_size_full_y) = computeMi(bspline_full_y_, g_full_y_,  lambda  );
-        cArrayView(Mitr_mLm1_full_x_, lambda * mi_size_full_x, mi_size_full_x) = computeMi(bspline_full_x_, g_full_x_, -lambda-1);
-        cArrayView(Mitr_mLm1_full_y_, lambda * mi_size_full_y, mi_size_full_y) = computeMi(bspline_full_y_, g_full_y_, -lambda-1);
-        
-        // calculate full basis full integral moments
-        Mtr_L_full_x_[lambda]   .populate([&](int i, int j) -> Complex { return computeM(bspline_full_x_, g_full_x_,  lambda,   i, j, true, true); });
-        Mtr_L_full_y_[lambda]   .populate([&](int i, int j) -> Complex { return computeM(bspline_full_y_, g_full_y_,  lambda,   i, j, true, true); });
-        Mtr_mLm1_full_x_[lambda].populate([&](int i, int j) -> Complex { return computeM(bspline_full_x_, g_full_x_, -lambda-1, i, j, true, true); });
-        Mtr_mLm1_full_y_[lambda].populate([&](int i, int j) -> Complex { return computeM(bspline_full_y_, g_full_y_, -lambda-1, i, j, true, true); });
+        // calculate full integral moments
+        Mtr_L_x_[lambda]   .populate([&](int i, int j) -> Complex { return computeM(bspline_x_, g_x_,  lambda,   i, j, true, true); });
+        Mtr_L_y_[lambda]   .populate([&](int i, int j) -> Complex { return computeM(bspline_y_, g_y_,  lambda,   i, j, true, true); });
+        Mtr_mLm1_x_[lambda].populate([&](int i, int j) -> Complex { return computeM(bspline_x_, g_x_, -lambda-1, i, j, true, true); });
+        Mtr_mLm1_y_[lambda].populate([&](int i, int j) -> Complex { return computeM(bspline_y_, g_y_, -lambda-1, i, j, true, true); });
         
         // diagonal contributions to two-electron integrals
-        std::string filename = format("rad-R_tr_dia_diag_%d-%.4lx-%.4lx.hdf", lambda, bspline_inner_x_.hash(), bspline_inner_y_.hash());
+        std::string filename = format("rad-R_tr_dia_diag_%d-%.4lx-%.4lx.hdf", lambda, bspline_x_.hash(), bspline_y_.hash());
         if (not cmd.shared_scratch or par.isMyWork(lambda))
         {
             if (R_tr_dia_diag_[lambda].hdfload(filename))
@@ -652,7 +599,7 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
         // this process will load all necessary data that were calculated by other processes
         for (int lambda = 0; lambda < Nlambdas_; lambda++) if (not par.isMyWork(lambda))
         {
-            std::string filename = format("rad-R_tr_dia_diag_%d-%.4lx-%lx..hdf", lambda, bspline_inner_x_.hash(), bspline_inner_y_.hash());
+            std::string filename = format("rad-R_tr_dia_diag_%d-%.4lx-%lx..hdf", lambda, bspline_x_.hash(), bspline_y_.hash());
             R_tr_dia_diag_[lambda].hdfload(filename);
             std::cout << "\t- integrals for lambda = " << lambda << " loaded from \"" << filename << "\"" << std::endl;
         }
@@ -672,14 +619,14 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
         bool keep_in_memory = ((par.isMyWork(lambda) and cmd.cache_own_radint) or cmd.cache_all_radint);
         
         // compose the file name
-        std::string filename = format("rad-R_tr_dia_%d-%.4lx-%.4lx.hdf", lambda, bspline_inner_x_.hash(), bspline_inner_y_.hash());
+        std::string filename = format("rad-R_tr_dia_%d-%.4lx-%.4lx.hdf", lambda, bspline_x_.hash(), bspline_y_.hash());
         
         // create the block matrix for radial integrals of this multipole
         R_tr_dia_[lambda] = BlockSymBandMatrix<Complex>
         (
-            Nspline_full_x,     // block count
+            Nspline_x,          // block count
             order + 1,          // block structure half-bandwidth
-            Nspline_full_y,     // block size
+            Nspline_y,          // block size
             order + 1,          // block half-bandwidth
             keep_in_memory,     // whether to keep in memory
             filename            // HDF scratch disk file name
@@ -725,12 +672,12 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
         {
             // for all blocks of the radial matrix
             # pragma omp for schedule (dynamic,1)
-            for (int i = 0; i < Nspline_full_x; i++)
+            for (int i = 0; i < Nspline_x; i++)
             for (int d = 0; d <= order; d++)
-            if (i + d < Nspline_full_x)
+            if (i + d < Nspline_x)
             {
                 // calculate the block
-                SymBandMatrix<Complex> block = calc_R_tr_dia_block(lambda, i, i + d, false);
+                SymBandMatrix<Complex> block = calc_R_tr_dia_block(lambda, i, i + d);
                 
                 // write the finished block to disk
                 # pragma omp critical
@@ -773,19 +720,19 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
         std::cout << std::endl;
 }
 
-SymBandMatrix<Complex> RadialIntegrals::calc_R_tr_dia_block (unsigned int lambda, int i, int k, bool inner_only, bool simple) const
+SymBandMatrix<Complex> RadialIntegrals::calc_R_tr_dia_block (unsigned int lambda, int i, int k) const
 {
     // shorthands
-    int Nspline = inner_only ? bspline_inner_y_.Nspline() : bspline_full_y_.Nspline();
-    int order = bspline_full_y_.order();
+    int Nspline = bspline_y_.Nspline();
+    int order = bspline_y_.order();
     
     // (i,k)-block data
-    SymBandMatrix<Complex> block_ik (Nspline_full_y, order + 1);
+    SymBandMatrix<Complex> block_ik (Nspline, order + 1);
     
     // for all elements in the symmetrical block : evaluate 2-D integral of Bi(1)Bj(2)V(1,2)Bk(1)Bl(2)
-    for (int j = 0; j < Nspline_inner_y; j++)
-    for (int l = j; l < Nspline_full_y and l <= j + order; l++)
-        block_ik(j,l) = computeR(lambda, i, j, k, l, simple);
+    for (int j = 0; j < Nspline; j++)
+    for (int l = j; l < Nspline and l <= j + order; l++)
+        block_ik(j,l) = computeR(lambda, i, j, k, l);
     
     return block_ik;
 }
@@ -794,14 +741,13 @@ void RadialIntegrals::apply_R_matrix
 (
     unsigned lambda,
     Complex a, const cArrayView src,
-    Complex b,       cArrayView dst,
-    bool simple
+    Complex b,       cArrayView dst
 ) const
 {
     // shorthands
-    std::size_t Nxspline = bspline_inner_x_.Nspline(); // WARNING : Computing only inner-region integrals.
-    std::size_t Nyspline = bspline_inner_y_.Nspline(); // WARNING : Computing only inner-region integrals.
-    std::size_t order = bspline_full_x_.order();
+    std::size_t Nxspline = bspline_x_.Nspline();
+    std::size_t Nyspline = bspline_y_.Nspline();
+    std::size_t order = bspline_x_.order();
     
     // update destination vector
     # pragma omp simd
@@ -817,7 +763,7 @@ void RadialIntegrals::apply_R_matrix
     for (std::size_t k = i; k < Nxspline and k <= i + order; k++)
     {
         // (i,k)-block data (= concatenated non-zero upper diagonals)
-        SymBandMatrix<Complex> block_ik = std::move ( calc_R_tr_dia_block(lambda, i, k, true, simple) );
+        SymBandMatrix<Complex> block_ik = std::move ( calc_R_tr_dia_block(lambda, i, k) );
         
         // multiply source vector by this block
         block_ik.dot(1., cArrayView(src, k * Nyspline, Nyspline), 0., prod);

@@ -1080,7 +1080,7 @@ void zip_solution
     GaussLegendre g_inner;
     
     // factorize the overlap matrix
-    CsrMatrix<LU_int_t,Complex> S_csr = r.S_inner_x().tocoo<LU_int_t>().tocsr();
+    CsrMatrix<LU_int_t,Complex> S_csr = r.S_x().tocoo<LU_int_t>().tocsr();
     std::shared_ptr<LUft> S_lu;
     S_lu.reset(LUft::Choose(cmd.factorizer));
     S_lu->factorize(S_csr);

@@ -69,10 +69,10 @@ class NoPreconditioner : public PreconditionerBase
             InputFile    const & inp,
             Parallel     const & par,
             AngularBasis const & ang,
-            Bspline const & bspline_x_inner,
-            Bspline const & bspline_x_full,
-            Bspline const & bspline_y_inner,
-            Bspline const & bspline_y_full
+            Bspline const & bspline_inner,
+            Bspline const & bspline_full,
+            Bspline const & bspline_panel_x,
+            Bspline const & bspline_panel_y
         );
         
         // destructor
@@ -92,7 +92,11 @@ class NoPreconditioner : public PreconditionerBase
         
         // internal routines
         BlockSymBandMatrix<Complex> calc_A_block (int ill, int illp, bool twoel = true) const;
-        RadialIntegrals const & rad () const { return *rad_; }
+        
+        // access to the radial integrals
+        RadialIntegrals const & rad_inner () const { return *rad_inner_; }
+        RadialIntegrals const & rad_full () const { return *rad_full_; }
+        RadialIntegrals const & rad_panel () const { return *rad_panel_; }
         
     protected:
         
@@ -134,8 +138,8 @@ class NoPreconditioner : public PreconditionerBase
         // number of channels considered when r1 -> inf and r2 -> inf, respectively
         std::vector<std::pair<int,int>> Nchan_;
         
-        // radial integrals for the solution
-        RadialIntegrals * rad_;
+        // radial integrals for inner, full and panel basis
+        RadialIntegrals *rad_inner_, *rad_full_, *rad_panel_;
         
         // eigenstates (expansions) of the inner one-electron hamiltonian for all relevant angular momenta and their overlaps
         std::array<Array<cArrays>,2> Xp_, Sp_;

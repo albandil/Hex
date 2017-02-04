@@ -70,10 +70,10 @@ class DOMPreconditioner : public NoPreconditioner
             InputFile    const & inp,
             Parallel     const & par,
             AngularBasis const & ang,
-            Bspline const & bspline_x_inner,
-            Bspline const & bspline_x_full,
-            Bspline const & bspline_y_inner,
-            Bspline const & bspline_y_full
+            Bspline const & bspline_inner,
+            Bspline const & bspline_full,
+            Bspline const & bspline_panel_x,
+            Bspline const & bspline_panel_y
         );
         
         // description of the preconditioner

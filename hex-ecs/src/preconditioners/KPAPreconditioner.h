@@ -90,8 +90,8 @@ class KPACGPreconditioner : public virtual CGPreconditioner
                 bspline_x_inner, bspline_x_full,
                 bspline_y_inner, bspline_y_full
             ),
-            refcount_atom_(inp.maxell + 1, 0),
-            refcount_proj_(inp.maxell + 1, 0)
+            refcount_atom_(inp.maxell + 1),
+            refcount_proj_(inp.maxell + 1)
         {
 #ifdef _OPENMP
             omp_init_lock(&lck_);

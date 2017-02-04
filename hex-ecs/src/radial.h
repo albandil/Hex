@@ -91,30 +91,15 @@ class RadialIntegrals
     public:
         
         /**
-         * @brief Constructor for idential bases.
-         * 
-         * This constructor will initialize the RadialIntegrals object assuming that the radial
-         * B-spline bases for both axes are identical.
-         */
-        RadialIntegrals
-        (
-            Bspline const & bspline_inner,
-            Bspline const & bspline_full,
-            int Nlambdas
-        );
-        
-        /**
-         * @brief Constructor for distinct bases.
+         * @brief Constructor.
          * 
          * This constructor will initialize the RadialIntegrals object with different B-spline
          * bases for every axis.
          */
         RadialIntegrals
         (
-            Bspline const & bspline_x_inner,
-            Bspline const & bspline_x_full,
-            Bspline const & bspline_y_inner,
-            Bspline const & bspline_y_full,
+            Bspline const & bspline_x,
+            Bspline const & bspline_y,
             int Nlambdas
         );
         
@@ -422,8 +407,7 @@ class RadialIntegrals
         SymBandMatrix<Complex> calc_R_tr_dia_block
         (
             unsigned lambda,
-            int i, int k,
-            bool simple = false
+            int i, int k
         ) const;
         
         /**
@@ -440,8 +424,7 @@ class RadialIntegrals
         (
             unsigned lambda,
             Complex a, const cArrayView src,
-            Complex b,       cArrayView dst,
-            bool simple = false
+            Complex b,       cArrayView dst
         ) const;
         
         /** 
@@ -514,27 +497,19 @@ class RadialIntegrals
         ) const;
         
         // Return reference to the B-spline object.
-        Bspline const & bspline_inner_x () const { return bspline_inner_x_; }
-        Bspline const & bspline_full_x  () const { return bspline_full_x_ ; }
-        Bspline const & bspline_inner_y () const { return bspline_inner_y_; }
-        Bspline const & bspline_full_y  () const { return bspline_full_y_ ; }
+        Bspline const & bspline_x () const { return bspline_x_; }
+        Bspline const & bspline_y () const { return bspline_y_; }
         
         // Return the Gauss-Legendre integrator object.
-        GaussLegendre const & gaussleg_inner_x () const { return g_inner_x_; }
-        GaussLegendre const & gaussleg_full_x  () const { return g_full_x_ ; }
-        GaussLegendre const & gaussleg_inner_y () const { return g_inner_y_; }
-        GaussLegendre const & gaussleg_full_y  () const { return g_full_y_ ; }
+        GaussLegendre const & gaussleg_x () const { return g_x_; }
+        GaussLegendre const & gaussleg_y () const { return g_y_; }
         
         #define OneElectronMatrixAccessors(M) \
-            SymBandMatrix<Complex> const & M##_inner_x () const { return M##_inner_x_; } \
-            SymBandMatrix<Complex> const & M##_full_x  () const { return M##_full_x_; } \
-            SymBandMatrix<Complex> const & M##_inner_y () const { return M##_inner_y_; } \
-            SymBandMatrix<Complex> const & M##_full_y  () const { return M##_full_y_; } \
-            Complex M##_inner_x (std::size_t i, std::size_t j) const { return M##_inner_x_(i,j); } \
-            Complex M##_full_x  (std::size_t i, std::size_t j) const { return M##_full_x_(i,j);  } \
-            Complex M##_inner_y (std::size_t i, std::size_t j) const { return M##_inner_y_(i,j); } \
-            Complex M##_full_y  (std::size_t i, std::size_t j) const { return M##_full_y_(i,j);  }
-        
+            SymBandMatrix<Complex> const & M##_x () const { return M##_x_; } \
+            SymBandMatrix<Complex> const & M##_y () const { return M##_y_; } \
+            Complex M##_x (std::size_t i, std::size_t j) const { return M##_x_(i,j); } \
+            Complex M##_y (std::size_t i, std::size_t j) const { return M##_y_(i,j); } \
+            
         // Access the precomputed one-electron overlap matrices.
         OneElectronMatrixAccessors(D)
         OneElectronMatrixAccessors(S)
@@ -542,43 +517,27 @@ class RadialIntegrals
         OneElectronMatrixAccessors(Mm2)
         
         #define OneElectronMatrixArrayAccessors(M) \
-            SymBandMatrix<Complex> const & M##_inner_x (int L) const { return M##_inner_x_[L]; } \
-            SymBandMatrix<Complex> const & M##_full_x  (int L) const { return M##_full_x_ [L]; } \
-            SymBandMatrix<Complex> const & M##_inner_y (int L) const { return M##_inner_y_[L]; } \
-            SymBandMatrix<Complex> const & M##_full_y  (int L) const { return M##_full_y_ [L]; } \
-            Complex M##_inner_x (int L, std::size_t i, std::size_t j) const { return M##_inner_x_[L](i,j); } \
-            Complex M##_full_x  (int L, std::size_t i, std::size_t j) const { return M##_full_x_ [L](i,j); } \
-            Complex M##_inner_y (int L, std::size_t i, std::size_t j) const { return M##_inner_y_[L](i,j); } \
-            Complex M##_full_y  (int L, std::size_t i, std::size_t j) const { return M##_full_y_ [L](i,j); }
-        
+            SymBandMatrix<Complex> const & M##_x (int L) const { return M##_x_[L]; } \
+            SymBandMatrix<Complex> const & M##_y (int L) const { return M##_y_[L]; } \
+            Complex M##_x (int L, std::size_t i, std::size_t j) const { return M##_x_[L](i,j); } \
+            Complex M##_y (int L, std::size_t i, std::size_t j) const { return M##_y_[L](i,j); } \
+            
         // Access the precomputed scaled full integral moments of order L / -L-1.
         OneElectronMatrixArrayAccessors(Mtr_L)
         OneElectronMatrixArrayAccessors(Mtr_mLm1)
         
         #define OneElectronPartialMatrixAccessors(M) \
-            cArrayView M##_inner_x (int L = -1) const \
+            cArrayView M##_x (int L = -1) const \
             { \
-                if (L < 0) return M##_inner_x_; \
-                std::size_t mi_size = bspline_inner_x_.Nspline() * (2 * bspline_inner_x_.order() + 1) * (bspline_inner_x_.order() + 1); \
-                return cArrayView (M##_inner_x_, L * mi_size, mi_size); \
+                if (L < 0) return M##_x_; \
+                std::size_t mi_size = bspline_x_.Nspline() * (2 * bspline_x_.order() + 1) * (bspline_x_.order() + 1); \
+                return cArrayView (M##_x_, L * mi_size, mi_size); \
             } \
-            cArrayView M##_inner_y (int L = -1) const \
+            cArrayView M##_y (int L = -1) const \
             { \
-                if (L < 0) return M##_inner_y_; \
-                std::size_t mi_size = bspline_inner_y_.Nspline() * (2 * bspline_inner_y_.order() + 1) * (bspline_inner_y_.order() + 1); \
-                return cArrayView (M##_inner_y_, L * mi_size, mi_size); \
-            } \
-            cArrayView M##_full_x (int L = -1) const \
-            { \
-                if (L < 0) return M##_full_x_; \
-                std::size_t mi_size = bspline_full_x_.Nspline() * (2 * bspline_full_x_.order() + 1) * (bspline_full_x_.order() + 1); \
-                return cArrayView (M##_full_x_, L * mi_size, mi_size); \
-            } \
-            cArrayView M##_full_y (int L = -1) const \
-            { \
-                if (L < 0) return M##_full_y_; \
-                std::size_t mi_size = bspline_full_y_.Nspline() * (2 * bspline_full_y_.order() + 1) * (bspline_full_y_.order() + 1); \
-                return cArrayView (M##_full_y_, L * mi_size, mi_size); \
+                if (L < 0) return M##_y_; \
+                std::size_t mi_size = bspline_y_.Nspline() * (2 * bspline_y_.order() + 1) * (bspline_y_.order() + 1); \
+                return cArrayView (M##_y_, L * mi_size, mi_size); \
             }
         
         // Access the precomputed scaled partial overlap matrices of order L / -L-1.
@@ -594,30 +553,24 @@ class RadialIntegrals
     private:
         
         // B-spline environment
-        Bspline bspline_inner_x_, bspline_full_x_;
-        Bspline bspline_inner_y_, bspline_full_y_;
+        Bspline bspline_x_;
+        Bspline bspline_y_;
         
         // Gauss-Legendre integrator
-        GaussLegendre g_inner_x_, g_inner_y_;
-        GaussLegendre g_full_x_, g_full_y_;
+        GaussLegendre g_x_;
+        GaussLegendre g_y_;
         
         // one-electron moment and overlap matrices
-        SymBandMatrix<Complex> D_inner_x_, S_inner_x_, Mm1_inner_x_, Mm1_tr_inner_x_, Mm2_inner_x_;
-        SymBandMatrix<Complex> D_inner_y_, S_inner_y_, Mm1_inner_y_, Mm1_tr_inner_y_, Mm2_inner_y_;
-        SymBandMatrix<Complex> D_full_x_, S_full_x_, Mm1_full_x_, Mm1_tr_full_x_, Mm2_full_x_;
-        SymBandMatrix<Complex> D_full_y_, S_full_y_, Mm1_full_y_, Mm1_tr_full_y_, Mm2_full_y_;
+        SymBandMatrix<Complex> D_x_, S_x_, Mm1_x_, Mm1_tr_x_, Mm2_x_;
+        SymBandMatrix<Complex> D_y_, S_y_, Mm1_y_, Mm1_tr_y_, Mm2_y_;
         
         // one-electron full integral moments for various orders (used to calculate R-integrals)
-        std::vector<SymBandMatrix<Complex>> Mtr_L_inner_x_, Mtr_mLm1_inner_x_;
-        std::vector<SymBandMatrix<Complex>> Mtr_L_inner_y_, Mtr_mLm1_inner_y_;
-        std::vector<SymBandMatrix<Complex>> Mtr_L_full_x_, Mtr_mLm1_full_x_;
-        std::vector<SymBandMatrix<Complex>> Mtr_L_full_y_, Mtr_mLm1_full_y_;
+        std::vector<SymBandMatrix<Complex>> Mtr_L_x_, Mtr_mLm1_x_;
+        std::vector<SymBandMatrix<Complex>> Mtr_L_y_, Mtr_mLm1_y_;
         
         // partial one-electron integral moments for various orders (used to calculate R-integrals)
-        cArray Mitr_L_inner_x_, Mitr_mLm1_inner_x_;
-        cArray Mitr_L_inner_y_, Mitr_mLm1_inner_y_;
-        cArray Mitr_L_full_x_, Mitr_mLm1_full_x_;
-        cArray Mitr_L_full_y_, Mitr_mLm1_full_y_;
+        cArray Mitr_L_x_, Mitr_mLm1_x_;
+        cArray Mitr_L_y_, Mitr_mLm1_y_;
         
         // diagonal contributions to R_tr_dia
         cArrays R_tr_dia_diag_;

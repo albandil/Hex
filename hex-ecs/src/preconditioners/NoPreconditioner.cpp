@@ -54,35 +54,41 @@
 
 NoPreconditioner::NoPreconditioner ()
   : PreconditionerBase(),
-    E_(0), cmd_(nullptr), par_(nullptr), inp_(nullptr), ang_(nullptr), rad_(nullptr)
+    E_(0), cmd_(nullptr), par_(nullptr), inp_(nullptr), ang_(nullptr),
+    rad_inner_(nullptr), rad_full_(nullptr), rad_panel_(nullptr)
 {
     // nothing to do
 }
 
 NoPreconditioner::NoPreconditioner
 (
-    Parallel const & par,
-    InputFile const & inp,
-    AngularBasis const & ll,
+    CommandLine  const & cmd,
+    InputFile    const & inp,
+    Parallel     const & par,
+    AngularBasis const & ang,
     Bspline const & bspline_inner,
     Bspline const & bspline_full,
-    CommandLine const & cmd
+    Bspline const & bspline_panel_x,
+    Bspline const & bspline_panel_y
 ) : PreconditionerBase(),
-    E_(0), cmd_(&cmd), par_(&par), inp_(&inp), ang_(&ll),
-    A_blocks_ (ll.states().size() * ll.states().size()),
-    B1_blocks_(ll.states().size() * ll.states().size()),
-    B2_blocks_(ll.states().size() * ll.states().size()),
-    Cu_blocks_(ll.states().size() * ll.states().size()),
-    Cl_blocks_(ll.states().size() * ll.states().size()),
-    rad_(new RadialIntegrals(bspline_inner, bspline_full, ll.maxlambda() + 1))
+    E_(0), cmd_(&cmd), par_(&par), inp_(&inp), ang_(&ang),
+    A_blocks_ (ang.states().size() * ang.states().size()),
+    B1_blocks_(ang.states().size() * ang.states().size()),
+    B2_blocks_(ang.states().size() * ang.states().size()),
+    Cu_blocks_(ang.states().size() * ang.states().size()),
+    Cl_blocks_(ang.states().size() * ang.states().size()),
+    rad_inner_(new RadialIntegrals(bspline_inner,   bspline_inner,   ang.maxlambda() + 1)),
+    rad_full_ (new RadialIntegrals(bspline_full,    bspline_full,    ang.maxlambda() + 1)),
+    rad_panel_(new RadialIntegrals(bspline_panel_x, bspline_panel_y, ang.maxlambda() + 1))
 {
     // nothing to do
 }
 
 NoPreconditioner::~NoPreconditioner ()
 {
-    if (rad_)
-        delete rad_;
+    if (rad_inner_) delete rad_inner_;
+    if (rad_full_)  delete rad_full_;
+    if (rad_panel_) delete rad_panel_;
 }
 
 std::string NoPreconditioner::description () const
@@ -92,16 +98,48 @@ std::string NoPreconditioner::description () const
 
 void NoPreconditioner::setup ()
 {
-    rad_->setupOneElectronIntegrals(*par_, *cmd_);
-    rad_->setupTwoElectronIntegrals(*par_, *cmd_);
+    Bspline const & bspline_inner = rad_inner_->bspline_x();
+    Bspline const & bspline_full  = rad_full_ ->bspline_x();
+    Bspline const & bspline_x     = rad_panel_->bspline_x();
+    Bspline const & bspline_y     = rad_panel_->bspline_y();
     
-    int Nspline_inner = rad_->bspline_inner().Nspline();
+    rad_panel_->setupOneElectronIntegrals(*par_, *cmd_);
+    rad_panel_->setupTwoElectronIntegrals(*par_, *cmd_);
     
-    //
-    // diagonalize the overlap matrix
-    // FIXME: Only factorize if necessary (i.e. when some Hl files are missing).
-    //
+    std::size_t Nspline_inner = bspline_inner.Nspline();
+    std::size_t Nspline_full  = bspline_full .Nspline();
     
+    std::size_t Nspline_x = bspline_x.Nspline();
+    std::size_t Nspline_y = bspline_y.Nspline();
+    
+    bool full_domain = (bspline_x.hash() == bspline_full.hash() and bspline_y.hash() == bspline_y.hash());
+    
+    std::array<std::vector<int>,2> ells;
+        
+    for (std::pair<int,int> ll : ang_->states()) ells[0].push_back(ll.first);
+    for (std::pair<int,int> ll : ang_->states()) ells[1].push_back(ll.second);
+    
+    std::sort(ells[0].begin(), ells[0].end());
+    std::sort(ells[1].begin(), ells[1].end());
+    
+    ells[0].resize(std::unique(ells[0].begin(), ells[0].end()) - ells[0].begin());
+    ells[1].resize(std::unique(ells[1].begin(), ells[1].end()) - ells[1].begin());
+    
+    Hl_[0].resize(ells[0].back() + 1);
+    Hl_[1].resize(ells[1].back() + 1);
+    
+    Xp_[0].resize(ells[0].back() + 1);  Xp_[0].fill(cArrays());
+    Sp_[0].resize(ells[0].back() + 1);  Sp_[0].fill(cArrays());
+    Eb_[0].resize(ells[0].back() + 1);  Eb_[0].fill(cArray());
+    Xp_[1].resize(ells[1].back() + 1);  Xp_[1].fill(cArrays());
+    Sp_[1].resize(ells[1].back() + 1);  Sp_[1].fill(cArrays());
+    Eb_[1].resize(ells[1].back() + 1);  Eb_[1].fill(cArray());
+    
+    // if the preconditioner is called for full domain, diagonalize the overlap matrix and
+    // find the eigenvectors of the one-electron hamiltonian
+    
+    if (full_domain)
+    {
         std::cout << "Setting up the hydrogen eigenstates..." << std::endl << std::endl;
         
         cArray D (Nspline_inner);
@@ -112,7 +150,7 @@ void NoPreconditioner::setup ()
         std::cout << "\t- inner region basis overlap matrix diagonalization" << std::endl;
         Timer timer;
         
-        ColMatrix<Complex> S = rad_->S_inner().torow().T();
+        ColMatrix<Complex> S = rad_inner_->S_x().torow().T();
         S.diagonalize(D, nullptr, &CR);
         CR.invert(invCR);
         
@@ -131,33 +169,11 @@ void NoPreconditioner::setup ()
         blas::gemm(1., CR, invCR, 0., invsqrtS);
         
         std::cout << std::endl;
-    
-    //
-    // calculate the eigenstates of the inner one-electron hamiltonian
-    // (these will be used in the asymptotic expansion in the outer region)
-    //
-    
-        std::array<std::vector<int>,2> ells;
         
-        // allocate space for the eigenvectors of the atomic electron
-        for (std::pair<int,int> ll : ang_->states()) ells[0].push_back(ll.first);
-        std::sort(ells[0].begin(), ells[0].end());
-        ells[0].resize(std::unique(ells[0].begin(), ells[0].end()) - ells[0].begin());
-        Hl_[0].resize(ells[0].back() + 1);
-        
-        // allocate space for the eigenvectors of the projectile particle
-        for (std::pair<int,int> ll : ang_->states()) ells[1].push_back(ll.second);
-        std::sort(ells[1].begin(), ells[1].end());
-        ells[1].resize(std::unique(ells[1].begin(), ells[1].end()) - ells[1].begin());
-        Hl_[1].resize(ells[1].back() + 1);
-        
-        // allocate (and clean) space for the atomic eigenvectors used in the asymptotic expansion
-        Xp_[0].resize(ells[0].back() + 1);  Xp_[0].fill(cArrays());
-        Sp_[0].resize(ells[0].back() + 1);  Sp_[0].fill(cArrays());
-        Eb_[0].resize(ells[0].back() + 1);  Eb_[0].fill(cArray());
-        Xp_[1].resize(ells[1].back() + 1);  Xp_[1].fill(cArrays());
-        Sp_[1].resize(ells[1].back() + 1);  Sp_[1].fill(cArrays());
-        Eb_[1].resize(ells[1].back() + 1);  Eb_[1].fill(cArray());
+        //
+        // now calculate the eigenstates of the inner one-electron hamiltonian
+        // (these will be used in the asymptotic expansion in the outer region)
+        //
         
         // diagonalize the one-electron hamiltonians for both the atomic and projectile particle
         for (int i = 0; i < 2; i++)
@@ -170,7 +186,7 @@ void NoPreconditioner::setup ()
             for (int l : ells[i])
             {
                 // compose name of the file containing the hamiltonian data
-                Hl_[i][l].hdflink(format("Hl%+g-%d-%.4x.hdf", Z, l, rad_->bspline_inner().hash()).c_str());
+                Hl_[i][l].hdflink(format("Hl%+g-%d-%.4x.hdf", Z, l, bspline_inner.hash()).c_str());
                 
                 // do not calculate if this work is supposed to be done by someone else
                 if (cmd_->shared_scratch and not (par_->isMyGroupWork(l) and par_->IamGroupMaster()))
@@ -185,7 +201,11 @@ void NoPreconditioner::setup ()
                 timer.reset();
                 
                 // compose the symmetrical one-electron hamiltonian
-                ColMatrix<Complex> tHl = (Complex(0.5) * rad_->D_inner() + Complex(Z) * rad_->Mm1_tr_inner() + Complex(0.5*l*(l+1)) * rad_->Mm2_inner()).torow().T();
+                ColMatrix<Complex> tHl;
+                if (i == 0)
+                    tHl = (Complex(0.5) * rad_inner_->D_x() + Complex(Z) * rad_inner_->Mm1_tr_x() + Complex(0.5*l*(l+1)) * rad_inner_->Mm2_x()).torow().T();
+                else
+                    tHl = (Complex(0.5) * rad_inner_->D_y() + Complex(Z) * rad_inner_->Mm1_tr_y() + Complex(0.5*l*(l+1)) * rad_inner_->Mm2_y()).torow().T();
                 
                 // symmetrically transform by inverse square root of the overlap matrix, tHl <- invsqrtS * tHl * invsqrtS
                 blas::gemm(1., invsqrtS, tHl, 0., S);
@@ -227,84 +247,82 @@ void NoPreconditioner::setup ()
         
         // wait for all processes so that all Hlxxx files get written
         par_->wait();
+    }
     
-    //
     // load the requested one-electron eigenstates from disk files
-    //
-    
-        for (int i = 0; i < 2; i++)
+    for (int i = 0; i < 2; i++)
+    {
+        // particle charge (first is electron, second is either electron or positron)
+        Real Z = (i == 0 ? -1.0 : inp_->Zp);
+        
+        // for all one-electron angular momenta needed by this particle and MPI group
+        bool written = false;
+        for (int l : ells[i])
         {
-            // particle charge (first is electron, second is either electron or positron)
-            Real Z = (i == 0 ? -1.0 : inp_->Zp);
+            // load the factorization file
+            if (not Hl_[i][l].hdfload())
+                HexException("Failed to load one-electron diagonalization file for Z = %g, l = %d.", Z, l);
             
-            // for all one-electron angular momenta needed by this particle and MPI group
-            bool written = false;
-            for (int l : ells[i])
+            written = true;
+            std::cout << "\t- one-electron Hamiltonian data loaded (Z = " << Z << ", l = " << l << ")" << std::endl;
+            
+            // get sorted energies (ascending real parts)
+            std::vector<int> indices (Nspline_inner);
+            std::iota(indices.begin(), indices.end(), 0);
+            std::sort(indices.begin(), indices.end(), [=](int a, int b){ return Hl_[i][l].Dl[a].real() < Hl_[i][l].Dl[b].real(); });
+            
+            // get maximal element that has accurate bound state energy
+            int max_nr = -1;
+            for (unsigned nr = 0; nr < Nspline_inner; nr++)
             {
-                // load the factorization file
-                if (not Hl_[i][l].hdfload())
-                    HexException("Failed to load one-electron diagonalization file for Z = %g, l = %d.", Z, l);
+                Real E = Hl_[i][l].Dl[indices[nr]].real();
+                Real E0 = -0.5 / ((nr + l + 1) * (nr + l + 1));
                 
-                written = true;
-                std::cout << "\t- one-electron Hamiltonian data loaded (Z = " << Z << ", l = " << l << ")" << std::endl;
-                
-                // get sorted energies (ascending real parts)
-                std::vector<int> indices (Nspline_inner);
-                std::iota(indices.begin(), indices.end(), 0);
-                std::sort(indices.begin(), indices.end(), [=](int a, int b){ return Hl_[i][l].Dl[a].real() < Hl_[i][l].Dl[b].real(); });
-                
-                // get maximal element that has accurate bound state energy
-                int max_nr = -1;
-                for (int nr = 0; nr < Nspline_inner; nr++)
-                {
-                    Real E = Hl_[i][l].Dl[indices[nr]].real();
-                    Real E0 = -0.5 / ((nr + l + 1) * (nr + l + 1));
-                    
-                    if (E < 0 and std::abs(E0 - E) < 1e-3 * std::abs(E0))
-                        max_nr = nr;
-                    else
-                        break;
-                }
-                if (max_nr >= 0)
-                {
-                    std::cout << "\t\t- bound states with energy within 0.1 % from exact value: " << l + 1 << " <= n <= " << max_nr + l + 1 << std::endl;
-                }
-                
-                // get all valid asymptotic states
-                for (int nr = 0; nr < Nspline_inner; nr++)
-                {
-                    // bound energy of the state (a.u. -> Ry)
-                    Complex Eb = 2.0_r * Hl_[i][l].Dl[indices[nr]];
-                    
-                    // maximal bound state energy allowed in the asymptotic expantion (or at least the bound energy allowed by impact channels)
-                    Real Em = std::max(inp_->channel_max_E, inp_->max_Etot);
-                    
-                    // add all requested channels
-                    if (Eb.real() <= Em)
-                    {
-                        Xp_[i][l].push_back(Hl_[i][l].Cl.col(indices[nr]));
-                        Sp_[i][l].push_back(rad_->S_inner().dot(Xp_[i][l][nr]));
-                        Eb_[i][l].push_back(Eb);
-                    }
-                    else
-                    {
-                        // there will be no more states (the energy rises with 'nr')
-                        break;
-                    }
-                }
-                if (Xp_[i][l].size() >= 1)
-                {
-                    std::cout << "\t\t- eigenstates used in asymptotic (outer) domain: " << l + 1 << " <= n <= " << l + Xp_[i][l].size() << std::endl;
-                }
-                
-                // unload the factorization file
-                Hl_[i][l].drop();
+                if (E < 0 and std::abs(E0 - E) < 1e-3 * std::abs(E0))
+                    max_nr = nr;
+                else
+                    break;
             }
-            if (written)
+            if (max_nr >= 0)
             {
-                std::cout << std::endl;
+                std::cout << "\t\t- bound states with energy within 0.1 % from exact value: " << l + 1 << " <= n <= " << max_nr + l + 1 << std::endl;
             }
+            
+            // get all valid asymptotic states
+            for (unsigned nr = 0; nr < Nspline_inner; nr++)
+            {
+                // bound energy of the state (a.u. -> Ry)
+                Complex Eb = 2.0_r * Hl_[i][l].Dl[indices[nr]];
+                
+                // maximal bound state energy allowed in the asymptotic expantion (or at least the bound energy allowed by impact channels)
+                Real Em = std::max(inp_->channel_max_E, inp_->max_Etot);
+                
+                // add all requested channels
+                if (Eb.real() <= Em)
+                {
+                    Xp_[i][l].push_back(Hl_[i][l].Cl.col(indices[nr]));
+                    Sp_[i][l].push_back((i == 0 ? rad_inner_->S_x() : rad_inner_->S_y()).dot(Xp_[i][l][nr]));
+                    Eb_[i][l].push_back(Eb);
+                }
+                else
+                {
+                    // there will be no more states (the energy rises with 'nr')
+                    break;
+                }
+            }
+            if (Xp_[i][l].size() >= 1)
+            {
+                std::cout << "\t\t- eigenstates used in asymptotic (outer) domain: " << l + 1 << " <= n <= " << l + Xp_[i][l].size() << std::endl;
+            }
+            
+            // unload the factorization file
+            Hl_[i][l].drop();
         }
+        if (written)
+        {
+            std::cout << std::endl;
+        }
+    }
 }
 
 std::pair<int,int> NoPreconditioner::bstates (Real E, int l1, int l2) const
@@ -338,7 +356,7 @@ std::pair<int,int> NoPreconditioner::bstates (Real E, int l1, int l2) const
 
 BlockSymBandMatrix<Complex> NoPreconditioner::calc_A_block (int ill, int illp, bool twoel) const
 {
-    int Nspline_inner = rad_->bspline_inner().Nspline();
+    int Nspline_inner = rad_inner_->bspline_x().Nspline();
     
     // angular momenta
     int l1 = ang_->states()[ill].first;
@@ -371,29 +389,29 @@ BlockSymBandMatrix<Complex> NoPreconditioner::calc_A_block (int ill, int illp, b
             (
                 [&](int j, int l)
                 {
-                    return E_ * rad_->S_full()(i,k) * rad_->S_full()(j,l)
-                            - (0.5_z * rad_->D_full()(i,k) - rad_->Mm1_tr_full()(i,k)) * rad_->S_full()(j,l)
-                            - 0.5_r * l1 * (l1 + 1) * rad_->Mm2_full()(i,k) * rad_->S_full()(j,l)
-                            - rad_->S_full()(i,k) * (0.5_z * rad_->D_full()(j,l) + inp_->Zp * rad_->Mm1_tr_full()(j,l))
-                            - 0.5_r * l2 * (l2 + 1) * rad_->S_full()(i,k) * rad_->Mm2_full()(j,l);
+                    return E_ * rad_full_->S_x()(i,k) * rad_full_->S_y()(j,l)
+                            - (0.5_z * rad_full_->D_x()(i,k) - rad_full_->Mm1_tr_x()(i,k)) * rad_full_->S_y()(j,l)
+                            - 0.5_r * l1 * (l1 + 1) * rad_full_->Mm2_x()(i,k) * rad_full_->S_y()(j,l)
+                            - rad_full_->S_x()(i,k) * (0.5_z * rad_full_->D_y()(j,l) + inp_->Zp * rad_full_->Mm1_tr_y()(j,l))
+                            - 0.5_r * l2 * (l2 + 1) * rad_full_->S_x()(i,k) * rad_full_->Mm2_y()(j,l);
                 }
             );
         }
         
         // two-electron part
         if(twoel)
-        for (int lambda = 0; lambda <= rad_->maxlambda(); lambda++) if (ang_->f(ill,illp,lambda) != 0)
+        for (int lambda = 0; lambda <= rad_full_->maxlambda(); lambda++) if (ang_->f(ill,illp,lambda) != 0)
         {
             // calculate two-electron term
             if (not cmd_->lightweight_radial_cache)
             {
                 // use precomputed block from scratch file or from memory
-                subblock.data() += inp_->Zp * ang_->f(ill,illp,lambda) * rad_->R_tr_dia(lambda).getBlock(i * (inp_->order + 1) + d).slice(0, Nspline_inner * (inp_->order + 1));
+                subblock.data() += inp_->Zp * ang_->f(ill,illp,lambda) * rad_full_->R_tr_dia(lambda).getBlock(i * (inp_->order + 1) + d).slice(0, Nspline_inner * (inp_->order + 1));
             }
             else
             {
                 // compute the data anew
-                subblock.data() += inp_->Zp * ang_->f(ill,illp,lambda) * rad_->calc_R_tr_dia_block(lambda, i, k).data().slice(0, Nspline_inner * (inp_->order + 1));
+                subblock.data() += inp_->Zp * ang_->f(ill,illp,lambda) * rad_full_->calc_R_tr_dia_block(lambda, i, k).data().slice(0, Nspline_inner * (inp_->order + 1));
             }
         }
         
@@ -412,8 +430,8 @@ void NoPreconditioner::update (Real E)
     // shorthands
     int order = inp_->order;
     int Nang = ang_->states().size();
-    int Nspline_inner = rad_->bspline_inner().Nspline();
-    int Nspline_full  = rad_->bspline_full().Nspline();
+    int Nspline_inner = rad_inner_->bspline_x().Nspline();
+    int Nspline_full  = rad_full_->bspline_x().Nspline();
     int Nspline_outer = Nspline_full - Nspline_inner;
     std::size_t A_size = std::size_t(Nspline_inner) * std::size_t(Nspline_inner);
     
@@ -427,7 +445,7 @@ void NoPreconditioner::update (Real E)
     
     // outer one-electron overlap matrix
     SymBandMatrix<Complex> S_outer (Nspline_outer, order + 1);
-    S_outer.populate([&](int m, int n) { return rad_->S_full()(Nspline_inner + m, Nspline_inner + n); });
+    S_outer.populate([&](int m, int n) { return rad_full_->S_x()(Nspline_inner + m, Nspline_inner + n); });
     
     // outer one-electron derivative matrix
     SymBandMatrix<Complex> D_outer (Nspline_outer, order + 1);

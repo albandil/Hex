@@ -53,15 +53,15 @@ DOMPreconditioner::DOMPreconditioner
     InputFile    const & inp,
     Parallel     const & par,
     AngularBasis const & ang,
-    Bspline const & bspline_x_inner,
-    Bspline const & bspline_x_full,
-    Bspline const & bspline_y_inner,
-    Bspline const & bspline_y_full
+    Bspline const & bspline_inner,
+    Bspline const & bspline_full,
+    Bspline const & bspline_panel_x,
+    Bspline const & bspline_panel_y
 ) : NoPreconditioner
     (
         cmd, inp, par, ang,
-        bspline_x_inner, bspline_x_full,
-        bspline_y_inner, bspline_y_full
+        bspline_inner, bspline_full,
+        bspline_panel_x, bspline_panel_y
     )
 {
     // nothing more to do

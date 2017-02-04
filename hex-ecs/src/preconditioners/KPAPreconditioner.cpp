@@ -101,7 +101,7 @@ void KPACGPreconditioner::CG_init (int iblock) const
     unlock_kpa_access();
     
     // calculate workspace size
-    std::size_t size = rad_->bspline_inner_x().Nspline() * rad_->bspline_inner_y().Nspline();
+    std::size_t size = rad_inner_->bspline_x().Nspline() * rad_inner_->bspline_y().Nspline();
     
     // allocate thread workspace
     unsigned ithread = 0;
@@ -121,12 +121,12 @@ void KPACGPreconditioner::CG_mmul (int iblock, const cArrayView p, cArrayView q)
         int l2 = ang_->states()[iblock].second;
         
         // multiply 'p' by the diagonal block (except for the two-electron term)
-        kron_dot(0., q,  1., p, Complex(E_) * rad_->S_inner_x(), rad_->S_inner_y());
-        kron_dot(1., q, -1., p, Complex(0.5) * rad_->D_inner_x() - rad_->Mm1_tr_inner_x() + Complex(0.5*(l1+1)*l1) * rad_->Mm2_inner_x(), rad_->S_inner_y());
-        kron_dot(1., q, -1., p, rad_->S_inner_x(), Complex(0.5) * rad_->D_inner_y() + Complex(inp_->Zp) * rad_->Mm1_tr_inner_y() + Complex(0.5*(l2+1)*l2) * rad_->Mm2_inner_y());
+        kron_dot(0., q,  1., p, Complex(E_) * rad_inner_->S_x(), rad_inner_->S_y());
+        kron_dot(1., q, -1., p, Complex(0.5) * rad_inner_->D_x() - rad_inner_->Mm1_tr_x() + Complex(0.5*(l1+1)*l1) * rad_inner_->Mm2_x(), rad_inner_->S_y());
+        kron_dot(1., q, -1., p, rad_inner_->S_x(), Complex(0.5) * rad_inner_->D_y() + Complex(inp_->Zp) * rad_inner_->Mm1_tr_y() + Complex(0.5*(l2+1)*l2) * rad_inner_->Mm2_y());
         
         // multiply 'p' by the two-electron integrals
-        for (int lambda = 0; lambda <= rad_->maxlambda(); lambda++)
+        for (int lambda = 0; lambda <= rad_full_->maxlambda(); lambda++)
         {
             // calculate angular integral
             Real f = special::computef(lambda, l1, l2, l1, l2, inp_->L);
@@ -135,7 +135,7 @@ void KPACGPreconditioner::CG_mmul (int iblock, const cArrayView p, cArrayView q)
             
             // multiply
             if (f != 0.)
-                rad_->apply_R_matrix(lambda, inp_->Zp * f, p, 1., q, cmd_->kpa_simple_rad);
+                rad_full_->apply_R_matrix(lambda, inp_->Zp * f, p, 1., q);
         }
     }
     

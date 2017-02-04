@@ -403,14 +403,14 @@ void Amplitudes::writeICS_files ()
 
 cArray Amplitudes::readProjPseudoStateEnergies (int l) const
 {
-    std::string filename = format("Hl%+g-%d-%.4x.hdf", inp_.Zp, l, rad_.bspline_inner().hash());
+    std::string filename = format("Hl%+g-%d-%.4x.hdf", inp_.Zp, l, rad_.bspline_x().hash());
     
     HDFFile datafile (filename, HDFFile::readonly);
     if (not datafile.valid())
         HexException("File %s with the one-electron eigenstates was not found. Run the solver again to regenerate it.", filename.c_str());
     
     int N = datafile.size("Dl") / 2;
-    if (N != rad_.bspline_inner().Nspline())
+    if (N != rad_.bspline_x().Nspline())
         HexException("File %s is not compatible with the current basis. You should delete it.", filename.c_str());
     
     cArray energies (N);
@@ -422,14 +422,14 @@ cArray Amplitudes::readProjPseudoStateEnergies (int l) const
 
 cArray Amplitudes::readAtomPseudoState (int l, int ichan) const
 {
-    std::string filename = format("Hl-1-%d-%.4x.hdf", l, rad_.bspline_inner().hash());
+    std::string filename = format("Hl-1-%d-%.4x.hdf", l, rad_.bspline_x().hash());
     
     HDFFile datafile (filename, HDFFile::readonly);
     if (not datafile.valid())
         HexException("File %s with the one-electron eigenstates was not found. Run the solver again to regenerate it.", filename.c_str());
     
     int N = datafile.size("Dl") / 2;
-    if (N != rad_.bspline_inner().Nspline())
+    if (N != rad_.bspline_x().Nspline())
         HexException("File %s is not compatible with the current basis. You should delete it.", filename.c_str());
     if (ichan >= N)
         HexException("File %s contains only %d (<= %d) channels.", filename.c_str(), N, ichan);
@@ -442,7 +442,7 @@ cArray Amplitudes::readAtomPseudoState (int l, int ichan) const
     std::iota(indices.begin(), indices.end(), 0);
     std::sort(indices.begin(), indices.end(), [&](int i, int j){ return energies[i].real() < energies[j].real(); });
     
-    unsigned Nspline_inner = rad_.bspline_inner().Nspline();
+    unsigned Nspline_inner = rad_.bspline_x().Nspline();
     
     cArray data (Nspline_inner);
     if (not datafile.read("Cl", &data[0], Nspline_inner, indices[ichan] * Nspline_inner))
@@ -480,7 +480,7 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> &
     
     // read the appropriate projectile channel function for the final state (nf,lf,*)
     cArray Xp = readAtomPseudoState(T.lf, T.nf - T.lf - 1);
-    cArray Sp = rad_.S_inner().dot(Xp);
+    cArray Sp = rad_.S_x().dot(Xp);
     
     // The extracted T-matrix oscillates and slowly radially converges.
     // If we are far enough and only oscillations are left, we can average several uniformly spaced

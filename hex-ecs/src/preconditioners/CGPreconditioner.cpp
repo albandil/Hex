@@ -53,8 +53,8 @@ std::string CGPreconditioner::description () const
 int CGPreconditioner::solve_block (int ill, const cArrayView r, cArrayView z) const
 {
     // shorthands
-    int Nspline_inner_x = rad_->bspline_inner_x().Nspline();
-    int Nspline_inner_y = rad_->bspline_inner_y().Nspline();
+    int Nspline_inner_x = rad_inner_->bspline_x().Nspline();
+    int Nspline_inner_y = rad_inner_->bspline_y().Nspline();
     
     // prepare the block-preconditioner for run
     this->CG_init(ill);
@@ -153,9 +153,9 @@ void CGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArray<C
             
             // subtract lower block diagonals for ill-th block row
             for (int illp = 0; illp < ill; illp++)
-            for (int lambda = 0; lambda <= rad_->maxlambda(); lambda++)
+            for (int lambda = 0; lambda <= rad_full_->maxlambda(); lambda++)
             if (ang_->f(ill, illp, lambda) != 0)
-                rad_->R_tr_dia(lambda).dot(-ang_->f(ill, illp, lambda), y[illp], 1., y[ill], true);
+                rad_full_->R_tr_dia(lambda).dot(-ang_->f(ill, illp, lambda), y[illp], 1., y[ill], true);
             
             // use (preconditioned) conjugate gradients to invert a diagonal block
             x[ill].resize(y[ill].size());
