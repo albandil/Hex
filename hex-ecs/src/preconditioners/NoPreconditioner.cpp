@@ -285,6 +285,28 @@ void NoPreconditioner::setup ()
                         Xp_[i][l].push_back(Hl_[i][l].Cl.col(indices[nr]));
                         Sp_[i][l].push_back(rad_->S_inner().dot(Xp_[i][l][nr]));
                         Eb_[i][l].push_back(Eb);
+                        
+                        // Adjust the overall sign of the eigenvector so that the result is compatible with the
+                        // sign convention of GSL's function gsl_sf_hydrogenicR (used in previous versions of hex-ecs).
+                        // That is, the radial function should increase from origin to positive values, then turn back
+                        // and (potentially) dive through zero.
+                        
+                        if (Xp_[i][l].back().front().real() < 0.0_r)
+                        {
+                            Xp_[i][l].back() = -Xp_[i][l].back();
+                            Sp_[i][l].back() = -Sp_[i][l].back();
+                        }
+                        
+                        write_array
+                        (
+                            linspace(0., 100., 1001),
+                            rad_->bspline_inner().zip
+                            (
+                                Xp_[i][l].back(),
+                                linspace(0., 100., 1001)
+                            ),
+                            format("P_%d_%d-%d.dat", nr + l + 1, l, i)
+                        );
                     }
                     else
                     {
