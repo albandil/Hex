@@ -135,7 +135,12 @@ class NoPreconditioner : public PreconditionerBase
         // radial integrals for the solution
         RadialIntegrals * rad_;
         
-        // eigenstates (expansions) of the inner one-electron hamiltonian for all relevant angular momenta and their overlaps
+        // Eigenstates (expansions) of the inner one-electron hamiltonian for all relevant angular momenta and their overlaps.
+        // They are normalized so that
+        //   1. (Xp|Xp) = 1 (xGEMM does that),
+        //   2. largest component of Xp is real (xGEMM does that),
+        //   3. the first component is positive (additional condition required by Hex).
+        // The last condition makes the states compatible with the function gsl_sf_hydrogenicR.
         std::array<Array<cArrays>,2> Xp_, Sp_;
         
         // eigen-energies (in Ry) of the pseudostates contained in Xp_ for each angular momentum
