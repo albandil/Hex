@@ -296,17 +296,6 @@ void NoPreconditioner::setup ()
                             Xp_[i][l].back() = -Xp_[i][l].back();
                             Sp_[i][l].back() = -Sp_[i][l].back();
                         }
-                        
-                        write_array
-                        (
-                            linspace(0., 100., 1001),
-                            rad_->bspline_inner().zip
-                            (
-                                Xp_[i][l].back(),
-                                linspace(0., 100., 1001)
-                            ),
-                            format("P_%d_%d-%d.dat", nr + l + 1, l, i)
-                        );
                     }
                     else
                     {
