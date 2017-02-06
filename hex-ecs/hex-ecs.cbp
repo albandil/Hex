@@ -101,6 +101,8 @@
 		<Unit filename="src/factorizers/lu-umfpack.h" />
 		<Unit filename="src/gauss.cpp" />
 		<Unit filename="src/gauss.h" />
+		<Unit filename="src/hldata.cpp" />
+		<Unit filename="src/hldata.h" />
 		<Unit filename="src/io.cpp" />
 		<Unit filename="src/io.h" />
 		<Unit filename="src/luft.cpp" />
