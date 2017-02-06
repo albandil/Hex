@@ -449,38 +449,38 @@ void NoPreconditioner::update (Real E)
     
     // outer one-electron derivative matrix
     SymBandMatrix<Complex> D_outer (Nspline_outer, order + 1);
-    D_outer.populate([&](int m, int n) { return rad_->D_full()(Nspline_inner + m, Nspline_inner + n); });
+    D_outer.populate([&](int m, int n) { return rad_full_->D_x()(Nspline_inner + m, Nspline_inner + n); });
     
     // outer one-electron centrifugal moment matrix
     SymBandMatrix<Complex> Mm2_outer (Nspline_outer, order + 1);
-    Mm2_outer.populate([&](int m, int n) { return rad_->Mm2_full()(Nspline_inner + m, Nspline_inner + n); });
+    Mm2_outer.populate([&](int m, int n) { return rad_full_->Mm2_x()(Nspline_inner + m, Nspline_inner + n); });
     
     // inner one-electron multipole moment matrices
     std::vector<SymBandMatrix<Complex>> Mtr_L_inner;
-    for (int lambda = 0; lambda <= rad_->maxlambda(); lambda++)
+    for (int lambda = 0; lambda <= rad_full_->maxlambda(); lambda++)
     {
         Mtr_L_inner.push_back(SymBandMatrix<Complex>(Nspline_inner, order + 1));
         Mtr_L_inner.back().populate
         (
             [ & ] (int m, int n)
             {
-                return rad_->Mtr_L_inner(lambda)(m, n)
-                     * special::pow_int(rad_->bspline_full().t(std::min(m,n) + order + 1).real(), lambda);
+                return rad_inner_->Mtr_L_x(lambda)(m, n)
+                     * special::pow_int(rad_full_->bspline_x().t(std::min(m,n) + order + 1).real(), lambda);
             }
         );
     }
     
     // outer one-electron multipole moment matrices
     std::vector<SymBandMatrix<Complex>> Mtr_mLm1_outer;
-    for (int lambda = 0; lambda <= rad_->maxlambda(); lambda++)
+    for (int lambda = 0; lambda <= rad_full_->maxlambda(); lambda++)
     {
         Mtr_mLm1_outer.push_back(SymBandMatrix<Complex>(Nspline_outer, order + 1));
         Mtr_mLm1_outer.back().populate
         (
             [ & ] (int m, int n)
             {
-                return rad_->Mtr_mLm1_full(lambda)(Nspline_inner + m, Nspline_inner + n)
-                     * special::pow_int(rad_->bspline_full().t(Nspline_inner + std::min(m,n) + order + 1).real(), -lambda-1);
+                return rad_full_->Mtr_mLm1_x(lambda)(Nspline_inner + m, Nspline_inner + n)
+                     * special::pow_int(rad_full_->bspline_x().t(Nspline_inner + std::min(m,n) + order + 1).real(), -lambda-1);
             }
         );
     }
@@ -550,7 +550,7 @@ void NoPreconditioner::update (Real E)
                 }
                 
                 // channel-offdiagonal contribution
-                for (int lambda = 1; lambda <= rad_->maxlambda(); lambda++) if (ang_->f(ill,illp,lambda) != 0.0_r)
+                for (int lambda = 1; lambda <= rad_full_->maxlambda(); lambda++) if (ang_->f(ill,illp,lambda) != 0.0_r)
                     subblock += inp_->Zp * ang_->f(ill,illp,lambda) * (Xp_[0][l1p][n] | Mtr_L_inner[lambda].dot(Xp_[0][l1][m])) * Mtr_mLm1_outer[lambda];
                 
                 // use the block
@@ -579,7 +579,7 @@ void NoPreconditioner::update (Real E)
                 }
                 
                 // channel-offdiagonal contribution
-                for (int lambda = 1; lambda <= rad_->maxlambda(); lambda++) if (ang_->f(ill,illp,lambda) != 0.0_r)
+                for (int lambda = 1; lambda <= rad_full_->maxlambda(); lambda++) if (ang_->f(ill,illp,lambda) != 0.0_r)
                     subblock += inp_->Zp * ang_->f(ill,illp,lambda) * (Xp_[1][l2p][n] | Mtr_L_inner[lambda].dot(Xp_[1][l2][m])) * Mtr_mLm1_outer[lambda];
                 
                 // use the block
@@ -606,22 +606,22 @@ void NoPreconditioner::update (Real E)
                 
                 if (ill == illp)
                 {
-                    elem += E_ * rad_->S_full()(i,k) * rad_->S_full()(j,l)
-                         - 0.5_r * rad_->D_full()(i,k) * rad_->S_full()(j,l)
-                         - 0.5_r * rad_->S_full()(i,k) * rad_->D_full()(j,l)
-                         - 0.5_r * (l1 * (l1 + 1.0_r)) * rad_->Mm2_full()(i,k) * rad_->S_full()(j,l)
-                         - 0.5_r * (l2 * (l2 + 1.0_r)) * rad_->S_full()(i,k) * rad_->Mm2_full()(j,l)
-                         + rad_->Mm1_tr_full()(i,k) * rad_->S_full()(j,l)
-                         - inp_->Zp * rad_->S_full()(i,k) * rad_->Mm1_tr_full()(j,l);
+                    elem += E_ * rad_full_->S_x()(i,k) * rad_full_->S_y()(j,l)
+                         - 0.5_r * rad_full_->D_x()(i,k) * rad_full_->S_y()(j,l)
+                         - 0.5_r * rad_full_->S_x()(i,k) * rad_full_->D_y()(j,l)
+                         - 0.5_r * (l1 * (l1 + 1.0_r)) * rad_full_->Mm2_x()(i,k) * rad_full_->S_y()(j,l)
+                         - 0.5_r * (l2 * (l2 + 1.0_r)) * rad_full_->S_x()(i,k) * rad_full_->Mm2_y()(j,l)
+                         + rad_full_->Mm1_tr_x()(i,k) * rad_full_->S_y()(j,l)
+                         - inp_->Zp * rad_full_->S_x()(i,k) * rad_full_->Mm1_tr_y()(j,l);
                 }
                 
-                Real r1 = rad_->bspline_full().t(std::min(i,k) + order + 1).real();
-                Real r2 = rad_->bspline_full().t(std::min(j,l) + order + 1).real();
+                Real r1 = rad_full_->bspline_x().t(std::min(i,k) + order + 1).real();
+                Real r2 = rad_full_->bspline_y().t(std::min(j,l) + order + 1).real();
                 
-                for (int lambda = 0; lambda <= rad_->maxlambda(); lambda++) if (ang_->f(ill,illp,lambda) != 0)
+                for (int lambda = 0; lambda <= rad_full_->maxlambda(); lambda++) if (ang_->f(ill,illp,lambda) != 0)
                 {
                     Real multipole = special::pow_int(r1/r2, lambda) / r2;
-                    elem += inp_->Zp * ang_->f(ill,illp,lambda) * multipole * rad_->Mtr_L_full(lambda)(i,k) * rad_->Mtr_mLm1_full(lambda)(j,l);
+                    elem += inp_->Zp * ang_->f(ill,illp,lambda) * multipole * rad_full_->Mtr_L_x(lambda)(i,k) * rad_full_->Mtr_mLm1_y(lambda)(j,l);
                 }
                 
                 Cu_blocks_[ill * Nang + illp].add(row, col, Xp_[0][l1p][n][k] * elem);
@@ -641,22 +641,22 @@ void NoPreconditioner::update (Real E)
                 
                 if (ill == illp)
                 {
-                    elem += E_ * rad_->S_full()(i,k) * rad_->S_full()(j,l)
-                         - 0.5_r * rad_->D_full()(i,k) * rad_->S_full()(j,l)
-                         - 0.5_r * rad_->S_full()(i,k) * rad_->D_full()(j,l)
-                         - 0.5_r * (l1 * (l1 + 1.0_r)) * rad_->Mm2_full()(i,k) * rad_->S_full()(j,l)
-                         - 0.5_r * (l2 * (l2 + 1.0_r)) * rad_->S_full()(i,k) * rad_->Mm2_full()(j,l)
-                         + rad_->Mm1_tr_full()(i,k) * rad_->S_full()(j,l)
-                         - inp_->Zp * rad_->S_full()(i,k) * rad_->Mm1_tr_full()(j,l);
+                    elem += E_ * rad_full_->S_x()(i,k) * rad_full_->S_y()(j,l)
+                         - 0.5_r * rad_full_->D_x()(i,k) * rad_full_->S_y()(j,l)
+                         - 0.5_r * rad_full_->S_x()(i,k) * rad_full_->D_y()(j,l)
+                         - 0.5_r * (l1 * (l1 + 1.0_r)) * rad_full_->Mm2_x()(i,k) * rad_full_->S_y()(j,l)
+                         - 0.5_r * (l2 * (l2 + 1.0_r)) * rad_full_->S_x()(i,k) * rad_full_->Mm2_y()(j,l)
+                         + rad_full_->Mm1_tr_x()(i,k) * rad_full_->S_y()(j,l)
+                         - inp_->Zp * rad_full_->S_x()(i,k) * rad_full_->Mm1_tr_y()(j,l);
                 }
                 
-                Real r1 = rad_->bspline_full().t(std::min(i,k) + order + 1).real();
-                Real r2 = rad_->bspline_full().t(std::min(j,l) + order + 1).real();
+                Real r1 = rad_full_->bspline_x().t(std::min(i,k) + order + 1).real();
+                Real r2 = rad_full_->bspline_y().t(std::min(j,l) + order + 1).real();
                 
-                for (int lambda = 0; lambda <= rad_->maxlambda(); lambda++) if (ang_->f(ill,illp,lambda) != 0)
+                for (int lambda = 0; lambda <= rad_full_->maxlambda(); lambda++) if (ang_->f(ill,illp,lambda) != 0)
                 {
                     Real multipole = special::pow_int(r2/r1, lambda) / r1;
-                    elem += inp_->Zp * ang_->f(ill,illp,lambda) * multipole * rad_->Mtr_mLm1_full(lambda)(i,k) * rad_->Mtr_L_full(lambda)(j,l);
+                    elem += inp_->Zp * ang_->f(ill,illp,lambda) * multipole * rad_full_->Mtr_mLm1_x(lambda)(i,k) * rad_full_->Mtr_L_y(lambda)(j,l);
                 }
                 
                 Cu_blocks_[ill * Nang + illp].add(row, col, Xp_[1][l2p][n][l] * elem);
@@ -676,17 +676,17 @@ void NoPreconditioner::update (Real E)
                 
                 if (ill == illp and m == n)
                 {
-                    elem += (E_ + 0.5_r / ((n + l1 + 1) * (n + l1 + 1))) * rad_->S_full()(j,l)
-                         - 0.5_r * rad_->D_full()(j,l)
-                         - 0.5_r * (l2 * (l2 + 1.0_r)) * rad_->Mm2_full()(j,l);
+                    elem += (E_ + 0.5_r / ((n + l1 + 1) * (n + l1 + 1))) * rad_full_->S_y()(j,l)
+                         - 0.5_r * rad_full_->D_y()(j,l)
+                         - 0.5_r * (l2 * (l2 + 1.0_r)) * rad_full_->Mm2_y()(j,l);
                 }
                 
-                Real r2 = rad_->bspline_full().t(std::min(j,l) + order + 1).real();
+                Real r2 = rad_full_->bspline_y().t(std::min(j,l) + order + 1).real();
                 
-                for (int lambda = 1; lambda <= rad_->maxlambda(); lambda++) if (ang_->f(ill,illp,lambda) != 0)
+                for (int lambda = 1; lambda <= rad_full_->maxlambda(); lambda++) if (ang_->f(ill,illp,lambda) != 0)
                 {
                     Real multipole = special::pow_int(1/r2, lambda + 1);
-                    elem += inp_->Zp * ang_->f(ill,illp,lambda) * multipole * rad_->Mtr_mLm1_full(lambda)(j,l) * (Xp_[0][l1p][n] | Mtr_L_inner[lambda].dot(Xp_[0][l1][m]));
+                    elem += inp_->Zp * ang_->f(ill,illp,lambda) * multipole * rad_full_->Mtr_mLm1_x(lambda)(j,l) * (Xp_[0][l1p][n] | Mtr_L_inner[lambda].dot(Xp_[0][l1][m]));
                 }
                 
                 Cl_blocks_[ill * Nang + illp].add(row, col, Sp_[0][l1p][n][k] * elem);
@@ -706,17 +706,17 @@ void NoPreconditioner::update (Real E)
                 
                 if (ill == illp and m == n)
                 {
-                    elem += (E_ + 0.5_r / ((n + l2 + 1) * (n + l2 + 1))) * rad_->S_full()(i,k)
-                         - 0.5_r * rad_->D_full()(i,k)
-                         - 0.5_r * (l1 * (l1 + 1.0_r)) * rad_->Mm2_full()(i,k);
+                    elem += (E_ + 0.5_r / ((n + l2 + 1) * (n + l2 + 1))) * rad_full_->S_x()(i,k)
+                         - 0.5_r * rad_full_->D_x()(i,k)
+                         - 0.5_r * (l1 * (l1 + 1.0_r)) * rad_full_->Mm2_x()(i,k);
                 }
                 
-                Real r1 = rad_->bspline_full().t(std::min(i,k) + order + 1).real();
+                Real r1 = rad_full_->bspline_x().t(std::min(i,k) + order + 1).real();
                 
-                for (int lambda = 1; lambda <= rad_->maxlambda(); lambda++) if (ang_->f(ill,illp,lambda) != 0)
+                for (int lambda = 1; lambda <= rad_full_->maxlambda(); lambda++) if (ang_->f(ill,illp,lambda) != 0)
                 {
                     Real multipole = special::pow_int(1/r1, lambda + 1);
-                    elem += inp_->Zp * ang_->f(ill,illp,lambda) * multipole * rad_->Mtr_mLm1_full(lambda)(i,k) * (Xp_[1][l2p][n] | Mtr_L_inner[lambda].dot(Xp_[1][l2][m]));
+                    elem += inp_->Zp * ang_->f(ill,illp,lambda) * multipole * rad_full_->Mtr_mLm1_x(lambda)(i,k) * (Xp_[1][l2p][n] | Mtr_L_inner[lambda].dot(Xp_[1][l2][m]));
                 }
                 
                 Cl_blocks_[ill * Nang + illp].add(row, col, Sp_[1][l2p][n][l] * elem);
@@ -736,22 +736,22 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
     int mi = std::get<2>(inp_->instates[instate]);
     
     // shorthands
-    int order = rad_->bspline_inner().order();
-    std::size_t Nspline_inner = rad_->bspline_inner().Nspline();
-    std::size_t Nspline_full  = rad_->bspline_full ().Nspline();
+    int order = rad_inner_->bspline_x().order();
+    std::size_t Nspline_inner = rad_inner_->bspline_x().Nspline();
+    std::size_t Nspline_full  = rad_full_->bspline_x().Nspline();
     std::size_t Nspline_outer = Nspline_full - Nspline_inner;
     
     // impact momentum
     rArray ki = { std::sqrt(inp_->Etot[ie] + 1.0_r/(ni*ni)) };
     
     // calculate LU-decomposition of the overlap matrix
-    CsrMatrix<LU_int_t,Complex> S_csr_full = rad_->S_full().tocoo<LU_int_t>().tocsr();
+    CsrMatrix<LU_int_t,Complex> S_csr_full = rad_full_->S_x().tocoo<LU_int_t>().tocsr();
     std::shared_ptr<LUft> lu_S_full;
     lu_S_full.reset(LUft::Choose("lapack"));
     lu_S_full->factorize(S_csr_full);
     
     // j-overlaps of shape [Nangmom × Nspline]
-    cArray ji_overlaps_full = rad_->overlapj(rad_->bspline_full(), rad_->gaussleg_full(), inp_->maxell, ki, weightEdgeDamp(rad_->bspline_full()), cmd_->fast_bessel);
+    cArray ji_overlaps_full = rad_full_->overlapj(rad_full_->bspline_x(), rad_full_->gaussleg_x(), inp_->maxell, ki, cmd_->fast_bessel);
     if (not std::isfinite(ji_overlaps_full.norm()))
         HexException("Unable to compute Riccati-Bessel function B-spline overlaps!");
     
@@ -768,14 +768,14 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
     
     // inner region multipole matrix
     std::vector<SymBandMatrix<Complex>> Mtr_L_inner;
-    for (int lambda = 0; lambda <= rad_->maxlambda(); lambda++)
+    for (int lambda = 0; lambda <= rad_full_->maxlambda(); lambda++)
     {
         Mtr_L_inner.push_back(SymBandMatrix<Complex>(Nspline_inner, order + 1));
         Mtr_L_inner.back().populate
         (
             [ & ] (int m, int n)
             {
-                return rad_->Mtr_L_inner(lambda)(m, n) * special::pow_int(rad_->bspline_full().t(std::min(m,n) + order + 1).real(), lambda);
+                return rad_inner_->Mtr_L_x(lambda)(m, n) * special::pow_int(rad_full_->bspline_y().t(std::min(m,n) + order + 1).real(), lambda);
             }
         );
     }
@@ -810,8 +810,8 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
                 continue;
             
             // calculate angular integrals
-            rArray f1 (rad_->maxlambda() + 1), f2 (rad_->maxlambda() + 1);
-            for (int lambda = 0; lambda <= rad_->maxlambda(); lambda++)
+            rArray f1 (rad_full_->maxlambda() + 1), f2 (rad_full_->maxlambda() + 1);
+            for (int lambda = 0; lambda <= rad_full_->maxlambda(); lambda++)
             {
                 f1[lambda] = special::computef(lambda, l1, l2, li, l, inp_->L);
                 f2[lambda] = special::computef(lambda, l1, l2, l, li, inp_->L);
@@ -824,41 +824,41 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
             }
             
             // calculate the right-hand side
-            if (cmd_->exact_rhs)
+            /*if (cmd_->exact_rhs)*/
             {
                 // quadrature degree
                 int points = order + li + l + 1;
                 
                 // prepare quadrature nodes and weights
-                rad_->gaussleg_full().precompute_nodes_and_weights(points);
+                rad_full_->gaussleg_x().precompute_nodes_and_weights(points);
                 
                 // precompute quadrature nodes and weights
-                cArray xs ((rad_->bspline_full().Nreknot() - 1) * points), xws ((rad_->bspline_full().Nreknot() - 1) * points);
+                cArray xs ((rad_full_->bspline_x().Nreknot() - 1) * points), xws ((rad_full_->bspline_x().Nreknot() - 1) * points);
                 # pragma omp parallel for
-                for (int ixknot = 0; ixknot < rad_->bspline_full().Nreknot() - 1; ixknot++)
-                    rad_->gaussleg_full().scaled_nodes_and_weights(points, rad_->bspline_full().t(ixknot), rad_->bspline_full().t(ixknot + 1), &xs[ixknot * points], &xws[ixknot * points]);
+                for (int ixknot = 0; ixknot < rad_full_->bspline_x().Nreknot() - 1; ixknot++)
+                    rad_full_->gaussleg_x().scaled_nodes_and_weights(points, rad_full_->bspline_x().t(ixknot), rad_full_->bspline_x().t(ixknot + 1), &xs[ixknot * points], &xws[ixknot * points]);
                 
                 // precompute B-splines
-                cArray B_x (rad_->bspline_full().Nspline() * (order + 1) * points);
+                cArray B_x (rad_full_->bspline_x().Nspline() * (order + 1) * points);
                 # pragma omp parallel for
-                for (int ixspline = 0; ixspline < rad_->bspline_full().Nspline(); ixspline++)
-                for (int ixknot = ixspline; ixknot <= ixspline + order and ixknot < rad_->bspline_full().Nreknot() - 1; ixknot++)
-                    rad_->bspline_full().B(ixspline, ixknot, points, &xs[ixknot * points], &B_x[(ixspline * (order + 1) + ixknot - ixspline) * points]);
+                for (int ixspline = 0; ixspline < rad_full_->bspline_x().Nspline(); ixspline++)
+                for (int ixknot = ixspline; ixknot <= ixspline + order and ixknot < rad_full_->bspline_x().Nreknot() - 1; ixknot++)
+                    rad_full_->bspline_x().B(ixspline, ixknot, points, &xs[ixknot * points], &B_x[(ixspline * (order + 1) + ixknot - ixspline) * points]);
                 
                 // precompute radial functions and Riccati-Bessel functions
-                rArray Pi_x = realpart(rad_->bspline_inner().zip(Xp, realpart(xs)));
+                rArray Pi_x = realpart(rad_inner_->bspline_x().zip(Xp, realpart(xs)));
                 rArray ji_x (xs.size());
                 # pragma omp parallel for
                 for (unsigned ix = 0; ix < xs.size(); ix++)
                     ji_x[ix] = special::ric_j(l, ki[0] * xs[ix].real());
                 
                 // damping distance
-                Real distance = rad_->bspline_full().R0();
+                Real distance = rad_full_->bspline_x().R2();
                 
                 // precompute integral moments
-                cArrays M_L_P (rad_->maxlambda() + 1), M_mLm1_P (rad_->maxlambda() + 1);
-                cArrays M_L_j (rad_->maxlambda() + 1), M_mLm1_j (rad_->maxlambda() + 1);
-                for (int lambda = 0; lambda <= rad_->maxlambda(); lambda++)
+                cArrays M_L_P (rad_full_->maxlambda() + 1), M_mLm1_P (rad_full_->maxlambda() + 1);
+                cArrays M_L_j (rad_full_->maxlambda() + 1), M_mLm1_j (rad_full_->maxlambda() + 1);
+                for (int lambda = 0; lambda <= rad_full_->maxlambda(); lambda++)
                 {
                     M_L_P[lambda].resize(Nspline_full); M_mLm1_P[lambda].resize(Nspline_full);
                     M_L_j[lambda].resize(Nspline_full); M_mLm1_j[lambda].resize(Nspline_full);
@@ -866,13 +866,13 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
                     # pragma omp parallel for
                     for (int ispline = 0; ispline < (int)Nspline_full; ispline++)
                     {
-                        for (int iknot = ispline; iknot < std::min(ispline + order + 1, rad_->bspline_full().Nreknot() - 1); iknot++)
-                        if (rad_->bspline_full().t(iknot).real() != rad_->bspline_full().t(iknot + 1).real())
+                        for (int iknot = ispline; iknot < std::min(ispline + order + 1, rad_full_->bspline_x().Nreknot() - 1); iknot++)
+                        if (rad_full_->bspline_x().t(iknot).real() != rad_full_->bspline_x().t(iknot + 1).real())
                         {
                             for (int ipoint = 0; ipoint < points; ipoint++)
                             {
                                 Real x = xs[iknot * points + ipoint].real();
-                                Real t = rad_->bspline_full().t(ispline + order + 1).real();
+                                Real t = rad_full_->bspline_x().t(ispline + order + 1).real();
                                 
                                 Real L = special::pow_int(x / t, lambda);
                                 Real mLm1 = special::pow_int(x / t, -lambda-1);
@@ -883,7 +883,7 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
                                 Real P = Pi_x[iknot * points + ipoint];
                                 Real j = ji_x[iknot * points + ipoint];
                                 
-                                Real d = damp(x, 0, distance);
+                                Real d = 1;//damp(x, 0, distance);
                                 
                                 M_L_P[lambda][ispline] += w * B * L * P * d;
                                 M_L_j[lambda][ispline] += w * B * L * j * d;
@@ -899,15 +899,15 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
                 for (int ichan1 = 0; ichan1 < Nchan1; ichan1++)
                 {
                     // this is needed only for exchange contribution
-                    rho_l2[ichan1].resize(rad_->maxlambda() + 1);
-                    for (int lambda = 1; lambda <= rad_->maxlambda(); lambda++)
+                    rho_l2[ichan1].resize(rad_full_->maxlambda() + 1);
+                    for (int lambda = 1; lambda <= rad_full_->maxlambda(); lambda++)
                         rho_l2[ichan1][lambda] = (Xp_[1][l2][ichan1] | Mtr_L_inner[lambda].dot(Xp));
                 }
                 for (int ichan2 = 0; ichan2 < Nchan2; ichan2++)
                 {
                     // this is needed only for direct contribution
-                    rho_l1[ichan2].resize(rad_->maxlambda() + 1);
-                    for (int lambda = 1; lambda <= rad_->maxlambda(); lambda++)
+                    rho_l1[ichan2].resize(rad_full_->maxlambda() + 1);
+                    for (int lambda = 1; lambda <= rad_full_->maxlambda(); lambda++)
                         rho_l1[ichan2][lambda] = (Xp_[0][l1][ichan2] | Mtr_L_inner[lambda].dot(Xp));
                 }
                 
@@ -926,8 +926,8 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
                         int ichan1 = (ispline - Nspline_inner * Nspline_inner) / Nspline_outer;
                         
                         // calculate the exchange contribution
-                        Real x = rad_->bspline_full().t(ixspline + order + 1).real(), multipole = x;
-                        for (int lambda = 1; lambda <= rad_->maxlambda(); lambda++)
+                        Real x = rad_full_->bspline_x().t(ixspline + order + 1).real(), multipole = x;
+                        for (int lambda = 1; lambda <= rad_full_->maxlambda(); lambda++)
                         {
                             multipole *= x;
                             
@@ -942,8 +942,8 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
                         int ichan2 = (ispline - Nspline_inner * Nspline_inner - Nchan1 * Nspline_outer) / Nspline_outer;
                         
                         // calculate the direct contribution
-                        Real y = rad_->bspline_full().t(iyspline + order + 1).real(), multipole = y;
-                        for (int lambda = 1; lambda <= rad_->maxlambda(); lambda++)
+                        Real y = rad_full_->bspline_y().t(iyspline + order + 1).real(), multipole = y;
+                        for (int lambda = 1; lambda <= rad_full_->maxlambda(); lambda++)
                         {
                             multipole *= y;
                             
@@ -963,19 +963,19 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
                             // monopole contribution
                             if (ixspline > iyspline and f1[0] != 0)
                             {
-                                contrib_direct   += f1[0] * (M_mLm1_P[0][ixspline] * M_L_j[0][iyspline] / rad_->bspline_full().t(ixspline + order + 1) - M_L_P[0][ixspline] * M_mLm1_j[0][iyspline] / rad_->bspline_full().t(iyspline + order + 1));
+                                contrib_direct   += f1[0] * (M_mLm1_P[0][ixspline] * M_L_j[0][iyspline] / rad_full_->bspline_x().t(ixspline + order + 1) - M_L_P[0][ixspline] * M_mLm1_j[0][iyspline] / rad_full_->bspline_y().t(iyspline + order + 1));
                                 contrib_exchange += 0;
                             }
                             if (ixspline < iyspline and f2[0] != 0 and inp_->exchange)
                             {
                                 contrib_direct   += 0;
-                                contrib_exchange += f2[0] * (M_L_j[0][ixspline] * M_mLm1_P[0][iyspline] / rad_->bspline_full().t(iyspline + order + 1) - M_mLm1_j[0][ixspline] * M_L_P[0][iyspline] / rad_->bspline_full().t(ixspline + order + 1));
+                                contrib_exchange += f2[0] * (M_L_j[0][ixspline] * M_mLm1_P[0][iyspline] / rad_full_->bspline_y().t(iyspline + order + 1) - M_mLm1_j[0][ixspline] * M_L_P[0][iyspline] / rad_full_->bspline_x().t(ixspline + order + 1));
                             }
                             
                             // multipole contributions
-                            Real x = rad_->bspline_full().t(ixspline + order + 1).real(), y = rad_->bspline_full().t(iyspline + order + 1).real();
+                            Real x = rad_full_->bspline_x().t(ixspline + order + 1).real(), y = rad_full_->bspline_y().t(iyspline + order + 1).real();
                             Real multipole1 = 1 / x, multipole2 = 1 / y, y_over_x = y / x, x_over_y = x / y;
-                            for (int lambda = 1; lambda <= rad_->maxlambda(); lambda++)
+                            for (int lambda = 1; lambda <= rad_full_->maxlambda(); lambda++)
                             {
                                 multipole1 *= y_over_x;
                                 multipole2 *= x_over_y;
@@ -995,8 +995,8 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
                         else
                         {
                             // for all knots
-                            for (int ixknot = ixspline; ixknot <= ixspline + order and ixknot < rad_->bspline_full().Nreknot() - 1; ixknot++) if (rad_->bspline_full().t(ixknot).real() != rad_->bspline_full().t(ixknot + 1).real())
-                            for (int iyknot = iyspline; iyknot <= iyspline + order and iyknot < rad_->bspline_full().Nreknot() - 1; iyknot++) if (rad_->bspline_full().t(iyknot).real() != rad_->bspline_full().t(iyknot + 1).real())
+                            for (int ixknot = ixspline; ixknot <= ixspline + order and ixknot < rad_full_->bspline_x().Nreknot() - 1; ixknot++) if (rad_full_->bspline_x().t(ixknot).real() != rad_full_->bspline_x().t(ixknot + 1).real())
+                            for (int iyknot = iyspline; iyknot <= iyspline + order and iyknot < rad_full_->bspline_y().Nreknot() - 1; iyknot++) if (rad_full_->bspline_y().t(iyknot).real() != rad_full_->bspline_y().t(iyknot + 1).real())
                             {
                                 // off-diagonal contribution
                                 if (ixknot != iyknot)
@@ -1019,7 +1019,7 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
                                         Complex wy = xws[iyknot * points + iy];
                                         
                                         // damp factor
-                                        Real dampfactor = damp(rx, ry, distance);
+                                        Real dampfactor = 1;//damp(rx, ry, distance);
                                         
                                         // monopole contribution
                                         if (rx > ry and li == l1 and l == l2)                    contrib_direct   += Bx * By * (1.0_r/rx - 1.0_r/ry) * Pix * jiy * dampfactor * wx * wy;
@@ -1027,7 +1027,7 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
                                         
                                         // higher multipoles contribution
                                         Real multipole = 1 / rmax, rmin_over_rmax = rmin / rmax;
-                                        for (int lambda = 1; lambda <= rad_->maxlambda(); lambda++)
+                                        for (int lambda = 1; lambda <= rad_full_->maxlambda(); lambda++)
                                         {
                                             multipole *= rmin_over_rmax;
                                             if (f1[lambda] != 0)                    contrib_direct   += f1[lambda] * Bx * By * multipole * Pix * jiy * dampfactor * wx * wy;
@@ -1036,14 +1036,14 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
                                     }
                                 }
                                 // diagonal contribution: needs to be integrated more carefully
-                                else if (ixknot < rad_->bspline_full().Nreknot() - 1)
+                                else if (ixknot < rad_full_->bspline_x().Nreknot() - 1)
                                 {
                                     // for all quadrature points from the triangle x < y
                                     for (int ix = 0; ix < points; ix++)
                                     {
                                         cArray ys (points), yws (points), B_y (points);
-                                        rad_->gaussleg_full().scaled_nodes_and_weights(points, xs[ixknot * points + ix], rad_->bspline_full().t(iyknot + 1), &ys[0], &yws[0]);
-                                        rad_->bspline_full().B(iyspline, iyknot, points, &ys[0], &B_y[0]);
+                                        rad_full_->gaussleg_x().scaled_nodes_and_weights(points, xs[ixknot * points + ix], rad_full_->bspline_y().t(iyknot + 1), &ys[0], &yws[0]);
+                                        rad_full_->bspline_y().B(iyspline, iyknot, points, &ys[0], &B_y[0]);
                                         
                                         for (int iy = 0; iy < points; iy++)
                                         {
@@ -1054,14 +1054,14 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
                                             Complex Bx = B_x[(ixspline * (order + 1) + ixknot - ixspline) * points + ix];
                                             Complex By = B_y[iy];
                                             Real Pix = Pi_x[ixknot * points + ix];
-                                            Real Piy = rad_->bspline_inner().eval(Xp, ry).real();
+                                            Real Piy = rad_inner_->bspline_y().eval(Xp, ry).real();
                                             Real jix = ji_x[ixknot * points + ix];
                                             Real jiy = special::ric_j(l, ki[0] * ry);
                                             Complex wx = xws[ixknot * points + ix];
                                             Complex wy = yws[iy];
                                             
                                             // damp factor
-                                            Real dampfactor = damp(rx, ry, distance);
+                                            Real dampfactor = 1;//damp(rx, ry, distance);
                                             
                                             // monopole contribution
                                             if (rx > ry and li == l1 and l == l2)                    contrib_direct   += Bx * By * (1.0_r/rx - 1.0_r/ry) * Pix * jiy * dampfactor * wx * wy;
@@ -1069,7 +1069,7 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
                                             
                                             // higher multipoles contribution
                                             Real multipole = 1 / rmax, rmin_over_rmax = rmin / rmax;
-                                            for (int lambda = 1; lambda <= rad_->maxlambda(); lambda++)
+                                            for (int lambda = 1; lambda <= rad_full_->maxlambda(); lambda++)
                                             {
                                                 multipole *= rmin_over_rmax;
                                                 if (f1[lambda] != 0)                    contrib_direct   += f1[lambda] * Bx * By * multipole * Pix * jiy * dampfactor * wx * wy;
@@ -1082,8 +1082,8 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
                                     for (int ix = 0; ix < points; ix++)
                                     {
                                         cArray ys (points), yws (points), B_y (points);
-                                        rad_->gaussleg_full().scaled_nodes_and_weights(points, rad_->bspline_full().t(iyknot), xs[ixknot * points + ix], &ys[0], &yws[0]);
-                                        rad_->bspline_full().B(iyspline, iyknot, points, &ys[0], &B_y[0]);
+                                        rad_full_->gaussleg_x().scaled_nodes_and_weights(points, rad_full_->bspline_y().t(iyknot), xs[ixknot * points + ix], &ys[0], &yws[0]);
+                                        rad_full_->bspline_y().B(iyspline, iyknot, points, &ys[0], &B_y[0]);
                                         
                                         for (int iy = 0; iy < points; iy++)
                                         {
@@ -1094,14 +1094,14 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
                                             Complex Bx = B_x[(ixspline * (order + 1) + ixknot - ixspline) * points + ix];
                                             Complex By = B_y[iy];
                                             Real Pix = Pi_x[ixknot * points + ix];
-                                            Real Piy = rad_->bspline_inner().eval(Xp, ry).real();
+                                            Real Piy = rad_inner_->bspline_y().eval(Xp, ry).real();
                                             Real jix = ji_x[ixknot * points + ix];
                                             Real jiy = special::ric_j(l, ki[0] * ry);
                                             Complex wx = xws[ixknot * points + ix];
                                             Complex wy = yws[iy];
                                             
                                             // damp factor
-                                            Real dampfactor = damp(rx, ry, distance);
+                                            Real dampfactor = 1;//damp(rx, ry, distance);
                                             
                                             // monopole contribution
                                             if (rx > ry and li == l1 and l == l2)                    contrib_direct   += Bx * By * (1.0_r/rx - 1.0_r/ry) * Pix * jiy * dampfactor * wx * wy;
@@ -1109,7 +1109,7 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
                                             
                                             // higher multipoles contribution
                                             Real multipole = 1 / rmax, rmin_over_rmax = rmin / rmax;
-                                            for (int lambda = 1; lambda <= rad_->maxlambda(); lambda++)
+                                            for (int lambda = 1; lambda <= rad_full_->maxlambda(); lambda++)
                                             {
                                                 multipole *= rmin_over_rmax;
                                                 if (f1[lambda] != 0)                    contrib_direct   += f1[lambda] * Bx * By * multipole * Pix * jiy * dampfactor * wx * wy;
@@ -1133,10 +1133,10 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
                     }
                 }
             }
-            else
+            /*else
             {
                 HexException("Please use --exact-rhs.");
-            }
+            }*/
         }
         
         // use the calculated block
@@ -1154,8 +1154,8 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
 void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Complex> & q, MatrixSelection::Selection tri) const
 {
     // shorthands
-    unsigned Nspline_inner = rad_->bspline_inner().Nspline();
-    unsigned Nspline_full  = rad_->bspline_full().Nspline();
+    unsigned Nspline_inner = rad_inner_->bspline_x().Nspline();
+    unsigned Nspline_full  = rad_full_->bspline_x().Nspline();
     unsigned Nspline_outer = Nspline_full - Nspline_inner;
     unsigned Nang = ang_->states().size();
     
@@ -1293,7 +1293,7 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
     {
         OMP_CREATE_LOCKS(Nang * Nspline_inner);
         
-        int maxlambda = rad_->maxlambda();
+        int maxlambda = rad_full_->maxlambda();
         
         # pragma omp parallel for collapse (3) schedule (dynamic,1)
         for (int lambda = 0; lambda <= maxlambda; lambda++)
@@ -1303,7 +1303,7 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
         {
             unsigned k = i + d;
             
-            SymBandMatrix<Complex> R = std::move(rad_->calc_R_tr_dia_block(lambda, i, k));
+            SymBandMatrix<Complex> R = std::move(rad_full_->calc_R_tr_dia_block(lambda, i, k));
             
             for (unsigned ill = 0; ill < Nang; ill++) if (par_->isMyGroupWork(ill))
             for (unsigned illp = 0; illp < Nang; illp++) if (par_->igroupproc() == (int)illp % par_->groupsize())

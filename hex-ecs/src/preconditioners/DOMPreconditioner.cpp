@@ -85,8 +85,8 @@ void DOMPreconditioner::update (Real E)
 void DOMPreconditioner::precondition (BlockArray<Complex> const & r, BlockArray<Complex> & z) const
 {
     // B-spline parameters
-    int order = rad().bspline_inner_x().order();
-    Real theta = rad().bspline_inner_x().ECStheta();
+    int order = rad_inner().bspline_x().order();
+    Real theta = rad_inner().bspline_x().ECStheta();
     
     // construct sub-domain bases
     std::vector<PanelSolution> p;
@@ -98,8 +98,8 @@ void DOMPreconditioner::precondition (BlockArray<Complex> const & r, BlockArray<
         rArray ryknots, cyknots1, cyknots2;
         
         // calculate the knot sub-sequences
-        knotSubsequence(ixpanel, xpanels, rad().bspline_inner_x(), rxknots, cxknots1, cxknots2);
-        knotSubsequence(iypanel, ypanels, rad().bspline_inner_x(), ryknots, cyknots1, cyknots2);
+        knotSubsequence(ixpanel, xpanels, rad_inner().bspline_x(), rxknots, cxknots1, cxknots2);
+        knotSubsequence(iypanel, ypanels, rad_inner().bspline_y(), ryknots, cyknots1, cyknots2);
         
         if (ixpanel == 0) cxknots1.drop();
         if (iypanel == 0) cyknots1.drop();
@@ -118,8 +118,8 @@ void DOMPreconditioner::precondition (BlockArray<Complex> const & r, BlockArray<
         (
             order,
             theta,
-            rad().bspline_inner_x(),
-            rad().bspline_inner_y(),
+            rad_inner().bspline_x(),
+            rad_inner().bspline_y(),
             cxknots1, rxknots, cxknots2,
             cyknots1, ryknots, cyknots2,
             cxknots1, rxknots, cxknots2,
@@ -132,8 +132,8 @@ void DOMPreconditioner::precondition (BlockArray<Complex> const & r, BlockArray<
         Bspline const & yspline = p.back().yspline_inner;
         
         // calculate overlaps
-        p.back().SaF = RadialIntegrals::computeOverlapMatrix(xspline, rad().bspline_inner_x(), xspline.R1(), xspline.R2());
-        p.back().SbF = RadialIntegrals::computeOverlapMatrix(yspline, rad().bspline_inner_y(), yspline.R1(), yspline.R2());
+        p.back().SaF = RadialIntegrals::computeOverlapMatrix(xspline, rad_inner().bspline_x(), xspline.R1(), xspline.R2());
+        p.back().SbF = RadialIntegrals::computeOverlapMatrix(yspline, rad_inner().bspline_y(), yspline.R1(), yspline.R2());
         p.back().Saa = RadialIntegrals::computeOverlapMatrix(xspline, xspline,  xspline.Rmin(), xspline.Rmax());
         p.back().Sbb = RadialIntegrals::computeOverlapMatrix(yspline, yspline,  yspline.Rmin(), yspline.Rmax());
         
@@ -201,7 +201,7 @@ void DOMPreconditioner::solvePanel (int n, std::vector<PanelSolution> & p, int i
     prec->update(E_);
     
     // get radial integrals
-    RadialIntegrals const & rad = dynamic_cast<NoPreconditioner*>(prec)->rad();
+    RadialIntegrals const & rad = dynamic_cast<NoPreconditioner*>(prec)->rad_inner();
     
     // B-spline bases
     Bspline const & xspline_inner = pCentre->xspline_inner;
@@ -223,7 +223,7 @@ void DOMPreconditioner::solvePanel (int n, std::vector<PanelSolution> & p, int i
         for (unsigned ill = 0; ill < chi.size(); ill++)
         for (int i = iR1 - 2 * order - 1; i < iR1; i++)
         for (int j = 0; j < Nyspline; j++)
-            chi[ill][i * Nyspline + j] += rad.S_inner_x(iR1 - order - 1, i) * pNbr[Left]->ssrc[Right][ill][j];
+            chi[ill][i * Nyspline + j] += rad.S_x(iR1 - order - 1, i) * pNbr[Left]->ssrc[Right][ill][j];
     }
     if (pNbr[Right] != nullptr)
     {
@@ -232,7 +232,7 @@ void DOMPreconditioner::solvePanel (int n, std::vector<PanelSolution> & p, int i
         for (unsigned ill = 0; ill < chi.size(); ill++)
         for (int i = iR2 - order; i < iR2 + order + 1; i++)
         for (int j = 0; j < Nyspline; j++)
-            chi[ill][i * Nyspline + j] += rad.S_inner_x(iR2, i) * pNbr[Right]->ssrc[Left][ill][j];
+            chi[ill][i * Nyspline + j] += rad.S_x(iR2, i) * pNbr[Right]->ssrc[Left][ill][j];
     }
     if (pNbr[Down] != nullptr)
     {
@@ -241,7 +241,7 @@ void DOMPreconditioner::solvePanel (int n, std::vector<PanelSolution> & p, int i
         for (unsigned ill = 0; ill < chi.size(); ill++)
         for (int i = 0; i < Nxspline; i++)
         for (int j = iR1 - 2 * order - 1; j < iR1; j++)
-            chi[ill][i * Nyspline + j] += rad.S_inner_y(iR1 - order - 1, j) * pNbr[Down]->ssrc[Up][ill][i];
+            chi[ill][i * Nyspline + j] += rad.S_y(iR1 - order - 1, j) * pNbr[Down]->ssrc[Up][ill][i];
     }
     if (pNbr[Up] != nullptr)
     {
@@ -250,7 +250,7 @@ void DOMPreconditioner::solvePanel (int n, std::vector<PanelSolution> & p, int i
         for (unsigned ill = 0; ill < chi.size(); ill++)
         for (int i = 0; i < Nxspline; i++)
         for (int j = iR2 - order; j < iR2 + order + 1; j++)
-            chi[ill][i * Nyspline + j] += rad.S_inner_y(iR2, j) * pNbr[Up]->ssrc[Down][ill][i];
+            chi[ill][i * Nyspline + j] += rad.S_y(iR2, j) * pNbr[Up]->ssrc[Down][ill][i];
     }
     
     // conjugate gradients callbacks
@@ -389,7 +389,7 @@ void DOMPreconditioner::surrogateSource (PanelSolution * panel, int direction, P
         Bspline const & yspline = panel->yspline_inner;
         
         // calculate radial integrals
-        RadialIntegrals rint (xspline, yspline, xspline, yspline, 0);
+        RadialIntegrals rint (xspline, yspline, 0);
         
         // for all angular states
         for (unsigned ill = 0; ill < ang_->states().size(); ill++)
@@ -400,11 +400,11 @@ void DOMPreconditioner::surrogateSource (PanelSolution * panel, int direction, P
         
             // construct the matrix of the free equations
             BlockSymBandMatrix<Complex> A =
-                kron(Complex(E_) * rint.S_inner_x(), rint.S_inner_y())
-                - kron(0.5_z * rint.D_inner_x(), rint.S_inner_x())
-                - kron(0.5_z * rint.S_inner_x(), rint.D_inner_x())
-                - kron(Complex(0.5 * l1 * (l1 + 1)) * rint.Mm2_inner_x(), rint.S_inner_x())
-                - kron(Complex(0.5 * l2 * (l2 + 1)) * rint.S_inner_x(), rint.Mm2_inner_x());
+                kron(Complex(E_) * rint.S_x(), rint.S_y())
+                - kron(0.5_z * rint.D_x(), rint.S_x())
+                - kron(0.5_z * rint.S_x(), rint.D_x())
+                - kron(Complex(0.5 * l1 * (l1 + 1)) * rint.Mm2_x(), rint.S_x())
+                - kron(Complex(0.5 * l2 * (l2 + 1)) * rint.S_x(), rint.Mm2_x());
             
             // add additional matrix elements
             CooMatrix<LU_int_t,Complex> A_coo = A.tocoo<LU_int_t>();
@@ -420,7 +420,7 @@ void DOMPreconditioner::surrogateSource (PanelSolution * panel, int direction, P
                 (
                     i * yspline.Nspline() + j,
                     xspline.Nspline() * yspline.Nspline() + j,
-                    -rint.S_inner_x(i, xspline.iR1() - 1)
+                    -rint.S_x(i, xspline.iR1() - 1)
                 );
             }
             for (int j = 0; j < yspline.Nspline(); j++)
@@ -501,14 +501,14 @@ void DOMPreconditioner::splitResidual (cBlockArray const & r, std::vector<PanelS
         writeVTK_points
         (
             out,
-            rad().bspline_inner_x().zip
+            rad_inner().bspline_x().zip
             (
                 r[ill],
-                linspace(rad().bspline_inner_x().Rmin(), rad().bspline_inner_x().Rmax(), 1001),
-                linspace(rad().bspline_inner_y().Rmin(), rad().bspline_inner_y().Rmax(), 1001)
+                linspace(rad_inner().bspline_x().Rmin(), rad_inner().bspline_x().Rmax(), 1001),
+                linspace(rad_inner().bspline_y().Rmin(), rad_inner().bspline_y().Rmax(), 1001)
             ),
-            linspace(rad().bspline_inner_x().Rmin(), rad().bspline_inner_x().Rmax(), 1001),
-            linspace(rad().bspline_inner_y().Rmin(), rad().bspline_inner_y().Rmax(), 1001),
+            linspace(rad_inner().bspline_x().Rmin(), rad_inner().bspline_x().Rmax(), 1001),
+            linspace(rad_inner().bspline_y().Rmin(), rad_inner().bspline_y().Rmax(), 1001),
             rArray{ 0. }
         );
     }
@@ -569,7 +569,7 @@ void DOMPreconditioner::splitResidual (cBlockArray const & r, std::vector<PanelS
             // map global indices to panel
             unsigned pxspline, pyspline;
             if (p.mapToPanel(ixspline, iyspline, pxspline, pyspline))
-                p.r[ill][pxspline * Nyspline + iyspline] = r[ill][ixspline * rad().bspline_inner_y().Nspline() + iyspline];
+                p.r[ill][pxspline * Nyspline + iyspline] = r[ill][ixspline * rad_inner().bspline_y().Nspline() + iyspline];
         }
         
         std::ofstream out2 (format("splt2-%d-%d-%d.vtk", ixpanel, iypanel, ill));

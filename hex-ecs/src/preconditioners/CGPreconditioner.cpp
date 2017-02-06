@@ -173,9 +173,9 @@ void CGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArray<C
         {
             // subtract upper block diagonals for ill-th block row
             for (int illp = ill + 1; illp < (int)ang_->states().size(); illp++)
-            for (int lambda = 0; lambda <= rad_->maxlambda(); lambda++)
+            for (int lambda = 0; lambda <= rad_full_->maxlambda(); lambda++)
             if (ang_->f(ill, illp, lambda) != 0)
-                rad_->R_tr_dia(lambda).dot(-ang_->f(ill, illp, lambda), y[illp], 1., y[ill], true);
+                rad_full_->R_tr_dia(lambda).dot(-ang_->f(ill, illp, lambda), y[illp], 1., y[ill], true);
             
             // use (preconditioned) conjugate gradients to invert a diagonal block
             n_[ill] += solve_block(ill, cmd_->ssor * y[ill], z[ill]);
@@ -238,10 +238,10 @@ void CGPreconditioner::CG_mmul (int iblock, const cArrayView p, cArrayView q) co
 {
     std::memset(q.data(), 0, q.size() * sizeof(Complex));
     
-    std::size_t Nspline_inner_x = rad_->bspline_inner_x().Nspline();
-    std::size_t Nspline_inner_y = rad_->bspline_inner_y().Nspline();
-    std::size_t Nspline_full_x = rad_->bspline_full_x().Nspline();
-    std::size_t Nspline_full_y = rad_->bspline_full_y().Nspline();
+    std::size_t Nspline_inner_x = rad_inner_->bspline_x().Nspline();
+    std::size_t Nspline_inner_y = rad_inner_->bspline_y().Nspline();
+    std::size_t Nspline_full_x = rad_full_->bspline_x().Nspline();
+    std::size_t Nspline_full_y = rad_full_->bspline_y().Nspline();
     std::size_t Nspline_outer_x = Nspline_full_x - Nspline_inner_x;
     std::size_t Nspline_outer_y = Nspline_full_y - Nspline_inner_y;
     std::size_t Nang = ang_->states().size();

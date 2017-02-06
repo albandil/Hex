@@ -102,14 +102,30 @@ class GPUCGPreconditioner : public virtual KPACGPreconditioner
         // constructor
         GPUCGPreconditioner
         (
-            Parallel const & par,
-            InputFile const & inp,
-            AngularBasis const & ll,
+            CommandLine  const & cmd,
+            InputFile    const & inp,
+            Parallel     const & par,
+            AngularBasis const & ang,
             Bspline const & bspline_inner,
             Bspline const & bspline_full,
-            CommandLine const & cmd
-        ) : CGPreconditioner(par, inp, ll, bspline_inner, bspline_full, cmd),
-            KPACGPreconditioner(par, inp, ll, bspline_inner, bspline_full, cmd)
+            Bspline const & bspline_panel_x,
+            Bspline const & bspline_panel_y
+        ) : CGPreconditioner
+            (
+                cmd, inp, par, ang,
+                bspline_inner,
+                bspline_full,
+                bspline_panel_x,
+                bspline_panel_y
+            ),
+            KPACGPreconditioner
+            (
+                cmd, inp, par, ang,
+                bspline_inner,
+                bspline_full,
+                bspline_panel_x,
+                bspline_panel_y
+            )
         {
             // nothing more to do
         }

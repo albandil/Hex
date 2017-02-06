@@ -153,8 +153,8 @@ void KPACGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z)
     int l2 = ang_->states()[iblock].second;
     
     // dimension of the matrices
-    std::size_t Nspline_inner_x = rad_->bspline_inner_x().Nspline();
-    std::size_t Nspline_inner_y = rad_->bspline_inner_y().Nspline();
+    std::size_t Nspline_inner_x = rad_inner_->bspline_x().Nspline();
+    std::size_t Nspline_inner_y = rad_inner_->bspline_y().Nspline();
     
     // get workspace
     int ithread = 0;
