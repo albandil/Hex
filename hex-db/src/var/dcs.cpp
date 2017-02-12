@@ -112,16 +112,20 @@ void hex_differential_cross_section
 (
     int ni, int li, int mi,
     int nf, int lf, int mf,
-    int S, double E, int N,
-    double * angles, double * dcs
+    int S,
+    int nEnergies, double * energies,
+    int nAngles, double * angles,
+    double * dcs, double * extra
 )
 {
     hex_differential_cross_section_
     (
         &ni, &li, &mi,
         &nf, &lf, &mf,
-        &S, &E, &N,
-        angles, dcs
+        &S,
+        &nEnergies, energies,
+        &nAngles, angles,
+        dcs, extra
     );
 }
 
@@ -129,27 +133,37 @@ void hex_differential_cross_section_
 (
     int * ni, int * li, int * mi,
     int * nf, int * lf, int * mf,
-    int * S, double * E, int * N,
-    double * angles, double * dcs
+    int * S,
+    int * nEnergies, double * energies,
+    int * nAngles, double * angles,
+    double * dcs, double * extra
 )
 {
-    double ki = std::sqrt((*E));
-    double kf = std::sqrt((*E) - 1./((*ni)*(*ni)) + 1./((*nf)*(*nf)));
+    rArrayView E (*nEnergies, energies);
     
-    // check if this is an allowed transition
-    if (not std::isfinite(ki) or not std::isfinite(kf))
-        return;
+    rArray ki = sqrt(E);
+    rArray kf = sqrt(E - 1./((*ni)*(*ni)) + 1./((*nf)*(*nf)));
     
     // get scattering amplitudes
-    cArray amplitudes(*N);
+    cArray amplitudes ((*nEnergies) * (*nAngles));
+    cArray xamplitudes ((*nEnergies) * (*nAngles));
     hex_scattering_amplitude_
     (
-        ni, li, mi, nf, lf, mf, S, E, N, angles,
-        reinterpret_cast<double*>(amplitudes.data())
+        ni, li, mi,
+        nf, lf, mf,
+        S,
+        nEnergies, energies,
+        nAngles, angles,
+        reinterpret_cast<double*>(amplitudes.data()),
+        extra ? nullptr : reinterpret_cast<double*>(xamplitudes.data())
     );
     
     // calculate differential cross section
-    rArrayView(*N, dcs) = sqrabs(amplitudes) * (kf/ki * 0.25 * (2 * (*S) + 1));
+    rArrayView(amplitudes.size(), dcs) = sqrabs(amplitudes) * (kf/ki * 0.25 * (2 * (*S) + 1));
+    
+    // calculate extrapolated cross section
+    if (extra)
+        rArrayView(xamplitudes.size(), extra) = sqrabs(xamplitudes) * (kf/ki * 0.25 * (2 * (*S) + 1));
 }
 
 bool DifferentialCrossSection::run (std::map<std::string,std::string> const & sdata)
@@ -186,7 +200,7 @@ bool DifferentialCrossSection::run (std::map<std::string,std::string> const & sd
     
     // compute cross section
     rArray scaled_angles = angles * afactor, dcs(angles.size());
-    hex_differential_cross_section(ni,li,mi, nf,lf,mf, S, E, angles.size(), scaled_angles.data(), dcs.data());
+    hex_differential_cross_section(ni,li,mi, nf,lf,mf, S, 1, &E, angles.size(), scaled_angles.data(), dcs.data(), nullptr);
     
     // write out
     std::cout << logo("#") <<

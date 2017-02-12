@@ -166,7 +166,7 @@ bool MomentumTransfer::run (std::map<std::string,std::string> const & sdata)
     std::pair<int,int> key(-1,-1);    // current (L,ell) pair
     int maxL = -1;    // maximal L
     int maxl = -1;    // maximal ell
-        
+    
     // load T-matrices
     std::map<std::pair<int,int>, std::pair<rArray*, cArray*>> Tmatrices;
     while (st.exec())

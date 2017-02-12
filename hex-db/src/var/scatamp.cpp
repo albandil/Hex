@@ -111,16 +111,20 @@ void hex_scattering_amplitude
 (
     int ni, int li, int mi,
     int nf, int lf, int mf,
-    int S, double E, int N,
-    double * angles, double * result
+    int S,
+    int nEnergies, double * energies,
+    int nAngles, double * angles,
+    double * result, double * extra
 )
 {
     hex_scattering_amplitude_
     (
         &ni, &li, &mi,
         &nf, &lf, &mf,
-        &S, &E, &N,
-        angles, result
+        &S,
+        &nEnergies, energies,
+        &nAngles, angles,
+        result, extra
     );
 }
 
@@ -128,141 +132,243 @@ void hex_scattering_amplitude_
 (
     int * ni, int * li, int * mi,
     int * nf, int * lf, int * mf,
-    int * S, double * E, int * N,
-    double * angles, double * result
+    int * S,
+    int * nEnergies, double * energies,
+    int * nAngles, double * angles,
+    double * result, double * extra
 )
 {
+    double Ei, ReT, ImT;
+    rArray avail_energies;
+    cArrays tmatrices;
+    
     ScatteringQuantity * TMat = get_quantity("tmat");
     
-    cArrayView results(*N,reinterpret_cast<Complex*>(result));
-    results.fill(0.);
+    // get view of the output result array
+    cArrayView results;
+    results.reset((*nEnergies) * (*nAngles), reinterpret_cast<Complex*>(result));
+    results.fill(0);
     
-    // we need cosines, not angles
-    rArray cos_angles = rArray(*N,angles).transform([](double x){ return std::cos(x); });
-    
-    // get lowest and highest partial wave
-    int min_ell, max_ell;
-    sqlitepp::statement st (TMat->session());
-    st << "SELECT MIN(ell), MAX(L)-lf FROM 'tmat' "
-           "WHERE ni = :ni "
-           "  AND li = :li "
-           "  AND mi = :mi "
-           "  AND nf = :nf "
-           "  AND lf = :lf "
-           "  AND mf = :mf "
-           "  AND  S = :S  ",
-        sqlitepp::into(min_ell), sqlitepp::into(max_ell),
-        sqlitepp::use(*ni), sqlitepp::use(*li), sqlitepp::use(*mi),
-        sqlitepp::use(*nf), sqlitepp::use(*lf), sqlitepp::use(*mf),
-        sqlitepp::use(*S);
-    st.exec();
-    
-    // resulting T-matrices
-    cArray tmatrices;
-    
-    // loop over all partial waves
-    for (int ell = min_ell; ; ell++)
+    // get view of the (optional) output extrapolated array
+    cArrayView extras;
+    if (extra)
     {
-        Complex Tmat;
-        double Ei, ReT, ImT;
-        bool missing = true;
-        
-        // check if there are data in the database
-        if (ell <= max_ell)
-        {
-            // prepare selection statement
-            sqlitepp::statement st1 (TMat->session());
-            // WARNING Sign convention changed.
-//             st1 << "SELECT Ei, SUM(-Re_T_ell - Re_TBorn_ell), SUM(-Im_T_ell - Im_TBorn_ell) FROM " + TMatrix::name() + " "
-            st1 << "SELECT Ei, SUM(Re_T_ell), SUM(Im_T_ell) FROM 'tmat' "
-                "WHERE ni = :ni "
-                "  AND li = :li "
-                "  AND mi = :mi "
-                "  AND nf = :nf "
-                "  AND lf = :lf "
-                "  AND mf = :mf "
-                "  AND  S = :S  "
-                "  AND ell = :ell "
-                "GROUP BY Ei "
-                "ORDER BY Ei ASC ",
-                sqlitepp::into(Ei), sqlitepp::into(ReT), sqlitepp::into(ImT),
-                sqlitepp::use(*ni), sqlitepp::use(*li), sqlitepp::use(*mi),
-                sqlitepp::use(*nf), sqlitepp::use(*lf), sqlitepp::use(*mf),
-                sqlitepp::use(*S), sqlitepp::use(ell);
-            
-            // load the data corresponding to the statement
-            rArray energies_ell;
-            cArray tmatrices_ell;
-            while (st1.exec())
-            {
-                energies_ell.push_back(Ei);
-                tmatrices_ell.push_back(Complex(ReT,ImT));
-            }
-            
-            // is the requested energy in the available energy interval?
-            if (energies_ell.size() != 0 and energies_ell.front() <= *E and *E <= energies_ell.back())
-            {
-                // interpolate requested energy
-                tmatrices.push_back(interpolate(energies_ell, tmatrices_ell, { *E })[0]);
-                missing = false;
-            }
-        }
-        
-//         if (missing) break;
-        
-        // if there are no more partial waves in the database, try to extrapolate
-        if (ell > max_ell or missing)
-        {
-            // only extrapolate if we have two or more samples, that are decreasing at the end
-            if
-            (
-                tmatrices.size() >= 2 and
-                std::abs(tmatrices.back(0).real()) < std::abs(tmatrices.back(1).real()) and
-                std::abs(tmatrices.back(0).imag()) < std::abs(tmatrices.back(1).imag())
-            )
-            {
-                // choose the asymptotics
-                if (*ni == *nf and *li == *lf and *mi == *mf)
-                {
-                    // extrapolate T_ell for elastic scattering [T ~ L^(-2.5)]
-                    tmatrices.push_back(tmatrices.back() * std::pow((ell-1.)/ell,2.5));
-                }
-                else /*if (std::abs((*ni) - (*nf)) == 1 and std::abs((*li) - (*lf)) == 1)
-                {
-                    // dipole transitions are special, they will need to be Born-subtracted
-                    break;
-                }
-                else*/
-                {
-                    // extrapolate T_ell for inelastic scattering [use geometric series]
-                    double extra_re = tmatrices.back(0).real() * tmatrices.back(0).real() / tmatrices.back(1).real();
-                    double extra_im = tmatrices.back(0).imag() * tmatrices.back(0).imag() / tmatrices.back(1).imag();
-                    tmatrices.push_back(Complex(extra_re,extra_im));
-                    std::cout << "# extrapolate " << ell << " " << tmatrices.back() << std::endl;
-                }
-            }
-            else
-            {
-                // unable to extrapolate => stop
-                break;
-            }
-        }
-        
-        // update scattering amplitudes¨
-        for (int i = 0; i < *N; i++)
-        {
-            double Y = gsl_sf_legendre_sphPlm(ell,std::abs((*mi)-(*mf)),cos_angles[i]);
-            results[i] += -tmatrices.back() * Y / special::constant::two_pi;
-        }
-        
-        // stop if the T-matrix is small
-        if (std::abs(tmatrices.back()) < 1e-5 * std::abs(sum(tmatrices)))
-            break;
+        extras.reset((*nEnergies) * (*nAngles), reinterpret_cast<Complex*>(extra));
+        extras.fill(0);
     }
     
-    // finally, Born-subtract dipole transition
-    /*if (std::abs((*ni) - (*nf)) == 1 and std::abs((*li) - (*lf)) == 1)
-        results += -FirstBornFullTMatrix(*ni, *li, *mi, *nf, *lf, *mf, *E, rArrayView(*N,angles)) / special::constant::two_pi;*/
+    // transform angles to cosines
+    rArray cos_angles = rArray(*nAngles, angles).transform([](double x){ return std::cos(x); });
+    
+    // indicator of partial waves convergence (0 = not yet converged, 1 = converged, 2 = convergence not possible)
+    iArray status (*nEnergies);
+    status.fill(0);
+    
+    // determine highest partial wave
+    int max_ell;
+    sqlitepp::statement st0 (TMat->session());
+    st0 << "SELECT MAX(ell) FROM '" + TMat->name() + "' "
+        "WHERE ni = :ni "
+        "  AND li = :li "
+        "  AND mi = :mi "
+        "  AND nf = :nf "
+        "  AND lf = :lf "
+        "  AND mf = :mf "
+        "  AND  S = :S  ",
+        sqlitepp::into(max_ell),
+        sqlitepp::use(*ni), sqlitepp::use(*li),  sqlitepp::use(*mi),
+        sqlitepp::use(*nf), sqlitepp::use(*lf),  sqlitepp::use(*mf),
+        sqlitepp::use(*S);
+    st0.exec();
+    
+    // loop over all partial waves (or until convergence)
+    for (int ell = std::abs((*mi) - (*mf)); ell <= max_ell or extra; ell++)
+    {
+        cArray tmatrices_ell (*nEnergies);
+        iArray complete (*nEnergies, true);
+        
+        //
+        // check if all energies converged
+        //
+        
+            if (std::find(status.begin(), status.end(), 0) == status.end())
+                break;
+        
+        //
+        // read existing data from the database
+        //
+        
+            // for all total angular momenta contributing to this partial wave
+            for (int L = std::abs((*lf) - ell); L <= (*lf) + ell; L++)
+            {
+                // skip forbidden contributions
+                if (special::ClebschGordan(ell, (*mi) - (*mf), (*lf), (*mf), L, (*mi)) == 0)
+                    continue;
+                
+                rArray energies_db, reT_db, imT_db;
+                
+                // prepare selection statement
+                sqlitepp::statement st1 (TMat->session());
+                st1 << "SELECT Ei, Re_T_ell, Im_T_ell FROM '" + TMat->name() + "' "
+                    "WHERE ni = :ni "
+                    "  AND li = :li "
+                    "  AND mi = :mi "
+                    "  AND nf = :nf "
+                    "  AND lf = :lf "
+                    "  AND mf = :mf "
+                    "  AND  L = :L  "
+                    "  AND  S = :S  "
+                    "  AND ell = :ell "
+                    "ORDER BY Ei ASC ",
+                    sqlitepp::into(Ei), sqlitepp::into(ReT), sqlitepp::into(ImT),
+                    sqlitepp::use(*ni), sqlitepp::use(*li),  sqlitepp::use(*mi),
+                    sqlitepp::use(*nf), sqlitepp::use(*lf),  sqlitepp::use(*mf),
+                    sqlitepp::use( L),  sqlitepp::use(*S),   sqlitepp::use(ell);
+                
+                // store the data produced by the statement
+                while (st1.exec())
+                {
+                    energies_db.push_back(Ei);
+                    reT_db.push_back(ReT * std::sqrt(Ei));
+                    imT_db.push_back(ImT * std::sqrt(Ei));
+                }
+                
+                // default to Akima spline interpolation, but fall back to linear if not enough points
+                gsl_interp_type const * interp = gsl_interp_akima;
+                if (gsl_interp_type_min_size(interp) <= energies_db.size() or gsl_interp_type_min_size(interp = gsl_interp_linear) <= energies_db.size())
+                {
+                    // create interpolators
+                    gsl_interp* spline_Re = gsl_interp_alloc(interp, energies_db.size());
+                    gsl_interp* spline_Im = gsl_interp_alloc(interp, energies_db.size());
+                    gsl_interp_init(spline_Re, energies_db.data(), reT_db.data(), energies_db.size());
+                    gsl_interp_init(spline_Im, energies_db.data(), imT_db.data(), energies_db.size());
+                    gsl_interp_accel* accel_Re = gsl_interp_accel_alloc();
+                    gsl_interp_accel* accel_Im = gsl_interp_accel_alloc();
+                    
+                    // interpolate retrieved data at requested energies
+                    for (int i = 0; i < (*nEnergies); i++) if (status[i] == 0)
+                    {
+                        if (energies_db.empty() or energies[i] < energies_db.front() or energies_db.back() < energies[i])
+                        {
+                            // not available -> incomplete data for this partial wave
+                            complete[i] = false;
+                        }
+                        else
+                        {
+                            int err_re = gsl_interp_eval_e(spline_Re, energies_db.data(), reT_db.data(), energies[i], accel_Re, &ReT);
+                            int err_im = gsl_interp_eval_e(spline_Im, energies_db.data(), imT_db.data(), energies[i], accel_Im, &ImT);
+                            
+                            if (err_re != GSL_SUCCESS)
+                            {
+                                std::cout << "Warning: Failed to interpolate real data for transition (" << ni << "," << li << "," << mi << ") -> (" << nf << "," << lf << "," << mf << "), "
+                                    "L = " << L << ", ell = " << ell << ", Ei = " << energies[i] << " (" << gsl_strerror(err_re) << ")" << std::endl;
+                            }
+                            
+                            if (err_im != GSL_SUCCESS)
+                            {
+                                std::cout << "Warning: Failed to interpolate imag data for transition (" << ni << "," << li << "," << mi << ") -> (" << nf << "," << lf << "," << mf << "), "
+                                    "L = " << L << ", ell = " << ell << ", Ei = " << energies[i] << " (" << gsl_strerror(err_re) << ")" << std::endl;
+                            }
+                            
+                            tmatrices_ell[i] += Complex(ReT, ImT) / std::sqrt(energies[i]);
+                        }
+                    }
+                    
+                    // delete interpolators
+                    gsl_interp_accel_free(accel_Re);
+                    gsl_interp_accel_free(accel_Im);
+                    gsl_interp_free(spline_Re);
+                    gsl_interp_free(spline_Im);
+                }
+                else
+                {
+                    // not enough data for interpolation -> all T-matrices deemed incomplete
+                    for (int i = 0; i < (*nEnergies); i++) if (status[i] == 0)
+                        complete[i] = false;
+                    break;
+                }
+            }
+        
+        //
+        // extrapolate incomplete data
+        //
+        
+            for (int i = 0; i < (*nEnergies); i++) if (not complete[i] and status[i] == 0)
+            {
+                // only extrapolate if we have two or more samples, that are decreasing at the end
+                if
+                (
+                    tmatrices.size() >= 2 and
+                    std::abs(tmatrices.back(0)[i].real()) < std::abs(tmatrices.back(1)[i].real()) and
+                    std::abs(tmatrices.back(0)[i].imag()) < std::abs(tmatrices.back(1)[i].imag())
+                )
+                {
+                    // degenerate transitions are notorious for slow convergence -> use finite range formula
+                    if ((*ni) == (*nf))
+                    {
+                        // extrapolate T_ell for elastic scattering [T ~ L^(-2.5)]
+                        tmatrices_ell[i] = Complex
+                        (
+                            tmatrices.back()[i].real() * std::pow((ell - 1.0) / ell, 2.5),
+                            tmatrices.back()[i].imag() * std::pow((ell - 1.0) / ell, 1.5)
+                        );
+                    }
+                    
+                    // dipole transitions converge fast, no need to extrapolate
+                    else if (std::abs((*li) - (*lf)) == 1)
+                    {
+                        // nothing
+                    }
+                    
+                    // other transitions need simple geometric extrapolation
+                    else
+                    {
+                        // extrapolate T_ell for inelastic scattering [use geometric series]
+                        double extra_re = tmatrices.back(0)[i].real() * tmatrices.back(0)[i].real() / tmatrices.back(1)[i].real();
+                        double extra_im = tmatrices.back(0)[i].imag() * tmatrices.back(0)[i].imag() / tmatrices.back(1)[i].imag();
+                        tmatrices_ell[i] = Complex(extra_re,extra_im);
+                    }
+                    
+                    // check convergence
+                    Complex tmat_sum = 0;
+                    for (unsigned n = 0; n < tmatrices.size(); n++)
+                        tmat_sum += tmatrices[n][i];
+                    if (std::abs(tmatrices_ell[i]) < 1e-5 * std::abs(tmat_sum))
+                        status[i] = 1;
+                }
+                else
+                {
+                    status[i] = 2; // convergence not possible
+                }
+            }
+            
+            tmatrices.push_back(tmatrices_ell);
+        
+        //
+        // update scattering amplitudes
+        //
+        
+            // all angles
+            for (int i = 0; i < (*nAngles); i++)
+            {
+                double Y = gsl_sf_legendre_sphPlm(ell, std::abs((*mi) - (*mf)), cos_angles[i]);
+                
+                // all energies
+                for (int j = 0; j < (*nEnergies); j++) if (status[j] == 0)
+                {
+                    Complex contrib = -tmatrices_ell[j] * Y / special::constant::two_pi;
+                    
+                    // update scattering amplitude
+                    if (complete[j])
+                        results[j * (*nAngles) + i] += contrib;
+                    
+                    // update the extrapolated scattering amplitude
+                    if (extra)
+                        extras[j * (*nAngles) + i] += contrib;
+                    
+                }
+            }
+    }
 }
 
 // --------------------------------------------------------------------------------- //
@@ -302,14 +408,16 @@ bool ScatteringAmplitude::run (std::map<std::string,std::string> const & sdata)
     // the scattering amplitudes
     rArray scaled_angles = angles * afactor;
     cArray amplitudes(angles.size());
+    cArray extra(angles.size());
     hex_scattering_amplitude
     (
-        ni,li,mi,
-        nf,lf,mf,
-        S, E,
-        angles.size(),
-        scaled_angles.data(),
-        reinterpret_cast<double*>(amplitudes.data())
+        ni, li, mi,
+        nf, lf, mf,
+        S,
+        1, &E,
+        angles.size(), scaled_angles.data(),
+        reinterpret_cast<double*>(amplitudes.data()),
+        reinterpret_cast<double*>(extra.data())
     );
     
     // write out
@@ -317,14 +425,14 @@ bool ScatteringAmplitude::run (std::map<std::string,std::string> const & sdata)
         "# Scattering amplitudes in " << unit_name(Lunits) << " for\n"
         "#     ni = " << ni << ", li = " << li << ", mi = " << mi << ",\n"
         "#     nf = " << nf << ", lf = " << lf << ", mf = " << mf << ",\n"
-        "#     S = " << S << ", E = " << E/efactor << unit_name(Eunits) << "\n"
+        "#     S = " << S << ", E = " << E/efactor << " " << unit_name(Eunits) << "\n"
         "# ordered by angle in " << unit_name(Aunits) << "\n"
         "# \n";
     OutputTable table;
     table.setWidth(15, 15);
     table.setAlignment(OutputTable::left);
-    table.write("# angle    ", "Re f     ", "Im f     ");
-    table.write("# ---------", "---------", "---------");
+    table.write("# angle    ", "Re f     ", "Im f     ", "Re f [ex]", "Im f [ex]");
+    table.write("# ---------", "---------", "---------", "---------", "---------");
     
     for (std::size_t i = 0; i < angles.size(); i++)
     {
@@ -332,7 +440,9 @@ bool ScatteringAmplitude::run (std::map<std::string,std::string> const & sdata)
         (
             angles[i],
             amplitudes[i].real() * lfactor,
-            amplitudes[i].imag() * lfactor
+            amplitudes[i].imag() * lfactor,
+            extra[i].real() * lfactor,
+            extra[i].imag() * lfactor
         );
     }
     

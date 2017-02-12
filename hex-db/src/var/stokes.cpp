@@ -113,7 +113,7 @@ bool StokesParameters::run (std::map<std::string,std::string> const & sdata)
     // atomic and projectile data
     int ni = Conv<int>(sdata, "ni", name());
     int nf = Conv<int>(sdata, "nf", name());
-    int Ei = Conv<double>(sdata, "Ei", name()) * efactor;
+    double Ei = Conv<double>(sdata, "Ei", name()) * efactor;
     double ki = sqrt(Ei);
     double kf = sqrt(Ei - 1./(ni*ni) + 1./(nf*nf));
     
@@ -156,20 +156,20 @@ bool StokesParameters::run (std::map<std::string,std::string> const & sdata)
     // compute scattering amplitudes
     cArray f0_singlet(angles.size()), f0_triplet(angles.size());
     cArray f1_singlet(angles.size()), f1_triplet(angles.size());
-    hex_scattering_amplitude(ni,0,0, nf,1,0, 0, Ei, angles.size(), scaled_angles.data(), reinterpret_cast<double*>(f0_singlet.data()));
-    hex_scattering_amplitude(ni,0,0, nf,1,0, 1, Ei, angles.size(), scaled_angles.data(), reinterpret_cast<double*>(f0_triplet.data()));
-    hex_scattering_amplitude(ni,0,0, nf,1,1, 0, Ei, angles.size(), scaled_angles.data(), reinterpret_cast<double*>(f1_singlet.data()));
-    hex_scattering_amplitude(ni,0,0, nf,1,1, 1, Ei, angles.size(), scaled_angles.data(), reinterpret_cast<double*>(f1_triplet.data()));
+    hex_scattering_amplitude(ni,0,0, nf,1,0, 0, 1,&Ei, angles.size(), scaled_angles.data(), reinterpret_cast<double*>(f0_singlet.data()), nullptr);
+    hex_scattering_amplitude(ni,0,0, nf,1,0, 1, 1,&Ei, angles.size(), scaled_angles.data(), reinterpret_cast<double*>(f0_triplet.data()), nullptr);
+    hex_scattering_amplitude(ni,0,0, nf,1,1, 0, 1,&Ei, angles.size(), scaled_angles.data(), reinterpret_cast<double*>(f1_singlet.data()), nullptr);
+    hex_scattering_amplitude(ni,0,0, nf,1,1, 1, 1,&Ei, angles.size(), scaled_angles.data(), reinterpret_cast<double*>(f1_triplet.data()), nullptr);
     
     // compute differential cross sections
     rArray dcs_p0s(angles.size()), dcs_pps(angles.size()), dcs_pms(angles.size());
     rArray dcs_p0t(angles.size()), dcs_ppt(angles.size()), dcs_pmt(angles.size());
-    hex_differential_cross_section(ni,0,0, nf,1, 0, 0, Ei, angles.size(), scaled_angles.data(), dcs_p0s.data());
-    hex_differential_cross_section(ni,0,0, nf,1, 1, 0, Ei, angles.size(), scaled_angles.data(), dcs_pps.data());
-    hex_differential_cross_section(ni,0,0, nf,1,-1, 0, Ei, angles.size(), scaled_angles.data(), dcs_pms.data());
-    hex_differential_cross_section(ni,0,0, nf,1, 0, 1, Ei, angles.size(), scaled_angles.data(), dcs_p0t.data());
-    hex_differential_cross_section(ni,0,0, nf,1, 1, 1, Ei, angles.size(), scaled_angles.data(), dcs_ppt.data());
-    hex_differential_cross_section(ni,0,0, nf,1,-1, 1, Ei, angles.size(), scaled_angles.data(), dcs_pmt.data());
+    hex_differential_cross_section(ni,0,0, nf,1, 0, 0, 1,&Ei, angles.size(), scaled_angles.data(), dcs_p0s.data(), nullptr);
+    hex_differential_cross_section(ni,0,0, nf,1, 1, 0, 1,&Ei, angles.size(), scaled_angles.data(), dcs_pps.data(), nullptr);
+    hex_differential_cross_section(ni,0,0, nf,1,-1, 0, 1,&Ei, angles.size(), scaled_angles.data(), dcs_pms.data(), nullptr);
+    hex_differential_cross_section(ni,0,0, nf,1, 0, 1, 1,&Ei, angles.size(), scaled_angles.data(), dcs_p0t.data(), nullptr);
+    hex_differential_cross_section(ni,0,0, nf,1, 1, 1, 1,&Ei, angles.size(), scaled_angles.data(), dcs_ppt.data(), nullptr);
+    hex_differential_cross_section(ni,0,0, nf,1,-1, 1, 1,&Ei, angles.size(), scaled_angles.data(), dcs_pmt.data(), nullptr);
     rArray dcs = dcs_p0s + dcs_pps + dcs_pms + dcs_p0t + dcs_ppt + dcs_pmt;
     
     // compute basic parameters

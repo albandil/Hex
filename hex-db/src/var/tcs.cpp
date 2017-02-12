@@ -37,10 +37,12 @@
 // --------------------------------------------------------------------------------- //
 
 #include "hex-interpolate.h"
+#include "hex-special.h"
 #include "hex-version.h"
 
 // --------------------------------------------------------------------------------- //
 
+#include "../interfaces.h"
 #include "../quantities.h"
 #include "../utils.h"
 
@@ -116,8 +118,8 @@ bool TotalCrossSection::run (std::map<std::string,std::string> const & sdata)
     int mi = Conv<int>(sdata, "mi", name());
     
     // energies and cross sections
-    double E, sigma;
-    rArray energies, E_arr, sigma_arr;
+    double E;
+    rArray energies, sigma_arr;
     
     // get energy / energies
     try
@@ -131,31 +133,61 @@ bool TotalCrossSection::run (std::map<std::string,std::string> const & sdata)
         energies = readStandardInput<double>();
     }
     
-    //
-    // load partial wave constributions
-    //
-    
-    // compose query
-    sqlitepp::statement st (session());
-    st << "SELECT Ei, sum(sigma) FROM 'ics' "
-            "WHERE ni = :ni "
-            "  AND li = :li "
-            "  AND mi = :mi "
-            "GROUP BY Ei "
-            "ORDER BY Ei ASC",
-        sqlitepp::into(E), sqlitepp::into(sigma),
-        sqlitepp::use(ni), sqlitepp::use(li), sqlitepp::use(mi);
-    
-    // retrieve data
-    while (st.exec())
+    // get all impact energies
+    if (not energies.empty() and energies.front() == -1)
     {
-        E_arr.push_back(E);
-        sigma_arr.push_back(sigma);
+        energies.clear();
+        sqlitepp::statement st (session());
+        st << "SELECT DISTINCT Ei FROM ics WHERE ni = :ni AND li = :li AND mi = :mi",
+            sqlitepp::into(E), sqlitepp::use(ni), sqlitepp::use(li), sqlitepp::use(mi);
+        while (st.exec())
+        {
+            energies.push_back(E);
+        }
     }
     
-    //
-    // compute and write output
-    //
+    // get all final states
+    iArray nfs, lfs, mfs;
+    int Nf = 0, nf, lf, mf;
+    sqlitepp::statement st(session());
+    st << "SELECT DISTINCT nf, lf, mf FROM ics WHERE ni = :ni AND li = :li AND mi = :mi",
+        sqlitepp::into(nf), sqlitepp::into(lf), sqlitepp::into(mf),
+        sqlitepp::use(ni),  sqlitepp::use(li),  sqlitepp::use(mi);
+    while (st.exec())
+    {
+        nfs.push_back(nf);
+        lfs.push_back(lf);
+        mfs.push_back(mf);
+        Nf++;
+    }
+    
+    // sum integral cross sections for all transitions
+    if (not energies.empty())
+    {
+        rArray cs (energies.size());
+        
+        sigma_arr.resize(energies.size());
+        
+        for (int i = 0; i < Nf; i++)
+        {
+            hex_complete_cross_section
+            (
+                ni, li, mi,
+                nfs[i], lfs[i], mfs[i],
+                energies.size(), &energies[0], &cs[0],
+                nullptr, -1, nullptr
+            );
+            
+            sigma_arr += cs;
+        }
+    }
+    
+    // calculate total cross section from the optical theorem
+    cArray singlet (energies.size()), triplet (energies.size());
+    double zero = 0;
+    hex_scattering_amplitude(ni, li, mi, ni, li, mi, 0, energies.size(), &energies[0], 1, &zero, reinterpret_cast<double*>(&singlet[0]), nullptr);
+    hex_scattering_amplitude(ni, li, mi, ni, li, mi, 1, energies.size(), &energies[0], 1, &zero, reinterpret_cast<double*>(&triplet[0]), nullptr);
+    rArray csopt = -4 * special::constant::pi * (0.25 * imagpart(singlet) + 0.75 * imagpart(triplet)) / sqrt(energies);
     
     // write header
     std::cout << logo("#") <<
@@ -166,36 +198,25 @@ bool TotalCrossSection::run (std::map<std::string,std::string> const & sdata)
     OutputTable table;
     table.setWidth(15);
     table.setAlignment(OutputTable::left);
-    table.write("# E        ", "sigma    ");
-    table.write("# ---------", "---------");
+    table.write("# E        ", "sigma (sum)", "sigma (opt)");
+    table.write("# ---------", "-----------", "-----------");
     
     // terminate if no data
-    if (E_arr.empty())
+    if (energies.empty())
     {
         std::cout << "No data for this transition." << std::endl;
         return true;
     }
     
-    // threshold for ionization
-    double Eion = 1./(ni*ni);
-    
-    // negative energy indicates output of all available cross sections
-    if (energies[0] < 0.)
+    // output corrected cross section
+    for (std::size_t i = 0; i < energies.size(); i++)
     {
-        // output corrected cross section
-        for (std::size_t i = 0; i < E_arr.size(); i++)
-            table.write(E_arr[i] / efactor, sigma_arr[i] * lfactor * lfactor);
-    }
-    else
-    {
-        // interpolate for given 'energies'
-        rArray tcs = (efactor * energies.front() < Eion) ? 
-            interpolate_real(E_arr, sigma_arr, energies * efactor, gsl_interp_linear) :
-            interpolate_real(E_arr, sigma_arr, energies * efactor, gsl_interp_cspline);
-        
-        // output
-        for (std::size_t i = 0; i < energies.size(); i++)
-            table.write(energies[i], (std::isfinite(tcs[i]) ? tcs[i] * lfactor * lfactor : 0.));
+        table.write
+        (
+            energies[i] / efactor,
+            sigma_arr[i] * lfactor * lfactor,
+            csopt[i] * lfactor * lfactor
+        );
     }
     
     return true;

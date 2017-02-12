@@ -149,14 +149,18 @@ void hex_scattering_amplitude_dir_
     for (int mi_ = -(*li); mi_ <= (*li); mi_++)
     for (int mf_ = -(*lf); mf_ <= (*lf); mf_++)
     {
+        int one = 1;
+        
         // compute the scattering amplitude (ni,li,mi_)->(nf,lf,mf_)
         hex_scattering_amplitude_
         (
             ni,li,&mi_,
             nf,lf,&mf_,
-            S, E,
+            S,
+            &one, E,
             N, angles,
-            reinterpret_cast<double*>(amplitudes.data())
+            reinterpret_cast<double*>(amplitudes.data()),
+            nullptr
         );
         
         // calculate the Wigner d-matrix factors

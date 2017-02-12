@@ -138,8 +138,8 @@ bool SpinAsymmetry::run (std::map<std::string,std::string> const & sdata)
     
     // compute cross sections
     rArray scaled_angles = angles * afactor, dcs0(angles.size()), dcs1(angles.size());
-    hex_differential_cross_section (ni,li,mi, nf,lf,mf, 0, E, angles.size(), scaled_angles.data(), dcs0.data());
-    hex_differential_cross_section (ni,li,mi, nf,lf,mf, 1, E, angles.size(), scaled_angles.data(), dcs1.data());
+    hex_differential_cross_section (ni,li,mi, nf,lf,mf, 0, 1,&E, angles.size(),scaled_angles.data(), dcs0.data(),nullptr);
+    hex_differential_cross_section (ni,li,mi, nf,lf,mf, 1, 1,&E, angles.size(),scaled_angles.data(), dcs1.data(),nullptr);
     
     // compute spin asymetry
     rArray asy = (dcs0 - dcs1 / 3.) / (dcs0 + dcs1);
