@@ -120,6 +120,9 @@ bool TripleDifferentialCrossSection::run (std::map<std::string,std::string> cons
     int  S = Conv<int>(sdata,  "S", name());
     double Ei = Conv<double>(sdata, "Ei", name()) * efactor;
     
+    if (mi < 0)
+        mi = -mi;
+    
     // read directions
     //  dirs.first  = ( theta1, phi1, E1frac )
     //  dirs.second = ( theta2, phi2, E2frac )

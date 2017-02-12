@@ -115,11 +115,15 @@ bool SpinAsymmetry::run (std::map<std::string,std::string> const & sdata)
     // scattering event parameters
     int ni = Conv<int>(sdata, "ni", name());
     int li = Conv<int>(sdata, "li", name());
-    int mi = Conv<int>(sdata, "mi", name());
+    int mi0= Conv<int>(sdata, "mi", name());
     int nf = Conv<int>(sdata, "nf", name());
     int lf = Conv<int>(sdata, "lf", name());
-    int mf = Conv<int>(sdata, "mf", name());
+    int mf0= Conv<int>(sdata, "mf", name());
     double E = Conv<double>(sdata, "Ei", name()) * efactor;
+    
+    // use mi >= 0; if mi < 0, flip both signs
+    int mi = (mi0 < 0 ? -mi0 : mi0);
+    int mf = (mi0 < 0 ? -mf0 : mf0);
     
     // angles
     rArray angles;
@@ -154,8 +158,8 @@ bool SpinAsymmetry::run (std::map<std::string,std::string> const & sdata)
     // write out
     std::cout << logo("#") <<
         "# Spin asymetry for \n" <<
-        "#     ni = " << ni << ", li = " << li << ", mi = " << mi << ",\n" <<
-        "#     nf = " << nf << ", lf = " << lf << ", mf = " << mf << ",\n" <<
+        "#     ni = " << ni << ", li = " << li << ", mi = " << mi0<< ",\n" <<
+        "#     nf = " << nf << ", lf = " << lf << ", mf = " << mf0<< ",\n" <<
         "#     E = " << E/efactor << " " << unit_name(Eunits)
                      << " ordered by angle in " << unit_name(Aunits) << "\n";
     OutputTable table;

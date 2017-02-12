@@ -233,8 +233,8 @@ bool MomentumTransfer::run (std::map<std::string,std::string> const & sdata)
     // write header
     std::cout << logo("#") <<
         "# Momentum transfer in " << unit_name(Lunits) << " for\n" <<
-        "#     ni = " << ni << ", li = " << li << ", mi = " << mi << ",\n" <<
-        "#     nf = " << nf << ", lf = " << lf << ", mf = " << mf << ",\n" <<
+        "#     ni = " << ni << ", li = " << li << ", mi = " << mi0 << ",\n" <<
+        "#     nf = " << nf << ", lf = " << lf << ", mf = " << mf0 << ",\n" <<
         "#     S = " << S << "\n" <<
         "# ordered by energy in " << unit_name(Eunits) << "\n" <<
         "#\n";

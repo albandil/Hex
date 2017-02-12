@@ -117,6 +117,9 @@ bool TotalCrossSection::run (std::map<std::string,std::string> const & sdata)
     int li = Conv<int>(sdata, "li", name());
     int mi = Conv<int>(sdata, "mi", name());
     
+    if (mi < 0)
+        mi = -mi;
+    
     // energies and cross sections
     double E;
     rArray energies, sigma_arr;

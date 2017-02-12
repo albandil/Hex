@@ -151,6 +151,9 @@ bool IonizationF::run (std::map<std::string,std::string> const & sdata)
     int l2 = Conv<int>(sdata, "l2", name());
     double Ei = Conv<double>(sdata, "Ei", name()) * efactor;
     
+    if (mi < 0)
+        mi = -mi;
+    
     // read energy sharing (in user units)
     rArray Eshare;
     try

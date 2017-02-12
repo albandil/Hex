@@ -136,10 +136,14 @@ bool SpinFlipCrossSection::run (std::map<std::string,std::string> const & sdata)
     // scattering event parameters
     int ni = Conv<int>(sdata, "ni", name());
     int li = Conv<int>(sdata, "li", name());
-    int mi = Conv<int>(sdata, "mi", name());
+    int mi0= Conv<int>(sdata, "mi", name());
     int nf = Conv<int>(sdata, "nf", name());
     int lf = Conv<int>(sdata, "lf", name());
-    int mf = Conv<int>(sdata, "mf", name());
+    int mf0= Conv<int>(sdata, "mf", name());
+    
+    // use mi >= 0; if mi < 0, flip both signs
+    int mi = (mi0 < 0 ? -mi0 : mi0);
+    int mf = (mi0 < 0 ? -mf0 : mf0);
     
     // energies and cross sections
     rArray energies;
@@ -236,8 +240,8 @@ bool SpinFlipCrossSection::run (std::map<std::string,std::string> const & sdata)
     // write out
     std::cout << logo("#") <<
         "# Spin flip cross section in " << unit_name(Lunits) << " for \n" <<
-        "#     ni = " << ni << ", li = " << li << ", mi = " << mi << ",\n" <<
-        "#     nf = " << nf << ", lf = " << lf << ", mf = " << mf << ",\n" <<
+        "#     ni = " << ni << ", li = " << li << ", mi = " << mi0 << ",\n" <<
+        "#     nf = " << nf << ", lf = " << lf << ", mf = " << mf0 << ",\n" <<
         "#     ordered by energy in " << unit_name(Eunits) << "\n";
     OutputTable table;
     table.setWidth(15);

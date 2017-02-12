@@ -466,8 +466,8 @@ bool IntegralCrossSection::run (std::map<std::string,std::string> const & sdata)
     // write header
     std::cout << logo("#") <<
         "# Integral cross section in " << unit_name(Lunits) << " for\n" <<
-        "#     ni = " << ni << ", li = " << li << ", mi = " << mi << ",\n" <<
-        "#     nf = " << nf << ", lf = " << lf << ", mf = " << mf << ",\n" <<
+        "#     ni = " << ni << ", li = " << li << ", mi = " << mi0 << ",\n" <<
+        "#     nf = " << nf << ", lf = " << lf << ", mf = " << mf0 << ",\n" <<
         "#     ell = " << ell << ", S = " << S << "\n" <<
         "# ordered by energy in " << unit_name(Eunits) << "\n" <<
         "#\n";
