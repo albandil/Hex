@@ -382,8 +382,8 @@
                 if (in_array($var, array("scatamp", "dcs", "ics", "momtf")))
                 {
                     printf("\t\t\t\\(S\\) = <select name = \"S\" title = \"total spin of the two electrons\">\n");
-                    printf("\t\t\t<option value = \"0\" %s>0</option>\n", isset($_POST["S"]) and $_POST["S"] == "0" ? "selected=\"selected\"" : "");
-                    printf("\t\t\t<option value = \"1\" %s>1</option>\n", isset($_POST["S"]) and $_POST["S"] == "1" ? "selected=\"selected\"" : "");
+                    printf("\t\t\t<option value = \"0\"" . ((isset($_POST["S"]) and $_POST["S"] == "0") ? " selected=\"selected\"" : "") . ">0</option>\n");
+                    printf("\t\t\t<option value = \"1\"" . ((isset($_POST["S"]) and $_POST["S"] == "1") ? " selected=\"selected\"" : "") . ">1</option>\n");
                     printf("\t\t\t</select>\n");
                 }
                 
