@@ -381,7 +381,10 @@
                 // total spin
                 if (in_array($var, array("scatamp", "dcs", "ics", "momtf")))
                 {
-                    printf("\t\t\t\\(S\\) = <input type = \"text\" title = \"total spin of the two electrons\" name = \"S\" size = \"3\" value = \"%s\" required = \"required\"/>\n", isset($_POST["S"]) ? $_POST["S"] : "");
+                    printf("\t\t\t\\(S\\) = <select name = \"S\" title = \"total spin of the two electrons\">\n");
+                    printf("\t\t\t<option value = \"0\" %s>0</option>\n", isset($_POST["S"]) and $_POST["S"] == "0" ? "selected=\"selected\"" : "");
+                    printf("\t\t\t<option value = \"1\" %s>1</option>\n", isset($_POST["S"]) and $_POST["S"] == "1" ? "selected=\"selected\"" : "");
+                    printf("\t\t\t</select>\n");
                 }
                 
                 printf("\t\t</center>\n");
