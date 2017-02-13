@@ -155,15 +155,22 @@ void hex_differential_cross_section_
         nEnergies, energies,
         nAngles, angles,
         reinterpret_cast<double*>(amplitudes.data()),
-        extra ? nullptr : reinterpret_cast<double*>(xamplitudes.data())
+        extra ? reinterpret_cast<double*>(xamplitudes.data()) : nullptr
     );
     
-    // calculate differential cross section
-    rArrayView(amplitudes.size(), dcs) = sqrabs(amplitudes) * (kf/ki * 0.25 * (2 * (*S) + 1));
+    for (int ie = 0; ie < (*nEnergies); ie++)
+    {
+        for (int ia = 0; ia < (*nAngles); ia++)
+        {
+            // calculate differential cross section
+            dcs[ie * (*nAngles) + ia] = sqrabs(amplitudes[ie * (*nAngles) + ia]) * (kf[ie]/ki[ie] * 0.25 * (2 * (*S) + 1));
+            
+            // calculate extrapolated cross section
+            if (extra)
+                extra[ie * (*nAngles) + ia] = sqrabs(xamplitudes[ie * (*nAngles) + ia]) * (kf[ie]/ki[ie] * 0.25 * (2 * (*S) + 1));
+        }
+    }
     
-    // calculate extrapolated cross section
-    if (extra)
-        rArrayView(xamplitudes.size(), extra) = sqrabs(xamplitudes) * (kf/ki * 0.25 * (2 * (*S) + 1));
 }
 
 bool DifferentialCrossSection::run (std::map<std::string,std::string> const & sdata)
@@ -203,8 +210,8 @@ bool DifferentialCrossSection::run (std::map<std::string,std::string> const & sd
     }
     
     // compute cross section
-    rArray scaled_angles = angles * afactor, dcs(angles.size());
-    hex_differential_cross_section(ni,li,mi, nf,lf,mf, S, 1, &E, angles.size(), scaled_angles.data(), dcs.data(), nullptr);
+    rArray scaled_angles = angles * afactor, dcs (angles.size()), dcs_ex (angles.size());
+    hex_differential_cross_section(ni,li,mi, nf,lf,mf, S, 1, &E, angles.size(), scaled_angles.data(), dcs.data(), dcs_ex.data());
     
     // write out
     std::cout << logo("#") <<
@@ -216,10 +223,17 @@ bool DifferentialCrossSection::run (std::map<std::string,std::string> const & sd
     OutputTable table;
     table.setWidth(15);
     table.setAlignment(OutputTable::left);
-    table.write("# angle    ", "dcs      ");
-    table.write("# ---------", "---------");
+    table.write("# angle    ", "dcs      ", "dcs [ex] ");
+    table.write("# ---------", "---------", "---------");
     for (std::size_t i = 0; i < angles.size(); i++)
-        table.write(angles[i], dcs[i]*lfactor*lfactor);
+    {
+        table.write
+        (
+            angles[i],
+            dcs[i] * lfactor * lfactor,
+            dcs_ex[i] * lfactor * lfactor
+        );
+    }
     
     return true;
 }

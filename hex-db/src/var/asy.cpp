@@ -141,19 +141,13 @@ bool SpinAsymmetry::run (std::map<std::string,std::string> const & sdata)
     }
     
     // compute cross sections
-    rArray scaled_angles = angles * afactor, dcs0(angles.size()), dcs1(angles.size());
-    hex_differential_cross_section (ni,li,mi, nf,lf,mf, 0, 1,&E, angles.size(),scaled_angles.data(), dcs0.data(),nullptr);
-    hex_differential_cross_section (ni,li,mi, nf,lf,mf, 1, 1,&E, angles.size(),scaled_angles.data(), dcs1.data(),nullptr);
+    rArray scaled_angles = angles * afactor, dcs0(angles.size()), dcs1(angles.size()), dcs0_ex(angles.size()), dcs1_ex(angles.size());
+    hex_differential_cross_section (ni,li,mi, nf,lf,mf, 0, 1,&E, angles.size(),scaled_angles.data(), dcs0.data(), dcs0_ex.data());
+    hex_differential_cross_section (ni,li,mi, nf,lf,mf, 1, 1,&E, angles.size(),scaled_angles.data(), dcs1.data(), dcs1_ex.data());
     
     // compute spin asymetry
     rArray asy = (dcs0 - dcs1 / 3.) / (dcs0 + dcs1);
-    
-    // substitute possible "nan"-s and "inf"-s by zeros
-    for (double & x : asy)
-    {
-        if (not std::isfinite(x))
-            x = 0.;
-    }
+    rArray asy_ex = (dcs0_ex - dcs1_ex / 3.) / (dcs0_ex + dcs1_ex);
     
     // write out
     std::cout << logo("#") <<
@@ -169,7 +163,14 @@ bool SpinAsymmetry::run (std::map<std::string,std::string> const & sdata)
     table.write("# ---------", "---------");
     
     for (std::size_t i = 0; i < angles.size(); i++)
-        table.write(angles[i], asy[i]);
+    {
+        table.write
+        (
+            angles[i],
+            std::isfinite(asy[i]) ? asy[i] : 0,
+            std::isfinite(asy_ex[i])? asy_ex[i] : 0
+        );
+    }
     
     return true;
 }

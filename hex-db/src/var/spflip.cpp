@@ -252,9 +252,9 @@ bool SpinFlipCrossSection::run (std::map<std::string,std::string> const & sdata)
     {
         table.write
         (
-            scaled_energies[i]*efactor,
-            spflip[i]*lfactor*lfactor,
-            spflip_ex[i]*lfactor*lfactor
+            scaled_energies[i] / efactor,
+            spflip[i] * lfactor * lfactor,
+            spflip_ex[i] * lfactor * lfactor
         );
     }
     

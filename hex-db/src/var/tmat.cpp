@@ -469,7 +469,8 @@ bool TMatrix::run (std::map<std::string,std::string> const & sdata)
         table.write
         (
             energies[i],
-            T_out[i].real()*lfactor,  T_out[i].imag()*lfactor
+            T_out[i].real() * lfactor,
+            T_out[i].imag() * lfactor
         );
     }
     

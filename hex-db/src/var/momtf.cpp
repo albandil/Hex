@@ -29,6 +29,7 @@
 //                                                                                   //
 //  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
+#include <deque>
 #include <map>
 #include <string>
 #include <vector>
@@ -47,6 +48,27 @@
 // --------------------------------------------------------------------------------- //
 
 createNewScatteringQuantity(MomentumTransfer, "momtf")
+
+// --------------------------------------------------------------------------------- //
+
+extern void hex_tmat_pw_transform
+(
+    int ni, int li, int mi,
+    int nf, int lf, int mf,
+    int nEnergies,
+    double * energies,
+    bool extra,
+    std::function
+    <
+        void
+        (
+            int ell,
+            iArrays const & converged,
+            iArrays const & complete,
+            cArrays const & tmatrices
+        )
+    > f
+);
 
 // --------------------------------------------------------------------------------- //
 
@@ -139,96 +161,114 @@ bool MomentumTransfer::run (std::map<std::string,std::string> const & sdata)
         energies = readStandardInput<double>();
     }
     
-    // SQL interface variables
-    double E, Re_T_ell, Im_T_ell;
-    int L, ell;
+    // convert energies to Ry
+    rArray scaled_energies = energies * efactor;
     
-    // compose the statement
-    sqlitepp::statement st (session());
-    st << "SELECT Ei, L, ell, Re_T_ell, Im_T_ell FROM 'tmat' "
-          "WHERE ni = :ni "
-          "  AND li = :li "
-          "  AND mi = :mi "
-          "  AND nf = :nf "
-          "  AND lf = :lf "
-          "  AND mf = :mf "
-          "  AND  S = :S  "
-          "ORDER BY L, ell, Ei ASC",
-        sqlitepp::into(E), sqlitepp::into(L), sqlitepp::into(ell), 
-        sqlitepp::into(Re_T_ell), sqlitepp::into(Im_T_ell),
-        sqlitepp::use(ni), sqlitepp::use(li), sqlitepp::use(mi),
-        sqlitepp::use(nf), sqlitepp::use(lf), sqlitepp::use(mf),
-        sqlitepp::use(S);
-    
-    // auxiliary variables
-    rArray *pE = nullptr;    // pointer to current energy array
-    cArray *pT = nullptr;    // pointer to current T-matrix array
-    std::pair<int,int> key(-1,-1);    // current (L,ell) pair
-    int maxL = -1;    // maximal L
-    int maxl = -1;    // maximal ell
-    
-    // load T-matrices
-    std::map<std::pair<int,int>, std::pair<rArray*, cArray*>> Tmatrices;
-    while (st.exec())
+    // get available energies if requested
+    if (not scaled_energies.empty() and scaled_energies.front() == -1)
     {
-        // create new arrays if necessary
-        if (key.first != L or key.second != ell)
+        scaled_energies.clear();
+        double E;
+        sqlitepp::statement st (session());
+        st << "SELECT DISTINCT Ei FROM 'tmat' "
+              "WHERE ni = :ni "
+              "  AND li = :li "
+              "  AND mi = :mi "
+              "  AND nf = :nf "
+              "  AND lf = :lf "
+              "  AND mf = :mf "
+              "ORDER BY Ei ASC",
+              sqlitepp::into(E),
+              sqlitepp::use(ni), sqlitepp::use(li),  sqlitepp::use(mi),
+              sqlitepp::use(nf), sqlitepp::use(lf),  sqlitepp::use(mf);
+        while (st.exec())
         {
-            pE = new rArray();
-            pT = new cArray();
-            key = std::make_pair(L,ell);
-            Tmatrices[key] = std::make_pair(pE,pT);
-            maxL = (L > maxL) ? L : maxL;
-            maxl = (ell > maxl) ? ell : maxl;
+            scaled_energies.push_back(E);
+        }
+    }
+    
+    // output data
+    rArray eta (scaled_energies.size()), eta_ex (scaled_energies.size());
+    
+    // T-matrices for the last three partial waves
+    std::deque<int> ells;
+    std::deque<iArrays> conv;
+    std::deque<iArrays> cmpl;
+    std::deque<cArrays> tmat;
+    
+    // callback for collecting T-matrices (called for every partial wave starting with ell = |mi - mf|)
+    auto callback = [&]
+    (
+        int ell,
+        iArrays const & converged,
+        iArrays const & complete,
+        cArrays const & tmatrices
+    )
+    {
+        ells.push_back(ell);
+        conv.push_back(converged);
+        cmpl.push_back(complete);
+        tmat.push_back(tmatrices);
+        
+        while (ells.size() > 3)
+        {
+            ells.pop_front();
+            conv.pop_front();
+            cmpl.pop_front();
+            tmat.pop_front();
         }
         
-        // insert new data
-        pE->push_back(E);
-        pT->push_back(Complex(Re_T_ell,Im_T_ell));
-    }
+        if (ells.size() >= 2)
+        {
+            // sum over
+            //   l = |mi-mf|, |mi-mf|+1, ...
+            // and
+            //   lp = l - 1, l, l + 1
+            
+            int il = ells.size() - 2;
+            int l = ells[il];
+            
+            for (unsigned ilp = 0; ilp < ells.size(); ilp++)
+            {
+                int lp = ells[ilp];
+                
+                // angular integral
+                double angintg = (
+                    l == lp ?
+                    1.0 :
+                    std::sqrt((2*l + 1.) / (2*lp + 1.)) * special::ClebschGordan(l,mi-mf,1,0,lp,mi-mf) * special::ClebschGordan(l,0,1,0,lp,0)
+                );
+                
+                for (unsigned i = 0; i < scaled_energies.size(); i++)
+                {
+                    // update momentum transfer with this partial wave if contained in database (and not yet converged)
+                    if (not conv[il][S][i] and cmpl[il][S][i])
+                        eta[i] += angintg * ( tmat[il][S][i] * std::conj(tmat[ilp][S][i]) ).real();
+                    
+                    // update extrapolated momentum transfer always
+                    if (true)
+                        eta_ex[i] += angintg * ( tmat[il][S][i] * std::conj(tmat[ilp][S][i]) ).real();
+                }
+            }
+        }
+    };
     
-    // terminate if no data
-    if (Tmatrices.empty())
-        return true;
+    // call the T-matrix retrieval driver
+    hex_tmat_pw_transform
+    (
+        ni, li, mi, nf, lf, mf,
+        scaled_energies.size(), scaled_energies.data(),
+        true,
+        callback
+    );
     
-    // compute momentum transfer
-    rArray eta_energies;
-    rArray eta;
-    for (int L = 0; L <= maxL; L++)
-    for (int Lp = 0; Lp <= maxL; Lp++)
-    for (int l = 0; l <= maxl; l++)
-    for (int lp = 0; lp <= maxl; lp++)
-    {
-        std::pair<int,int> key(L,l), keyp(Lp,lp);
-        
-        // if no data, skip
-        if (Tmatrices.find(key) == Tmatrices.end() or Tmatrices.find(keyp) == Tmatrices.end())
-            continue;
-        
-        // get energies and T-matrices pointers
-        rArray *pE = Tmatrices[key].first;
-        cArray *pT = Tmatrices[key].second;
-        rArray *pEp = Tmatrices[keyp].first;
-        cArray *pTp = Tmatrices[keyp].second;
-        
-        // normalize
-        cArray emptyp(pEp->size());    // zero-filled ghost
-        merge (*pE, *pT, *pEp, emptyp);    // inflate *pE and *pT to accomodate *pEp and emptyp
-        cArray empty(pE->size()); // zero-filled ghost
-        merge (*pEp, *pTp, *pE, empty);
-        
-        // compute factor
-        double factor = 0;
-        for (int m = -l; m <= l; m++)
-            factor += special::ClebschGordan(l,m,1,0,lp,m);
-        factor *= -sqrt((2.*l+1.)/(2.*lp+1.)) * special::ClebschGordan(l,0,1,0,lp,0);
-        if (l == lp)
-            factor += 1.;
-        
-        // update momentum transfer
-        merge (eta_energies, eta, *pE, factor * abs((*pT) * (*pTp).conj()));
-    }
-    eta *= 1. / std::pow(2 * special::constant::pi, 2);
+    // momenta
+    rArray ki = sqrt(scaled_energies);
+    rArray kf = sqrt(scaled_energies - 1.0 / (ni * ni) + 1.0 / (nf * nf));
+    
+    // add prefactor
+    eta *= kf / ki * (2 * S + 1) / 157.9136704174297;
+    eta_ex *= kf / ki * (2 * S + 1) / 157.9136704174297;
     
     // write header
     std::cout << logo("#") <<
@@ -239,25 +279,19 @@ bool MomentumTransfer::run (std::map<std::string,std::string> const & sdata)
         "# ordered by energy in " << unit_name(Eunits) << "\n" <<
         "#\n";
     OutputTable table;
-    table.setWidth(15, 15);
+    table.setWidth(20, 20, 20);
     table.setAlignment(OutputTable::left);
-    table.write("# E        ", "momtrans.");
-    table.write("# ---------", "---------");
+    table.write("# E        ", "momtransfer", "momtransfer [ex]");
+    table.write("# ---------", "-----------", "----------------");
     
-    if (energies[0] < 0.)
+    for (unsigned i = 0; i < scaled_energies.size(); i++)
     {
-        // negative energy indicates full output
-        for (std::size_t i = 0; i < eta_energies.size(); i++)
-            table.write(eta_energies[i] / efactor, eta[i] * lfactor * lfactor);
-    }
-    else
-    {
-        // interpolate
-        eta = interpolate (eta_energies, eta, energies * efactor);
-        
-        // output
-        for (std::size_t i = 0; i < energies.size(); i++)
-            table.write(energies[i], eta[i] * lfactor * lfactor);
+        table.write
+        (
+            scaled_energies[i] / efactor,
+            std::isfinite(eta[i]) ? eta[i] * lfactor * lfactor : 0,
+            std::isfinite(eta_ex[i]) ? eta_ex[i] * lfactor * lfactor : 0
+        );
     }
     
     return true;
