@@ -454,7 +454,7 @@
 //
 
     // convert query to lower case
-    $query = strtolower($_GET["QUERY"]);
+    $query = str_replace(';', '', strtolower($_GET["QUERY"]));
     
     // get first token of the query : must be "select"
     $first_token = strtok($query, " ");
