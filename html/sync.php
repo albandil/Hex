@@ -559,7 +559,7 @@
 //
 
     // Open the Hex database.
-    include "hexdbdat.inc";
+    include "paths.inc";
     $db = new SQLite3 ($hexdbdat, SQLITE3_OPEN_READONLY);
     
     // Write all sections of the XSAMS file.
