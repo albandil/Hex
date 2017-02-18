@@ -995,6 +995,7 @@ void InputFile::read (std::ifstream & inf)
     std::cout << "\tfull list: " << Etot         << std::endl;
     
     // check that all energies are allowed by the asymptotic expansion
+    max_Etot = -1;
     if (not inner_only and not Etot.empty())
     {
         max_Etot = *std::max_element(Etot.begin(), Etot.end());
