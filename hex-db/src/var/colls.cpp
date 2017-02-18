@@ -109,7 +109,6 @@ bool CollisionStrength::run (std::map<std::string,std::string> const & sdata)
 {
     // manage units
     double efactor = change_units(Eunits, eUnit_Ry);
-    double lfactor = change_units(lUnit_au, Lunits);
     
     // scattering event parameters
     int ni = Conv<int>(sdata, "ni", name());
@@ -118,18 +117,22 @@ bool CollisionStrength::run (std::map<std::string,std::string> const & sdata)
     int lf = Conv<int>(sdata, "lf", name());
     
     // initial magnetic quantum number
-    int mi = 0; bool all_mi = false;
+    int mi0= 0; bool all_mi = false;
     if (sdata.find("mi") == sdata.end() or sdata.at("mi") == "*")
         all_mi = true;
     else
-        mi = Conv<int>(sdata, "mi", name());
+        mi0= Conv<int>(sdata, "mi", name());
     
     // final magnetic quantum number
-    int mf = 0; bool all_mf = false;
+    int mf0= 0; bool all_mf = false;
     if (sdata.find("mf") == sdata.end() or sdata.at("mf") == "*")
         all_mf = true;
     else
-        mf = Conv<int>(sdata, "mf", name());
+        mf0= Conv<int>(sdata, "mf", name());
+    
+    // use mi >= 0; if mi < 0, flip both signs
+    int mi = (mi0 < 0 ? -mi0 : mi0);
+    int mf = (mi0 < 0 ? -mf0 : mf0);
     
     // check if we have the optional pw list
     iArray pws;
@@ -198,8 +201,8 @@ bool CollisionStrength::run (std::map<std::string,std::string> const & sdata)
     // write header
     std::cout << logo("#") <<
         "# Collision strengths in " << unit_name(Lunits) << " for\n" <<
-        "#     ni = " << ni << ", li = " << li << ", mi = " << (all_mi ? "*" : std::to_string(mi)) << ",\n" <<
-        "#     nf = " << nf << ", lf = " << lf << ", mf = " << (all_mf ? "*" : std::to_string(mf)) << ",\n";
+        "#     ni = " << ni << ", li = " << li << ", mi = " << (all_mi ? "*" : std::to_string(mi0)) << ",\n" <<
+        "#     nf = " << nf << ", lf = " << lf << ", mf = " << (all_mf ? "*" : std::to_string(mf0)) << ",\n";
     if (not pws.empty())
     {
         std::cout <<
@@ -219,7 +222,13 @@ bool CollisionStrength::run (std::map<std::string,std::string> const & sdata)
     
     // write data
     for (std::size_t i = 0; i < scaled_energies.size(); i++)
-        table.write(scaled_energies[i]/efactor, (std::isfinite(ccs[i]) ? scaled_energies[i] * ccs[i] : 0.));
+    {
+        table.write
+        (
+            scaled_energies[i] / efactor,
+            std::isfinite(ccs[i]) ? scaled_energies[i] * ccs[i] : 0.
+        );
+    }
     
     return true;
 }

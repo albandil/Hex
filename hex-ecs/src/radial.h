@@ -497,14 +497,17 @@ class RadialIntegrals
         ) const;
         
         // Return reference to the B-spline object.
+        Bspline const & bspline () const { return bspline_x_; }
         Bspline const & bspline_x () const { return bspline_x_; }
         Bspline const & bspline_y () const { return bspline_y_; }
         
         // Return the Gauss-Legendre integrator object.
+        GaussLegendre const & gaussleg () const { return g_x_; }
         GaussLegendre const & gaussleg_x () const { return g_x_; }
         GaussLegendre const & gaussleg_y () const { return g_y_; }
         
         #define OneElectronMatrixAccessors(M) \
+            SymBandMatrix<Complex> const & M () const { return M##_x_; } \
             SymBandMatrix<Complex> const & M##_x () const { return M##_x_; } \
             SymBandMatrix<Complex> const & M##_y () const { return M##_y_; } \
             Complex M##_x (std::size_t i, std::size_t j) const { return M##_x_(i,j); } \
@@ -517,6 +520,7 @@ class RadialIntegrals
         OneElectronMatrixAccessors(Mm2)
         
         #define OneElectronMatrixArrayAccessors(M) \
+            SymBandMatrix<Complex> const & M (int L) const { return M##_x_[L]; } \
             SymBandMatrix<Complex> const & M##_x (int L) const { return M##_x_[L]; } \
             SymBandMatrix<Complex> const & M##_y (int L) const { return M##_y_[L]; } \
             Complex M##_x (int L, std::size_t i, std::size_t j) const { return M##_x_[L](i,j); } \

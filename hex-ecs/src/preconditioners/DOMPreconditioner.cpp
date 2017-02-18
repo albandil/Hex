@@ -85,8 +85,8 @@ void DOMPreconditioner::update (Real E)
 void DOMPreconditioner::precondition (BlockArray<Complex> const & r, BlockArray<Complex> & z) const
 {
     // B-spline parameters
-    int order = rad_inner().bspline_x().order();
-    Real theta = rad_inner().bspline_x().ECStheta();
+    int order = rad_inner().bspline().order();
+    Real theta = rad_inner().bspline().ECStheta();
     
     // construct sub-domain bases
     std::vector<PanelSolution> p;
@@ -98,8 +98,8 @@ void DOMPreconditioner::precondition (BlockArray<Complex> const & r, BlockArray<
         rArray ryknots, cyknots1, cyknots2;
         
         // calculate the knot sub-sequences
-        knotSubsequence(ixpanel, xpanels, rad_inner().bspline_x(), rxknots, cxknots1, cxknots2);
-        knotSubsequence(iypanel, ypanels, rad_inner().bspline_y(), ryknots, cyknots1, cyknots2);
+        knotSubsequence(ixpanel, xpanels, rad_inner().bspline(), rxknots, cxknots1, cxknots2);
+        knotSubsequence(iypanel, ypanels, rad_inner().bspline(), ryknots, cyknots1, cyknots2);
         
         if (ixpanel == 0) cxknots1.drop();
         if (iypanel == 0) cyknots1.drop();
@@ -184,16 +184,18 @@ void DOMPreconditioner::solvePanel (int n, std::vector<PanelSolution> & p, int i
     int order = pCentre->xspline_inner.order();
     
     // construct the surrogate sources for all boundaries shared with other panels
-    for (int nbr = 0; nbr < nNbrs; nbr++)
+    for (int nbr = 0; nbr < nNbrs; nbr++) if (pNbr[nbr] != nullptr)
         surrogateSource(pCentre, nbr, pNbr[nbr]);
     
     // create the preconditioner object
     PreconditionerBase * prec = PreconditionerBase::Choose
     (
-        "ILU",
+        "ILU", // TODO : Make (wisely) runtime selectable.
         *cmd_, *inp_, *par_, *ang_,
-        pCentre->xspline_inner, pCentre->xspline_full,
-        pCentre->yspline_inner, pCentre->yspline_full
+        pCentre->xspline_inner, // inner region basis
+        pCentre->xspline_full,  // full domain basis
+        pCentre->xspline_full,  // panel x basis
+        pCentre->yspline_full   // panel y basis
     );
     
     // construct the matrix of the equations etc.
@@ -232,7 +234,14 @@ void DOMPreconditioner::solvePanel (int n, std::vector<PanelSolution> & p, int i
         for (unsigned ill = 0; ill < chi.size(); ill++)
         for (int i = iR2 - order; i < iR2 + order + 1; i++)
         for (int j = 0; j < Nyspline; j++)
+        {
+            std::cout << "chi.size() = " << chi.size() << std::endl;
+            std::cout << "chi[" << ill << "].size() = " << chi[ill].size() << std::endl;
+            std::cout << "pNbr[" << Right << "]->ssrc[" << Left << "].size() = " << pNbr[Right]->ssrc[Left].size() << std::endl;
+            std::cout << "pNbr[" << Right << "]->ssrc[" << Left << "][" << ill << "].size() = " << pNbr[Right]->ssrc[Left][ill].size() << std::endl;
+            
             chi[ill][i * Nyspline + j] += rad.S_x(iR2, i) * pNbr[Right]->ssrc[Left][ill][j];
+        }
     }
     if (pNbr[Down] != nullptr)
     {
@@ -297,6 +306,7 @@ void DOMPreconditioner::solvePanel (int n, std::vector<PanelSolution> & p, int i
     };
     
     std::cout << "Solve panel " << i << "," << j << std::endl;
+    /// v --- v DEBUG
     std::ofstream ofs (format("solve-%d-%d.vtk", i, j));
     writeVTK_points
     (
@@ -314,6 +324,7 @@ void DOMPreconditioner::solvePanel (int n, std::vector<PanelSolution> & p, int i
         rArray{ 0. }
     );
     ofs.close();
+    /// ^ --- ^
     
     // solve the system
     ConjugateGradients<Complex, cBlockArray, cBlockArray&> CG;
@@ -374,6 +385,8 @@ void DOMPreconditioner::surrogateSource (PanelSolution * panel, int direction, P
 {
     if (direction == Left)
     {
+        std::cout << "Surrogate source LEFT" << std::endl;
+        
         // original B-spline basis
         Bspline const & org_xspline = panel->xspline_inner;
         
@@ -447,13 +460,15 @@ void DOMPreconditioner::surrogateSource (PanelSolution * panel, int direction, P
             cArray solution (rhs.size());
             CsrMatrix<LU_int_t,Complex> A_csr = A_coo.tocsr();
             std::unique_ptr<LUft> A_lu;
-            A_lu.reset(LUft::Choose("umfpack"));
+            A_lu.reset(LUft::Choose("umfpack")); // TODO : Make (wisely) runtime selectable.
             A_lu->factorize(A_csr);
             A_lu->solve(rhs, solution, 1);
             
             // store the surrogate source
             for (int j = 0; j < neighbour->yspline_inner.Nspline(); j++)
                 panel->ssrc[Left][ill][j] = solution[xspline.Nspline() * yspline.Nspline() + j];
+            
+            std::cout << "panel->ssrc[Left][" << ill << "] = " << panel->ssrc[Left][ill] << std::endl;
         }
     }
     if (direction == Right)
@@ -495,14 +510,17 @@ void DOMPreconditioner::splitResidual (cBlockArray const & r, std::vector<PanelS
     std::cout << std::endl;
     std::cout << "Split residual" << std::endl;
     
+    /// v --- v DEBUG
     for (unsigned ill = 0; ill < r.size(); ill++)
     {
         std::ofstream out (format("res-%d.vtk", ill));
         writeVTK_points
         (
             out,
-            rad_inner().bspline_x().zip
+            Bspline::zip
             (
+                rad_inner().bspline_x(),
+                rad_inner().bspline_y(),
                 r[ill],
                 linspace(rad_inner().bspline_x().Rmin(), rad_inner().bspline_x().Rmax(), 1001),
                 linspace(rad_inner().bspline_y().Rmin(), rad_inner().bspline_y().Rmax(), 1001)
@@ -512,6 +530,7 @@ void DOMPreconditioner::splitResidual (cBlockArray const & r, std::vector<PanelS
             rArray{ 0. }
         );
     }
+    /// ^ --- ^ DEBUG
     
     for (int ixpanel = 0; ixpanel < xpanels; ixpanel++)
     for (int iypanel = 0; iypanel < ypanels; iypanel++)
@@ -520,44 +539,9 @@ void DOMPreconditioner::splitResidual (cBlockArray const & r, std::vector<PanelS
         PanelSolution & p = panels[ixpanel * 2 + iypanel];
         unsigned Nxspline = p.xspline_inner.Nspline();
         unsigned Nyspline = p.yspline_inner.Nspline();
-        unsigned order = p.xspline_full.order();
         
         std::cout << "Sub-domain (" << ixpanel << "," << iypanel << ")" << std::endl;
-/*
-        // (S x S) . r
-        cArray rab0 = kron_dot(p.SaF, p.SbF, r[ill]);
-        std::cout << "    r[" << ill << "].norm() = " << r[ill].norm() << std::endl;
-        std::cout << "    rab0.norm() = " << rab0.norm() << std::endl;
         
-        // (S⁻¹ x 1) . (S x S) . r
-        cArray rab1 (Nxspline * Nyspline);
-        p.lu_Saa->solve(rab0, rab1, Nyspline);
-        transpose(rab1, Nxspline, Nyspline);
-        std::cout << "    rab1.norm() = " << rab1.norm() << std::endl;
-        
-        // (S⁻¹ x S⁻¹) . (S x S) . r
-        cArray rab2 (Nxspline * Nyspline);
-        p.lu_Sbb->solve(rab1, rab2, Nxspline);
-        transpose(rab2, Nyspline, Nxspline);
-        std::cout << "    rab2.norm() = " << rab2.norm() << std::endl;
-        
-        p.r[ill] = rab2;
-        
-        std::ofstream out (format("splt-%d-%d-%d.vtk", ixpanel, iypanel, ill));
-        writeVTK_points
-        (
-            out,
-            p.xspline_inner.zip
-            (
-                p.r[ill],
-                linspace(p.xspline_inner.Rmin(), p.xspline_inner.Rmax(), 1001),
-                linspace(p.yspline_inner.Rmin(), p.yspline_inner.Rmax(), 1001)
-            ),
-            linspace(p.xspline_inner.Rmin(), p.xspline_inner.Rmax(), 1001),
-            linspace(p.yspline_inner.Rmin(), p.yspline_inner.Rmax(), 1001),
-            rArray{ 0. }
-        );
-*/
         // allocate memory or erase the old residual
         p.r[ill].resize(Nxspline * Nyspline);
         p.r[ill].fill(0.);
@@ -572,12 +556,15 @@ void DOMPreconditioner::splitResidual (cBlockArray const & r, std::vector<PanelS
                 p.r[ill][pxspline * Nyspline + iyspline] = r[ill][ixspline * rad_inner().bspline_y().Nspline() + iyspline];
         }
         
+        /// v --- v DEBUG
         std::ofstream out2 (format("splt2-%d-%d-%d.vtk", ixpanel, iypanel, ill));
         writeVTK_points
         (
             out2,
-            p.xspline_inner.zip
+            Bspline::zip
             (
+                p.xspline_inner,
+                p.yspline_inner,
                 p.r[ill],
                 linspace(p.xspline_inner.Rmin(), p.xspline_inner.Rmax(), 1001),
                 linspace(p.yspline_inner.Rmin(), p.yspline_inner.Rmax(), 1001)
@@ -586,6 +573,7 @@ void DOMPreconditioner::splitResidual (cBlockArray const & r, std::vector<PanelS
             linspace(p.yspline_inner.Rmin(), p.yspline_inner.Rmax(), 1001),
             rArray{ 0. }
         );
+        /// ^ --- ^
     }
 }
 
@@ -637,10 +625,10 @@ bool DOMPreconditioner::PanelSolution::mapToPanel
     pxspline = ixspline - xoffset;
     pyspline = iyspline - yoffset;
     
-    if (pxspline >= xspline_inner.iR2() - xspline_inner.iR1())
+    if ((int)pxspline >= xspline_inner.iR2() - xspline_inner.iR1())
         return false;
     
-    if (pyspline >= yspline_inner.iR2() - yspline_inner.iR1())
+    if ((int)pyspline >= yspline_inner.iR2() - yspline_inner.iR1())
         return false;
     
     return true;

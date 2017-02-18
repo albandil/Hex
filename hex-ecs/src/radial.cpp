@@ -544,12 +544,14 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
     // resize partial moments arrays
     Mitr_L_x_   .resize(Nlambdas_ * mi_size_x);
     Mitr_L_y_   .resize(Nlambdas_ * mi_size_y);
+    Mitr_mLm1_x_.resize(Nlambdas_ * mi_size_x);
+    Mitr_mLm1_y_.resize(Nlambdas_ * mi_size_y);
     
     // resize full moments arrays, initialize with empty matrices
-    Mtr_L_x_ .resize(Nlambdas_, SymBandMatrix<Complex>(Nspline_x, order + 1));
-    Mtr_L_y_ .resize(Nlambdas_, SymBandMatrix<Complex>(Nspline_y, order + 1));
-    Mtr_mLm1_x_ .resize(Nlambdas_, SymBandMatrix<Complex>(Nspline_x, order + 1));
-    Mtr_mLm1_y_ .resize(Nlambdas_, SymBandMatrix<Complex>(Nspline_y, order + 1));
+    Mtr_L_x_   .resize(Nlambdas_, SymBandMatrix<Complex>(Nspline_x, order + 1));
+    Mtr_L_y_   .resize(Nlambdas_, SymBandMatrix<Complex>(Nspline_y, order + 1));
+    Mtr_mLm1_x_.resize(Nlambdas_, SymBandMatrix<Complex>(Nspline_x, order + 1));
+    Mtr_mLm1_y_.resize(Nlambdas_, SymBandMatrix<Complex>(Nspline_y, order + 1));
     
     // resize two-electron integrals array
     R_tr_dia_diag_.resize(Nlambdas_);

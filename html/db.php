@@ -201,7 +201,29 @@
             
             if ($var == "scatamp")
             {
-                fwrite($pipes2[0], "plot [" . $nums[0] . ":" . end($nums) .  "] \"-\" using 1:2 with lines, \"\" using 1:3 with lines\n");
+                fwrite($pipes2[0], "set key box opaque width 1 height 1\n");
+                fwrite($pipes2[0], "plot [" . $nums[0] . ":" . end($nums) .  "] \"-\" using 1:2 with lines title \"Re f\", \"\" using 1:3 with lines title \"Im f\"\n");
+                fwrite($pipes2[0], $hexoutput);
+                fwrite($pipes2[0], "e\n");
+                fwrite($pipes2[0], $hexoutput);
+                fwrite($pipes2[0], "e\n");
+            }
+            else if ($var == "dcs" or $var == "asy")
+            {
+                fwrite($pipes2[0], "set key box opaque width 1 height 1\n");
+                fwrite($pipes2[0], "plot [" . $nums[0] . ":" . end($nums) .  "] \"-\" using 1:2 with lines title \"$var\", \"\" using 1:3 with lines title \"extrapolated\"\n");
+                fwrite($pipes2[0], $hexoutput);
+                fwrite($pipes2[0], "e\n");
+                fwrite($pipes2[0], $hexoutput);
+                fwrite($pipes2[0], "e\n");
+            }
+            else if ($var == "momtf" or $var == "spflip")
+            {
+                fwrite($pipes2[0], "set key box opaque width 1 height 1\n");
+                if ($_POST["Emin"] < 0 and $nums[0] < 0)
+                    fwrite($pipes2[0], "plot \"-\" using 1:2 with lines title \"$var\", \"-\" using 1:2 with lines title \"extrapolated\"\n");
+                else
+                    fwrite($pipes2[0], "plot [" . $nums[0] . ":" . end($nums) .  "] \"-\" using 1:2 with lines\n");
                 fwrite($pipes2[0], $hexoutput);
                 fwrite($pipes2[0], "e\n");
                 fwrite($pipes2[0], $hexoutput);
@@ -290,9 +312,9 @@
                 <option value = "scatamp" <?php if ($var == "scatamp") echo "selected = \"selected\""; ?> >scatering amplitude</option>
                 <option value = "dcs" <?php if ($var == "dcs") echo "selected = \"selected\""; ?> >differential cross section</option>
                 <option value = "asy" <?php if ($var == "asy") echo "selected = \"selected\""; ?> >spin asymmetry</option>
-                <option value = "ics" <?php if ($var == "ics") echo "selected = \"selected\""; ?> >integral cross section</option>
+                <!-- <option value = "ics" <?php if ($var == "ics") echo "selected = \"selected\""; ?> >integral cross section</option> -->
                 <option value = "ccs" <?php if ($var == "ccs") echo "selected = \"selected\""; ?> >complete cross section</option>
-                <option value = "xcs" <?php if ($var == "xcs") echo "selected = \"selected\""; ?> >extrapolated cross section</option>
+                <!-- <option value = "xcs" <?php if ($var == "xcs") echo "selected = \"selected\""; ?> >extrapolated cross section</option> -->
                 <option value = "colls" <?php if ($var == "colls") echo "selected = \"selected\""; ?> >collision strength</option>
                 <option value = "momtf" <?php if ($var == "momtf") echo "selected = \"selected\""; ?> >momentum transfer</option>
                 <option value = "spflip" <?php if ($var == "spflip") echo "selected = \"selected\""; ?> >spin-flip cross section</option>
@@ -359,7 +381,10 @@
                 // total spin
                 if (in_array($var, array("scatamp", "dcs", "ics", "momtf")))
                 {
-                    printf("\t\t\t\\(S\\) = <input type = \"text\" title = \"total spin of the two electrons\" name = \"S\" size = \"3\" value = \"%s\" required = \"required\"/>\n", isset($_POST["S"]) ? $_POST["S"] : "");
+                    printf("\t\t\t\\(S\\) = <select name = \"S\" title = \"total spin of the two electrons\">\n");
+                    printf("\t\t\t<option value = \"0\"" . ((isset($_POST["S"]) and $_POST["S"] == "0") ? " selected=\"selected\"" : "") . ">0</option>\n");
+                    printf("\t\t\t<option value = \"1\"" . ((isset($_POST["S"]) and $_POST["S"] == "1") ? " selected=\"selected\"" : "") . ">1</option>\n");
+                    printf("\t\t\t</select>\n");
                 }
                 
                 printf("\t\t</center>\n");

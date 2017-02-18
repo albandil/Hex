@@ -29,6 +29,7 @@
 //                                                                                   //
 //  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
+#include <cmath>
 #include <map>
 #include <string>
 #include <vector>
@@ -48,6 +49,27 @@
 // --------------------------------------------------------------------------------- //
 
 createNewScatteringQuantity(ScatteringAmplitude, "scatamp")
+
+// --------------------------------------------------------------------------------- //
+
+extern void hex_tmat_pw_transform
+(
+    int ni, int li, int mi,
+    int nf, int lf, int mf,
+    int nEnergies,
+    double * energies,
+    bool extra,
+    std::function
+    <
+        void
+        (
+            int ell,
+            iArrays const & converged,
+            iArrays const & complete,
+            cArrays const & tmatrices
+        )
+    > f
+);
 
 // --------------------------------------------------------------------------------- //
 
@@ -111,16 +133,20 @@ void hex_scattering_amplitude
 (
     int ni, int li, int mi,
     int nf, int lf, int mf,
-    int S, double E, int N,
-    double * angles, double * result
+    int S,
+    int nEnergies, double * energies,
+    int nAngles, double * angles,
+    double * result, double * extra
 )
 {
     hex_scattering_amplitude_
     (
         &ni, &li, &mi,
         &nf, &lf, &mf,
-        &S, &E, &N,
-        angles, result
+        &S,
+        &nEnergies, energies,
+        &nAngles, angles,
+        result, extra
     );
 }
 
@@ -128,141 +154,71 @@ void hex_scattering_amplitude_
 (
     int * ni, int * li, int * mi,
     int * nf, int * lf, int * mf,
-    int * S, double * E, int * N,
-    double * angles, double * result
+    int * S,
+    int * nEnergies, double * energies,
+    int * nAngles, double * angles,
+    double * result, double * extra
 )
 {
-    ScatteringQuantity * TMat = get_quantity("tmat");
-    
-    cArrayView results(*N,reinterpret_cast<Complex*>(result));
-    results.fill(0.);
-    
-    // we need cosines, not angles
-    rArray cos_angles = rArray(*N,angles).transform([](double x){ return std::cos(x); });
-    
-    // get lowest and highest partial wave
-    int min_ell, max_ell;
-    sqlitepp::statement st (TMat->session());
-    st << "SELECT MIN(ell), MAX(L)-lf FROM 'tmat' "
-           "WHERE ni = :ni "
-           "  AND li = :li "
-           "  AND mi = :mi "
-           "  AND nf = :nf "
-           "  AND lf = :lf "
-           "  AND mf = :mf "
-           "  AND  S = :S  ",
-        sqlitepp::into(min_ell), sqlitepp::into(max_ell),
-        sqlitepp::use(*ni), sqlitepp::use(*li), sqlitepp::use(*mi),
-        sqlitepp::use(*nf), sqlitepp::use(*lf), sqlitepp::use(*mf),
-        sqlitepp::use(*S);
-    st.exec();
-    
-    // resulting T-matrices
-    cArray tmatrices;
-    
-    // loop over all partial waves
-    for (int ell = min_ell; ; ell++)
+    // get views of the output arrays
+    cArrayView results, extras;
+    results.reset((*nEnergies) * (*nAngles), reinterpret_cast<Complex*>(result));
+    if (extra)
     {
-        Complex Tmat;
-        double Ei, ReT, ImT;
-        bool missing = true;
-        
-        // check if there are data in the database
-        if (ell <= max_ell)
-        {
-            // prepare selection statement
-            sqlitepp::statement st1 (TMat->session());
-            // WARNING Sign convention changed.
-//             st1 << "SELECT Ei, SUM(-Re_T_ell - Re_TBorn_ell), SUM(-Im_T_ell - Im_TBorn_ell) FROM " + TMatrix::name() + " "
-            st1 << "SELECT Ei, SUM(Re_T_ell), SUM(Im_T_ell) FROM 'tmat' "
-                "WHERE ni = :ni "
-                "  AND li = :li "
-                "  AND mi = :mi "
-                "  AND nf = :nf "
-                "  AND lf = :lf "
-                "  AND mf = :mf "
-                "  AND  S = :S  "
-                "  AND ell = :ell "
-                "GROUP BY Ei "
-                "ORDER BY Ei ASC ",
-                sqlitepp::into(Ei), sqlitepp::into(ReT), sqlitepp::into(ImT),
-                sqlitepp::use(*ni), sqlitepp::use(*li), sqlitepp::use(*mi),
-                sqlitepp::use(*nf), sqlitepp::use(*lf), sqlitepp::use(*mf),
-                sqlitepp::use(*S), sqlitepp::use(ell);
-            
-            // load the data corresponding to the statement
-            rArray energies_ell;
-            cArray tmatrices_ell;
-            while (st1.exec())
-            {
-                energies_ell.push_back(Ei);
-                tmatrices_ell.push_back(Complex(ReT,ImT));
-            }
-            
-            // is the requested energy in the available energy interval?
-            if (energies_ell.size() != 0 and energies_ell.front() <= *E and *E <= energies_ell.back())
-            {
-                // interpolate requested energy
-                tmatrices.push_back(interpolate(energies_ell, tmatrices_ell, { *E })[0]);
-                missing = false;
-            }
-        }
-        
-//         if (missing) break;
-        
-        // if there are no more partial waves in the database, try to extrapolate
-        if (ell > max_ell or missing)
-        {
-            // only extrapolate if we have two or more samples, that are decreasing at the end
-            if
-            (
-                tmatrices.size() >= 2 and
-                std::abs(tmatrices.back(0).real()) < std::abs(tmatrices.back(1).real()) and
-                std::abs(tmatrices.back(0).imag()) < std::abs(tmatrices.back(1).imag())
-            )
-            {
-                // choose the asymptotics
-                if (*ni == *nf and *li == *lf and *mi == *mf)
-                {
-                    // extrapolate T_ell for elastic scattering [T ~ L^(-2.5)]
-                    tmatrices.push_back(tmatrices.back() * std::pow((ell-1.)/ell,2.5));
-                }
-                else /*if (std::abs((*ni) - (*nf)) == 1 and std::abs((*li) - (*lf)) == 1)
-                {
-                    // dipole transitions are special, they will need to be Born-subtracted
-                    break;
-                }
-                else*/
-                {
-                    // extrapolate T_ell for inelastic scattering [use geometric series]
-                    double extra_re = tmatrices.back(0).real() * tmatrices.back(0).real() / tmatrices.back(1).real();
-                    double extra_im = tmatrices.back(0).imag() * tmatrices.back(0).imag() / tmatrices.back(1).imag();
-                    tmatrices.push_back(Complex(extra_re,extra_im));
-                    std::cout << "# extrapolate " << ell << " " << tmatrices.back() << std::endl;
-                }
-            }
-            else
-            {
-                // unable to extrapolate => stop
-                break;
-            }
-        }
-        
-        // update scattering amplitudes¨
-        for (int i = 0; i < *N; i++)
-        {
-            double Y = gsl_sf_legendre_sphPlm(ell,std::abs((*mi)-(*mf)),cos_angles[i]);
-            results[i] += -tmatrices.back() * Y / special::constant::two_pi;
-        }
-        
-        // stop if the T-matrix is small
-        if (std::abs(tmatrices.back()) < 1e-5 * std::abs(sum(tmatrices)))
-            break;
+        extras.reset((*nEnergies) * (*nAngles), reinterpret_cast<Complex*>(extra));
     }
     
-    // finally, Born-subtract dipole transition
-    /*if (std::abs((*ni) - (*nf)) == 1 and std::abs((*li) - (*lf)) == 1)
-        results += -FirstBornFullTMatrix(*ni, *li, *mi, *nf, *lf, *mf, *E, rArrayView(*N,angles)) / special::constant::two_pi;*/
+    // calculate cosines of the scattering angles
+    rArray cos_angles (*nAngles);
+    for (int i = 0; i < (*nAngles); i++)
+    {
+        cos_angles[i] = std::cos(angles[i]);
+    }
+    
+    // This function will be called by "hex_tmat_pw_transform" for every partial wave
+    //    -  "ell" is the angular momentum of the partial wave
+    //    -  "converged" indicates whether the partial wave expansion is converged (0 = not yet, 1 = yes, 2 = convergence failed)
+    //    -  "complete" indicates whether all T-matrix components were found in the database (0 = no, 1 = yes)
+    //    -  "tmatrices" are singlet and triplet T-matrix arrays at given energies
+    auto fun = [&]
+    (
+        int ell,
+        iArrays const & converged,
+        iArrays const & complete,
+        cArrays const & tmatrices
+    )
+    {
+        // for all angles
+        for (int i = 0; i < (*nAngles); i++)
+        {
+            // evaluate the spherical harmonics
+            double Y = gsl_sf_legendre_sphPlm(ell, std::abs((*mi) - (*mf)), cos_angles[i]);
+            
+            // all energies
+            for (int j = 0; j < (*nEnergies); j++) if (converged[*S][j] == 0)
+            {
+                Complex contrib = -tmatrices[*S][j] * Y / special::constant::two_pi;
+                
+                // update scattering amplitude
+                if (complete[*S][j])
+                    results[j * (*nAngles) + i] += contrib;
+                
+                // update the extrapolated scattering amplitude
+                if (extra)
+                    extras[j * (*nAngles) + i] += contrib;
+                
+            }
+        }
+    };
+    
+    // call the T-matrix retrieval driver
+    hex_tmat_pw_transform
+    (
+        *ni, *li, *mi, *nf, *lf, *mf,
+        *nEnergies, energies,
+        extra != nullptr,
+        fun
+    );
 }
 
 // --------------------------------------------------------------------------------- //
@@ -277,12 +233,16 @@ bool ScatteringAmplitude::run (std::map<std::string,std::string> const & sdata)
     // scattering event parameters
     int ni = Conv<int>(sdata, "ni", name());
     int li = Conv<int>(sdata, "li", name());
-    int mi = Conv<int>(sdata, "mi", name());
+    int mi0= Conv<int>(sdata, "mi", name());
     int nf = Conv<int>(sdata, "nf", name());
     int lf = Conv<int>(sdata, "lf", name());
-    int mf = Conv<int>(sdata, "mf", name());
+    int mf0= Conv<int>(sdata, "mf", name());
     int  S = Conv<int>(sdata, "S", name());
     double E = Conv<double>(sdata, "Ei", name()) * efactor;
+    
+    // use mi >= 0; if mi < 0, flip both signs
+    int mi = (mi0 < 0 ? -mi0 : mi0);
+    int mf = (mi0 < 0 ? -mf0 : mf0);
     
     // angles
     rArray angles;
@@ -302,29 +262,31 @@ bool ScatteringAmplitude::run (std::map<std::string,std::string> const & sdata)
     // the scattering amplitudes
     rArray scaled_angles = angles * afactor;
     cArray amplitudes(angles.size());
+    cArray extra(angles.size());
     hex_scattering_amplitude
     (
-        ni,li,mi,
-        nf,lf,mf,
-        S, E,
-        angles.size(),
-        scaled_angles.data(),
-        reinterpret_cast<double*>(amplitudes.data())
+        ni, li, mi,
+        nf, lf, mf,
+        S,
+        1, &E,
+        angles.size(), scaled_angles.data(),
+        reinterpret_cast<double*>(amplitudes.data()),
+        reinterpret_cast<double*>(extra.data())
     );
     
     // write out
     std::cout << logo("#") <<
         "# Scattering amplitudes in " << unit_name(Lunits) << " for\n"
-        "#     ni = " << ni << ", li = " << li << ", mi = " << mi << ",\n"
-        "#     nf = " << nf << ", lf = " << lf << ", mf = " << mf << ",\n"
-        "#     S = " << S << ", E = " << E/efactor << unit_name(Eunits) << "\n"
+        "#     ni = " << ni << ", li = " << li << ", mi = " << mi0 << ",\n"
+        "#     nf = " << nf << ", lf = " << lf << ", mf = " << mf0 << ",\n"
+        "#     S = " << S << ", E = " << E/efactor << " " << unit_name(Eunits) << "\n"
         "# ordered by angle in " << unit_name(Aunits) << "\n"
         "# \n";
     OutputTable table;
     table.setWidth(15, 15);
     table.setAlignment(OutputTable::left);
-    table.write("# angle    ", "Re f     ", "Im f     ");
-    table.write("# ---------", "---------", "---------");
+    table.write("# angle    ", "Re f     ", "Im f     ", "Re f [ex]", "Im f [ex]");
+    table.write("# ---------", "---------", "---------", "---------", "---------");
     
     for (std::size_t i = 0; i < angles.size(); i++)
     {
@@ -332,7 +294,9 @@ bool ScatteringAmplitude::run (std::map<std::string,std::string> const & sdata)
         (
             angles[i],
             amplitudes[i].real() * lfactor,
-            amplitudes[i].imag() * lfactor
+            amplitudes[i].imag() * lfactor,
+            extra[i].real() * lfactor,
+            extra[i].imag() * lfactor
         );
     }
     

@@ -112,16 +112,20 @@ void hex_differential_cross_section
 (
     int ni, int li, int mi,
     int nf, int lf, int mf,
-    int S, double E, int N,
-    double * angles, double * dcs
+    int S,
+    int nEnergies, double * energies,
+    int nAngles, double * angles,
+    double * dcs, double * extra
 )
 {
     hex_differential_cross_section_
     (
         &ni, &li, &mi,
         &nf, &lf, &mf,
-        &S, &E, &N,
-        angles, dcs
+        &S,
+        &nEnergies, energies,
+        &nAngles, angles,
+        dcs, extra
     );
 }
 
@@ -129,27 +133,44 @@ void hex_differential_cross_section_
 (
     int * ni, int * li, int * mi,
     int * nf, int * lf, int * mf,
-    int * S, double * E, int * N,
-    double * angles, double * dcs
+    int * S,
+    int * nEnergies, double * energies,
+    int * nAngles, double * angles,
+    double * dcs, double * extra
 )
 {
-    double ki = std::sqrt((*E));
-    double kf = std::sqrt((*E) - 1./((*ni)*(*ni)) + 1./((*nf)*(*nf)));
+    rArrayView E (*nEnergies, energies);
     
-    // check if this is an allowed transition
-    if (not std::isfinite(ki) or not std::isfinite(kf))
-        return;
+    rArray ki = sqrt(E);
+    rArray kf = sqrt(E - 1./((*ni)*(*ni)) + 1./((*nf)*(*nf)));
     
     // get scattering amplitudes
-    cArray amplitudes(*N);
+    cArray amplitudes ((*nEnergies) * (*nAngles));
+    cArray xamplitudes ((*nEnergies) * (*nAngles));
     hex_scattering_amplitude_
     (
-        ni, li, mi, nf, lf, mf, S, E, N, angles,
-        reinterpret_cast<double*>(amplitudes.data())
+        ni, li, mi,
+        nf, lf, mf,
+        S,
+        nEnergies, energies,
+        nAngles, angles,
+        reinterpret_cast<double*>(amplitudes.data()),
+        extra ? reinterpret_cast<double*>(xamplitudes.data()) : nullptr
     );
     
-    // calculate differential cross section
-    rArrayView(*N, dcs) = sqrabs(amplitudes) * (kf/ki * 0.25 * (2 * (*S) + 1));
+    for (int ie = 0; ie < (*nEnergies); ie++)
+    {
+        for (int ia = 0; ia < (*nAngles); ia++)
+        {
+            // calculate differential cross section
+            dcs[ie * (*nAngles) + ia] = sqrabs(amplitudes[ie * (*nAngles) + ia]) * (kf[ie]/ki[ie] * 0.25 * (2 * (*S) + 1));
+            
+            // calculate extrapolated cross section
+            if (extra)
+                extra[ie * (*nAngles) + ia] = sqrabs(xamplitudes[ie * (*nAngles) + ia]) * (kf[ie]/ki[ie] * 0.25 * (2 * (*S) + 1));
+        }
+    }
+    
 }
 
 bool DifferentialCrossSection::run (std::map<std::string,std::string> const & sdata)
@@ -162,12 +183,16 @@ bool DifferentialCrossSection::run (std::map<std::string,std::string> const & sd
     // scattering event parameters
     int ni = Conv<int>(sdata, "ni", name());
     int li = Conv<int>(sdata, "li", name());
-    int mi = Conv<int>(sdata, "mi", name());
+    int mi0= Conv<int>(sdata, "mi", name());
     int nf = Conv<int>(sdata, "nf", name());
     int lf = Conv<int>(sdata, "lf", name());
-    int mf = Conv<int>(sdata, "mf", name());
+    int mf0= Conv<int>(sdata, "mf", name());
     int  S = Conv<int>(sdata, "S", name());
     double E = Conv<double>(sdata, "Ei", name()) * efactor;
+    
+    // use mi >= 0; if mi < 0, flip both signs
+    int mi = (mi0 < 0 ? -mi0 : mi0);
+    int mf = (mi0 < 0 ? -mf0 : mf0);
     
     // angles
     rArray angles;
@@ -185,23 +210,30 @@ bool DifferentialCrossSection::run (std::map<std::string,std::string> const & sd
     }
     
     // compute cross section
-    rArray scaled_angles = angles * afactor, dcs(angles.size());
-    hex_differential_cross_section(ni,li,mi, nf,lf,mf, S, E, angles.size(), scaled_angles.data(), dcs.data());
+    rArray scaled_angles = angles * afactor, dcs (angles.size()), dcs_ex (angles.size());
+    hex_differential_cross_section(ni,li,mi, nf,lf,mf, S, 1, &E, angles.size(), scaled_angles.data(), dcs.data(), dcs_ex.data());
     
     // write out
     std::cout << logo("#") <<
         "# Differential cross section in " << unit_name(Lunits) << " for \n" <<
-        "#     ni = " << ni << ", li = " << li << ", mi = " << mi << ",\n" <<
-        "#     nf = " << nf << ", lf = " << lf << ", mf = " << mf << ",\n" <<
+        "#     ni = " << ni << ", li = " << li << ", mi = " << mi0 << ",\n" <<
+        "#     nf = " << nf << ", lf = " << lf << ", mf = " << mf0 << ",\n" <<
         "#     S = " << S << ", E = " << E/efactor << " " << unit_name(Eunits)
                      << " ordered by angle in " << unit_name(Aunits) << "\n";
     OutputTable table;
     table.setWidth(15);
     table.setAlignment(OutputTable::left);
-    table.write("# angle    ", "dcs      ");
-    table.write("# ---------", "---------");
+    table.write("# angle    ", "dcs      ", "dcs [ex] ");
+    table.write("# ---------", "---------", "---------");
     for (std::size_t i = 0; i < angles.size(); i++)
-        table.write(angles[i], dcs[i]*lfactor*lfactor);
+    {
+        table.write
+        (
+            angles[i],
+            dcs[i] * lfactor * lfactor,
+            dcs_ex[i] * lfactor * lfactor
+        );
+    }
     
     return true;
 }

@@ -60,13 +60,15 @@ void Solver::choose_preconditioner ()
     (
         cmd_.preconditioner,
         cmd_, inp_,  par_, ang_,
-        bspline_inner_, bspline_full_,
-        bspline_inner_, bspline_full_
+        bspline_inner_, // inner region basis
+        bspline_full_,  // full basis
+        bspline_full_,  // x axis full basis
+        bspline_full_   // y axis full basis
     );
     
     // check success
     if (prec_ == nullptr)
-        HexException("Preconditioner %d not implemented.", cmd_.preconditioner);
+        HexException("Preconditioner %s not implemented.", cmd_.preconditioner);
 }
 
 void Solver::setup_preconditioner ()
@@ -147,12 +149,9 @@ void Solver::solve ()
         }
         
         // calculate size of the hamiltonian
-        std::size_t Hsize = std::accumulate
-        (
-            bstates_.begin(), bstates_.end(),
-            Nspline_inner * Nspline_inner * ang_.states().size(),
-            [&](std::size_t n, std::pair<iArray,iArray> const & p) { return n + (p.first.size() + p.second.size()) * Nspline_outer; }
-        );
+        std::size_t Hsize = Nspline_inner * Nspline_inner * ang_.states().size();
+        for (std::pair<iArray,iArray> const & p : bstates_)
+            Hsize += (p.first.size() + p.second.size()) * Nspline_outer;
         
         // print system information
         std::cout.imbue(std::locale(std::locale::classic(), new MyNumPunct));

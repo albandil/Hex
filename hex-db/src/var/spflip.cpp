@@ -52,6 +52,27 @@ createNewScatteringQuantity(SpinFlipCrossSection, "spflip")
 
 // --------------------------------------------------------------------------------- //
 
+extern void hex_tmat_pw_transform
+(
+    int ni, int li, int mi,
+    int nf, int lf, int mf,
+    int nEnergies,
+    double * energies,
+    bool extra,
+    std::function
+    <
+        void
+        (
+            int ell,
+            iArrays const & converged,
+            iArrays const & complete,
+            cArrays const & tmatrices
+        )
+    > f
+);
+
+// --------------------------------------------------------------------------------- //
+
 std::string SpinFlipCrossSection::description ()
 {
     return "Spin flip cross section.";
@@ -115,10 +136,14 @@ bool SpinFlipCrossSection::run (std::map<std::string,std::string> const & sdata)
     // scattering event parameters
     int ni = Conv<int>(sdata, "ni", name());
     int li = Conv<int>(sdata, "li", name());
-    int mi = Conv<int>(sdata, "mi", name());
+    int mi0= Conv<int>(sdata, "mi", name());
     int nf = Conv<int>(sdata, "nf", name());
     int lf = Conv<int>(sdata, "lf", name());
-    int mf = Conv<int>(sdata, "mf", name());
+    int mf0= Conv<int>(sdata, "mf", name());
+    
+    // use mi >= 0; if mi < 0, flip both signs
+    int mi = (mi0 < 0 ? -mi0 : mi0);
+    int mf = (mi0 < 0 ? -mf0 : mf0);
     
     // energies and cross sections
     rArray energies;
@@ -138,73 +163,100 @@ bool SpinFlipCrossSection::run (std::map<std::string,std::string> const & sdata)
     // energies in Rydbergs
     rArray scaled_energies = energies * efactor;
     
-    // compute cross section
-    double E, sigma;
-    sqlitepp::statement st (session());
-    st << "SELECT singlet.Ei AS Ei, SUM(singlet.ReT*singlet.ReT+singlet.ImT*singlet.ImT+triplet.ReT*triplet.ReT+triplet.ImT*triplet.ImT-2*singlet.ReT*triplet.ReT-2*singlet.ImT*triplet.ImT)/157.91367 "
-              "FROM "
-              "( "
-                "SELECT Ei, ell, SUM(Re_T_ell) AS ReT, SUM(Im_T_ell) As ImT "
-                "FROM 'tmat' "
-                "WHERE ni = :ni AND li = :li AND mi = :mi AND nf = :nf AND lf = :lf AND mf = :mf AND S = 0 "
-                "GROUP BY Ei, ell, L "
-                "ORDER BY Ei, ell ASC "
-              ") AS singlet "
-              "INNER JOIN "
-              "( "
-                "SELECT Ei, ell, SUM(Re_T_ell) AS ReT, SUM(Im_T_ell) AS ImT "
-                "FROM 'tmat' "
-                "WHERE ni = :ni AND li = :li AND mi = :mi AND nf = :nf AND lf = :lf AND mf = :mf AND S = 1 "
-                "GROUP BY Ei, ell, L "
-                "ORDER BY Ei, ell ASC "
-              ") AS triplet "
-              "ON singlet.Ei = triplet.Ei AND singlet.ell = triplet.ell "
-              "GROUP BY singlet.Ei "
-              "ORDER BY singlet.Ei",
-            sqlitepp::into(E), sqlitepp::into(sigma),
-            sqlitepp::use(ni), sqlitepp::use(li), sqlitepp::use(mi), sqlitepp::use(nf), sqlitepp::use(lf), sqlitepp::use(mf);
-    
-    // retrieve data
-    rArray E_arr, sigma_arr;
-    while (st.exec())
+    // get available energies if requested
+    if (not scaled_energies.empty() and scaled_energies.front() == -1)
     {
-        E_arr.push_back(E);
-        sigma_arr.push_back(sigma);
+        scaled_energies.clear();
+        double E;
+        sqlitepp::statement st (session());
+        st << "SELECT DISTINCT Ei FROM 'tmat' "
+              "WHERE ni = :ni "
+              "  AND li = :li "
+              "  AND mi = :mi "
+              "  AND nf = :nf "
+              "  AND lf = :lf "
+              "  AND mf = :mf "
+              "ORDER BY Ei ASC",
+              sqlitepp::into(E),
+              sqlitepp::use(ni), sqlitepp::use(li),  sqlitepp::use(mi),
+              sqlitepp::use(nf), sqlitepp::use(lf),  sqlitepp::use(mf);
+        while (st.exec())
+        {
+            scaled_energies.push_back(E);
+        }
     }
     
-    // terminate if no data
-    if (E_arr.empty() or energies.empty())
-        return true;
+    // results
+    rArray spflip (scaled_energies.size()), spflip_ex (scaled_energies.size());
     
-    rArray spflip;
-    double Eion = 1./(ni*ni);
-    if (energies[0] < 0)
+    // This function will be called by "hex_tmat_pw_transform" for every partial wave
+    //    -  "ell" is the angular momentum of the partial wave
+    //    -  "converged" indicates whether the partial wave expansion is converged (0 = not yet, 1 = yes, 2 = convergence failed)
+    //    -  "complete" indicates whether all T-matrix components were found in the database (0 = no, 1 = yes)
+    //    -  "tmatrices" are singlet and triplet T-matrix arrays at given energies
+    auto fun = [&]
+    (
+        int ell,
+        iArrays const & converged,
+        iArrays const & complete,
+        cArrays const & tmatrices
+    )
     {
-        // all available
-        energies = E_arr;
-        spflip = sigma_arr;
-    }
-    else
-    {
-        // interpolate
-        spflip = (energies[0] < Eion) ? 
-            interpolate_real(E_arr, sigma_arr, energies, gsl_interp_linear) :
-            interpolate_real(E_arr, sigma_arr, energies, gsl_interp_cspline);
-    }
+        // all energies
+        for (unsigned j = 0; j < scaled_energies.size(); j++)
+        if (converged[0][j] == 0 and converged[1][j] == 0)
+        {
+            double contrib = sqrabs(tmatrices[0][j])
+                           + sqrabs(tmatrices[1][j])
+                           + 2.0 * (tmatrices[0][j] * tmatrices[1][j]).real();
+            
+            // update scattering amplitude
+            if (complete[0][j] and complete[1][j])
+                spflip[j] += contrib;
+            
+            // update the extrapolated scattering amplitude
+            spflip_ex[j] += contrib;
+            
+        }
+    };
+    
+    // call the T-matrix retrieval driver
+    hex_tmat_pw_transform
+    (
+        ni, li, mi, nf, lf, mf,
+        scaled_energies.size(), scaled_energies.data(),
+        true,
+        fun
+    );
+    
+    // momenta
+    rArray ki = sqrt(scaled_energies);
+    rArray kf = sqrt(scaled_energies - 1.0 / (ni * ni) + 1.0 / (nf * nf));
+    
+    // add prefactor
+    spflip *= kf / ki / 157.9136704174297; // 16pi^2
+    spflip_ex *= kf / ki / 157.9136704174297;
     
     // write out
     std::cout << logo("#") <<
         "# Spin flip cross section in " << unit_name(Lunits) << " for \n" <<
-        "#     ni = " << ni << ", li = " << li << ", mi = " << mi << ",\n" <<
-        "#     nf = " << nf << ", lf = " << lf << ", mf = " << mf << ",\n" <<
+        "#     ni = " << ni << ", li = " << li << ", mi = " << mi0 << ",\n" <<
+        "#     nf = " << nf << ", lf = " << lf << ", mf = " << mf0 << ",\n" <<
         "#     ordered by energy in " << unit_name(Eunits) << "\n";
     OutputTable table;
     table.setWidth(15);
     table.setAlignment(OutputTable::left);
-    table.write("# Ei       ", "spin flip");
-    table.write("# ---------", "---------");
-    for (std::size_t i = 0; i < energies.size(); i++)
-        table.write(energies[i], spflip[i]*lfactor*lfactor);
+    table.write("# Ei       ", "spin flip     ", "spin flip [ex]");
+    table.write("# ---------", "--------------", "--------------");
+    for (std::size_t i = 0; i < scaled_energies.size(); i++)
+    {
+        table.write
+        (
+            scaled_energies[i] / efactor,
+            spflip[i] * lfactor * lfactor,
+            spflip_ex[i] * lfactor * lfactor
+        );
+    }
     
     return true;
 }

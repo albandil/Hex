@@ -31,21 +31,21 @@
     <!-- TAP service -->
     <capability standardID='ivo://ivoa.net/std/TAP' xsi:type='vr:Capability'>
         <interface xsi:type='vs:ParamHTTP'>
-            <accessURL use='base'>http://utf.mff.cuni.cz/~benda/</accessURL>
+            <accessURL use='base'>http://utf.mff.cuni.cz/data/hex</accessURL>
         </interface>
     </capability>
     
     <!-- Capability service -->
     <capability standardID='ivo://ivoa.net/std/VOSI#capabilities' xsi:type='vr:Capability'>
         <interface xsi:type='vs:ParamHTTP'>
-            <accessURL use='base'>http://utf.mff.cuni.cz/~benda/capabilities</accessURL>
+            <accessURL use='base'>http://utf.mff.cuni.cz/data/hex/capabilities</accessURL>
         </interface>
     </capability>
     
     <!-- Availability service -->
     <capability standardID="ivo://ivoa.net/std/VOSI#availability" xsi:type='vr:Capability'>
         <interface xsi:type="vs:ParamHTTP">
-            <accessURL use="base">http://utf.mff.cuni.cz/~benda/availability</accessURL>
+            <accessURL use="base">http://utf.mff.cuni.cz/data/hex/availability</accessURL>
         </interface>
     </capability>
     

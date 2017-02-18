@@ -152,17 +152,21 @@ void hex_dump (const char* dumpname);
    @param lf Final atomic orbital quantum number.
    @param mf Final atomic magnetic quantum number.
    @param S Total spin (0 = singlet, 1 = triplet).
-   @param E Impact energy in Rydbergs.
-   @param N Sample count.
-   @param angles Real array of length N containing scattering angles.
-   @param result Complex array of length N (or real array of length 2N) to contain the amplitudes.
+   @param nEnergies Number of supplied impact energies.
+   @param energies Real array of length @c nEnergies containing impact energies in Rydbergs.
+   @param nAngles Number of supplied angles.
+   @param angles Real array of length @c nAngles containing scattering angles.
+   @param result Complex array of length @c nEnergies*nAngles (or real array of twice that length) to contain the amplitudes.
+   @param extra Extrapolated result (w.r.t. partial waves); optional - can be set to zero.
 */
 void hex_scattering_amplitude_
 (
     int * ni, int * li, int * mi,
     int * nf, int * lf, int * mf,
-    int * S, double * E, int * N,
-    double * angles, double * result
+    int * S,
+    int * nEnergies, double * energies,
+    int * nAngles, double * angles,
+    double * result, double * extra
 );
 
 /**
@@ -177,17 +181,21 @@ void hex_scattering_amplitude_
    @param lf Final atomic orbital quantum number.
    @param mf Final atomic magnetic quantum number.
    @param S Total spin (0 = singlet, 1 = triplet).
-   @param E Impact energy in Rydbergs.
-   @param N Sample count.
-   @param angles Real array of length N containing scattering angles.
-   @param result Complex array of length N (or real array of length 2N) to contain the amplitudes.
+   @param nEnergies Number of supplied impact energies.
+   @param energies Real array of length @c nEnergies containing impact energies in Rydbergs.
+   @param nAngles Number of supplied angles.
+   @param angles Real array of length @c nAngles containing scattering angles.
+   @param result Complex array of length @c nEnergies*nAngles (or real array of twice that length) to contain the amplitudes.
+   @param extra Extrapolated result (w.r.t. partial waves); optional - can be set to zero.
 */
 void hex_scattering_amplitude
 (
     int ni, int li, int mi,
     int nf, int lf, int mf,
-    int S, double E, int N,
-    double * angles, double * result
+    int S,
+    int nEnergies, double * energies,
+    int nAngles, double * angles,
+    double * result, double * extra
 );
 
 /**
@@ -303,8 +311,10 @@ void hex_differential_cross_section_
 (
     int * ni, int * li, int * mi,
     int * nf, int * lf, int * mf,
-    int * S, double * E, int * N,
-    double * angles, double * dcs
+    int * S,
+    int * nEnergies, double * energies,
+    int * nAngles, double * angles,
+    double * dcs, double * extra
 );
 
 /**
@@ -328,8 +338,10 @@ void hex_differential_cross_section
 (
     int ni, int li, int mi,
     int nf, int lf, int mf,
-    int S, double E, int N,
-    double * angles, double * dcs
+    int S,
+    int nEnergies, double * energies,
+    int nAngles, double * angles,
+    double * dcs, double * extra
 );
 
 /**

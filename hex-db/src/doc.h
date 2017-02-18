@@ -35,7 +35,7 @@
 /**
   @mainpage
   @author Jakub Benda, MFF UK, jakub.benda&at;seznam.cz
-  @date 15. 3. 2016
+  @date 10. 2. 2017
   @section db Hex-db
   
   Hex-db is the interface program that can be used to access data precomputed
@@ -48,8 +48,9 @@
   The whole package is written in C++11, which is supported by most of the
   up-to-date compilers. The following have been tested:
   
-  - GCC 5.3.0
-  - Intel C++ Composer XE 16.0.0
+  - GCC 6.3.0
+  - LLVM/clang 3.9.1
+  - Intel C++ Composer XE 17.0
   
   There are several external libraries that are being used for some partial tasks.
   Here is the list of the libraries with versions that were used:
@@ -57,7 +58,7 @@
   - GSL 2.1<br/>
            Obtainable from http://www.gnu.org/software/gsl/<br/>
            Used for special functions and some others.
-  - SQLite 3.11.1<br/>
+  - SQLite 3.15.0<br/>
            Obtainable from http://www.sqlite.org/download.html<br/>
            Used for access to the database files.
  
@@ -83,7 +84,7 @@
   The tables present in the new database can be listed using "sqlite3" program,
  
   <pre>
-  sqlite3 hex.db .tables    # prints "ccs ics ionf tmat"
+  sqlite3 hex.db .tables    # prints "ics ionf tmat"
   </pre>
  
   The SQL statements used to create the tables can be retrieved similarly,
@@ -109,7 +110,7 @@
   the source code). It is necessary to install a full-featured MinGW-w64 compiler, though;
   the compiler bundled with Code::Blocks lacks all necessary features.
  
-  -# Download MinGW-w64 installer from SourceForge (tested 5.3.0 x86_64 posix seh).
+  -# Download MinGW-w64 installer from SourceForge (tested 6.3.0 x86_64 posix seh).
   -# Download and install latest Code::Blocks (tested version was 16.01), configure to use MinGW-w64 binaries.
   
   @subsection theory Theory
@@ -135,13 +136,13 @@
   - the differential cross section
     @f[
         \frac{\mathrm{d}\sigma_{i \rightarrow f}^{S}}{\mathrm{d}\Omega} = 
-        \frac{k_f}{k_i} \frac{2S+1}{4} |f_{i \rightarrow j}^{S}|^2 \ ,
+        \frac{k_f}{k_i} \frac{2S+1}{4} |f_{i \rightarrow f}^{S}|^2 \ ,
     @f]
   - the partial integral cross section
     @f[
         \sigma_{i \rightarrow f}^{LS} = \frac{k_f}{k_i} \frac{2S + 1}{4}
         \int_{4\pi} |f_{i \rightarrow f}^{LS}|^2 \mathrm{d}\Omega
-        = \frac{k_f}{k_i} \frac{2S+1}{16\pi^2} \sum_{\ell L'} T_{fi,\ell}^{Lm_iS}T_{fi,\ell}^{L'm_iS*} \ ,
+        = \frac{k_f}{k_i} \frac{2S+1}{16\pi^2} \sum_{\ell L'} T_{i \rightarrow f,\ell}^{Lm_iS}T_{i \rightarrow f,\ell}^{L'm_iS*} \ ,
     @f]
   - the “complete” integral cross section
     @f[
@@ -154,12 +155,20 @@
     @f]
   - and also the dimensionless, @f$ i \leftrightarrow j @f$ symmetrical, collision strength
     @f[
-        \Omega_{i \rightarrow f}^{LS} = k_i^2 \sigma_{i \rightarrow f}^{LS}
+        \Omega_{i \rightarrow f}^{LS} = k_i^2 (2\ell_i + 1) \sigma_{i \rightarrow f}^{LS}
     @f]
   - or the momentum transfer
     @f[
         \eta_{i \rightarrow f}^{LS} = \int \frac{\mathrm{d}\sigma_{i \rightarrow f}^{LS}}{\mathrm{d}\Omega}
-         (1 - \cos\vartheta) \, \mathrm{d}\Omega \ .
+         (1 - \cos\vartheta) \, \mathrm{d}\Omega = \frac{k_f}{k_i} \frac{2S+1}{16\pi^2}
+         \sum_{\ell \ell'} \left(\delta_{\ell\ell'} - \sqrt{\frac{2\ell+1}{2\ell'+1}}
+         C_{\ell,m_i-m_f,1,0}^{\ell',m_i-m_f} C_{\ell,0,1,0}^{\ell',0}
+         \right) \sum_{LL'} T_{i \rightarrow f,\ell}^{LS} T_{i \rightarrow f,\ell'}^{L'S\ast}
+    @f]
+  - and spin-flip cross section
+    @f[
+        \frac{\mathrm{d}\varsigma_{i \rightarrow f}}{\mathrm{d}\Omega} = \frac{1}{4}
+        \frac{k_f}{k_i} |f_{i \rightarrow f}^1 - f_{i \rightarrow f}^0|^2 \,.
     @f]
   
   Ultimately, all these variables are computed from the partial wave expansion of the T-matrix.
@@ -251,7 +260,7 @@
   <tr><td><code>-n</code></td> <td><code>\--new</code></td> <td>Create database file, either "hex.db" or the given name if specified by --database.</td></tr>
   <tr><td><code>-i</code></td> <td><code>\--import</code></td> <td>Import SQL data produced by some of the modules.</td></tr>
   <tr><td><code>-u</code></td> <td><code>\--update</code></td> <td>Update cache tables (variables dependent on lower-level data) after insertion.</td></tr>
-  <tr><td><code>-o</code></td> <td><code>\--optimize</code></td> <td>Use VACUUM command to shrink the databse file.</td></tr>
+  <tr><td><code>-o</code></td> <td><code>\--optimize</code></td> <td>Use VACUUM command to shrink the database file.</td></tr>
   <tr><td><code>-d</code></td> <td><code>\--dump</code></td> <td>Export all data in the form of SQL statements.</td></tr>
   <tr><td><code>-v</code></td> <td><code>\--vars</code></td> <td>Print available variables with short info.</td></tr>
   <tr><td><code>-p</code></td> <td><code>\--params</code></td> <td>Show what quantum numbers need to be given for a specific variable.</td></tr>
@@ -269,10 +278,9 @@
   <tr><td>Scattering amplitude</td> <td>@f$ n_i, l_i, m_i, n_f, l_f, m_f, S, E_i @f$</td> <td>angles [deg]</td></tr>
   <tr><td>Differential cross section</td> <td>@f$ n_i, l_i, m_i, n_f, l_f, m_f, S, E_i @f$</td> <td>angles [deg]</td></tr>
   <tr><td>Spin asymmetry</td> <td>@f$ n_i, l_i, m_i, n_f, l_f, m_f, E_i @f$</td> <td>angles [deg]</td></tr>
-  <tr><td>Momentum transfer</td> <td>@f$ n_i, l_i, m_i, n_f, l_f, m_f, L, S @f$</td> <td>energies [Ry]</td></tr>
+  <tr><td>Momentum transfer</td> <td>@f$ n_i, l_i, m_i, n_f, l_f, m_f, S @f$</td> <td>energies [Ry]</td></tr>
   <tr><td>Integral cross section</td> <td>@f$ n_i, l_i, m_i, n_f, l_f, m_f, ell @f$</td> <td>energies [Ry]</td></tr>
   <tr><td>Complete cross section</td> <td>@f$ n_i, l_i, m_i, n_f, l_f, m_f @f$</td> <td>energies [Ry]</td></tr>
-  <tr><td>Extrapolated cross section</td> <td>@f$ n_i, l_i, m_i, n_f, l_f, m_f @f$</td> <td>energies [Ry]</td></tr>
   <tr><td>Collision strength</td> <td>@f$ n_i, l_i, m_i, n_f, l_f, m_f, ell @f$</td> <td>energies [Ry]</td></tr>
   <tr><td>Total cross section</td> <td>@f$ n_i, l_i, m_i @f$</td> <td>energies [Ry]</td></tr>
   </table></center>
