@@ -158,14 +158,17 @@ cArray RadialIntegrals::diagonalR (int lambda) const
     cArray R (Nspline * O * O * O, 0.);
     
     // calculate elements
-    # pragma omp parallel for
-    for (int a = 0; a < Nspline; a++)
-    for (int b = a; b <= a + order; b++)
-    for (int c = a; c <= a + order; c++)
-    for (int d = a; d <= a + order; d++)
+    if (bspline_x_.hash() == bspline_y_.hash())
     {
-        for (int iknot = mmax(a,b,c,d); iknot <= mmin(a,b,c,d) + order and iknot < Nreknot - 1; iknot++)
-            R[((a * O + (b-a)) * O + (c-a)) * O + (d-a)] += computeRdiag(lambda, a, b, c, d, iknot, Nreknot - 1);
+        # pragma omp parallel for
+        for (int a = 0; a < Nspline; a++)
+        for (int b = a; b <= a + order; b++)
+        for (int c = a; c <= a + order; c++)
+        for (int d = a; d <= a + order; d++)
+        {
+            for (int iknot = mmax(a,b,c,d); iknot <= mmin(a,b,c,d) + order and iknot < Nreknot - 1; iknot++)
+                R[((a * O + (b-a)) * O + (c-a)) * O + (d-a)] += computeRdiag(lambda, a, b, c, d, iknot, Nreknot - 1);
+        }
     }
     
     return R;

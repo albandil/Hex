@@ -6,7 +6,7 @@
 //                    / /   / /    \_\      / /  \ \                                 //
 //                                                                                   //
 //                                                                                   //
-//  Copyright (c) 2016, Jakub Benda, Charles University in Prague                    //
+//  Copyright (c) 2017, Jakub Benda, Charles University in Prague                    //
 //                                                                                   //
 // MIT License:                                                                      //
 //                                                                                   //
@@ -131,6 +131,12 @@ void DOMPreconditioner::precondition (BlockArray<Complex> const & r, BlockArray<
         Bspline const & xspline = p.back().xspline_inner;
         Bspline const & yspline = p.back().yspline_inner;
         
+        std::cout << " xknots = " << xspline.t() << std::endl;
+        std::cout << " xknots.size() = " << xspline.t().size() << std::endl;
+        std::cout << " Nxknots = " << xspline.Nknot() << std::endl;
+        std::cout << " Nxspline = " << xspline.Nspline() << std::endl;
+        std::cout << " Nyspline = " << yspline.Nspline() << std::endl;
+        
         // calculate overlaps
         p.back().SaF = RadialIntegrals::computeOverlapMatrix(xspline, rad_inner().bspline_x(), xspline.R1(), xspline.R2());
         p.back().SbF = RadialIntegrals::computeOverlapMatrix(yspline, rad_inner().bspline_y(), yspline.R1(), yspline.R2());
@@ -170,15 +176,15 @@ void DOMPreconditioner::finish ()
 
 void DOMPreconditioner::solvePanel (int n, std::vector<PanelSolution> & p, int i, int j) const
 {
+    std::cout << "Solve panel " << i << " " << j << std::endl;
+    
     // get reference to the current panel and its neighbours
     PanelSolution * pCentre = &p[i * n + j];
-    PanelSolution * pNbr [nNbrs] =
-    {
-        i     == 0 ? nullptr : &p[(i - 1) * n + j],
-        i + 1 == n ? nullptr : &p[(i + 1) * n + j],
-        j     == 0 ? nullptr : &p[i * n + (j - 1)],
-        j + 1 == n ? nullptr : &p[i * n + (j + 1)]
-    };
+    PanelSolution * pNbr [nNbrs];
+    pNbr[Left]  = (i     == 0 ? nullptr : &p[(i - 1) * n + j]);
+    pNbr[Right] = (i + 1 == n ? nullptr : &p[(i + 1) * n + j]);
+    pNbr[Down]  = (j     == 0 ? nullptr : &p[i * n + (j - 1)]);
+    pNbr[Up]    = (j + 1 == n ? nullptr : &p[i * n + (j + 1)]);
     
     // B-spline order
     int order = pCentre->xspline_inner.order();
@@ -192,11 +198,15 @@ void DOMPreconditioner::solvePanel (int n, std::vector<PanelSolution> & p, int i
     (
         "ILU", // TODO : Make (wisely) runtime selectable.
         *cmd_, *inp_, *par_, *ang_,
-        pCentre->xspline_inner, // inner region basis
-        pCentre->xspline_full,  // full domain basis
+        rad_inner().bspline(),  // inner region basis
+        rad_full().bspline(),   // full domain basis
         pCentre->xspline_full,  // panel x basis
         pCentre->yspline_full   // panel y basis
     );
+    
+    std::cout << "expected hamiltonian size = " << pCentre->xspline_full.Nspline() * pCentre->yspline_full.Nspline() << std::endl;
+    std::cout << "\t- central source size: " << pCentre->r[0].size() << std::endl;
+    std::cout << "\t- central solution size: " << pCentre->z[0].size() << std::endl;
     
     // construct the matrix of the equations etc.
     prec->setup();
@@ -205,13 +215,9 @@ void DOMPreconditioner::solvePanel (int n, std::vector<PanelSolution> & p, int i
     // get radial integrals
     RadialIntegrals const & rad = dynamic_cast<NoPreconditioner*>(prec)->rad_inner();
     
-    // B-spline bases
-    Bspline const & xspline_inner = pCentre->xspline_inner;
-    Bspline const & yspline_inner = pCentre->yspline_inner;
-    
     // number of B-splines in both directions of this panel
-    int Nxspline = xspline_inner.Nspline();
-    int Nyspline = yspline_inner.Nspline();
+    int Nxspline = pCentre->xspline_inner.Nspline();
+    int Nyspline = pCentre->yspline_inner.Nspline();
     
     // contruct the right-hand side
     cBlockArray & psi = pCentre->z;
@@ -225,7 +231,7 @@ void DOMPreconditioner::solvePanel (int n, std::vector<PanelSolution> & p, int i
         for (unsigned ill = 0; ill < chi.size(); ill++)
         for (int i = iR1 - 2 * order - 1; i < iR1; i++)
         for (int j = 0; j < Nyspline; j++)
-            chi[ill][i * Nyspline + j] += rad.S_x(iR1 - order - 1, i) * pNbr[Left]->ssrc[Right][ill][j];
+            chi[ill][i * Nyspline + j] += rad.S_x(iR1 - order - 1, i) * pCentre->ssrc[Left][ill][j];
     }
     if (pNbr[Right] != nullptr)
     {
@@ -234,14 +240,7 @@ void DOMPreconditioner::solvePanel (int n, std::vector<PanelSolution> & p, int i
         for (unsigned ill = 0; ill < chi.size(); ill++)
         for (int i = iR2 - order; i < iR2 + order + 1; i++)
         for (int j = 0; j < Nyspline; j++)
-        {
-            std::cout << "chi.size() = " << chi.size() << std::endl;
-            std::cout << "chi[" << ill << "].size() = " << chi[ill].size() << std::endl;
-            std::cout << "pNbr[" << Right << "]->ssrc[" << Left << "].size() = " << pNbr[Right]->ssrc[Left].size() << std::endl;
-            std::cout << "pNbr[" << Right << "]->ssrc[" << Left << "][" << ill << "].size() = " << pNbr[Right]->ssrc[Left][ill].size() << std::endl;
-            
-            chi[ill][i * Nyspline + j] += rad.S_x(iR2, i) * pNbr[Right]->ssrc[Left][ill][j];
-        }
+            chi[ill][i * Nyspline + j] += rad.S_x(iR2, i) * pCentre->ssrc[Right][ill][j];
     }
     if (pNbr[Down] != nullptr)
     {
@@ -250,7 +249,7 @@ void DOMPreconditioner::solvePanel (int n, std::vector<PanelSolution> & p, int i
         for (unsigned ill = 0; ill < chi.size(); ill++)
         for (int i = 0; i < Nxspline; i++)
         for (int j = iR1 - 2 * order - 1; j < iR1; j++)
-            chi[ill][i * Nyspline + j] += rad.S_y(iR1 - order - 1, j) * pNbr[Down]->ssrc[Up][ill][i];
+            chi[ill][i * Nyspline + j] += rad.S_y(iR1 - order - 1, j) * pCentre->ssrc[Down][ill][i];
     }
     if (pNbr[Up] != nullptr)
     {
@@ -259,7 +258,7 @@ void DOMPreconditioner::solvePanel (int n, std::vector<PanelSolution> & p, int i
         for (unsigned ill = 0; ill < chi.size(); ill++)
         for (int i = 0; i < Nxspline; i++)
         for (int j = iR2 - order; j < iR2 + order + 1; j++)
-            chi[ill][i * Nyspline + j] += rad.S_y(iR2, j) * pNbr[Up]->ssrc[Down][ill][i];
+            chi[ill][i * Nyspline + j] += rad.S_y(iR2, j) * pCentre->ssrc[Up][ill][i];
     }
     
     // conjugate gradients callbacks
@@ -291,7 +290,9 @@ void DOMPreconditioner::solvePanel (int n, std::vector<PanelSolution> & p, int i
         assert(A.size() == B.size());
         for (std::size_t i = 0; i < A.size(); i++)
         for (std::size_t j = 0; j < A[i].size(); j++)
-            A[i] = a * A[i] + b * B[i];
+        {
+            A[i][j] = a * A[i][j] + b * B[i][j];
+        }
     };
     auto new_array = [pCentre](std::size_t N, std::string name) -> cBlockArray
     {
@@ -305,25 +306,27 @@ void DOMPreconditioner::solvePanel (int n, std::vector<PanelSolution> & p, int i
         // nothing
     };
     
-    std::cout << "Solve panel " << i << "," << j << std::endl;
     /// v --- v DEBUG
-    std::ofstream ofs (format("solve-%d-%d.vtk", i, j));
-    writeVTK_points
-    (
-        ofs,
-        Bspline::zip
+    for (unsigned ill = 0; ill < chi.size(); ill++)
+    {
+        std::ofstream ofs (format("dom-chi-%d-%d-%d.vtk", i, j, ill));
+        writeVTK_points
         (
-            pCentre->xspline_inner,
-            pCentre->yspline_inner,
-            chi[0],
+            ofs,
+            Bspline::zip
+            (
+                pCentre->xspline_inner,
+                pCentre->yspline_inner,
+                chi[ill],
+                linspace(pCentre->xspline_inner.Rmin(), pCentre->xspline_inner.Rmax(), 1001),
+                linspace(pCentre->yspline_inner.Rmin(), pCentre->yspline_inner.Rmax(), 1001)
+            ),
             linspace(pCentre->xspline_inner.Rmin(), pCentre->xspline_inner.Rmax(), 1001),
-            linspace(pCentre->yspline_inner.Rmin(), pCentre->yspline_inner.Rmax(), 1001)
-        ),
-        linspace(pCentre->xspline_inner.Rmin(), pCentre->xspline_inner.Rmax(), 1001),
-        linspace(pCentre->yspline_inner.Rmin(), pCentre->yspline_inner.Rmax(), 1001),
-        rArray{ 0. }
-    );
-    ofs.close();
+            linspace(pCentre->yspline_inner.Rmin(), pCentre->yspline_inner.Rmax(), 1001),
+            rArray{ 0. }
+        );
+        ofs.close();
+    }
     /// ^ --- ^
     
     // solve the system
@@ -336,7 +339,31 @@ void DOMPreconditioner::solvePanel (int n, std::vector<PanelSolution> & p, int i
     CG.axby                 = axby_operation;
     CG.new_array            = new_array;
     CG.process_solution     = process_solution;
+    CG.reset();
     CG.solve(chi, psi, cmd_->itertol, 0, 1000);
+    
+    /// v --- v DEBUG
+    for (unsigned ill = 0; ill < psi.size(); ill++)
+    {
+        std::ofstream ofs (format("dom-psi-%d-%d-%d.vtk", i, j, ill));
+        writeVTK_points
+        (
+            ofs,
+            Bspline::zip
+            (
+                pCentre->xspline_inner,
+                pCentre->yspline_inner,
+                psi[ill],
+                linspace(pCentre->xspline_inner.Rmin(), pCentre->xspline_inner.Rmax(), 1001),
+                linspace(pCentre->yspline_inner.Rmin(), pCentre->yspline_inner.Rmax(), 1001)
+            ),
+            linspace(pCentre->xspline_inner.Rmin(), pCentre->xspline_inner.Rmax(), 1001),
+            linspace(pCentre->yspline_inner.Rmin(), pCentre->yspline_inner.Rmax(), 1001),
+            rArray{ 0. }
+        );
+        ofs.close();
+    }
+    /// ^ --- ^
     
     // evaluate the outgoing field by subtracting the incoming field
     if (pNbr[Left] != nullptr)
@@ -345,9 +372,24 @@ void DOMPreconditioner::solvePanel (int n, std::vector<PanelSolution> & p, int i
         Real R1 = pCentre->xspline_inner.R1();
         
         for (unsigned ill = 0; ill < chi.size(); ill++)
-        for (int i = iR1 - 2 * order - 1; i < iR1; i++)
-        for (int j = 0; j < Nyspline; j++)
-            pCentre->outf[Right][ill][j] = psi[ill][i * Nyspline + j] * xspline_inner.bspline(i, iR1, order, R1) - pNbr[Left]->outf[Right][ill][j];
+        {
+            pCentre->outf[Left][ill].fill(0.0);
+            
+            for (int i = iR1 - 2 * order - 1; i < iR1; i++)
+            for (int j = 0; j < Nyspline; j++)
+                pCentre->outf[Left][ill][j] += psi[ill][i * Nyspline + j] * pCentre->xspline_inner.bspline(i, iR1, order, R1) - pNbr[Left]->outf[Right][ill][j];
+            
+            write_array
+            (
+                linspace(pCentre->yspline_inner.Rmin(), pCentre->yspline_inner.Rmax(), 1001),
+                pCentre->yspline_inner.zip
+                (
+                    pCentre->outf[Left][ill],
+                    linspace(pCentre->yspline_inner.Rmin(), pCentre->yspline_inner.Rmax(), 1001)
+                ),
+                format("outf-%d-%d-Left-%d.dat", i, j, ill)
+            );
+        }
     }
     if (pNbr[Right] != nullptr)
     {
@@ -355,9 +397,24 @@ void DOMPreconditioner::solvePanel (int n, std::vector<PanelSolution> & p, int i
         Real R2 = pCentre->xspline_inner.R2();
         
         for (unsigned ill = 0; ill < chi.size(); ill++)
-        for (int i = iR2 - order; i < iR2 + order + 1; i++)
-        for (int j = 0; j < Nyspline; j++)
-            pCentre->outf[Left][ill][j] = psi[ill][i * Nyspline + j] * xspline_inner.bspline(i, iR2, order, R2) - pNbr[Right]->outf[Left][ill][j];
+        {
+            pCentre->outf[Right][ill].fill(0.0);
+            
+            for (int i = iR2 - order; i < iR2 + order + 1; i++)
+            for (int j = 0; j < Nyspline; j++)
+                pCentre->outf[Right][ill][j] += psi[ill][i * Nyspline + j] * pCentre->xspline_inner.bspline(i, iR2, order, R2) - pNbr[Right]->outf[Left][ill][j];
+            
+            write_array
+            (
+                linspace(pCentre->yspline_inner.Rmin(), pCentre->yspline_inner.Rmax(), 1001),
+                pCentre->yspline_inner.zip
+                (
+                    pCentre->outf[Right][ill],
+                    linspace(pCentre->yspline_inner.Rmin(), pCentre->yspline_inner.Rmax(), 1001)
+                ),
+                format("outf-%d-%d-Right-%d.dat", i, j, ill)
+            );
+        }
     }
     if (pNbr[Down] != nullptr)
     {
@@ -365,9 +422,24 @@ void DOMPreconditioner::solvePanel (int n, std::vector<PanelSolution> & p, int i
         Real R1 = pCentre->yspline_inner.R1();
         
         for (unsigned ill = 0; ill < chi.size(); ill++)
-        for (int i = 0; i < Nxspline; i++)
-        for (int j = iR1 - 2 * order - 1; j < iR1; j++)
-            pCentre->outf[Down][ill][i] = psi[ill][i * Nyspline + j] * yspline_inner.bspline(j, iR1, order, R1) - pNbr[Down]->outf[Up][ill][i];
+        {
+            pCentre->outf[Down][ill].fill(0.0);
+            
+            for (int i = 0; i < Nxspline; i++)
+            for (int j = iR1 - 2 * order - 1; j < iR1; j++)
+                pCentre->outf[Down][ill][i] += psi[ill][i * Nyspline + j] * pCentre->yspline_inner.bspline(j, iR1, order, R1) - pNbr[Down]->outf[Up][ill][i];
+            
+            write_array
+            (
+                linspace(pCentre->xspline_inner.Rmin(), pCentre->xspline_inner.Rmax(), 1001),
+                pCentre->xspline_inner.zip
+                (
+                    pCentre->outf[Down][ill],
+                    linspace(pCentre->xspline_inner.Rmin(), pCentre->xspline_inner.Rmax(), 1001)
+                ),
+                format("outf-%d-%d-Down-%d.dat", i, j, ill)
+            );
+        }
     }
     if (pNbr[Up] != nullptr)
     {
@@ -375,9 +447,24 @@ void DOMPreconditioner::solvePanel (int n, std::vector<PanelSolution> & p, int i
         Real R2 = pCentre->yspline_inner.R2();
         
         for (unsigned ill = 0; ill < chi.size(); ill++)
-        for (int i = 0; i < Nxspline; i++)
-        for (int j = iR2 - order; j < iR2 + order + 1; j++)
-            pCentre->outf[Up][ill][i] = psi[ill][i * Nyspline + j] * yspline_inner.bspline(j, iR2, order, R2) - pNbr[Up]->outf[Down][ill][i];
+        {
+            pCentre->outf[Up][ill].fill(0.0);
+            
+            for (int i = 0; i < Nxspline; i++)
+            for (int j = iR2 - order; j < iR2 + order + 1; j++)
+                pCentre->outf[Up][ill][i] += psi[ill][i * Nyspline + j] * pCentre->yspline_inner.bspline(j, iR2, order, R2) - pNbr[Up]->outf[Down][ill][i];
+            
+            write_array
+            (
+                linspace(pCentre->xspline_inner.Rmin(), pCentre->xspline_inner.Rmax(), 1001),
+                pCentre->xspline_inner.zip
+                (
+                    pCentre->outf[Up][ill],
+                    linspace(pCentre->xspline_inner.Rmin(), pCentre->xspline_inner.Rmax(), 1001)
+                ),
+                format("outf-%d-%d-Up-%d.dat", i, j, ill)
+            );
+        }
     }
 }
 
@@ -385,7 +472,7 @@ void DOMPreconditioner::surrogateSource (PanelSolution * panel, int direction, P
 {
     if (direction == Left)
     {
-        std::cout << "Surrogate source LEFT" << std::endl;
+        std::cout << "Construct surrogate source from LEFT" << std::endl;
         
         // original B-spline basis
         Bspline const & org_xspline = panel->xspline_inner;
@@ -396,13 +483,25 @@ void DOMPreconditioner::surrogateSource (PanelSolution * panel, int direction, P
             org_xspline.order(),
             org_xspline.ECStheta(),
             org_xspline.cknots1(),
-            org_xspline.rknots().slice(0, org_xspline.order() + 1),
-            org_xspline.cknots2() - org_xspline.cknots2().front() + org_xspline.rknots().front(org_xspline.order())
+            rArray{ org_xspline.cknots1().back() },
+            org_xspline.cknots2() - org_xspline.cknots2().front() + org_xspline.cknots1().back()
         );
         Bspline const & yspline = panel->yspline_inner;
         
+        std::cout << "  short basis knots: " << xspline.t() << std::endl;
+        
+        // basis sizes
+        int Nxspline = xspline.Nspline();
+        int Nyspline = yspline.Nspline();
+        
+        // other quantities
+        int order = xspline.order();
+        int iR1x = xspline.iR1();
+        Real R1x = xspline.R1();
+        
         // calculate radial integrals
         RadialIntegrals rint (xspline, yspline, 0);
+        rint.setupOneElectronIntegrals(*par_, *cmd_);
         
         // for all angular states
         for (unsigned ill = 0; ill < ang_->states().size(); ill++)
@@ -410,51 +509,50 @@ void DOMPreconditioner::surrogateSource (PanelSolution * panel, int direction, P
             // angular momenta
             int l1 = ang_->states()[ill].first;
             int l2 = ang_->states()[ill].second;
-        
-            // construct the matrix of the free equations
+            
+            // construct matrix of the free equations
             BlockSymBandMatrix<Complex> A =
                 kron(Complex(E_) * rint.S_x(), rint.S_y())
-                - kron(0.5_z * rint.D_x(), rint.S_x())
-                - kron(0.5_z * rint.S_x(), rint.D_x())
-                - kron(Complex(0.5 * l1 * (l1 + 1)) * rint.Mm2_x(), rint.S_x())
-                - kron(Complex(0.5 * l2 * (l2 + 1)) * rint.S_x(), rint.Mm2_x());
+                - kron(0.5_z * rint.D_x(), rint.S_y())
+                - kron(0.5_z * rint.S_x(), rint.D_y())
+                - kron(Complex(0.5 * l1 * (l1 + 1)) * rint.Mm2_x(), rint.S_y())
+                - kron(Complex(0.5 * l2 * (l2 + 1)) * rint.S_x(), rint.Mm2_y());
             
-            // add additional matrix elements
+            // resize matrix for additional elements
             CooMatrix<LU_int_t,Complex> A_coo = A.tocoo<LU_int_t>();
             A_coo.resize
             (
-                A_coo.rows() + yspline.Nspline(),
-                A_coo.cols() + yspline.Nspline()
+                A_coo.rows() + Nyspline,
+                A_coo.cols() + Nyspline
             );
-            for (int i = xspline.iR1() - 2*xspline.order() - 1; i < xspline.iR1(); i++)
-            for (int j = 0; j < yspline.Nspline(); j++)
+            
+            // add coupling to surrogate source
+            for (int i = iR1x - 2 * order - 1; i < iR1x; i++)
+            for (int j = 0; j < Nyspline; j++)
             {
                 A_coo.add
                 (
-                    i * yspline.Nspline() + j,
-                    xspline.Nspline() * yspline.Nspline() + j,
-                    -rint.S_x(i, xspline.iR1() - 1)
-                );
-            }
-            for (int j = 0; j < yspline.Nspline(); j++)
-            for (int k = xspline.iR1() - xspline.order() - 1; k < xspline.iR1(); k++)
-            {
-                A_coo.add
-                (
-                    xspline.Nspline() * yspline.Nspline() + j,
-                    k * yspline.Nspline() + j,
-                    xspline.bspline(k, xspline.iR1(), xspline.order(), xspline.R1())
+                    i * Nyspline + j,
+                    Nxspline * Nyspline + j,
+                    -rint.S_x(i, iR1x - order - 1)
                 );
             }
             
-            // calculate the right-hand side
-            cArray rhs (xspline.Nspline() * yspline.Nspline() + yspline.Nspline());
-            for (int i = neighbour->xspline_inner.iR2() - neighbour->xspline_inner.order() - 1; i < neighbour->xspline_inner.iR2(); i++)
-            for (int j = 0; j < neighbour->yspline_inner.Nspline(); j++)
+            // add coupling to outgoing field
+            for (int j = 0; j < Nyspline; j++)
+            for (int k = iR1x - order - 1; k < iR1x; k++)
             {
-                rhs[xspline.Nspline() * yspline.Nspline() + j] += neighbour->outf[Right][ill][j]
-                    * neighbour->xspline_inner.bspline(i, neighbour->xspline_inner.iR2(), neighbour->xspline_inner.order(), neighbour->xspline_inner.R2());
+                A_coo.add
+                (
+                    Nxspline * Nyspline + j,
+                    k * Nyspline + j,
+                    xspline.bspline(k, iR1x, order, R1x)
+                );
             }
+            
+            // set up the right-hand side
+            cArray rhs (Nxspline * Nyspline + Nyspline);
+            cArrayView (rhs, Nxspline * Nyspline, Nyspline) = neighbour->outf[Right][ill];
             
             // factorize the block matrix and solve
             cArray solution (rhs.size());
@@ -465,8 +563,7 @@ void DOMPreconditioner::surrogateSource (PanelSolution * panel, int direction, P
             A_lu->solve(rhs, solution, 1);
             
             // store the surrogate source
-            for (int j = 0; j < neighbour->yspline_inner.Nspline(); j++)
-                panel->ssrc[Left][ill][j] = solution[xspline.Nspline() * yspline.Nspline() + j];
+            panel->ssrc[Left][ill] = cArrayView (solution, Nxspline * Nyspline, Nyspline);
             
             std::cout << "panel->ssrc[Left][" << ill << "] = " << panel->ssrc[Left][ill] << std::endl;
         }
@@ -511,7 +608,7 @@ void DOMPreconditioner::splitResidual (cBlockArray const & r, std::vector<PanelS
     std::cout << "Split residual" << std::endl;
     
     /// v --- v DEBUG
-    for (unsigned ill = 0; ill < r.size(); ill++)
+    /*for (unsigned ill = 0; ill < r.size(); ill++)
     {
         std::ofstream out (format("res-%d.vtk", ill));
         writeVTK_points
@@ -529,35 +626,47 @@ void DOMPreconditioner::splitResidual (cBlockArray const & r, std::vector<PanelS
             linspace(rad_inner().bspline_y().Rmin(), rad_inner().bspline_y().Rmax(), 1001),
             rArray{ 0. }
         );
-    }
+    }*/
     /// ^ --- ^ DEBUG
     
     for (int ixpanel = 0; ixpanel < xpanels; ixpanel++)
     for (int iypanel = 0; iypanel < ypanels; iypanel++)
     for (unsigned ill = 0; ill < r.size(); ill++)
     {
-        PanelSolution & p = panels[ixpanel * 2 + iypanel];
-        unsigned Nxspline = p.xspline_inner.Nspline();
-        unsigned Nyspline = p.yspline_inner.Nspline();
+        PanelSolution & p = panels[ixpanel * ypanels + iypanel];
+        int order = rad_full().bspline().order();
+        int Ntyspline = rad_inner().bspline_y().Nspline();
+        int Npxspline = p.xspline_inner.Nspline();
+        int Npyspline = p.yspline_inner.Nspline();
         
         std::cout << "Sub-domain (" << ixpanel << "," << iypanel << ")" << std::endl;
         
         // allocate memory or erase the old residual
-        p.r[ill].resize(Nxspline * Nyspline);
+        p.r[ill].resize(Npxspline * (std::size_t)Npyspline);
         p.r[ill].fill(0.);
         
-        // copy only elements corresponding to the real-grid B-splines
-        for (unsigned ixspline = 0; ixspline < Nxspline; ixspline++)
-        for (unsigned iyspline = 0; iyspline < Nyspline; iyspline++)
+        // copy only elements corresponding to the real B-splines
+        for (int ixspline = 0; ixspline < rad_inner().bspline_x().iR2() - order; ixspline++)
+        for (int iyspline = 0; iyspline < rad_inner().bspline_y().iR2() - order; iyspline++)
         {
             // map global indices to panel
-            unsigned pxspline, pyspline;
-            if (p.mapToPanel(ixspline, iyspline, pxspline, pyspline))
-                p.r[ill][pxspline * Nyspline + iyspline] = r[ill][ixspline * rad_inner().bspline_y().Nspline() + iyspline];
+            int pxspline, pyspline;
+            if
+            (
+                p.mapToPanel(ixspline, iyspline, pxspline, pyspline)
+                and pxspline > p.xspline_inner.iR1()
+                and pyspline > p.yspline_inner.iR1()
+                and pxspline + order < p.xspline_inner.iR2()
+                and pyspline + order < p.yspline_inner.iR2()
+            )
+            {
+                // copy the element of the residual
+                p.r[ill][pxspline * Npyspline + pyspline] = r[ill][ixspline * Ntyspline + iyspline];
+            }
         }
         
         /// v --- v DEBUG
-        std::ofstream out2 (format("splt2-%d-%d-%d.vtk", ixpanel, iypanel, ill));
+        /*std::ofstream out2 (format("splt2-%d-%d-%d.vtk", ixpanel, iypanel, ill));
         writeVTK_points
         (
             out2,
@@ -572,14 +681,36 @@ void DOMPreconditioner::splitResidual (cBlockArray const & r, std::vector<PanelS
             linspace(p.xspline_inner.Rmin(), p.xspline_inner.Rmax(), 1001),
             linspace(p.yspline_inner.Rmin(), p.yspline_inner.Rmax(), 1001),
             rArray{ 0. }
-        );
+        );*/
         /// ^ --- ^
     }
 }
 
 void DOMPreconditioner::collectSolution (cBlockArray & z, std::vector<PanelSolution> & panels) const
 {
-    // TODO
+    for (unsigned ill = 0; ill < z.size(); ill++)
+    {
+        // TODO : Combine panel solutions.
+        
+        /// v --- v DEBUG
+        std::ofstream out (format("combined-%d.vtk", ill));
+        writeVTK_points
+        (
+            out,
+            Bspline::zip
+            (
+                rad_inner().bspline(),
+                rad_inner().bspline(),
+                z[ill],
+                linspace(rad_inner().bspline().Rmin(), rad_inner().bspline().Rmax(), 1001),
+                linspace(rad_inner().bspline().Rmin(), rad_inner().bspline().Rmax(), 1001)
+            ),
+            linspace(rad_inner().bspline().Rmin(), rad_inner().bspline().Rmax(), 1001),
+            linspace(rad_inner().bspline().Rmin(), rad_inner().bspline().Rmax(), 1001),
+            rArray{ 0. }
+        );
+        /// ^ --- ^
+    }
 }
 
 DOMPreconditioner::PanelSolution::PanelSolution
@@ -598,22 +729,31 @@ DOMPreconditioner::PanelSolution::PanelSolution
     yspline_full (order, theta, cyspline1_full, ryspline_full, cyspline2_full),
     r (Nang), z (Nang)
 {
-    // allocate memory
-    for (int nbr = 0; nbr < nNbrs; nbr++)
-    {
-        ssrc[nbr] = cBlockArray(Nang);
-        outf[nbr] = cBlockArray(Nang);
-    }
+    // allocate memory for surrogate sources and outgoing fields
+    ssrc[Left] .resize(Nang); for (cArray & arr : ssrc[Left] ) arr.resize(yspline_inner.Nspline());
+    outf[Left] .resize(Nang); for (cArray & arr : outf[Left] ) arr.resize(yspline_inner.Nspline());
+    ssrc[Right].resize(Nang); for (cArray & arr : ssrc[Right]) arr.resize(yspline_inner.Nspline());
+    outf[Right].resize(Nang); for (cArray & arr : outf[Right]) arr.resize(yspline_inner.Nspline());
+    ssrc[Down] .resize(Nang); for (cArray & arr : ssrc[Down] ) arr.resize(xspline_inner.Nspline());
+    outf[Down] .resize(Nang); for (cArray & arr : outf[Down] ) arr.resize(xspline_inner.Nspline());
+    ssrc[Up]   .resize(Nang); for (cArray & arr : ssrc[Up]   ) arr.resize(xspline_inner.Nspline());
+    outf[Up]   .resize(Nang); for (cArray & arr : outf[Up]   ) arr.resize(xspline_inner.Nspline());
+    
+    // allocate memory for residual and solution
+    for (int i = 0; i < Nang; i++) r[i].resize(xspline_inner.Nspline() * yspline_inner.Nspline());
+    for (int i = 0; i < Nang; i++) z[i].resize(xspline_inner.Nspline() * yspline_inner.Nspline());
+    
+    std::cout << "@@@ r[0].size() = " << r[0].size() << ", z[0].size() = " << z[0].size() << std::endl;
     
     // calculate panel-to-full real basis offset
-    xoffset = xspline.knot(xspline_inner.R1());
-    yoffset = yspline.knot(yspline_inner.R1());
+    xoffset = xspline.knot(xspline_inner.R1()) - xspline_inner.iR1();
+    yoffset = yspline.knot(yspline_inner.R1()) - yspline_inner.iR1();
 }
 
 bool DOMPreconditioner::PanelSolution::mapToPanel
 (
-    unsigned   ixspline, unsigned   iyspline,
-    unsigned & pxspline, unsigned & pyspline
+    int   ixspline, int   iyspline,
+    int & pxspline, int & pyspline
 ) const
 {
     if (ixspline < xoffset)
@@ -625,10 +765,10 @@ bool DOMPreconditioner::PanelSolution::mapToPanel
     pxspline = ixspline - xoffset;
     pyspline = iyspline - yoffset;
     
-    if ((int)pxspline >= xspline_inner.iR2() - xspline_inner.iR1())
+    if (pxspline >= xspline_inner.iR2())
         return false;
     
-    if ((int)pyspline >= yspline_inner.iR2() - yspline_inner.iR1())
+    if (pyspline >= yspline_inner.iR2())
         return false;
     
     return true;
@@ -636,8 +776,8 @@ bool DOMPreconditioner::PanelSolution::mapToPanel
 
 bool DOMPreconditioner::PanelSolution::mapFromPanel
 (
-    unsigned & ixspline, unsigned & iyspline,
-    unsigned   pxspline, unsigned   pyspline
+    int & ixspline, int & iyspline,
+    int   pxspline, int   pyspline
 ) const
 {
     pxspline = ixspline + xoffset;

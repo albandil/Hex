@@ -722,19 +722,62 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
         std::cout << std::endl;
 }
 
+void RadialIntegrals::subsetTwoElectronIntegrals (Parallel const & par, CommandLine const & cmd, RadialIntegrals const & rad)
+{
+    rad_ = &rad;
+    
+    setupTwoElectronIntegrals(par, cmd);
+}
+
 SymBandMatrix<Complex> RadialIntegrals::calc_R_tr_dia_block (unsigned int lambda, int i, int k) const
 {
     // shorthands
     int Nspline = bspline_y_.Nspline();
     int order = bspline_y_.order();
     
+    // first and last purely real B-spline indices
+    int first_x = bspline_x_.iR1();
+    int first_y = bspline_y_.iR1();
+    int last_x = bspline_x_.iR2() - order - 1;
+    int last_y = bspline_y_.iR2() - order - 1;
+    
     // (i,k)-block data
     SymBandMatrix<Complex> block_ik (Nspline, order + 1);
     
+    // get panel B-spline offsets w.r.t. the global bases
+    unsigned xoffset = rad_ ? rad_->bspline_x().knot(bspline_x_.R1()) - first_x : 0;
+    unsigned yoffset = rad_ ? rad_->bspline_y().knot(bspline_y_.R1()) - first_y : 0;
+    
+    /*if (rad_)
+    {
+        std::cout << "calc_R_tr_dia_block" << std::endl;
+        std::cout << "\tbspline_x_.R1() = " << bspline_x_.R1() << std::endl;
+        std::cout << "\tbspline_y_.R1() = " << bspline_y_.R1() << std::endl;
+        std::cout << "\tfirst_x = " << first_x << std::endl;
+        std::cout << "\tfirst_y = " << first_y << std::endl;
+        std::cout << "\txoffset = " << xoffset << std::endl;
+        std::cout << "\tyoffset = " << yoffset << std::endl;
+        std::cout << "\trad_->bspline_x_.knot(bspline_x_.R1()) = " << rad_->bspline_x_.knot(bspline_x_.R1()) << std::endl;
+        std::cout << "\trad_->bspline_y_.knot(bspline_y_.R1()) = " << rad_->bspline_y_.knot(bspline_y_.R1()) << std::endl;
+        std::cout << "\trad_->bspline_x_.t(xoffset) = " << rad_->bspline_x_.t(xoffset) << std::endl;
+        std::cout << "\trad_->bspline_y_.t(yoffset) = " << rad_->bspline_y_.t(yoffset) << std::endl;
+    }*/
+    
     // for all elements in the symmetrical block : evaluate 2-D integral of Bi(1)Bj(2)V(1,2)Bk(1)Bl(2)
-    for (int j = 0; j < Nspline; j++)
-    for (int l = j; l < Nspline and l <= j + order; l++)
-        block_ik(j,l) = computeR(lambda, i, j, k, l);
+    for (int j = first_y; j <= last_y; j++)
+    for (int l = j; l <= last_y and l <= j + order; l++)
+    {
+        if (not rad_)
+        {
+            // compute integral in own basis
+            block_ik(j,l) = computeR(lambda, i, j, k, l);
+        }
+        else
+        {
+            // compute integral in global basis
+            block_ik(j,l) = rad_->computeR(lambda, i + xoffset, j + yoffset, k + xoffset, l + yoffset);
+        }
+    }
     
     return block_ik;
 }

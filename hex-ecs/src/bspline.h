@@ -252,10 +252,19 @@ class Bspline
         /// B-spline order.
         int order () const { return order_; }
         
-        /// Index of knot between leading complex grid and real grid.
+        /**
+         * @brief Index of knot between leading complex grid and real grid.
+         * 
+         * This is also the index of the first possibly purely real B-spline.
+         */
         int iR1 () const { return cknots1_.empty() ? 0 : cknots1_.size() - 1; }
         
-        /// Index of knot between real grid and trailing complex grid.
+        /**
+         * @brief Index of knot between real grid and trailing complex grid.
+         * 
+         * This is the index of the trailing knot of the last possibly purely real B-spline.
+         * The index of that B-spline is iR2 - order - 1.
+         */
         int iR2 () const { return cknots2_.empty() ? t_.size() - 1 : t_.size() - cknots2_.size(); }
         
         /// Beginning of the real grid.

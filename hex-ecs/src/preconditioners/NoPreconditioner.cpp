@@ -99,8 +99,8 @@ std::string NoPreconditioner::description () const
 void NoPreconditioner::setup ()
 {
     // shorthands
-    Bspline const & bspline_inner = rad_inner_->bspline_x();
-    Bspline const & bspline_full  = rad_full_ ->bspline_x();
+    Bspline const & bspline_inner = rad_inner_->bspline();
+    Bspline const & bspline_full  = rad_full_ ->bspline();
     Bspline const & bspline_x     = rad_panel_->bspline_x();
     Bspline const & bspline_y     = rad_panel_->bspline_y();
     
@@ -111,9 +111,9 @@ void NoPreconditioner::setup ()
     // calculate one-electron integrals in full domain
     rad_full_->setupOneElectronIntegrals(*par_, *cmd_);
     
-    // calculate all radial integrals on panel
+    // calculate/copy all radial integrals on panel
     rad_panel_->setupOneElectronIntegrals(*par_, *cmd_);
-    rad_panel_->setupTwoElectronIntegrals(*par_, *cmd_);
+    rad_panel_->subsetTwoElectronIntegrals(*par_, *cmd_, *rad_inner_);
     
     // number of basis B-splines
     std::size_t Nspline_inner = bspline_inner.Nspline();
@@ -278,9 +278,12 @@ void NoPreconditioner::setup ()
         bool written = false;
         for (int l : ells[i])
         {
+            // compose name of the file containing the hamiltonian data
+            Hl_[i][l].hdflink(format("Hl%+g-%d-%.4x.hdf", Z, l, bspline_inner.hash()).c_str());
+            
             // load the factorization file
             if (not Hl_[i][l].hdfload())
-                HexException("Failed to load one-electron diagonalization file for Z = %g, l = %d.", Z, l);
+                HexException("Failed to load one-electron diagonalization file %s for Z = %g, l = %d.", Hl_[i][l].filename.c_str(), Z, l);
             
             written = true;
             std::cout << "\t- one-electron Hamiltonian data loaded (Z = " << Z << ", l = " << l << ")" << std::endl;
@@ -329,7 +332,7 @@ void NoPreconditioner::setup ()
                     if (Eb.real() <= Em)
                     {
                         Xp_[i][l].push_back(Hl_[i][l].Cl.col(indices[nr]));
-                        Sp_[i][l].push_back(rad_inner_->S_x().dot(Xp_[i][l][nr]));
+                        Sp_[i][l].push_back(rad_inner_->S().dot(Xp_[i][l][nr]));
                         Eb_[i][l].push_back(Eb);
                         
                         // Adjust the overall sign of the eigenvector so that the result is compatible with the
@@ -402,8 +405,8 @@ std::pair<int,int> NoPreconditioner::bstates (Real E, int l1, int l2) const
 BlockSymBandMatrix<Complex> NoPreconditioner::calc_A_block (int ill, int illp, bool twoel) const
 {
     // number of panel B-splines common with the inner basis
-    int Nspline_x_inner = rad_panel_->bspline_x().knot(rad_inner_->bspline_x().R2());
-    int Nspline_y_inner = rad_panel_->bspline_y().knot(rad_inner_->bspline_y().R2());
+    int Nspline_x_inner = rad_panel_->bspline_x().Nspline();
+    int Nspline_y_inner = rad_panel_->bspline_y().Nspline();
     
     // angular momenta
     int l1 = ang_->states()[ill].first;
@@ -1217,12 +1220,12 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
     
     // panel x basis
     unsigned Nspline_x_full  = rad_panel_->bspline_x().Nspline();
-    unsigned Nspline_x_inner = rad_inner_->bspline().knot(rad_panel_->bspline_x().R2());
+    unsigned Nspline_x_inner = Nspline_x_full; // FIXME
     unsigned Nspline_x_outer = Nspline_x_full - Nspline_x_inner;
     
     // panel y basis
     unsigned Nspline_y_full  = rad_panel_->bspline_y().Nspline();
-    unsigned Nspline_y_inner = rad_inner_->bspline().knot(rad_panel_->bspline_y().R2());
+    unsigned Nspline_y_inner = Nspline_y_full; // FIXME
     unsigned Nspline_y_outer = Nspline_y_full - Nspline_y_inner;
     
     // number of diagonal blocks

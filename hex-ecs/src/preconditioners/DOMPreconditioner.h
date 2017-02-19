@@ -48,10 +48,23 @@
 // --------------------------------------------------------------------------------- //
 
 /**
- * @brief Multiplicative Schwarz domain decomposition preconditioner.
+ * @brief Domain decomposition preconditioner.
  * 
- * This preconditioner splits the simulated domain into several overlapping subdomains
- * and solves the smaller per-subdomain problems in a sequence.
+ * This preconditioner splits the simulated domain into several non-overlapping subdomains
+ * and solves the smaller per-subdomain problems in a sequence. The numbering of
+ * the domains is as follows:
+ * 
+ * @verbatim
+ * 
+ * ┌──┬──┬──┐
+ * │2 │5 │8 │
+ * ├──┼──┼──┤
+ * │1 │4 │7 │
+ * ├──┼──┼──┤
+ * │0 │3 │6 │
+ * └──┴──┴──┘
+ * 
+ * @endverbatim
  */
 class DOMPreconditioner : public NoPreconditioner
 {
@@ -134,14 +147,14 @@ class DOMPreconditioner : public NoPreconditioner
                 
                 bool mapToPanel
                 (
-                    unsigned   ixspline, unsigned   iyspline,
-                    unsigned & pxspline, unsigned & pyspline
+                    int   ixspline, int   iyspline,
+                    int & pxspline, int & pyspline
                 ) const;
                 
                 bool mapFromPanel
                 (
-                    unsigned & ixspline, unsigned & iyspline,
-                    unsigned   pxspline, unsigned   pyspline
+                    int & ixspline, int & iyspline,
+                    int   pxspline, int   pyspline
                 ) const;
                 
                 Bspline xspline_inner;  // inner x-axis B-spline basis
@@ -158,11 +171,11 @@ class DOMPreconditioner : public NoPreconditioner
                 cBlockArray r;  // original source
                 cBlockArray z;  // solution
                 
-                std::array<cBlockArray,nNbrs> ssrc;  // surrogate sources from neighbour panels
-                std::array<cBlockArray,nNbrs> outf;  // outgoing field to neighbour panels
+                std::array<cArrays,nNbrs> ssrc;  // surrogate sources from neighbour panels
+                std::array<cArrays,nNbrs> outf;  // outgoing field to neighbour panels
                 
-                unsigned xoffset;   // x-offset of the real basis of panel
-                unsigned yoffset;   // y-offset of the real basis of panel
+                int xoffset;   // x-offset of the real basis of panel
+                int yoffset;   // y-offset of the real basis of panel
         };
         
         // find solution on a sub-domain

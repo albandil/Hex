@@ -130,6 +130,14 @@ class RadialIntegrals
         void setupTwoElectronIntegrals (Parallel const & par, CommandLine const & cmd);
         
         /**
+         * @brief Copy values of two-electron integrals from large matrix.
+         * 
+         * This function is used instead of calculation of the two-electron integrals
+         * on sub-domains. The values are just copied from the full-domain integral matrix.
+         */
+        void subsetTwoElectronIntegrals (Parallel const & par, CommandLine const & cmd, RadialIntegrals const & rad);
+        
+        /**
          * @brief Verbosity control.
          * 
          * Setting this to false will inhibit standard output messages from this class.
@@ -587,6 +595,9 @@ class RadialIntegrals
         
         // number of multipole matrices
         int Nlambdas_;
+        
+        // superset of the radial integrals
+        RadialIntegrals const * rad_;
 };
 
 #endif // HEX_ECS_RADIAL_H

@@ -238,21 +238,25 @@ void CGPreconditioner::CG_mmul (int iblock, const cArrayView p, cArrayView q) co
 {
     std::memset(q.data(), 0, q.size() * sizeof(Complex));
     
+    std::size_t Nspline_x = rad_panel_->bspline_x().Nspline();
+    std::size_t Nspline_y = rad_panel_->bspline_y().Nspline();
+    
     std::size_t Nspline_inner_x = rad_inner_->bspline_x().Nspline();
     std::size_t Nspline_inner_y = rad_inner_->bspline_y().Nspline();
     std::size_t Nspline_full_x = rad_full_->bspline_x().Nspline();
     std::size_t Nspline_full_y = rad_full_->bspline_y().Nspline();
     std::size_t Nspline_outer_x = Nspline_full_x - Nspline_inner_x;
     std::size_t Nspline_outer_y = Nspline_full_y - Nspline_inner_y;
+    
     std::size_t Nang = ang_->states().size();
     std::size_t iang = iblock * Nang + iblock;
     
     if (cmd_->lightweight_full)
     {
-        dynamic_cast<NoPreconditioner const*>(this)->calc_A_block(iblock, iblock).dot
+        this->calc_A_block(iblock, iblock).dot
         (
-            1.0_r, cArrayView(p, 0, Nspline_inner_x * Nspline_inner_y),
-            1.0_r, cArrayView(q, 0, Nspline_inner_x * Nspline_inner_y),
+            1.0_r, cArrayView(p, 0, Nspline_x * Nspline_y),
+            1.0_r, cArrayView(q, 0, Nspline_x * Nspline_y),
             !cmd_->parallel_precondition
         );
     }
@@ -262,8 +266,8 @@ void CGPreconditioner::CG_mmul (int iblock, const cArrayView p, cArrayView q) co
         
         A_blocks_[iang].dot
         (
-            1.0_r, cArrayView(p, 0, Nspline_inner_x * Nspline_inner_y),
-            1.0_r, cArrayView(q, 0, Nspline_inner_x * Nspline_inner_y),
+            1.0_r, cArrayView(p, 0, Nspline_x * Nspline_y),
+            1.0_r, cArrayView(q, 0, Nspline_x * Nspline_y),
             !cmd_->parallel_precondition
         );
         

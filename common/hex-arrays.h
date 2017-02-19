@@ -1443,7 +1443,7 @@ template <class T> class BlockArray
         void setSegment (std::size_t iblock, std::size_t offset, std::size_t n, const ArrayView<T> data) const
         {
             if (data.size() != n)
-                HexException("Incompatible domensions %ld != %ld.", n, data.size());
+                HexException("Incompatible dimensions %ld != %ld.", n, data.size());
             
             // update a view of existing data ...
             if (inmemory_)
