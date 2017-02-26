@@ -389,11 +389,6 @@ CsrMatrix<LU_int_t, Complex> RadialIntegrals::computeOverlapMatrix
                         v += B1[ipt] * B2[ipt] * ws[ipt];
                 }
                 
-                if (i == 75 and j == 76)
-                {
-                    std::cout << i << " " << j << " " << iknot << " " << jknot << " " << left << " " << right << " " << v << std::endl;
-                }
-                
                 // move on to the next interval
                 if (ishift) iknot++;
                 if (jshift) jknot++;

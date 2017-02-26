@@ -6,7 +6,7 @@
 //                    / /   / /    \_\      / /  \ \                                 //
 //                                                                                   //
 //                                                                                   //
-//  Copyright (c) 2015, Jakub Benda, Charles University in Prague                    //
+//  Copyright (c) 2017, Jakub Benda, Charles University in Prague                    //
 //                                                                                   //
 // MIT License:                                                                      //
 //                                                                                   //
@@ -32,8 +32,13 @@
 #ifndef HEX_COOMATRIX_H
 #define HEX_COOMATRIX_H
 
+// --------------------------------------------------------------------------------- //
+
 #include "hex-arrays.h"
+#include "hex-csrmatrix.h"
 #include "hex-matrix.h"
+
+// --------------------------------------------------------------------------------- //
 
 /**
  * @brief Complex COO matrix.
@@ -99,24 +104,6 @@ public:
     
     // Destructor
     ~CooMatrix () {}
-    
-//     /// Convert 1×1 matrix to a complex number.
-//     operator Complex () const
-//     {
-//         if (m_ == 1 and n_ == 1)
-//         {
-//             // get number of nonzero matrix elements
-//             std::size_t elems = this->shake().x_.size();
-//             if (elems > 1)
-//                 HexException("[CooMatrix::operator Complex] more elements than nominal volume!");
-//             else if (elems == 1)
-//                 return this->shake().x_[0];
-//             else
-//                 return 0.;
-//         }
-//         else
-//             HexException("[CooMatrix::operator Complex] matrix is not 1×1!");
-//     }
     
     // Getters
     
@@ -317,45 +304,6 @@ public:
             y[row] = a * x_[i] * x[col] + b * y[row];
         }
     }
-    
-//     /// SpMV multiplication.
-//     CooMatrix<IdxT,DataT> dot (const ArrayView<DataT> B) const
-//     {
-//         // FIXME: This is a memory INEFFICIENT method.
-//         // NOTE: Row-major storage assumed for B.
-//         
-//         // volumes
-//         IdxT A_vol = x_.size();
-//         IdxT B_vol = B.size();
-//         
-//         // check B shape
-//         assert(B_vol % n_ == 0);
-//         
-//         // create output matrix
-//         IdxT C_rows = m_;
-//         IdxT C_cols = B_vol / n_;
-//         CooMatrix C(C_rows, C_cols);
-//         
-//         // for all elements of A
-//         for (IdxT i = 0; i < A_vol; i++)
-//         {
-//             IdxT row = i_[i];
-//             IdxT col = j_[i];
-//             
-//             // for all columns of B
-//             for (IdxT icol = 0; icol < C_cols; icol++)
-//             {
-//                 C.add
-//                 (
-//                     row, icol,
-//                     x_[i] * B[col*C_cols + icol]
-//                 );
-//             }
-//         }
-//         
-//         // summation is done by shaking
-//         return C.shake();
-//     }
     
     /**
      * @brief Double inner matrix-matrix product.
@@ -561,7 +509,7 @@ public:
     CooMatrix<IdxT,DataT> shake () const
     {
         // ugly and memory inefficient method... FIXME
-        return tocsc().tocoo();
+        return tocsr().tocoo();
     }
     
     /**
@@ -749,5 +697,7 @@ CooMatrix<IdxT,DataT> stairs (IdxT N)
  */
 template <class IdxT, class DataT>
 CooMatrix<IdxT,DataT> kron (CooMatrix<IdxT,DataT> const & A, CooMatrix<IdxT,DataT> const & B);
+
+// --------------------------------------------------------------------------------- //
 
 #endif // HEX_COOMATRIX_H

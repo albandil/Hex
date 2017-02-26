@@ -89,7 +89,7 @@ class PreconditionerBase
             /**
              * @brief Dummy default constructor needed by the run-time selection.
              */
-            PreconditionerBase () {}
+            PreconditionerBase () : verbose_(true) {}
             
             /**
              * @brief Virtual destructor.
@@ -172,6 +172,17 @@ class PreconditionerBase
              * It may use the MPI environment.
              */
             virtual void precondition (BlockArray<Complex> const & r, BlockArray<Complex> & z) const {}
+            
+            /**
+             * @brief Set verbosity level.
+             * 
+             * Determine whether the preconditioner will produce a text output.
+             */
+            virtual void verbose (bool b) { verbose_ = b; }
+            
+    protected:
+        
+        bool verbose_;
 };
 
 // --------------------------------------------------------------------------------- //

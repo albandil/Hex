@@ -524,6 +524,7 @@ class RadialIntegrals
         // Access the precomputed one-electron overlap matrices.
         OneElectronMatrixAccessors(D)
         OneElectronMatrixAccessors(S)
+        OneElectronMatrixAccessors(Mm1)
         OneElectronMatrixAccessors(Mm1_tr)
         OneElectronMatrixAccessors(Mm2)
         
@@ -533,7 +534,7 @@ class RadialIntegrals
             SymBandMatrix<Complex> const & M##_y (int L) const { return M##_y_[L]; } \
             Complex M##_x (int L, std::size_t i, std::size_t j) const { return M##_x_[L](i,j); } \
             Complex M##_y (int L, std::size_t i, std::size_t j) const { return M##_y_[L](i,j); } \
-            
+        
         // Access the precomputed scaled full integral moments of order L / -L-1.
         OneElectronMatrixArrayAccessors(Mtr_L)
         OneElectronMatrixArrayAccessors(Mtr_mLm1)

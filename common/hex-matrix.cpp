@@ -37,6 +37,8 @@
 #include <set>
 #include <vector>
 
+// --------------------------------------------------------------------------------- //
+
 #include "hex-arrays.h"
 #include "hex-csrmatrix.h"
 #include "hex-densematrix.h"
@@ -44,6 +46,8 @@
 #include "hex-matrix.h"
 #include "hex-misc.h"
 #include "hex-symbandmatrix.h"
+
+// --------------------------------------------------------------------------------- //
 
 #ifdef SINGLE
 extern "C" void cgetrf_ (int*, int*, Complex*, int*, int*, int*);
@@ -309,11 +313,18 @@ CsrMatrix<LU_int_t,Complex> CooMatrix<LU_int_t,Complex>::tocsr () const
 {
     // get number of structurally non-zero elements
     LU_int_t nz = x_.size();
+    assert((LU_int_t)i_.size() == nz);
     
     // get row lengths
     std::vector<LU_int_t> len (m_, 0);
-    for (LU_int_t n = 0; n < nz; n++) if (x_[n] != 0.0_r)
-        len[i_[n]]++;
+    for (LU_int_t n = 0; n < nz; n++) 
+    {
+        if (x_[n] != 0.0_r)
+        {
+            assert(i_[n] < m_);
+            len[i_[n]]++;
+        }
+    }
     
     // create element pointer array for each matrix row
     std::vector<std::vector<LU_int_t>> elem_ptrs (m_);

@@ -135,6 +135,7 @@ class DOMPreconditioner : public NoPreconditioner
                 
                 PanelSolution
                 (
+                    int ixpanel, int iypanel,
                     int order,
                     Real theta,
                     Bspline const & xspline, Bspline const & yspline,
@@ -163,10 +164,10 @@ class DOMPreconditioner : public NoPreconditioner
                 Bspline xspline_full;   // full x-axis B-spline basis
                 Bspline yspline_full;   // full y-axis B-spline basis
                 
-                CsrMatrix<LU_int_t,Complex> SaF, SbF;   // overlaps of panel and full basis
-                CsrMatrix<LU_int_t,Complex> Saa, Sbb;   // panel B-spline self-overlap matrices
+                CsrMatrix<LU_int_t,Complex> SxF, SyF;   // overlaps of panel and full basis
+                CsrMatrix<LU_int_t,Complex> Sxx, Syy;   // panel B-spline self-overlap matrices
                 
-                std::shared_ptr<LUft> lu_Saa, lu_Sbb;   // LU decomposition of the panel overlaps
+                std::shared_ptr<LUft> lu_Sxx, lu_Syy;   // LU decomposition of the panel overlaps
                 
                 cBlockArray r;  // original source
                 cBlockArray z;  // solution
@@ -174,15 +175,30 @@ class DOMPreconditioner : public NoPreconditioner
                 std::array<cArrays,nNbrs> ssrc;  // surrogate sources from neighbour panels
                 std::array<cArrays,nNbrs> outf;  // outgoing field to neighbour panels
                 
+                int ixpanel;   // which panel (x-dir)
+                int iypanel;   // which panel (y-dir)
+                
                 int xoffset;   // x-offset of the real basis of panel
                 int yoffset;   // y-offset of the real basis of panel
         };
         
         // find solution on a sub-domain
-        void solvePanel (int n, std::vector<PanelSolution> & p, int i, int j) const;
+        void solvePanel
+        (
+            int cycle, int cycles,
+            int n,
+            std::vector<PanelSolution> & p,
+            int i, int j
+        ) const;
         
         // construct the surrogate source for panel's boundary
-        void surrogateSource (PanelSolution * panel, int direction, PanelSolution * neighbour) const;
+        void surrogateSource
+        (
+            int cycle, int cycles,
+            PanelSolution * panel,
+            int direction,
+            PanelSolution * neighbour
+        ) const;
         
         // get knot sub-sequences
         void knotSubsequence

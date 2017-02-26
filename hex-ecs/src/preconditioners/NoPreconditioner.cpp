@@ -105,13 +105,16 @@ void NoPreconditioner::setup ()
     Bspline const & bspline_y     = rad_panel_->bspline_y();
     
     // calculate all radial integrals in inner region
+    rad_inner_->verbose(verbose_);
     rad_inner_->setupOneElectronIntegrals(*par_, *cmd_);
     rad_inner_->setupTwoElectronIntegrals(*par_, *cmd_);
     
     // calculate one-electron integrals in full domain
+    rad_full_->verbose(verbose_);
     rad_full_->setupOneElectronIntegrals(*par_, *cmd_);
     
     // calculate/copy all radial integrals on panel
+    rad_panel_->verbose(verbose_);
     rad_panel_->setupOneElectronIntegrals(*par_, *cmd_);
     rad_panel_->subsetTwoElectronIntegrals(*par_, *cmd_, *rad_inner_);
     
@@ -159,14 +162,14 @@ void NoPreconditioner::setup ()
     
     if (full_domain)
     {
-        std::cout << "Setting up the hydrogen eigenstates..." << std::endl << std::endl;
+        if (verbose_) std::cout << "Setting up the hydrogen eigenstates..." << std::endl << std::endl;
         
         cArray D (Nspline_inner);
         ColMatrix<Complex> CR (Nspline_inner, Nspline_inner);
         ColMatrix<Complex> invCR (Nspline_inner, Nspline_inner);
         ColMatrix<Complex> invsqrtS (Nspline_inner, Nspline_inner);
         
-        std::cout << "\t- inner region basis overlap matrix diagonalization" << std::endl;
+        if (verbose_) std::cout << "\t- inner region basis overlap matrix diagonalization" << std::endl;
         Timer timer;
         
         ColMatrix<Complex> S = rad_inner_->S_x().torow().T();
@@ -174,20 +177,20 @@ void NoPreconditioner::setup ()
         CR.invert(invCR);
         
         // Now S = CR * (D * CR⁻¹)
-        std::cout << "\t\t- time: " << timer.nice_time() << std::endl;
+        if (verbose_) std::cout << "\t\t- time: " << timer.nice_time() << std::endl;
         for (std::size_t i = 0; i < (std::size_t)Nspline_inner * (std::size_t)Nspline_inner; i++)
             invCR.data()[i] *= D[i % Nspline_inner];
         
         // S = S - CR * invCR
         blas::gemm(-1., CR, invCR, 1., S);
-        std::cout << "\t\t- residual: " << S.data().norm() << std::endl;
+        if (verbose_) std::cout << "\t\t- residual: " << S.data().norm() << std::endl;
         
         // compute √S⁻¹
         for (std::size_t i = 0; i < (std::size_t)Nspline_inner * (std::size_t)Nspline_inner; i++)
             invCR.data()[i] /= std::pow(D.data()[i % Nspline_inner], 1.5);
         blas::gemm(1., CR, invCR, 0., invsqrtS);
         
-        std::cout << std::endl;
+        if (verbose_) std::cout << std::endl;
         
         //
         // now calculate the eigenstates of the inner one-electron hamiltonian
@@ -216,7 +219,7 @@ void NoPreconditioner::setup ()
                     continue;
                 
                 written = true;
-                std::cout << "\t- inner region one-electron Hamiltonian matrix diagonalization (Z = " << Z << ", l = " << l << ")" << std::endl;
+                if (verbose_) std::cout << "\t- inner region one-electron Hamiltonian matrix diagonalization (Z = " << Z << ", l = " << l << ")" << std::endl;
                 timer.reset();
                 
                 // compose the symmetrical one-electron hamiltonian
@@ -242,13 +245,13 @@ void NoPreconditioner::setup ()
                 blas::gemm(1., invCR, invsqrtS, 0., Hl_[i][l].invCl_invsqrtS);
                 
                 // Now Hl = ClR * D * ClR⁻¹
-                std::cout << "\t\t- time: " << timer.nice_time() << std::endl;
+                if (verbose_) std::cout << "\t\t- time: " << timer.nice_time() << std::endl;
                 for (std::size_t i = 0; i < (std::size_t)Nspline_inner * (std::size_t)Nspline_inner; i++)
                     invCR.data()[i] *= D[i % Nspline_inner];
                 
                 // Hl <- Hl - CR * invCR
                 blas::gemm(-1., CR, invCR, 1., tHl);
-                std::cout << "\t\t- residual: " << tHl.data().norm() << std::endl;
+                if (verbose_) std::cout << "\t\t- residual: " << tHl.data().norm() << std::endl;
                 
                 // copy the eigenvectors as columns
                 // - already normalized by xGEEV to "Euclidean norm equal to 1 and largest component real"
@@ -260,7 +263,7 @@ void NoPreconditioner::setup ()
             }
             if (written)
             {
-                std::cout << std::endl;
+                if (verbose_) std::cout << std::endl;
             }
         }
         
@@ -286,7 +289,7 @@ void NoPreconditioner::setup ()
                 HexException("Failed to load one-electron diagonalization file %s for Z = %g, l = %d.", Hl_[i][l].filename.c_str(), Z, l);
             
             written = true;
-            std::cout << "\t- one-electron Hamiltonian data loaded (Z = " << Z << ", l = " << l << ")" << std::endl;
+            if (verbose_) std::cout << "\t- one-electron Hamiltonian data loaded (Z = " << Z << ", l = " << l << ")" << std::endl;
             
             // get sorted energies (ascending real parts)
             std::vector<int> indices (Nspline_inner);
@@ -307,7 +310,7 @@ void NoPreconditioner::setup ()
             }
             if (max_nr >= 0)
             {
-                std::cout << "\t\t- bound states with energy within 0.1 % from exact value: " << l + 1 << " <= n <= " << max_nr + l + 1 << std::endl;
+                if (verbose_) std::cout << "\t\t- bound states with energy within 0.1 % from exact value: " << l + 1 << " <= n <= " << max_nr + l + 1 << std::endl;
             }
             
             // get all valid asymptotic states
@@ -360,7 +363,7 @@ void NoPreconditioner::setup ()
             }
             if (Xp_[i][l].size() >= 1)
             {
-                std::cout << "\t\t- eigenstates used in asymptotic (outer) domain: " << l + 1 << " <= n <= " << l + Xp_[i][l].size() << std::endl;
+                if (verbose_) std::cout << "\t\t- eigenstates used in asymptotic (outer) domain: " << l + 1 << " <= n <= " << l + Xp_[i][l].size() << std::endl;
             }
             
             // unload the factorization file
@@ -368,7 +371,7 @@ void NoPreconditioner::setup ()
         }
         if (written)
         {
-            std::cout << std::endl;
+            if (verbose_) std::cout << std::endl;
         }
     }
 }
@@ -506,9 +509,9 @@ void NoPreconditioner::update (Real E)
     // update energy
     E_ = E;
     
-    std::cout << "\tUpdate the common preconditioner base" << std::endl;
+    if (verbose_) std::cout << "\tUpdate the common preconditioner base" << std::endl;
     
-    std::cout << "\tPrecompute matrix blocks ... " << std::flush;
+    if (verbose_) std::cout << "\tPrecompute matrix blocks ... " << std::flush;
     Timer t;
     
     // outer one-electron overlap matrix
@@ -792,7 +795,7 @@ void NoPreconditioner::update (Real E)
         }
     }
     
-    std::cout << "done after " << t.nice_time() << std::endl;
+    if (verbose_) std::cout << "done after " << t.nice_time() << std::endl;
     par_->wait();
 }
 

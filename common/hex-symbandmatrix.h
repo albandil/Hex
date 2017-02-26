@@ -1186,6 +1186,21 @@ BlockSymBandMatrix<DataT> kron
 }
 
 template<class DataT>
+BlockSymBandMatrix<DataT> operator +
+(
+    BlockSymBandMatrix<DataT> const & A,
+    BlockSymBandMatrix<DataT> const & B
+)
+{
+    BlockSymBandMatrix<DataT> C (A.blockcount(), A.blockhalfbw(), A.size(), A.halfbw());
+    
+    for (std::size_t i = 0; i < A.blockcount() * A.blockhalfbw(); i++)
+        C.setBlock(i, A.getBlock(i) + B.getBlock(i));
+    
+    return C;
+}
+
+template<class DataT>
 BlockSymBandMatrix<DataT> operator -
 (
     BlockSymBandMatrix<DataT> const & A,

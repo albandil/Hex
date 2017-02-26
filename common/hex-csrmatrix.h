@@ -6,7 +6,7 @@
 //                    / /   / /    \_\      / /  \ \                                 //
 //                                                                                   //
 //                                                                                   //
-//  Copyright (c) 2015, Jakub Benda, Charles University in Prague                    //
+//  Copyright (c) 2017, Jakub Benda, Charles University in Prague                    //
 //                                                                                   //
 // MIT License:                                                                      //
 //                                                                                   //
@@ -32,15 +32,23 @@
 #ifndef HEX_CSRMATRIX_H
 #define HEX_CSRMATRIX_H
 
+// --------------------------------------------------------------------------------- //
+
 #include <memory>
+
+// --------------------------------------------------------------------------------- //
 
 #ifdef WITH_PNG
 #include <png++/png.hpp>
 #endif
 
+// --------------------------------------------------------------------------------- //
+
 #include "hex-arrays.h"
 #include "hex-coomatrix.h"
 #include "hex-densematrix.h"
+
+// --------------------------------------------------------------------------------- //
 
 /**
  * @brief Complex CSR matrix.
@@ -457,7 +465,34 @@ public:
     /**
      * Convert to COO format.
      */
-    CooMatrix<IdxT,DataT> tocoo() const;
+    CooMatrix<IdxT,DataT> tocoo () const
+    {
+        if (p().empty() or i().empty() or x().empty())
+            return CooMatrix<IdxT,DataT>();
+        
+        IdxT nz = p().back();
+        
+        NumberArray<IdxT>  I; I.reserve(nz);
+        NumberArray<IdxT>  J; J.reserve(nz);
+        NumberArray<DataT> V; V.reserve(nz);
+        
+        for (IdxT irow = 0; irow < (IdxT)rows(); irow++)
+        for (IdxT idx = p()[irow]; idx < p()[irow + 1]; idx++)
+        {
+            I.push_back(irow);
+            J.push_back(i()[idx]);
+            V.push_back(x()[idx]);
+        }
+        
+        return CooMatrix<IdxT,DataT>
+        (
+            rows(),
+            cols(),
+            std::move(I),
+            std::move(J),
+            std::move(V)
+        );
+    }
     
     /**
      * Convert to dense matrix.
@@ -713,5 +748,7 @@ NumberArray<DataT> kron_dot (CsrMatrix<IdxT,DataT> const & A, CsrMatrix<IdxT,Dat
     
     return W;
 }
+
+// --------------------------------------------------------------------------------- //
 
 #endif // HEX_CSRMATRIX_H
