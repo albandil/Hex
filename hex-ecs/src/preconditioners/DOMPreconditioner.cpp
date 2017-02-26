@@ -222,9 +222,13 @@ void DOMPreconditioner::solvePanel (int cycle, int cycles, int n, std::vector<Pa
     rad.S_y().tocoo<LU_int_t>().tocsr().write(format("Sy-%d-%d-%d.txt", i, j, Nyspline));
     /// ^ --- ^
     
-    // contruct the right-hand side
+    // get right-hand side and solution arrays
     cBlockArray & psi = pCentre->z;
     cBlockArray   chi = pCentre->r;
+    
+    // reset the solution
+    for (cArray & segment : psi)
+        segment.fill(0.0);
     
     // add surrogate sources
     if (pNbr[Left] != nullptr)
