@@ -85,8 +85,15 @@ void DOMPreconditioner::update (Real E)
 void DOMPreconditioner::precondition (BlockArray<Complex> const & r, BlockArray<Complex> & z) const
 {
     // B-spline parameters
+    int Nspline = rad_inner().bspline().Nspline();
     int order = rad_inner().bspline().order();
     Real theta = rad_inner().bspline().ECStheta();
+    
+    // one-electron overlap matrix will be useful
+    CsrMatrix<LU_int_t,Complex> SFF_csr = rad_inner_->S().tocoo<LU_int_t>().tocsr();
+    std::unique_ptr<LUft> SFF_lu;
+    SFF_lu.reset(LUft::Choose("lapack"));
+    SFF_lu->factorize(SFF_csr);
     
     // construct sub-domain bases
     std::vector<PanelSolution> p;
@@ -119,31 +126,40 @@ void DOMPreconditioner::precondition (BlockArray<Complex> const & r, BlockArray<
             ang_->states().size()
         );
         
+        // get the panel data structure
+        PanelSolution & panel = p.back();
+        
         // get the current B-spline objects
-        Bspline const & xspline = p.back().xspline_inner;
-        Bspline const & yspline = p.back().yspline_inner;
+        Bspline const & xspline = panel.xspline_inner;
+        Bspline const & yspline = panel.yspline_inner;
         
         // calculate overlaps
-        p.back().SxF = RadialIntegrals::computeOverlapMatrix(xspline, rad_inner().bspline_x(), xspline.R1(), xspline.R2());
-        p.back().SyF = RadialIntegrals::computeOverlapMatrix(yspline, rad_inner().bspline_y(), yspline.R1(), yspline.R2());
-        p.back().Sxx = RadialIntegrals::computeOverlapMatrix(xspline, xspline,  xspline.Rmin(), xspline.Rmax());
-        p.back().Syy = RadialIntegrals::computeOverlapMatrix(yspline, yspline,  yspline.Rmin(), yspline.Rmax());
+        panel.SFx = RadialIntegrals::computeOverlapMatrix(rad_inner().bspline_x(), xspline, xspline.R1(), ixpanel + 1 == xpanels ? xspline.Rmax() : xspline.R2());
+        panel.SFy = RadialIntegrals::computeOverlapMatrix(rad_inner().bspline_y(), yspline, yspline.R1(), iypanel + 1 == ypanels ? yspline.Rmax() : yspline.R2());
+        panel.Sxx = RadialIntegrals::computeOverlapMatrix(xspline, xspline,  xspline.Rmin(), xspline.Rmax());
+        panel.Syy = RadialIntegrals::computeOverlapMatrix(yspline, yspline,  yspline.Rmin(), yspline.Rmax());
         
         /// v --- v DEBUG
-        p.back().Sxx.plot(format("Sxx-%d-%d.png", ixpanel, iypanel));
-        p.back().Syy.plot(format("Syy-%d-%d.png", ixpanel, iypanel));
+        panel.Sxx.plot(format("Sxx-%d-%d.png", ixpanel, iypanel));
+        panel.Syy.plot(format("Syy-%d-%d.png", ixpanel, iypanel));
         
-        p.back().SxF.write(format("SaF-%d-%d.mat", ixpanel, iypanel));
-        p.back().SyF.write(format("SbF-%d-%d.mat", ixpanel, iypanel));
-        p.back().Sxx.write(format("Saa-%d-%d-%d.mat", ixpanel, iypanel, xspline.Nspline()));
-        p.back().Syy.write(format("Sbb-%d-%d-%d.mat", ixpanel, iypanel, yspline.Nspline()));
+        panel.SFx.write(format("SFx-%d-%d.mat", ixpanel, iypanel));
+        panel.SFy.write(format("SFy-%d-%d.mat", ixpanel, iypanel));
+        panel.Sxx.write(format("Sxx-%d-%d-%d.mat", ixpanel, iypanel, xspline.Nspline()));
+        panel.Syy.write(format("Syy-%d-%d-%d.mat", ixpanel, iypanel, yspline.Nspline()));
         /// ^ --- ^
         
         // factorize the square overlap matrices
-        p.back().lu_Sxx.reset(LUft::Choose("lapack"));
-        p.back().lu_Syy.reset(LUft::Choose("lapack"));
-        p.back().lu_Sxx->factorize(p.back().Sxx);
-        p.back().lu_Syy->factorize(p.back().Syy);
+        panel.lu_Sxx.reset(LUft::Choose("lapack"));
+        panel.lu_Syy.reset(LUft::Choose("lapack"));
+        panel.lu_Sxx->factorize(panel.Sxx);
+        panel.lu_Syy->factorize(panel.Syy);
+        
+        // calculate reconstruction matrices for this panel
+        panel.SFFm1SFx = ColMatrix<Complex>(Nspline, xspline.Nspline());
+        panel.SFFm1SFy = ColMatrix<Complex>(Nspline, yspline.Nspline());
+        SFF_lu->solve(panel.SFx.tocoo().transpose().torow().data(), panel.SFFm1SFx.data(), xspline.Nspline());
+        SFF_lu->solve(panel.SFy.tocoo().transpose().torow().data(), panel.SFFm1SFy.data(), yspline.Nspline());
     }
     
     // interpolate the residual into sub-domains
@@ -203,7 +219,7 @@ void DOMPreconditioner::solvePanel (int cycle, int cycles, int n, std::vector<Pa
         pCentre->yspline_full   // panel y basis
     );
     
-    std::cout << "\tPanel hamiltonian size: " << pCentre->xspline_full.Nspline() * pCentre->yspline_full.Nspline() << std::endl;
+    std::cout << "\tPanel hamiltonian size: " << ang_->states().size() * pCentre->xspline_full.Nspline() * pCentre->yspline_full.Nspline() << std::endl;
     
     // construct the matrix of the equations etc.
     prec->verbose(false);
@@ -225,6 +241,9 @@ void DOMPreconditioner::solvePanel (int cycle, int cycles, int n, std::vector<Pa
     // get right-hand side and solution arrays
     cBlockArray & psi = pCentre->z;
     cBlockArray   chi = pCentre->r;
+    
+    for (int ill = 0; ill < chi.size(); ill++)
+        std::cout << "chi[" << ill << "].norm() = " << chi[ill].norm() << std::endl;
     
     // reset the solution
     for (cArray & segment : psi)
@@ -304,11 +323,11 @@ void DOMPreconditioner::solvePanel (int cycle, int cycles, int n, std::vector<Pa
             }
         }
     };
-    auto new_array = [pCentre](std::size_t N, std::string name) -> cBlockArray
+    auto new_array = [Nxspline,Nyspline](std::size_t N, std::string name) -> cBlockArray
     {
         cBlockArray A (N);
         for (cArray & a : A)
-            a.resize(pCentre->xspline_inner.Nspline() * pCentre->yspline_inner.Nspline());
+            a.resize(Nxspline * Nyspline);
         return A;
     };
     auto process_solution = [](unsigned iteration, cBlockArray const & x) -> void
@@ -335,11 +354,11 @@ void DOMPreconditioner::solvePanel (int cycle, int cycles, int n, std::vector<Pa
                 pCentre->xspline_inner,
                 pCentre->yspline_inner,
                 d,
-                linspace(pCentre->xspline_inner.Rmin(), pCentre->xspline_inner.Rmax(), 1001),
-                linspace(pCentre->yspline_inner.Rmin(), pCentre->yspline_inner.Rmax(), 1001)
+                linspace(pCentre->xspline_inner.Rmin(), i == 0 ? 5 : pCentre->xspline_inner.Rmax(), 1001),
+                linspace(pCentre->yspline_inner.Rmin(), j == 0 ? 5 : pCentre->yspline_inner.Rmax(), 1001)
             ),
-            linspace(pCentre->xspline_inner.Rmin(), pCentre->xspline_inner.Rmax(), 1001),
-            linspace(pCentre->yspline_inner.Rmin(), pCentre->yspline_inner.Rmax(), 1001),
+            linspace(pCentre->xspline_inner.Rmin(), i == 0 ? 5 : pCentre->xspline_inner.Rmax(), 1001),
+            linspace(pCentre->yspline_inner.Rmin(), j == 0 ? 5 : pCentre->yspline_inner.Rmax(), 1001),
             rArray{ 0. }
         );
         ofs.close();
@@ -494,6 +513,8 @@ void DOMPreconditioner::solvePanel (int cycle, int cycles, int n, std::vector<Pa
             /// ^ --- ^
         }
     }
+    
+    prec->finish();
 }
 
 void DOMPreconditioner::surrogateSource (int cycle, int cycles, PanelSolution * panel, int direction, PanelSolution * neighbour) const
@@ -1297,31 +1318,6 @@ void DOMPreconditioner::knotSubsequence (int i, int n, Bspline const & bspline, 
 
 void DOMPreconditioner::splitResidual (cBlockArray const & r, std::vector<PanelSolution> & panels) const
 {
-    //std::cout << std::endl;
-    //std::cout << "Split residual" << std::endl;
-    
-    /// v --- v DEBUG
-    /*for (unsigned ill = 0; ill < r.size(); ill++)
-    {
-        std::ofstream out (format("res-%d.vtk", ill));
-        writeVTK_points
-        (
-            out,
-            Bspline::zip
-            (
-                rad_inner().bspline_x(),
-                rad_inner().bspline_y(),
-                r[ill],
-                linspace(rad_inner().bspline_x().Rmin(), rad_inner().bspline_x().Rmax(), 1001),
-                linspace(rad_inner().bspline_y().Rmin(), rad_inner().bspline_y().Rmax(), 1001)
-            ),
-            linspace(rad_inner().bspline_x().Rmin(), rad_inner().bspline_x().Rmax(), 1001),
-            linspace(rad_inner().bspline_y().Rmin(), rad_inner().bspline_y().Rmax(), 1001),
-            rArray{ 0. }
-        );
-    }*/
-    /// ^ --- ^ DEBUG
-    
     for (int ixpanel = 0; ixpanel < xpanels; ixpanel++)
     for (int iypanel = 0; iypanel < ypanels; iypanel++)
     for (unsigned ill = 0; ill < r.size(); ill++)
@@ -1356,24 +1352,7 @@ void DOMPreconditioner::splitResidual (cBlockArray const & r, std::vector<PanelS
             }
         }
         
-        /// v --- v DEBUG
-        /*std::ofstream out2 (format("splt2-%d-%d-%d.vtk", ixpanel, iypanel, ill));
-        writeVTK_points
-        (
-            out2,
-            Bspline::zip
-            (
-                p.xspline_inner,
-                p.yspline_inner,
-                p.r[ill],
-                linspace(p.xspline_inner.Rmin(), p.xspline_inner.Rmax(), 1001),
-                linspace(p.yspline_inner.Rmin(), p.yspline_inner.Rmax(), 1001)
-            ),
-            linspace(p.xspline_inner.Rmin(), p.xspline_inner.Rmax(), 1001),
-            linspace(p.yspline_inner.Rmin(), p.yspline_inner.Rmax(), 1001),
-            rArray{ 0. }
-        );*/
-        /// ^ --- ^
+        //std::cout << "split : " << ixpanel << " " << iypanel << " " << ill << " |r| = " << p.r[ill].norm() << std::endl;
     }
 }
 
@@ -1381,7 +1360,12 @@ void DOMPreconditioner::collectSolution (cBlockArray & z, std::vector<PanelSolut
 {
     for (unsigned ill = 0; ill < z.size(); ill++)
     {
-        // TODO : Combine panel solutions.
+        // reset solution
+        z[ill].fill(0.0);
+        
+        // combine panel solutions
+        for (PanelSolution const & panel : panels)
+            z[ill] += kron_dot(panel.SFFm1SFx, panel.SFFm1SFy, panel.z[ill]);
         
         /// v --- v DEBUG
         std::ofstream out (format("combined-%d.vtk", ill));

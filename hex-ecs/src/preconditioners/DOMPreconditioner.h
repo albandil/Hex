@@ -40,6 +40,7 @@
 // --------------------------------------------------------------------------------- //
 
 #include "hex-csrmatrix.h"
+#include "hex-densematrix.h"
 
 // --------------------------------------------------------------------------------- //
 
@@ -164,10 +165,13 @@ class DOMPreconditioner : public NoPreconditioner
                 Bspline xspline_full;   // full x-axis B-spline basis
                 Bspline yspline_full;   // full y-axis B-spline basis
                 
-                CsrMatrix<LU_int_t,Complex> SxF, SyF;   // overlaps of panel and full basis
+                CsrMatrix<LU_int_t,Complex> SFx, SFy;   // overlaps of panel and full basis
                 CsrMatrix<LU_int_t,Complex> Sxx, Syy;   // panel B-spline self-overlap matrices
                 
                 std::shared_ptr<LUft> lu_Sxx, lu_Syy;   // LU decomposition of the panel overlaps
+                
+                ColMatrix<Complex> SFFm1SFx; // solution reconstruction operator (x-axis)
+                ColMatrix<Complex> SFFm1SFy; // solution reconstruction operator (y-axis)
                 
                 cBlockArray r;  // original source
                 cBlockArray z;  // solution

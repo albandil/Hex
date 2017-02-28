@@ -799,6 +799,35 @@ cArray kron_dot (RowMatrix<Complex,Base1> const & A, RowMatrix<Complex,Base2> co
     return w;
 }
 
+/**
+ * @brief Dot product of kronecker product and a vector
+ * 
+ * This function will compute the following expression, given two matrices and a vector,
+ * @f[
+ *     \mathbf{w} = (\mathsf{A} \otimes \mathsf{B}) \cdot \mathbf{v} \,,
+ * @f]
+ * witnout the need of evaluating (and storing) the Kronecker product.
+ */
+template <class Base1, class Base2>
+cArray kron_dot (ColMatrix<Complex,Base1> const & A, ColMatrix<Complex,Base2> const & B, cArrayView const v)
+{
+    // allocate output array and a temporary array
+    cArray w (A.rows() * B.rows());
+    cArray z (A.rows() * B.cols());
+    
+    // reshape vectors
+    RowMatrixView<Complex> V (A.cols(), B.cols(), v);
+    RowMatrixView<Complex> W (A.rows(), B.rows(), w);
+    RowMatrixView<Complex> Z (A.rows(), B.cols(), z);
+    
+    // calculate the contraction
+    blas::gemm(1., A, V, 0., Z);
+    blas::gemm(1., Z, B.T(), 0., W);
+    
+    // return result
+    return w;
+}
+
 template <class Type>
 NumberArray<Type> operator | (DenseMatrixView<Type> const & A, ArrayView<Type> v)
 {

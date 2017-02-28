@@ -447,9 +447,9 @@ BlockSymBandMatrix<Complex> NoPreconditioner::calc_A_block (int ill, int illp, b
                 [&](int j, int l)
                 {
                     return E_ * rad_panel_->S_x()(i,k) * rad_panel_->S_y()(j,l)
-                            - (0.5_z * rad_panel_->D_x()(i,k) - rad_panel_->Mm1_tr_x()(i,k)) * rad_panel_->S_y()(j,l)
+                            - (0.5_z * rad_panel_->D_x()(i,k) - rad_panel_->Mm1_x()(i,k)) * rad_panel_->S_y()(j,l)
                             - 0.5_r * l1 * (l1 + 1) * rad_panel_->Mm2_x()(i,k) * rad_panel_->S_y()(j,l)
-                            - rad_panel_->S_x()(i,k) * (0.5_z * rad_panel_->D_y()(j,l) + inp_->Zp * rad_panel_->Mm1_tr_y()(j,l))
+                            - rad_panel_->S_x()(i,k) * (0.5_z * rad_panel_->D_y()(j,l) + inp_->Zp * rad_panel_->Mm1_y()(j,l))
                             - 0.5_r * l2 * (l2 + 1) * rad_panel_->S_x()(i,k) * rad_panel_->Mm2_y()(j,l);
                 }
             );
@@ -457,7 +457,7 @@ BlockSymBandMatrix<Complex> NoPreconditioner::calc_A_block (int ill, int illp, b
         
         // two-electron part
         if(twoel)
-        for (int lambda = 0; lambda <= rad_panel_->maxlambda(); lambda++) if (ang_->f(ill,illp,lambda) != 0)
+        for (int lambda = 0; lambda <= ang_->maxlambda(); lambda++) if (ang_->f(ill,illp,lambda) != 0)
         {
             // calculate two-electron term
             if (not cmd_->lightweight_radial_cache)
