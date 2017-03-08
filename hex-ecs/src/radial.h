@@ -222,7 +222,6 @@ class RadialIntegrals
             GaussLegendre const & g,
             int a, int i, int j,
             int iknot,
-            CCFunction weight,
             Real scale
         ) const;
         
@@ -281,12 +280,7 @@ class RadialIntegrals
          * Uses the "diagonal" contribution from @ref diagonalR and the off-diagonal
          * contributions calculated from products of the partial moments.
          */
-        Complex computeR
-        (
-            int lambda,
-            int i, int j, int k, int l,
-            bool simple = false
-        ) const;
+        Complex computeR (int lambda, int i, int j, int k, int l) const;
         
         /**
          * @brief Diagonal contribution to R-integral.

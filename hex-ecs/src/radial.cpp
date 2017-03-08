@@ -70,7 +70,8 @@ RadialIntegrals::RadialIntegrals
     Mm1_tr_y_(bspline_y.Nspline(), bspline_y.order() + 1),
     Mm2_y_   (bspline_y.Nspline(), bspline_y.order() + 1),
     verbose_(true),
-    Nlambdas_(Nlambdas)
+    Nlambdas_(Nlambdas),
+    rad_(nullptr)
 {
     // maximal number of evaluation points (quadrature rule)
     int npts = std::max(EXPANSION_QUADRATURE_POINTS, bspline_x_.order() + Nlambdas + 2);
@@ -407,7 +408,7 @@ Complex RadialIntegrals::computeM_iknot
 (
     Bspline const & bspline, GaussLegendre const & g,
     int a, int i, int j,
-    int iknot, CCFunction weight, Real scale
+    int iknot, Real scale
 ) const
 {
     // get interval boundaries
@@ -434,7 +435,7 @@ Complex RadialIntegrals::computeM_iknot
     
     // accumulate the (weighted) result
     for (int k = 0; k < points; k++)
-        res += weight(xs[k]) * values_i[k] * values_j[k] * special::pow_int(scale * xs[k], a) * ws[k];
+        res += values_i[k] * values_j[k] * special::pow_int(scale * xs[k], a) * ws[k];
     
     return res;
 }
@@ -446,21 +447,17 @@ Complex RadialIntegrals::computeM
     bool truncate, bool scale
 ) const
 {
-    // get boundary iknots
-    int left = std::max(i, j);
+    // get indices of knots that enclose the overlap of the two B-splines
+    int left  = std::max(i, j);
     int right = std::min(i, j) + bspline.order() + 1;
     
-    // truncating function
-    auto weight = [&](Complex x) -> Complex
+    // adjust the boundary knots so that they span only restricted interval with non-zero potential
+    if (truncate)
     {
-        if (not truncate)
-            return 1.0_z;
-        else if (x.real() < bspline.R1() or bspline.R2() < x.real())
-            return 0.0_z;
-        else
-            return std::tanh(0.125 * (bspline.R2() - x.real()));
-        
-    };
+        // use only 2*order + 1 knots from each side of the real section of the knot sequence
+        left  = std::max(left,  bspline.iR1() - 2*bspline.order() - 1);
+        right = std::min(right, bspline.iR2() + 2*bspline.order() + 1);
+    }
     
     // calculate scaling factor
     Real scalefactor = (scale ? 1.0_r / bspline.t(right).real() : 1.0_r);
@@ -470,7 +467,7 @@ Complex RadialIntegrals::computeM
     
     // undergo integration on sub-intervals
     for (int iknot = left; iknot < right; iknot++)
-        res += computeM_iknot(bspline, g, a, i, j, iknot, weight, scalefactor);
+        res += computeM_iknot(bspline, g, a, i, j, iknot, scalefactor);
     
     return res;
 }
@@ -560,13 +557,13 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
         cArrayView(Mitr_mLm1_x_, lambda * mi_size_x, mi_size_x) = computeMi(bspline_x_, g_x_,  -lambda-1);
         cArrayView(Mitr_mLm1_y_, lambda * mi_size_y, mi_size_y) = computeMi(bspline_y_, g_y_,  -lambda-1);
         
-        // calculate full integral moments
+        // calculate full (scaled) integral moments
         Mtr_L_x_[lambda]   .populate([&](int i, int j) -> Complex { return computeM(bspline_x_, g_x_,  lambda,   i, j, true, true); });
         Mtr_L_y_[lambda]   .populate([&](int i, int j) -> Complex { return computeM(bspline_y_, g_y_,  lambda,   i, j, true, true); });
         Mtr_mLm1_x_[lambda].populate([&](int i, int j) -> Complex { return computeM(bspline_x_, g_x_, -lambda-1, i, j, true, true); });
         Mtr_mLm1_y_[lambda].populate([&](int i, int j) -> Complex { return computeM(bspline_y_, g_y_, -lambda-1, i, j, true, true); });
         
-        // diagonal contributions to two-electron integrals
+        // calculate diagonal contributions to two-electron integrals
         std::string filename = format("rad-R_tr_dia_diag_%d-%.4lx-%.4lx.hdf", lambda, bspline_x_.hash(), bspline_y_.hash());
         if (not cmd.shared_scratch or par.isMyWork(lambda))
         {
@@ -665,21 +662,16 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
         
         Timer t;
         
-        # pragma omp parallel firstprivate (lambda)
+        // for all blocks of the radial matrix
+        # pragma omp parallel for
+        for (int i = 0; i < Nspline_x; i++)
+        for (int k = i; k < Nspline_x and k <= i + order; k++)
         {
-            // for all blocks of the radial matrix
-            # pragma omp for schedule (dynamic,1)
-            for (int i = 0; i < Nspline_x; i++)
-            for (int d = 0; d <= order; d++)
-            if (i + d < Nspline_x)
-            {
-                // calculate the block
-                SymBandMatrix<Complex> block = calc_R_tr_dia_block(lambda, i, i + d);
-                
-                // write the finished block to disk
-                # pragma omp critical
-                R_tr_dia_[lambda].setBlock(i * (order + 1) + d, block.data());
-            }
+            // calculate the block
+            SymBandMatrix<Complex> block = calc_R_tr_dia_block(lambda, i, k);
+            
+            // update the finished block
+            R_tr_dia_[lambda].setBlock(i * (order + 1) + k - i, block.data());
         }
         
         if (verbose_)
@@ -727,51 +719,51 @@ void RadialIntegrals::subsetTwoElectronIntegrals (Parallel const & par, CommandL
 SymBandMatrix<Complex> RadialIntegrals::calc_R_tr_dia_block (unsigned int lambda, int i, int k) const
 {
     // shorthands
-    int Nspline = bspline_y_.Nspline();
+    int Nspline_y = bspline_y_.Nspline();
     int order = bspline_y_.order();
     
-    // first and last purely real B-spline indices
-    int first_x = bspline_x_.iR1();
-    int first_y = bspline_y_.iR1();
-    int last_x = bspline_x_.iR2() - order - 1;
-    int last_y = bspline_y_.iR2() - order - 1;
+    // first and last purely real B-spline
+    int xminspline = bspline_x_.iR1(), xmaxspline = bspline_x_.iR2() - order - 1;
+    int yminspline = bspline_y_.iR1(), ymaxspline = bspline_y_.iR2() - order - 1;
+    
+    // B-spline offsets of the real panel basis with respect to the global real basis
+    int xoffset, yoffset;
+    if (rad_)
+    {
+        xoffset = rad_->bspline_x_.knot(bspline_x_.R1());
+        yoffset = rad_->bspline_y_.knot(bspline_y_.R1());
+    }
     
     // (i,k)-block data
-    SymBandMatrix<Complex> block_ik (Nspline, order + 1);
+    SymBandMatrix<Complex> block_ik (Nspline_y, order + 1);
     
-    // get panel B-spline offsets w.r.t. the global bases
-    unsigned xoffset = rad_ ? rad_->bspline_x().knot(bspline_x_.R1()) - first_x : 0;
-    unsigned yoffset = rad_ ? rad_->bspline_y().knot(bspline_y_.R1()) - first_y : 0;
-    
-    /*if (rad_)
+    // for all elements in the symmetrical block
+    for (int j = 0; j < Nspline_y; j++)
+    for (int l = j; l < Nspline_y and l <= j + order; l++)
     {
-        std::cout << "calc_R_tr_dia_block" << std::endl;
-        std::cout << "\tbspline_x_.R1() = " << bspline_x_.R1() << std::endl;
-        std::cout << "\tbspline_y_.R1() = " << bspline_y_.R1() << std::endl;
-        std::cout << "\tfirst_x = " << first_x << std::endl;
-        std::cout << "\tfirst_y = " << first_y << std::endl;
-        std::cout << "\txoffset = " << xoffset << std::endl;
-        std::cout << "\tyoffset = " << yoffset << std::endl;
-        std::cout << "\trad_->bspline_x_.knot(bspline_x_.R1()) = " << rad_->bspline_x_.knot(bspline_x_.R1()) << std::endl;
-        std::cout << "\trad_->bspline_y_.knot(bspline_y_.R1()) = " << rad_->bspline_y_.knot(bspline_y_.R1()) << std::endl;
-        std::cout << "\trad_->bspline_x_.t(xoffset) = " << rad_->bspline_x_.t(xoffset) << std::endl;
-        std::cout << "\trad_->bspline_y_.t(yoffset) = " << rad_->bspline_y_.t(yoffset) << std::endl;
-    }*/
-    
-    // for all elements in the symmetrical block : evaluate 2-D integral of Bi(1)Bj(2)V(1,2)Bk(1)Bl(2)
-    for (int j = first_y; j <= last_y; j++)
-    for (int l = j; l <= last_y and l <= j + order; l++)
-    {
-        if (not rad_)
-        {
-            // compute integral in own basis
+        // evaluate 2-D integral of Bi(1)Bj(2)V(1,2)Bk(1)Bl(2)
+        
+//         if (not rad_)
+//         {
+            // Compute integral in r1 <-> r2 symmetrical basis.
             block_ik(j,l) = computeR(lambda, i, j, k, l);
-        }
-        else
-        {
-            // compute integral in global basis
-            block_ik(j,l) = rad_->computeR(lambda, i + xoffset, j + yoffset, k + xoffset, l + yoffset);
-        }
+//         }
+//         else
+//         {
+            // We are calculating R-integral in panel basis, which is generally not r1 <-> r2 symmetric.
+            // The function 'computeR' requires symmetrical basis for purely real B-splines due to the indexing
+            // scheme used for the individual contributions. On the contrary, when some of the B-spline is complex,
+            // the function 'computeR' does not make such assumption.
+            
+//             if (xminspline <= std::min(i,k) and std::max(i,k) <= xmaxspline and yminspline <= std::min(j,l) and std::max(j,l) <= ymaxspline)
+//             {
+//                 block_ik(j,l) = rad_->R_tr_dia(lambda)(i + xoffset, j + yoffset, k + xoffset, l + yoffset);
+//             }
+//             else
+//             {
+//                 block_ik(j,l) = computeR(lambda, i, j, k, l);
+//             }
+//         }
     }
     
     return block_ik;

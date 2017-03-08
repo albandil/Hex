@@ -974,6 +974,10 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
                     int ixspline = (ispline - Nspline_inner * Nspline_inner) % Nspline_outer + Nspline_inner;
                     int ichan1 = (ispline - Nspline_inner * Nspline_inner) / Nspline_outer;
                     
+                    // skip B-splines too close to the complex region
+                    if (ixspline + order + 1 > rad_full().bspline_x().iR2())
+                        continue;
+                    
                     // calculate the exchange contribution
                     Real x = rad_full_->bspline().t(ixspline + order + 1).real(), multipole = x;
                     for (int lambda = 1; lambda <= rad_full_->maxlambda(); lambda++)
@@ -990,6 +994,10 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
                     int iyspline = (ispline - Nspline_inner * Nspline_inner - Nchan1 * Nspline_outer) % Nspline_outer + Nspline_inner;
                     int ichan2 = (ispline - Nspline_inner * Nspline_inner - Nchan1 * Nspline_outer) / Nspline_outer;
                     
+                    // skip B-splines too close to the complex region
+                    if (iyspline + order + 1 > rad_full().bspline_y().iR2())
+                        continue;
+                    
                     // calculate the direct contribution
                     Real y = rad_full_->bspline().t(iyspline + order + 1).real(), multipole = y;
                     for (int lambda = 1; lambda <= rad_full_->maxlambda(); lambda++)
@@ -1005,6 +1013,10 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
                     // r1 < Ra, r2 < Ra
                     int ixspline = ispline / Nspline_inner;
                     int iyspline = ispline % Nspline_inner;
+                    
+                    // skip B-splines too close to the complex region
+                    if (ixspline + order + 1 > rad_full().bspline_x().iR2() or iyspline + order + 1 > rad_full().bspline_y().iR2())
+                        continue;
                     
                     // non-overlapping B-splines ?
                     if (std::abs(ixspline - iyspline) > order)
@@ -1187,7 +1199,7 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
         chi[ill] = chi_block;
         
         /// v --- v DEBUG
-        std::ofstream out (format("chi-%d.vtk", ill));
+        /*std::ofstream out (format("chi-%d.vtk", ill));
         writeVTK_points
         (
             out,
@@ -1202,7 +1214,7 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
             linspace(rad_full().bspline_x().Rmin(), rad_full().bspline_x().Rmax(), 1001),
             linspace(rad_full().bspline_y().Rmin(), rad_full().bspline_y().Rmax(), 1001),
             rArray{ 0. }
-        );
+        );*/
         /// ^ --- ^ DEBUG
         
         // optionally transfer to disk
