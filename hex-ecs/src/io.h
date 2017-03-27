@@ -396,8 +396,18 @@ class SolutionIO
 {
     public:
         
-        SolutionIO (int L, int S, int Pi, int ni, int li, int mi, Real E, std::vector<std::pair<int,int>> const & ang, std::string prefix = "psi")
-            : L_(L), S_(S), Pi_(Pi), ni_(ni), li_(li), mi_(mi), E_(E), ang_(ang), prefix_(prefix) {}
+        SolutionIO
+        (
+            int L, int S, int Pi,
+            int ni, int li, int mi,
+            Real E,
+            std::vector<std::pair<int,int>> const & ang,
+            std::vector<std::pair<int,int>> const & chann = std::vector<std::pair<int,int>>(),
+            std::string prefix = "psi"
+        ) : L_(L), S_(S), Pi_(Pi),
+            ni_(ni), li_(li), mi_(mi),
+            E_(E), ang_(ang), chann_(chann), prefix_(prefix)
+        {}
         
         /// All blocks flag.
         static const int All = -1;
@@ -565,6 +575,8 @@ class SolutionIO
             success = (success and hdf.write("E",  &E_,  1));
             success = (success and hdf.write("l1",  &ang_[ill].first,  1));
             success = (success and hdf.write("l2",  &ang_[ill].second, 1));
+            success = (success and hdf.write("Nchan1", &chann_[ill].first, 1));
+            success = (success and hdf.write("Nchan2", &chann_[ill].second, 1));
             success = (success and hdf.write("array", solution.data(), solution.size()));
             return success;
         }
@@ -573,7 +585,7 @@ class SolutionIO
         
         int L_, S_, Pi_, ni_, li_, mi_;
         Real E_;
-        std::vector<std::pair<int,int>> ang_;
+        std::vector<std::pair<int,int>> ang_, chann_;
         std::string prefix_;
 };
 

@@ -727,7 +727,7 @@ SymBandMatrix<Complex> RadialIntegrals::calc_R_tr_dia_block (unsigned int lambda
     int yminspline = bspline_y_.iR1(), ymaxspline = bspline_y_.iR2() - order - 1;
     
     // B-spline offsets of the real panel basis with respect to the global real basis
-    int xoffset, yoffset;
+    int xoffset = 0, yoffset = 0;
     if (rad_)
     {
         xoffset = rad_->bspline_x_.knot(bspline_x_.R1());
@@ -743,27 +743,27 @@ SymBandMatrix<Complex> RadialIntegrals::calc_R_tr_dia_block (unsigned int lambda
     {
         // evaluate 2-D integral of Bi(1)Bj(2)V(1,2)Bk(1)Bl(2)
         
-//         if (not rad_)
-//         {
+        if (not rad_)
+        {
             // Compute integral in r1 <-> r2 symmetrical basis.
             block_ik(j,l) = computeR(lambda, i, j, k, l);
-//         }
-//         else
-//         {
+        }
+        else
+        {
             // We are calculating R-integral in panel basis, which is generally not r1 <-> r2 symmetric.
             // The function 'computeR' requires symmetrical basis for purely real B-splines due to the indexing
-            // scheme used for the individual contributions. On the contrary, when some of the B-spline is complex,
+            // scheme used for the individual contributions. On the contrary, when some of the B-splines is complex,
             // the function 'computeR' does not make such assumption.
             
-//             if (xminspline <= std::min(i,k) and std::max(i,k) <= xmaxspline and yminspline <= std::min(j,l) and std::max(j,l) <= ymaxspline)
-//             {
-//                 block_ik(j,l) = rad_->R_tr_dia(lambda)(i + xoffset, j + yoffset, k + xoffset, l + yoffset);
-//             }
-//             else
-//             {
-//                 block_ik(j,l) = computeR(lambda, i, j, k, l);
-//             }
-//         }
+            if (xminspline <= std::min(i,k) and std::max(i,k) <= xmaxspline and yminspline <= std::min(j,l) and std::max(j,l) <= ymaxspline)
+            {
+                block_ik(j,l) = rad_->R_tr_dia(lambda)(i + xoffset, j + yoffset, k + xoffset, l + yoffset);
+            }
+            else
+            {
+                block_ik(j,l) = computeR(lambda, i, j, k, l);
+            }
+        }
     }
     
     return block_ik;

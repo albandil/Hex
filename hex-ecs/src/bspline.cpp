@@ -207,7 +207,16 @@ cArray Bspline::zip (const cArrayView coeff, const rArrayView grid) const
     return f;
 }
 
-cArray Bspline::zip (Bspline const & bx, Bspline const & by, const cArrayView coeff, const rArrayView xgrid, const rArrayView ygrid)
+cArray Bspline::zip
+(
+    Bspline const & bx,
+    Bspline const & by,
+    const cArrayView coeff,
+    const rArrayView xgrid,
+    const rArrayView ygrid,
+    Complex (Bspline::* evalXBSpline) (int,int,int,Complex) const,
+    Complex (Bspline::* evalYBSpline) (int,int,int,Complex) const
+)
 {
     // evaluated function
     cArray f (xgrid.size() * ygrid.size());
@@ -248,7 +257,7 @@ cArray Bspline::zip (Bspline const & bx, Bspline const & by, const cArrayView co
                     HexException("Some evaluation points are outside of grid.");
             
             // evaluate this spline at the current evaluation point
-            evBx[ispline][ix - xleft] = bx.bspline(ispline, iknot, bx.order_, *ix);
+            evBx[ispline][ix - xleft] = (bx.*evalXBSpline)(ispline, iknot, bx.order_, *ix);
         }
     }
     
@@ -281,7 +290,7 @@ cArray Bspline::zip (Bspline const & bx, Bspline const & by, const cArrayView co
                     HexException("Some evaluation points are outside of grid.");
             
             // evaluate this spline at the current evaluation point
-            evBy[ispline][iy - yleft] = by.bspline(ispline, iknot, by.order_, *iy);
+            evBy[ispline][iy - yleft] = (by.*evalYBSpline)(ispline, iknot, by.order_, *iy);
         }
     }
     

@@ -42,6 +42,7 @@
 #include "hex-cmdline.h"
 #include "hex-csrmatrix.h"
 #include "hex-matrix.h"
+#include "hex-vtkfile.h"
 
 // --------------------------------------------------------------------------------- //
 
@@ -1060,7 +1061,7 @@ void zip_solution
         HexException("Cannot load file %s.", cmd.zipdata.file.c_str());
     
     // get solution information
-    int l1, l2, Nchan1, Nchan2; Real E;
+    int l1, l2, Nchan1 = 0, Nchan2 = 0; Real E;
     if (not hdf.read("l1", &l1, 1) or
         not hdf.read("l2", &l2, 1) or
         not hdf.read("E", &E, 1) or
@@ -1068,9 +1069,8 @@ void zip_solution
         HexException("This is not a valid solution file.");
     
     // get number of asymptotic channels
-    int max_n = (E >= 0 ? 0 : 1.0_r / std::sqrt(-E));
-    Nchan1 = (inp.Zp < 0 and max_n >= l2 + 1 ? max_n - l2 : 0);
-    Nchan2 = (               max_n >= l1 + 1 ? max_n - l1 : 0);
+    hdf.read("Nchan1", &Nchan1, 1);
+    hdf.read("Nchan2", &Nchan2, 1);
     
     // prepare radial integrals structure
     RadialIntegrals r (bspline_inner, bspline_full, 0);
@@ -1126,19 +1126,50 @@ void zip_solution
         }
     }
     
-    // write full solution to file
-    std::ofstream out ((cmd.zipdata.file + "-full.vtk").c_str());
-    writeVTK_points
+    // evaluate the solution
+    cArray evPsi = Bspline::zip
     (
-        out,                                // output file stream
-        Bspline::zip
-        (
-            bspline_full, bspline_full,     // B-spline bases (for x and y)
-            full_solution,                  // function expansion in those two bases
-            grid_x, grid_y                  // evaluation grids
-        ),
-        grid_x, grid_y, rArray({0.})        // x,y,z
+        bspline_full,
+        bspline_full,
+        full_solution,
+        grid_x,
+        grid_y
     );
+    
+    // evaluate the solution differentiated with respect to the first coordinate
+    cArray evDxPsi = Bspline::zip
+    (
+        bspline_full,
+        bspline_full,
+        full_solution,
+        grid_x,
+        grid_y,
+        &Bspline::dspline,
+        &Bspline::bspline
+    );
+    
+    // evaluate the solution differentiated with respect to the second coordinate
+    cArray evDyPsi = Bspline::zip
+    (
+        bspline_full,
+        bspline_full,
+        full_solution,
+        grid_x,
+        grid_y,
+        &Bspline::bspline,
+        &Bspline::dspline
+    );
+    
+    // write full solution to file
+    VTKRectGridFile vtk;
+    vtk.setGridX(grid_x);
+    vtk.setGridY(grid_y);
+    vtk.setGridZ(rArray{0.});
+    vtk.appendScalarAttribute("RePsi", realpart(evPsi));
+    vtk.appendScalarAttribute("ImPsi", imagpart(evPsi));
+    vtk.appendScalarAttribute("probDensity", sqrabs(evPsi));
+    vtk.appendVector3DAttribute("probFlux", imagpart(evPsi.conj() * evDxPsi), imagpart(evPsi.conj() * evDyPsi), rArray(evPsi.size(), 0.0_r));
+    vtk.write(cmd.zipdata.file + "-full.vtk");
     
     // expand the channel functions
     for (int n = 0; n < Nchan1; n++)

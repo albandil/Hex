@@ -220,6 +220,9 @@ class DOMPreconditioner : public NoPreconditioner
         
         // interpolate solution from sub-domains
         void collectSolution (cBlockArray & z, std::vector<PanelSolution> & p) const;
+        
+        // gap of real knots between the panel seam and the complex absorption layer
+        int gap_;
 };
 
 // --------------------------------------------------------------------------------- //

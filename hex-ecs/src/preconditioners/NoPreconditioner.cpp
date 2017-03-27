@@ -1282,12 +1282,17 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
         // for all angular blocks in a block row; only executed by one of the processes in a process group
         for (unsigned illp = 0; illp < Nang; illp++) if (par_->igroupproc() == (int)illp % par_->groupsize())
         {
+            // skip unwanted angular blocks
+            if (ill == illp and not (tri & MatrixSelection::BlockDiagonal))    continue;
+            if (ill <  illp and not (tri & MatrixSelection::BlockStrictUpper)) continue;
+            if (ill >  illp and not (tri & MatrixSelection::BlockStrictLower)) continue;
+            
             // determine which part of the block should be considered non-zero for a particlar selection
             MatrixSelection::Selection selection = tri;
             if (ill < illp) selection = (tri & MatrixSelection::StrictUpper ? MatrixSelection::Both : MatrixSelection::None);
             if (ill > illp) selection = (tri & MatrixSelection::StrictLower ? MatrixSelection::Both : MatrixSelection::None);
             
-            // near-origin part multiplication
+            // inner region part multiplication
             if (cmd_->lightweight_full)
             {
                 // only one-electron contribution; the rest is below
@@ -1396,6 +1401,11 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
             for (unsigned illp = 0; illp < Nang; illp++) if (par_->igroupproc() == (int)illp % par_->groupsize())
             if (Real f = ang_->f(ill, illp, lambda))
             {
+                // skip unwanted angular blocks
+                if (ill == illp and not (tri & MatrixSelection::BlockDiagonal))    continue;
+                if (ill <  illp and not (tri & MatrixSelection::BlockStrictUpper)) continue;
+                if (ill >  illp and not (tri & MatrixSelection::BlockStrictLower)) continue;
+                
                 // diagonal blocks
                 if (d == 0)
                 {

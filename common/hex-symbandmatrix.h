@@ -60,14 +60,21 @@ class MatrixSelection
         
         typedef int Selection;
         
-        static const Selection None        = 0; // = 0b000
-        static const Selection StrictLower = 1; // = 0b001
-        static const Selection StrictUpper = 2; // = 0b010
-        static const Selection StrictBoth  = 3; // = 0b011 = StrictLower | StrictUpper
-        static const Selection Diagonal    = 4; // = 0b100
-        static const Selection Lower       = 5; // = 0b101 = StrictLower | Diagonal
-        static const Selection Upper       = 6; // = 0b110 = StrictUpper | Diagonal
-        static const Selection Both        = 7; // = 0b111 = StrictLower | StrictUpper | Diagonal
+        static const Selection None        = 0; // = 0b0000
+        static const Selection StrictLower = 1; // = 0b0001
+        static const Selection StrictUpper = 2; // = 0b0010
+        static const Selection StrictBoth  = 3; // = 0b0011 = StrictLower | StrictUpper
+        static const Selection Diagonal    = 4; // = 0b0100
+        static const Selection Lower       = 5; // = 0b0101 = StrictLower | Diagonal
+        static const Selection Upper       = 6; // = 0b0110 = StrictUpper | Diagonal
+        static const Selection Both        = 7; // = 0b0111 = StrictLower | StrictUpper | Diagonal
+        static const Selection BlockStrictLower  = StrictLower << 3; // = 0b0001000
+        static const Selection BlockStrictUpper  = StrictLower << 3; // = 0b0010000
+        static const Selection BlockStrictBoth   = StrictBoth  << 3; // = 0b0011000
+        static const Selection BlockDiagonal     = Diagonal    << 3; // = 0b0100000
+        static const Selection BlockLower        = Lower       << 3; // = 0b0101000
+        static const Selection BlockUpper        = Upper       << 3; // = 0b0110000
+        static const Selection BlockBoth         = Both        << 3; // = 0b0111000
 };
 
 // --------------------------------------------------------------------------------- //

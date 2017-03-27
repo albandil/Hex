@@ -138,7 +138,7 @@ BASECXX = $(shell basename $(CXX))
 
 # common source files
 COMMON_FILES   = hex-arrays hex-blas hex-hdffile hex-hydrogen \
-                 hex-matrix hex-misc hex-special hex-version
+                 hex-matrix hex-misc hex-special hex-version hex-vtkfile
 COMMON_SOURCES = $(patsubst %,../common/%.cpp,$(COMMON_FILES))
 COMMON_OBJECTS = $(patsubst %,obj/$(BASECXX)/common/%.o,$(COMMON_FILES))
 COMMON_DEPS    = $(patsubst %,obj/$(BASECXX)/common/%.dep,$(COMMON_FILES))

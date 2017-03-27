@@ -133,6 +133,9 @@ class Solver
         
         /// Asymptotic bound channels for every angular momentum state (l₁,l₂) and r₁- or r₂-asymptotics.
         std::vector<std::pair<iArray,iArray>> bstates_;
+        
+        /// Number of channels for individual angular states.
+        std::vector<std::pair<int,int>> channels_;
 };
 
 // --------------------------------------------------------------------------------- //

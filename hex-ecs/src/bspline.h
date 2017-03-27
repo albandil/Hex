@@ -198,7 +198,25 @@ class Bspline
          * these first \c Nspline**2 coefficients that are used in evaluation.
          */
         cArray zip (const cArrayView coeff, const rArrayView xgrid, const rArrayView ygrid) const;
-        static cArray zip (Bspline const & bx, Bspline const & by, const cArrayView coeff, const rArrayView xgrid, const rArrayView ygrid);
+        
+        /**
+         * @nrief Zip 2D expansion.
+         * 
+         * Evaluate 2D function given as a B-spline expansion over a carthesian product
+         * of two 1D grids. The user may supply the B-spline evaluation functions for the
+         * individual axes, thus allowing evaluation of partial derivatives besides the
+         * plain B-spline expansion.
+         */
+        static cArray zip
+        (
+            Bspline const & bx,
+            Bspline const & by,
+            const cArrayView coeff,
+            const rArrayView xgrid,
+            const rArrayView ygrid,
+            Complex (Bspline::* evalXBSpline) (int,int,int,Complex) const = &Bspline::bspline,
+            Complex (Bspline::* evalYBSpline) (int,int,int,Complex) const = &Bspline::bspline
+        );
         
         /**
          * @brief Get knot index for coordinate.

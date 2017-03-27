@@ -128,6 +128,7 @@ void Solver::solve ()
                   << " CG iterations per energy)" << std::endl;
         
         // get asymptotical bound states for each of the angular momentum pairs
+        channels_.resize(ang_.states().size());
         bstates_.clear();
         for (unsigned ill = 0; ill < ang_.states().size(); ill++)
         {
@@ -135,15 +136,18 @@ void Solver::solve ()
             int l2 = ang_.states()[ill].second;
             
             // get number of bound states for each particle at this energy
-            std::pair<int,int> bstates = prec_->bstates(std::max(inp_.Etot[ie], inp_.channel_max_E), l1, l2);
+            channels_[ill] = prec_->bstates(std::max(inp_.Etot[ie], inp_.channel_max_E), l1, l2);
+            
+            // the number of scattering channels
+            std::swap(channels_[ill].first, channels_[ill].second);
             
             // store all principal quantum numbers for given l1 or l2
             bstates_.push_back
             (
                 std::make_pair
                 (
-                    linspace<int>(l1 + 1, l1 + bstates.first,  bstates.first),
-                    linspace<int>(l2 + 1, l2 + bstates.second, bstates.second)
+                    linspace<int>(l1 + 1, l1 + channels_[ill].second, channels_[ill].second),
+                    linspace<int>(l2 + 1, l2 + channels_[ill].first,  channels_[ill].first)
                 )
             );
         }
@@ -197,7 +201,7 @@ void Solver::solve ()
             }
             
             // check if there is some precomputed solution on the disk
-            SolutionIO reader (inp_.L, Spin, inp_.Pi, ni, li, mi, inp_.Etot[ie], ang_.states());
+            SolutionIO reader (inp_.L, Spin, inp_.Pi, ni, li, mi, inp_.Etot[ie], ang_.states(), channels_);
             std::size_t size = 0;
             reader.check(SolutionIO::All, size);
             
@@ -313,7 +317,7 @@ void Solver::solve ()
             computations_done++;
             
             // save solution to disk (if valid)
-            SolutionIO reader (ang_.L(), ang_.S(), ang_.Pi(), ni_, li_, mi_, 2 * E_, ang_.states());
+            SolutionIO reader (ang_.L(), ang_.S(), ang_.Pi(), ni_, li_, mi_, 2 * E_, ang_.states(), channels_);
             if (std::isfinite(compute_norm(psi)))
             {
                 for (unsigned ill = 0; ill < ang_.states().size(); ill++)
@@ -513,7 +517,7 @@ void Solver::process_solution_ (unsigned iteration, BlockArray<Complex> const & 
 {
     if (cmd_.write_intermediate_solutions)
     {
-        SolutionIO writer (ang_.L(), ang_.S(), ang_.Pi(), ni_, li_, mi_, 2 * E_, ang_.states(), format("tmp-%d", iteration));
+        SolutionIO writer (ang_.L(), ang_.S(), ang_.Pi(), ni_, li_, mi_, 2 * E_, ang_.states(), channels_, format("tmp-%d", iteration));
         writer.save(x);
     }
 }
