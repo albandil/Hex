@@ -196,13 +196,7 @@ class DOMPreconditioner : public NoPreconditioner
         ) const;
         
         // construct the surrogate source for panel's boundary
-        void surrogateSource
-        (
-            int cycle, int cycles,
-            PanelSolution * panel,
-            int direction,
-            PanelSolution * neighbour
-        ) const;
+        void surrogateSource (PanelSolution * panel, std::array<PanelSolution*,nNbrs> & leftnbr) const;
         
         // get knot sub-sequences
         void knotSubsequence

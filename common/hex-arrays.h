@@ -1744,7 +1744,15 @@ template <class T> void write_array
 (
     const ArrayView<T> array,
     std::string filename
-);
+)
+{
+    std::ofstream fout(filename);
+    for (std::size_t i = 0; i < array.size(); i++)
+        fout << array[i] << "\n";
+    fout.close();
+}
+
+template<> void write_array (const ArrayView<Complex> array, std::string filename);
 
 /**
  * Write array to file. Array will be written as a two columns into

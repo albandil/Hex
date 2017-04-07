@@ -221,6 +221,9 @@ public:
      */
     void add (IdxT i, IdxT j, DataT v)
     {
+        assert(0 <= i and i < m_);
+        assert(0 <= j and j < n_);
+        
         i_.push_back(i);
         j_.push_back(j);
         x_.push_back(v);

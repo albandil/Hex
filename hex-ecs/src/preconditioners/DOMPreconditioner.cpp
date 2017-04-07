@@ -32,6 +32,8 @@
 #include "hex-csrmatrix.h"
 #include "hex-itersolve.h"
 
+#include <csignal>
+
 // --------------------------------------------------------------------------------- //
 
 #include "radial.h"
@@ -219,7 +221,7 @@ void DOMPreconditioner::solvePanel (int cycle, int cycles, int n, std::vector<Pa
     
     // get reference to the current panel and its neighbours
     PanelSolution * pCentre = &p[i * n + j];
-    PanelSolution * pNbr [nNbrs];
+    std::array<PanelSolution*,nNbrs> pNbr;
     pNbr[Left]  = (i     == 0 ? nullptr : &p[(i - 1) * n + j]);
     pNbr[Right] = (i + 1 == n ? nullptr : &p[(i + 1) * n + j]);
     pNbr[Down]  = (j     == 0 ? nullptr : &p[i * n + (j - 1)]);
@@ -229,8 +231,7 @@ void DOMPreconditioner::solvePanel (int cycle, int cycles, int n, std::vector<Pa
     int order = pCentre->xspline_inner.order();
     
     // construct the surrogate sources for all boundaries shared with other panels
-    for (int nbr = 0; nbr < nNbrs; nbr++) if (pNbr[nbr] != nullptr)
-        surrogateSource(cycle, cycles, pCentre, nbr, pNbr[nbr]);
+    surrogateSource(pCentre, pNbr);
     
     // create the preconditioner object
     PreconditionerBase * prec = PreconditionerBase::Choose
@@ -271,38 +272,42 @@ void DOMPreconditioner::solvePanel (int cycle, int cycles, int n, std::vector<Pa
     if (pNbr[Left] != nullptr)
     {
         int iR1 = pCentre->xspline_inner.iR1();
-        std::cout << "\tAdd surrogate source from LEFT" << std::endl;
+        
         for (unsigned ill = 0; ill < chi.size(); ill++)
         for (int i = iR1 - order; i <= iR1 + order; i++)
         for (int j = 0; j < Nyspline; j++)
-            chi[ill][i * Nyspline + j] += rad.S_x(iR1, i) * pCentre->ssrc[Left][ill][j];
+        for (int l = (j < order ? 0 : j - order); l <= j + order and l < Nyspline; l++)
+            chi[ill][i * Nyspline + j] += rad.S_x(i, iR1) * rad.S_y(j, l) * pCentre->ssrc[Left][ill][l];
     }
     if (pNbr[Right] != nullptr)
     {
         int iR2 = pCentre->xspline_inner.iR2();
-        std::cout << "\tAdd surrogate source from RIGHT" << std::endl;
+        
         for (unsigned ill = 0; ill < chi.size(); ill++)
         for (int i = iR2 - 2*order - 1; i < iR2; i++)
         for (int j = 0; j < Nyspline; j++)
-            chi[ill][i * Nyspline + j] += rad.S_x(iR2 - order - 1, i) * pCentre->ssrc[Right][ill][j];
+        for (int l = (j < order ? 0 : j - order); l <= j + order and l < Nyspline; l++)
+            chi[ill][i * Nyspline + j] += rad.S_x(i, iR2 - order - 1) * rad.S_y(j, l) * pCentre->ssrc[Right][ill][l];
     }
     if (pNbr[Down] != nullptr)
     {
         int iR1 = pCentre->yspline_inner.iR1();
-        std::cout << "\tAdd surrogate source from DOWN" << std::endl;
+        
         for (unsigned ill = 0; ill < chi.size(); ill++)
         for (int i = 0; i < Nxspline; i++)
         for (int j = iR1 - order; j <= iR1 + order; j++)
-            chi[ill][i * Nyspline + j] += rad.S_y(iR1, j) * pCentre->ssrc[Down][ill][i];
+        for (int k = (i < order ? 0 : i - order); k <= i + order and k < Nxspline; k++)
+            chi[ill][i * Nyspline + j] += rad.S_x(i, k) * rad.S_y(iR1, j) * pCentre->ssrc[Down][ill][k];
     }
     if (pNbr[Up] != nullptr)
     {
         int iR2 = pCentre->yspline_inner.iR2();
-        std::cout << "\tAdd surrogate source from UP" << std::endl;
+        
         for (unsigned ill = 0; ill < chi.size(); ill++)
         for (int i = 0; i < Nxspline; i++)
         for (int j = iR2 - 2*order - 1; j < iR2; j++)
-            chi[ill][i * Nyspline + j] += rad.S_y(iR2 - order - 1, j) * pCentre->ssrc[Up][ill][i];
+        for (int k = (i < order ? 0 : i - order); k <= i + order and k < Nxspline; k++)
+            chi[ill][i * Nyspline + j] += rad.S_x(i, k) * rad.S_y(iR2 - order - 1, j) * pCentre->ssrc[Up][ill][k];
     }
     
     // conjugate gradients callbacks
@@ -555,561 +560,518 @@ void DOMPreconditioner::solvePanel (int cycle, int cycles, int n, std::vector<Pa
     prec->finish();
 }
 
-void DOMPreconditioner::surrogateSource (int cycle, int cycles, PanelSolution * panel, int direction, PanelSolution * neighbour) const
+void DOMPreconditioner::surrogateSource
+(
+    PanelSolution * panel,
+    std::array<PanelSolution*,nNbrs> & pNbr
+) const
 {
-    //
-    // What needs to be yet taken care of here:
-    //
-    //  1. The angular states are not coupled by the multi-pole potential.
-    //     This may corrupt the accuracy.
-    //
-    //  2. The surrogate sources are calculated even in the complex parts of the grid of the other dimension.
-    //     These tails may contribute to other edges, which is not desirable.
-    //
+    std::cout << "\tConstruct surrogate source" << std::endl;
     
-    if (direction == Left)
+    // B-spline parameters
+    unsigned order = panel->xspline_inner.order();
+    Real ecstheta = panel->xspline_inner.ECStheta();
+    
+    // empty deleter used below to prevent deallocation of non-owned pointers
+    auto nodelete = [](Bspline*){};
+    
+    // B-spline bases for all four edges
+    std::array<std::shared_ptr<Bspline>,nNbrs> xspline, yspline;
+    if (pNbr[Left] != nullptr)
     {
-        std::cout << "\tConstruct surrogate source from LEFT" << std::endl;
+        rArray const & cknots1 = panel->xspline_inner.cknots1();
+        rArray const & rknots  = panel->xspline_inner.rknots ();
+        rArray const & cknots2 = panel->xspline_inner.cknots2();
         
-        // original B-spline basis
-        Bspline const & org_xspline = panel->xspline_inner;
-        
-        // short B-spline basis
-        Bspline xspline
+        /*xspline[Left].reset
         (
-            org_xspline.order(),
-            org_xspline.ECStheta(),
-            org_xspline.cknots1(),
-            org_xspline.rknots(),
-            org_xspline.cknots2()
-        );
-        Bspline const & yspline = panel->yspline_inner;
+            new Bspline
+            (
+                order,
+                ecstheta,
+                cknots1,
+                rknots.slice(0, 2*order + 3),
+                cknots2 - cknots2.front() + rknots.front(2*order + 2)
+            )
+        );*/
         
-        // basis sizes
-        int Nxspline = xspline.Nspline();
-        int Nyspline = yspline.Nspline();
+        xspline[Left].reset(&panel->xspline_inner, nodelete);
+        yspline[Left].reset(&panel->yspline_inner, nodelete);
+    }
+    if (pNbr[Right] != nullptr)
+    {
+        rArray const & cknots1 = panel->xspline_inner.cknots1();
+        rArray const & rknots  = panel->xspline_inner.rknots ();
+        rArray const & cknots2 = panel->xspline_inner.cknots2();
         
-        // other quantities
-        int order = xspline.order();
-        int iR1x = xspline.iR1();
-        Real R1xa = xspline.t(iR1x + order + 1).real();
+        /*xspline[Right].reset
+        (
+            new Bspline
+            (
+                order,
+                ecstheta,
+                cknots1 - cknots1.back() + rknots.back(2*order + 2),
+                rknots.slice(rknots.size() - 2*order - 3, rknots.size()),
+                cknots2
+            )
+        );*/
         
-        // calculate radial integrals
-        RadialIntegrals rint (xspline, yspline, ang_->maxlambda() + 1);
-        rint.verbose(false);
-        rint.setupOneElectronIntegrals(*par_, *cmd_);
-        rint.setupTwoElectronIntegrals(*par_, *cmd_);
-        //rint.subsetTwoElectronIntegrals(*par_, *cmd_, rad_inner());
+        xspline[Right].reset(&panel->xspline_inner, nodelete);
+        yspline[Right].reset(&panel->yspline_inner, nodelete);
+    }
+    if (pNbr[Down] != nullptr)
+    {
+        rArray const & cknots1 = panel->yspline_inner.cknots1();
+        rArray const & rknots  = panel->yspline_inner.rknots ();
+        rArray const & cknots2 = panel->yspline_inner.cknots2();
         
-        // for all angular states
-        for (unsigned ill = 0; ill < ang_->states().size(); ill++)
+        xspline[Down].reset(&panel->xspline_inner, nodelete);
+        yspline[Down].reset(&panel->yspline_inner, nodelete);
+        
+        /*yspline[Down].reset
+        (
+            new Bspline
+            (
+                order,
+                ecstheta,
+                cknots1,
+                rknots.slice(0, 2*order + 3),
+                cknots2 - cknots2.front() + rknots.front(2*order + 2)
+            )
+        );*/
+    }
+    if (pNbr[Up] != nullptr)
+    {
+        rArray const & cknots1 = panel->yspline_inner.cknots1();
+        rArray const & rknots  = panel->yspline_inner.rknots ();
+        rArray const & cknots2 = panel->yspline_inner.cknots2();
+        
+        xspline[Up].reset(&panel->xspline_inner, nodelete);
+        yspline[Up].reset(&panel->yspline_inner, nodelete);
+        
+        /*yspline[Up].reset
+        (
+            new Bspline
+            (
+                order,
+                ecstheta,
+                cknots1 - cknots1.back() + rknots.back(2*order + 2),
+                rknots.slice(rknots.size() - 2*order - 3, rknots.size()),
+                cknots2
+            )
+        );*/
+    }
+    
+    // calculate radial integrals
+    std::array<std::shared_ptr<RadialIntegrals>,nNbrs> rint;
+    for (int nbr = 0; nbr < nNbrs; nbr++) if (pNbr[nbr] != nullptr)
+    {
+        rint[nbr].reset(new RadialIntegrals(*xspline[nbr], *yspline[nbr], ang_->maxlambda() + 1));
+        rint[nbr]->verbose(false);
+        rint[nbr]->setupOneElectronIntegrals(*par_, *cmd_);
+        rint[nbr]->setupTwoElectronIntegrals(*par_, *cmd_);
+    }
+    
+    // B-spline basis sizes and other dimensions
+    std::array<std::size_t,nNbrs> Nxspline, Nyspline;
+    std::array<std::size_t,nNbrs> iR1x, iR2x, iR1y, iR2y;
+    for (int nbr = 0; nbr < nNbrs; nbr++) if (pNbr[nbr] != nullptr)
+    {
+        // number of B-splines in the basis
+        Nxspline[nbr] = xspline[nbr]->Nspline();
+        Nyspline[nbr] = yspline[nbr]->Nspline();
+        
+        // B-spline knots that bound the real grids
+        iR1x[nbr] = xspline[nbr]->iR1();
+        iR2x[nbr] = xspline[nbr]->iR2();
+        iR1y[nbr] = yspline[nbr]->iR1();
+        iR2y[nbr] = yspline[nbr]->iR2();
+    }
+    
+    // indices of the first and (one after) the last B-splines that contribute to the matching line
+    std::array<std::size_t,nNbrs> iBeg, iEnd, ssrcsize;
+    for (int nbr = 0; nbr < nNbrs; nbr++) if (pNbr[nbr] != nullptr)
+    {
+        // vertical edges
+        if (nbr == Left or nbr == Right)
         {
-            // angular momenta
-            int l1 = ang_->states()[ill].first;
-            int l2 = ang_->states()[ill].second;
-            
-            // construct matrix of the free equations
-            BlockSymBandMatrix<Complex> A =
-                kron(Complex(E_) * rint.S_x(), rint.S_y())
-                - kron(0.5_z * rint.D_x(), rint.S_y())
-                - kron(0.5_z * rint.S_x(), rint.D_y())
-                - kron(Complex(0.5 * l1 * (l1 + 1)) * rint.Mm2_x(), rint.S_y())
-                - kron(Complex(0.5 * l2 * (l2 + 1)) * rint.S_x(), rint.Mm2_y())
-                + kron(rint.Mm1_x(), rint.S_y())
-                + kron(rint.S_x(), rint.Mm1_y());
-            
-            for (int lambda = 0; lambda <= ang_->maxlambda(); lambda++)
-                A -= Complex(ang_->f(ill, ill, lambda)) * rint.R_tr_dia(lambda);
-            
-            // resize matrix for additional elements
-            CooMatrix<LU_int_t,Complex> A_coo = A.tocoo<LU_int_t>();
-            CooMatrix<LU_int_t,Complex> A_coo0 = A_coo;
-            A_coo.resize
-            (
-                A_coo.rows() + Nyspline,
-                A_coo.cols() + Nyspline
-            );
-            
-            // add coupling to surrogate source
-            for (int i = iR1x - order; i <= iR1x + order; i++)
-            for (int j = 0; j < Nyspline; j++)
-            {
-                A_coo.add
-                (
-                    i * Nyspline + j,
-                    Nxspline * Nyspline + j,
-                    -rint.S_x(i, iR1x)
-                );
-            }
-            
-            // add coupling to outgoing field
-            for (int j = 0; j < Nyspline; j++)
-            for (int k = iR1x + 1; k < iR1x + order + 1; k++)
-            {
-                A_coo.add
-                (
-                    Nxspline * Nyspline + j,
-                    k * Nyspline + j,
-                    xspline.bspline(k, iR1x + order + 1, order, R1xa)
-                );
-            }
-            
-            // set up the right-hand side
-            cArray rhs (Nxspline * Nyspline + Nyspline);
-            cArrayView (rhs, Nxspline * Nyspline, Nyspline) = neighbour->outf[Right][ill] - panel->outf[Left][ill];
-            
-#ifdef DOM_DEBUG
-            write_array
-            (
-                linspace(yspline.Rmin(), yspline.Rmax(), 10001),
-                yspline.zip
-                (
-                    neighbour->outf[Right][ill] - panel->outf[Left][ill],
-                    linspace(yspline.Rmin(), yspline.Rmax(), 10001)
-                ),
-                format("dom-%d-%d-%d-left-nbrf-%d.txt", cycle, panel->ixpanel, panel->iypanel, ill)
-            );
-#endif
-            
-            // factorize the block matrix and solve
-            cArray solution (rhs.size());
-            CsrMatrix<LU_int_t,Complex> A_csr = A_coo.tocsr();
-            std::unique_ptr<LUft> A_lu;
-            A_lu.reset(LUft::Choose("umfpack")); // TODO : Make (wisely) runtime selectable.
-            A_lu->factorize(A_csr);
-            A_lu->solve(rhs, solution, 1);
-            
-            // update the surrogate source
-            panel->ssrc[Left][ill] += cArrayView (solution, Nxspline * Nyspline, Nyspline);
-            
-#ifdef DOM_DEBUG
-            std::ofstream ofsp (format("dom-%d-%d-%d-left-ispsi-%d.vtk", cycle, panel->ixpanel, panel->iypanel, ill));
-            writeVTK_points
-            (
-                ofsp,
-                Bspline::zip
-                (
-                    xspline,
-                    yspline,
-                    solution.slice(0, Nxspline * Nyspline),
-                    linspace(xspline.Rmin(), xspline.Rmax(), 1001),
-                    linspace(yspline.Rmin(), yspline.Rmax(), 1001)
-                ),
-                linspace(xspline.Rmin(), xspline.Rmax(), 1001),
-                linspace(yspline.Rmin(), yspline.Rmax(), 1001),
-                rArray{ 0 }
-            );
-            ofsp.close();
-#endif
+            iBeg[nbr] = (pNbr[Down] ? iR1y[nbr] + 1 : 0);
+            iEnd[nbr] = (pNbr[Up]   ? iR2y[nbr] - order - 1 : iR2y[nbr] - 1);
+            ssrcsize[nbr] = iEnd[nbr] - iBeg[nbr];
+        }
+        
+        // horizontal edges
+        if (nbr == Down or nbr == Up)
+        {
+            iBeg[nbr] = (pNbr[Left]  ? iR1x[nbr] + 1 : 0);
+            iEnd[nbr] = (pNbr[Right] ? iR2x[nbr] - order - 1 : iR2x[nbr] - 1);
+            ssrcsize[nbr] = iEnd[nbr] - iBeg[nbr];
         }
     }
     
-    if (direction == Right)
+    // knot indices of the matching line
+    std::array<std::size_t,nNbrs> iMline;
+    iMline[Left]  = (pNbr[Left]  ? iR1x[Left]  + order + 1 : iR1x[Left] );
+    iMline[Right] = (pNbr[Right] ? iR2x[Right] - order - 1 : iR2x[Right]);
+    iMline[Down]  = (pNbr[Down]  ? iR1y[Down]  + order + 1 : iR1y[Down] );
+    iMline[Up]    = (pNbr[Up]    ? iR2y[Up]    - order - 1 : iR2y[Up]   );
+    
+    // coordinate positions of the matching line
+    std::array<Real,nNbrs> Mline;
+    Mline[Left]  = (pNbr[Left]  ? xspline[Left] ->t(iMline[Left]) .real() : 0);
+    Mline[Right] = (pNbr[Right] ? xspline[Right]->t(iMline[Right]).real() : 0);
+    Mline[Down]  = (pNbr[Down]  ? yspline[Down] ->t(iMline[Down]) .real() : 0);
+    Mline[Up]    = (pNbr[Up]    ? yspline[Up]   ->t(iMline[Up])   .real() : 0);
+    
+    // position of the surrogate source
+    std::array<std::size_t,nNbrs> iSrc;
+    iSrc[Left]  = (pNbr[Left]  ? iR1x[Left]              : 0);
+    iSrc[Right] = (pNbr[Right] ? iR2x[Right] - order - 1 : 0);
+    iSrc[Down]  = (pNbr[Down]  ? iR1y[Down]              : 0);
+    iSrc[Up]    = (pNbr[Up]    ? iR2y[Up]    - order - 1 : 0);
+    
+    // each of the edges needs also the overlap matrix with the support
+    // between the complex grid and the mathing line
+    std::array<SymBandMatrix<Complex>,nNbrs> Swgt;
+    if (pNbr[Left] != nullptr)
     {
-        std::cout << "\tConstruct surrogate source from RIGHT" << std::endl;
-        
-        // original B-spline basis
-        Bspline const & org_xspline = panel->xspline_inner;
-        
-        // short B-spline basis
-        Bspline xspline
+        Swgt[Left] = SymBandMatrix<Complex>(Nxspline[Left], order + 1).populate
         (
-            org_xspline.order(),
-            org_xspline.ECStheta(),
-            org_xspline.cknots1(),
-            org_xspline.rknots(),
-            org_xspline.cknots2()
+            [&](int m, int n)
+            {
+                return rint[Left]->computeM(rint[Left]->bspline_x(), rint[Left]->gaussleg_x(), 0, m, n, iR1x[Left], iMline[Left], false);
+            }
         );
-        Bspline const & yspline = panel->yspline_inner;
-        
-        // basis sizes
-        int Nxspline = xspline.Nspline();
-        int Nyspline = yspline.Nspline();
-        
-        // other quantities
-        int order = xspline.order();
-        int iR2x = xspline.iR2();
-        Real R2xa = xspline.t(iR2x - order - 1).real();
-        
-        // calculate radial integrals
-        RadialIntegrals rint (xspline, yspline, ang_->maxlambda() + 1);
-        rint.verbose(false);
-        rint.setupOneElectronIntegrals(*par_, *cmd_);
-        rint.setupTwoElectronIntegrals(*par_, *cmd_);
-        
-        // for all angular states
-        for (unsigned ill = 0; ill < ang_->states().size(); ill++)
-        {
-            // angular momenta
-            int l1 = ang_->states()[ill].first;
-            int l2 = ang_->states()[ill].second;
-            
-            // construct matrix of the free equations
-            BlockSymBandMatrix<Complex> A =
-                kron(Complex(E_) * rint.S_x(), rint.S_y())
-                - kron(0.5_z * rint.D_x(), rint.S_y())
-                - kron(0.5_z * rint.S_x(), rint.D_y())
-                - kron(Complex(0.5 * l1 * (l1 + 1)) * rint.Mm2_x(), rint.S_y())
-                - kron(Complex(0.5 * l2 * (l2 + 1)) * rint.S_x(), rint.Mm2_y())
-                + kron(rint.Mm1_x(), rint.S_y())
-                + kron(rint.S_x(), rint.Mm1_y());
-            
-            for (int lambda = 0; lambda <= ang_->maxlambda(); lambda++)
-                A -= Complex(ang_->f(ill, ill, lambda)) * rint.R_tr_dia(lambda);
-            
-            // resize matrix for additional elements
-            CooMatrix<LU_int_t,Complex> A_coo = A.tocoo<LU_int_t>();
-            CooMatrix<LU_int_t,Complex> A_coo0 = A_coo;
-            A_coo.resize
-            (
-                A_coo.rows() + Nyspline,
-                A_coo.cols() + Nyspline
-            );
-            
-            // add coupling to surrogate source
-            for (int i = iR2x - 2*order - 1; i < iR2x; i++)
-            for (int j = 0; j < Nyspline; j++)
+    }
+    if (pNbr[Right] != nullptr)
+    {
+        Swgt[Right] = SymBandMatrix<Complex>(Nxspline[Right], order + 1).populate
+        (
+            [&](int m, int n)
             {
-                A_coo.add
-                (
-                    i * Nyspline + j,
-                    Nxspline * Nyspline + j,
-                    -rint.S_x(i, iR2x - order - 1)
-                );
+                return rint[Right]->computeM(rint[Right]->bspline_x(), rint[Right]->gaussleg_x(), 0, m, n, iMline[Right], iR2x[Right], false);
             }
-            
-            // add coupling to outgoing field
-            for (int j = 0; j < Nyspline; j++)
-            for (int k = iR2x - 2*order - 1; k < iR2x - order - 1; k++)
+        );
+    }
+    if (pNbr[Down] != nullptr)
+    {
+        Swgt[Down] = SymBandMatrix<Complex>(Nyspline[Down], order + 1).populate
+        (
+            [&](int m, int n)
             {
-                A_coo.add
-                (
-                    Nxspline * Nyspline + j,
-                    k * Nyspline + j,
-                    xspline.bspline(k, iR2x - order - 1, order, R2xa)
-                );
+                return rint[Down]->computeM(rint[Down]->bspline_y(), rint[Down]->gaussleg_y(), 0, m, n, iR1y[Down], iMline[Down], false);
             }
-            
-            // set up the right-hand side
-            cArray rhs (Nxspline * Nyspline + Nyspline);
-            cArrayView (rhs, Nxspline * Nyspline, Nyspline) = neighbour->outf[Left][ill] - panel->outf[Right][ill];
-            
-#ifdef DOM_DEBUG
-            write_array
-            (
-                linspace(yspline.Rmin(), yspline.Rmax(), 10001),
-                yspline.zip
-                (
-                    neighbour->outf[Left][ill] - panel->outf[Right][ill],
-                    linspace(yspline.Rmin(), yspline.Rmax(), 10001)
-                ),
-                format("dom-%d-%d-%d-right-nbrf-%d.txt", cycle, panel->ixpanel, panel->iypanel, ill)
-            );
-#endif
-            
-            // factorize the block matrix and solve
-            cArray solution (rhs.size());
-            CsrMatrix<LU_int_t,Complex> A_csr = A_coo.tocsr();
-            std::unique_ptr<LUft> A_lu;
-            A_lu.reset(LUft::Choose("umfpack")); // TODO : Make (wisely) runtime selectable.
-            A_lu->factorize(A_csr);
-            A_lu->solve(rhs, solution, 1);
-            
-            // update the surrogate source
-            panel->ssrc[Right][ill] += cArrayView (solution, Nxspline * Nyspline, Nyspline);
-            
-#ifdef DOM_DEBUG
-            std::ofstream ofsp (format("dom-%d-%d-%d-right-ispsi-%d.vtk", cycle, panel->ixpanel, panel->iypanel, ill));
-            writeVTK_points
-            (
-                ofsp,
-                Bspline::zip
-                (
-                    xspline,
-                    yspline,
-                    solution.slice(0, Nxspline * Nyspline),
-                    linspace(xspline.Rmin(), xspline.Rmax(), 1001),
-                    linspace(yspline.Rmin(), yspline.Rmax(), 1001)
-                ),
-                linspace(xspline.Rmin(), xspline.Rmax(), 1001),
-                linspace(yspline.Rmin(), yspline.Rmax(), 1001),
-                rArray{ 0 }
-            );
-            ofsp.close();
-#endif
-        }
+        );
+    }
+    if (pNbr[Up] != nullptr)
+    {
+        Swgt[Up] = SymBandMatrix<Complex>(Nyspline[Up], order + 1).populate
+        (
+            [&](int m, int n)
+            {
+                return rint[Up]->computeM(rint[Up]->bspline_y(), rint[Up]->gaussleg_y(), 0, m, n, iMline[Up], iR2y[Up], false);
+            }
+        );
     }
     
-    if (direction == Down)
+    // for all angular states
+    for (unsigned ill = 0; ill < ang_->states().size(); ill++)
     {
-        std::cout << "\tConstruct surrogate source from DOWN" << std::endl;
+        // angular momenta of the two electrons
+        int l1 = ang_->states()[ill].first;
+        int l2 = ang_->states()[ill].second;
         
-        // original B-spline basis
-        Bspline const & org_yspline = panel->yspline_inner;
+        //
+        // Construct matrices of the free equations for all four grids
+        //
         
-        // short B-spline basis
-        Bspline yspline
-        (
-            org_yspline.order(),
-            org_yspline.ECStheta(),
-            org_yspline.cknots1(),
-            org_yspline.rknots(),
-            org_yspline.cknots2()
-        );
-        Bspline const & xspline = panel->xspline_inner;
-        
-        // basis sizes
-        int Nxspline = xspline.Nspline();
-        int Nyspline = yspline.Nspline();
-        
-        // other quantities
-        int order = yspline.order();
-        int iR1y = yspline.iR1();
-        Real R1ya = yspline.t(iR1y + order + 1).real();
-        
-        // calculate radial integrals
-        RadialIntegrals rint (xspline, yspline, ang_->maxlambda() + 1);
-        rint.verbose(false);
-        rint.setupOneElectronIntegrals(*par_, *cmd_);
-        rint.setupTwoElectronIntegrals(*par_, *cmd_);
-        
-        // for all angular states
-        for (unsigned ill = 0; ill < ang_->states().size(); ill++)
-        {
-            // angular momenta
-            int l1 = ang_->states()[ill].first;
-            int l2 = ang_->states()[ill].second;
+            std::array<BlockSymBandMatrix<Complex>,nNbrs> A;
             
-            // construct matrix of the free equations
-            BlockSymBandMatrix<Complex> A =
-                kron(Complex(E_) * rint.S_x(), rint.S_y())
-                - kron(0.5_z * rint.D_x(), rint.S_y())
-                - kron(0.5_z * rint.S_x(), rint.D_y())
-                - kron(Complex(0.5 * l1 * (l1 + 1)) * rint.Mm2_x(), rint.S_y())
-                - kron(Complex(0.5 * l2 * (l2 + 1)) * rint.S_x(), rint.Mm2_y())
-                + kron(rint.Mm1_x(), rint.S_y())
-                + kron(rint.S_x(), rint.Mm1_y());
-            
-            for (int lambda = 0; lambda <= ang_->maxlambda(); lambda++)
-                A -= Complex(ang_->f(ill, ill, lambda)) * rint.R_tr_dia(lambda);
-            
-            // resize matrix for additional elements
-            CooMatrix<LU_int_t,Complex> A_coo = A.tocoo<LU_int_t>();
-            CooMatrix<LU_int_t,Complex> A_coo0 = A_coo;
-            A_coo.resize
-            (
-                A_coo.rows() + Nxspline,
-                A_coo.cols() + Nxspline
-            );
-            
-            // add coupling to surrogate source
-            for (int i = 0; i < Nxspline; i++)
-            for (int j = iR1y - order; j < iR1y + order + 1; j++)
+            for (int nbr = 0; nbr < nNbrs; nbr++) if (pNbr[nbr] != nullptr)
             {
-                A_coo.add
-                (
-                    i * Nyspline + j,
-                    Nxspline * Nyspline + i,
-                    -rint.S_y(j, iR1y)
-                );
+                A[nbr] = kron(Complex(E_) * rint[nbr]->S_x(), rint[nbr]->S_y())
+                    - kron(0.5_z * rint[nbr]->D_x(), rint[nbr]->S_y())
+                    - kron(0.5_z * rint[nbr]->S_x(), rint[nbr]->D_y())
+                    - kron(Complex(0.5 * l1 * (l1 + 1)) * rint[nbr]->Mm2_x(), rint[nbr]->S_y())
+                    - kron(Complex(0.5 * l2 * (l2 + 1)) * rint[nbr]->S_x(), rint[nbr]->Mm2_y())
+                    + kron(rint[nbr]->Mm1_x(), rint[nbr]->S_y())
+                    + kron(rint[nbr]->S_x(), rint[nbr]->Mm1_y());
+            
+                for (int lambda = 0; lambda <= ang_->maxlambda(); lambda++)
+                    A[nbr] -= Complex(ang_->f(ill, ill, lambda)) * rint[nbr]->R_tr_dia(lambda);
+            }
+        
+        //
+        // Own surrogate source coupling matrices (-C)
+        //
+        
+            // surrogate coupling blocks, -C are diagonal blocks, -X offdiagonal blocks
+            std::array<std::array<CooMatrix<LU_int_t,Complex>,nNbrs>,nNbrs> X;
+            
+            // for all edges
+            for (int nbr = 0; nbr < nNbrs; nbr++) if (pNbr[nbr] != nullptr)
+            {
+                // resize the matrix according to the grid
+                X[nbr][nbr].resize(Nxspline[nbr] * Nyspline[nbr], ssrcsize[nbr]);
+                
+                // vertical matching line
+                if (nbr == Left or nbr == Right)
+                {
+                    // for all B-spline elements of the surrogate source
+                    for (std::size_t i = iSrc[nbr]; i <= iSrc[nbr]; i++) // 1 B-spline wide
+                    for (std::size_t j = iBeg[nbr]; j < iEnd[nbr]; j++)
+                    {
+                        // for all solution B-spline that overlap this source B-spline
+                        for (std::size_t a = (i < order ? 0 : i - order); a <= i + order and a < Nxspline[nbr]; a++)
+                        for (std::size_t b = (j < order ? 0 : j - order); b <= j + order and b < Nyspline[nbr]; b++)
+                            X[nbr][nbr].add(a * Nyspline[nbr] + b, j - iBeg[nbr], -rint[nbr]->S_x(a,i) * rint[nbr]->S_y(b,j));
+                    }
+                }
+                
+                // horizontal matching line
+                if (nbr == Down or nbr == Up)
+                {
+                    // for all B-spline elements of the surrogate source
+                    for (std::size_t i = iBeg[nbr]; i < iEnd[nbr]; i++)
+                    for (std::size_t j = iSrc[nbr]; j <= iSrc[nbr]; j++) // 1 B-spline wide
+                    {
+                        // for all solution B-spline that overlap this source B-spline
+                        for (std::size_t a = (i < order ? 0 : i - order); a <= i + order and a < Nxspline[nbr]; a++)
+                        for (std::size_t b = (j < order ? 0 : j - order); b <= j + order and b < Nyspline[nbr]; b++)
+                            X[nbr][nbr].add(a * Nyspline[nbr] + b, i - iBeg[nbr], -rint[nbr]->S_x(a,i) * rint[nbr]->S_y(b,j));
+                    }
+                }
+            }
+        
+        //
+        // Neighbour surrogate source coupling matrices (-X)
+        //
+        
+            // for all edges and their neighbours
+            for (int nbr = 0; nbr < nNbrs; nbr++) if (pNbr[nbr] != nullptr)
+            for (int mbr = 0; mbr < nNbrs; mbr++) if (pNbr[mbr] != nullptr)
+            {
+                // coupling to self already done in matrix -C
+                if (nbr == mbr)
+                    continue;
+                
+                // coupling to opposite edge is null
+                if (nbr == rev(mbr))
+                    continue;
+                
+                // resize the matrix according to the grid
+                X[nbr][mbr].resize(Nxspline[nbr] * Nyspline[nbr], ssrcsize[mbr]);
+                
+                // vertical matching line
+                if (nbr == Left or nbr == Right)
+                {
+                    // for all relevant B-splines of the neighbour surrogate source
+                    for (std::size_t k = iMline[nbr] - order; k < iMline[nbr]; k++)
+                    for (std::size_t l = iSrc[mbr]; l <= iSrc[mbr]; l++) // 1 B-spline wide
+                    {
+                        // for all solution B-splines that overlap this source B-spline
+                        for (std::size_t i = (k < order ? 0 : k - order); i <= k + order and i < Nxspline[nbr]; i++)
+                        for (std::size_t j = (l < order ? 0 : l - order); j <= l + order and j < Nyspline[nbr]; j++)
+                            X[nbr][mbr].add(i * Nyspline[nbr] + j, k - iBeg[mbr], -Swgt[nbr](i,k) * rint[nbr]->S_y(j,l));
+                    }
+                }
+                
+                // horizontal matching line
+                if (nbr == Down or nbr == Up)
+                {
+                    // for all relevant B-splines of the neighbour surrogate source
+                    for (std::size_t k = iSrc[mbr]; k <= iSrc[mbr]; k++) // 1 B-spline wide
+                    for (std::size_t l = iMline[nbr] - order; l < iMline[nbr]; l++)
+                    {
+                        // for all solution B-splines that overlap this source B-spline
+                        for (std::size_t i = (k < order ? 0 : k - order); i <= k + order and i < Nxspline[nbr]; i++)
+                        for (std::size_t j = (l < order ? 0 : l - order); j <= l + order and j < Nyspline[nbr]; j++)
+                            X[nbr][mbr].add(i * Nyspline[nbr] + j, l - iBeg[mbr], -rint[nbr]->S_x(i,k) * Swgt[nbr](j,l));
+                    }
+                }
+            }
+        
+        //
+        // Boundary field coupling matrices (D)
+        //
+        
+            std::array<CooMatrix<LU_int_t,Complex>,nNbrs> D;
+            
+            for (int nbr = 0; nbr < nNbrs; nbr++) if (pNbr[nbr] != nullptr)
+            {
+                D[nbr].resize(ssrcsize[nbr], Nxspline[nbr] * Nyspline[nbr]);
+                
+                // vertical matching line
+                if (nbr == Left or nbr == Right)
+                {
+                    for (std::size_t j = iBeg[nbr]; j < iEnd[nbr]; j++)
+                    for (std::size_t k = iMline[nbr] - order; k < iMline[nbr]; k++)
+                        D[nbr].add(j - iBeg[nbr], k * Nyspline[nbr] + j, xspline[nbr]->bspline(k, iMline[nbr], order, Mline[nbr]));
+                }
+                
+                // horizontal matching line
+                if (nbr == Down or nbr == Up)
+                {
+                    for (std::size_t i = iBeg[nbr]; i < iEnd[nbr]; i++)
+                    for (std::size_t l = iMline[nbr] - order; l < iMline[nbr]; l++)
+                        D[nbr].add(i - iBeg[nbr], i * Nyspline[nbr] + l, yspline[nbr]->bspline(l, iMline[nbr], order, Mline[nbr]));
+                }
+            }
+        
+        //
+        // Merge the blocks
+        //
+        
+            NumberArray<LU_int_t> I, J; cArray V;
+            std::size_t A_rows = 0, A_cols = 0, D_rows = 0, D_cols = 0, C_rows = 0, C_cols = 0;
+            
+            for (int nbr = 0; nbr < nNbrs; nbr++) if (pNbr[nbr] != nullptr)
+            {
+                // append elements of A
+                CooMatrix<LU_int_t,Complex> A_coo = A[nbr].tocoo<LU_int_t>();
+                I.reserve(I.size() + A_coo.i().size());
+                J.reserve(J.size() + A_coo.j().size());
+                V.reserve(V.size() + A_coo.v().size());
+                for (std::size_t i = 0; i < A_coo.i().size(); i++)
+                {
+                    I.push_back(A_coo.i()[i] + A_rows);
+                    J.push_back(A_coo.j()[i] + A_cols);
+                    V.push_back(A_coo.v()[i]);
+                }
+                
+                // update matrix size
+                A_rows += Nxspline[nbr] * Nyspline[nbr]; D_rows = A_rows;
+                A_cols += Nxspline[nbr] * Nyspline[nbr]; C_cols = A_cols;
             }
             
-            // add coupling to outgoing field
-            for (int i = 0; i < Nxspline; i++)
-            for (int l = iR1y + 1; l < iR1y + order + 1; l++)
+            for (int nbr = 0; nbr < nNbrs; nbr++) if (pNbr[nbr] != nullptr)
             {
-                A_coo.add
-                (
-                    Nxspline * Nyspline + i,
-                    i * Nyspline + l,
-                    yspline.bspline(l, iR1y + order + 1, order, R1ya)
-                );
+                // reset block column
+                C_cols = A_cols;
+                
+                // for all C and X blocks in this blocks row
+                for (int mbr = 0; mbr < nNbrs; mbr++) if (pNbr[mbr] != nullptr)
+                {
+                    // append elements of -C and -X, if available
+                    if (nbr == mbr) /// DEBUG
+                    //if (nbr != rev(mbr))
+                    {
+                        I.reserve(I.size() + X[nbr][mbr].i().size());
+                        J.reserve(J.size() + X[nbr][mbr].j().size());
+                        V.reserve(V.size() + X[nbr][mbr].v().size());
+                        for (std::size_t i = 0; i < X[nbr][mbr].i().size(); i++)
+                        {
+                            I.push_back(X[nbr][mbr].i()[i] + C_rows);
+                            J.push_back(X[nbr][mbr].j()[i] + C_cols);
+                            V.push_back(X[nbr][mbr].v()[i]);
+                        }
+                    }
+                    
+                    // move to next block column
+                    C_cols += ssrcsize[mbr];
+                }
+                
+                // move to next block row
+                C_rows += Nxspline[nbr] * Nyspline[nbr];
             }
             
-            // set up the right-hand side
-            cArray rhs (Nxspline * Nyspline + Nxspline);
-            cArrayView (rhs, Nxspline * Nyspline, Nxspline) = neighbour->outf[Up][ill] - panel->outf[Down][ill];
+            for (int nbr = 0; nbr < nNbrs; nbr++) if (pNbr[nbr] != nullptr)
+            {
+                // append elements of D
+                I.reserve(I.size() + D[nbr].i().size());
+                J.reserve(J.size() + D[nbr].j().size());
+                V.reserve(V.size() + D[nbr].v().size());
+                for (std::size_t i = 0; i < D[nbr].i().size(); i++)
+                {
+                    I.push_back(D[nbr].i()[i] + D_rows);
+                    J.push_back(D[nbr].j()[i] + D_cols);
+                    V.push_back(D[nbr].v()[i]);
+                }
+                
+                // update matrix size
+                D_rows += ssrcsize[nbr];
+                D_cols += Nxspline[nbr] * Nyspline[nbr];
+            }
             
-#ifdef DOM_DEBUG
-            write_array
-            (
-                linspace(xspline.Rmin(), xspline.Rmax(), 10001),
-                xspline.zip
-                (
-                    neighbour->outf[Up][ill] - panel->outf[Down][ill],
-                    linspace(xspline.Rmin(), xspline.Rmax(), 10001)
-                ),
-                format("dom-%d-%d-%d-down-nbrf-%d.txt", cycle, panel->ixpanel, panel->iypanel, ill)
-            );
-#endif
+            // construct the final matrix
+            CooMatrix<LU_int_t,Complex> A_coo (D_rows, C_cols, std::move(I), std::move(J), std::move(V));
+        
+        //
+        // Righ-hand side
+        //
+        
+            cArray rhs (A_coo.rows());
             
-            // factorize the block matrix and solve
-            cArray solution (rhs.size());
+            // offset rhs pointer to the start of surrogate sources segment
+            Complex * rhs_ptr = rhs.data();
+            for (int nbr = 0; nbr < nNbrs; nbr++) if (pNbr[nbr] != nullptr)
+                rhs_ptr += Nxspline[nbr] * Nyspline[nbr];
+            
+            // evaluate the neighbour fields
+            for (int nbr = 0; nbr < nNbrs; nbr++) if (pNbr[nbr] != nullptr)
+            {
+                // panel's and neighbour's boundary field
+                cArray const & ownf = panel->outf[nbr][ill];
+                cArray const & nbrf = pNbr[nbr]->outf[rev(nbr)][ill];
+                
+                // copy neighbour field difference to right-hand side
+                for (std::size_t i = iBeg[nbr]; i < iEnd[nbr]; i++)
+                    *rhs_ptr++ = nbrf[i] - ownf[i];
+            }
+        
+        //
+        // Solve the equations
+        //
+            
+            // convert COO matrix to CSR
             CsrMatrix<LU_int_t,Complex> A_csr = A_coo.tocsr();
             std::unique_ptr<LUft> A_lu;
-            A_lu.reset(LUft::Choose("umfpack")); // TODO : Make (wisely) runtime selectable.
+            
+            // calculate the LU decomposition
+            A_lu.reset(LUft::Choose("umfpack")); // TODO : Make runtime selectable.
             A_lu->factorize(A_csr);
+            
+            // solve the system by application of the LU
+            cArray solution (A_coo.cols());
             A_lu->solve(rhs, solution, 1);
             
-            // update the surrogate source
-            panel->ssrc[Down][ill] += cArrayView (solution, Nxspline * Nyspline, Nxspline);
-            
-#ifdef DOM_DEBUG
-            std::ofstream ofsp (format("dom-%d-%d-%d-down-ispsi-%d.vtk", cycle, panel->ixpanel, panel->iypanel, ill));
-            writeVTK_points
-            (
-                ofsp,
-                Bspline::zip
-                (
-                    xspline,
-                    yspline,
-                    solution.slice(0, Nxspline * Nyspline),
-                    linspace(xspline.Rmin(), xspline.Rmax(), 1001),
-                    linspace(yspline.Rmin(), yspline.Rmax(), 1001)
-                ),
-                linspace(xspline.Rmin(), xspline.Rmax(), 1001),
-                linspace(yspline.Rmin(), yspline.Rmax(), 1001),
-                rArray{ 0 }
-            );
-            ofsp.close();
-#endif
-        }
-    }
-    
-    if (direction == Up)
-    {
-        std::cout << "\tConstruct surrogate source from UP" << std::endl;
-        
-        // original B-spline basis
-        Bspline const & org_yspline = panel->yspline_inner;
-        
-        // short B-spline basis
-        Bspline yspline
-        (
-            org_yspline.order(),
-            org_yspline.ECStheta(),
-            org_yspline.cknots1(),
-            org_yspline.rknots(),
-            org_yspline.cknots2()
-        );
-        Bspline const & xspline = panel->xspline_inner;
-        
-        // basis sizes
-        int Nxspline = xspline.Nspline();
-        int Nyspline = yspline.Nspline();
-        
-        // other quantities
-        int order = yspline.order();
-        int iR2y = yspline.iR2();
-        Real R2ya = yspline.t(iR2y - order - 1).real();
-        
-        // calculate radial integrals
-        RadialIntegrals rint (xspline, yspline, ang_->maxlambda() + 1);
-        rint.verbose(false);
-        rint.setupOneElectronIntegrals(*par_, *cmd_);
-        rint.setupTwoElectronIntegrals(*par_, *cmd_);
-        
-        // for all angular states
-        for (unsigned ill = 0; ill < ang_->states().size(); ill++)
-        {
-            // angular momenta
-            int l1 = ang_->states()[ill].first;
-            int l2 = ang_->states()[ill].second;
-            
-            // construct matrix of the free equations
-            BlockSymBandMatrix<Complex> A =
-                kron(Complex(E_) * rint.S_x(), rint.S_y())
-                - kron(0.5_z * rint.D_x(), rint.S_y())
-                - kron(0.5_z * rint.S_x(), rint.D_y())
-                - kron(Complex(0.5 * l1 * (l1 + 1)) * rint.Mm2_x(), rint.S_y())
-                - kron(Complex(0.5 * l2 * (l2 + 1)) * rint.S_x(), rint.Mm2_y())
-                + kron(rint.Mm1_x(), rint.S_y())
-                + kron(rint.S_x(), rint.Mm1_y());
-            
-            for (int lambda = 0; lambda <= ang_->maxlambda(); lambda++)
-                A -= Complex(ang_->f(ill, ill, lambda)) * rint.R_tr_dia(lambda);
-            
-            // resize matrix for additional elements
-            CooMatrix<LU_int_t,Complex> A_coo = A.tocoo<LU_int_t>();
-            CooMatrix<LU_int_t,Complex> A_coo0 = A_coo;
-            A_coo.resize
-            (
-                A_coo.rows() + Nxspline,
-                A_coo.cols() + Nxspline
-            );
-            
-            // add coupling to surrogate source
-            for (int i = 0; i < Nxspline; i++)
-            for (int j = iR2y - 2*order - 1; j < iR2y; j++)
+            // DEBUG
+            static int ble = 0; ble++;
+            Complex * ptr = solution.data();
+            for (int nbr = 0; nbr < nNbrs; nbr++) if (pNbr[nbr] != nullptr)
             {
-                A_coo.add
+                std::ofstream ofs (format("dom-%d-[%d]-ispsi-%d.vtk", ble, nbr, ill));
+                writeVTK_points
                 (
-                    i * Nyspline + j,
-                    Nxspline * Nyspline + i,
-                    -rint.S_y(j, iR2y - order - 1)
+                    ofs,
+                    Bspline::zip
+                    (
+                        *xspline[nbr],
+                        *yspline[nbr],
+                        cArrayView(Nxspline[nbr] * Nyspline[nbr], ptr),
+                        linspace(xspline[nbr]->Rmin(), xspline[nbr]->Rmax(), 1001),
+                        linspace(yspline[nbr]->Rmin(), yspline[nbr]->Rmax(), 1001)
+                    ),
+                    linspace(xspline[nbr]->Rmin(), xspline[nbr]->Rmax(), 1001),
+                    linspace(yspline[nbr]->Rmin(), yspline[nbr]->Rmax(), 1001),
+                    rArray{0}
                 );
+                ptr += Nxspline[nbr] * Nyspline[nbr];
             }
+        
+        //
+        // Update the surrogate sources
+        //
             
-            // add coupling to outgoing field
-            for (int i = 0; i < Nxspline; i++)
-            for (int l = iR2y - 2*order - 1; l < iR2y - order - 1; l++)
-            {
-                A_coo.add
-                (
-                    Nxspline * Nyspline + i,
-                    i * Nyspline + l,
-                    yspline.bspline(l, iR2y - order - 1, order, R2ya)
-                );
-            }
+            // offset solution pointer to the start of surrogate sources segment
+            Complex const * sol = solution.data();
+            for (int nbr = 0; nbr < nNbrs; nbr++) if (pNbr[nbr] != nullptr)
+                sol += Nxspline[nbr] * Nyspline[nbr];
             
-            // set up the right-hand side
-            cArray rhs (Nxspline * Nyspline + Nxspline);
-            cArrayView (rhs, Nxspline * Nyspline, Nxspline) = neighbour->outf[Down][ill] - panel->outf[Up][ill];
-            
-#ifdef DOM_DEBUG
-            write_array
-            (
-                linspace(xspline.Rmin(), xspline.Rmax(), 10001),
-                xspline.zip
-                (
-                    neighbour->outf[Down][ill] - panel->outf[Up][ill],
-                    linspace(xspline.Rmin(), xspline.Rmax(), 10001)
-                ),
-                format("dom-%d-%d-%d-up-nbrf-%d.txt", cycle, panel->ixpanel, panel->iypanel, ill)
-            );
-#endif
-            
-            // factorize the block matrix and solve
-            cArray solution (rhs.size());
-            CsrMatrix<LU_int_t,Complex> A_csr = A_coo.tocsr();
-            std::unique_ptr<LUft> A_lu;
-            A_lu.reset(LUft::Choose("umfpack")); // TODO : Make (wisely) runtime selectable.
-            A_lu->factorize(A_csr);
-            A_lu->solve(rhs, solution, 1);
-            
-            // update the surrogate source
-            panel->ssrc[Up][ill] += cArrayView (solution, Nxspline * Nyspline, Nxspline);
-            
-#ifdef DOM_DEBUG
-            std::ofstream ofsp (format("dom-%d-%d-%d-up-ispsi-%d.vtk", cycle, panel->ixpanel, panel->iypanel, ill));
-            writeVTK_points
-            (
-                ofsp,
-                Bspline::zip
-                (
-                    xspline,
-                    yspline,
-                    solution.slice(0, Nxspline * Nyspline),
-                    linspace(xspline.Rmin(), xspline.Rmax(), 1001),
-                    linspace(yspline.Rmin(), yspline.Rmax(), 1001)
-                ),
-                linspace(xspline.Rmin(), xspline.Rmax(), 1001),
-                linspace(yspline.Rmin(), yspline.Rmax(), 1001),
-                rArray{ 0 }
-            );
-            ofsp.close();
-#endif
-        }
+            // extract individual surrogate sources
+            for (int nbr = 0; nbr < nNbrs; nbr++) if (pNbr[nbr] != nullptr)
+            for (std::size_t i = iBeg[nbr]; i < iEnd[nbr]; i++)
+                panel->ssrc[nbr][ill][i] += *sol++;
     }
 }
 

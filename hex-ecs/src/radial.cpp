@@ -459,6 +459,16 @@ Complex RadialIntegrals::computeM
         right = std::min(right, bspline.iR2() + 2*bspline.order() + 1);
     }
     
+    return computeM(bspline, g, a, i, j, left, right, scale);
+}
+
+Complex RadialIntegrals::computeM
+(
+    Bspline const & bspline, GaussLegendre const & g,
+    int a, int i, int j,
+    int left, int right, bool scale
+) const
+{
     // calculate scaling factor
     Real scalefactor = (scale ? 1.0_r / bspline.t(right).real() : 1.0_r);
     

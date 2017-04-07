@@ -233,7 +233,6 @@ class RadialIntegrals
          * @param a Exponent.
          * @param i B-spline index.
          * @param j B-spline index.
-         * @param maxknot Right-most knot of any integration.
          */
         Complex computeM
         (
@@ -242,6 +241,25 @@ class RadialIntegrals
             int a, int i, int j,
             bool truncate = false,
             bool scale = false
+        ) const;
+        
+        /**
+         * @brief Integral moments.
+         * 
+         * Compute integral moment of coordinate power between the B-splines
+         * @f$ B_i @f$ and @f$ B_j @f$
+         * @param a Exponent.
+         * @param i B-spline index.
+         * @param j B-spline index.
+         */
+        Complex computeM
+        (
+            Bspline const & bspline,
+            GaussLegendre const & g,
+            int a, int i, int j,
+            int begin_knot,
+            int end_knot,
+            bool scale
         ) const;
         
         /**
