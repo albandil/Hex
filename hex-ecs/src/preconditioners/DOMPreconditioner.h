@@ -147,43 +147,23 @@ class DOMPreconditioner : public NoPreconditioner
                     int Nang
                 );
                 
-                bool mapToPanel
-                (
-                    int   ixspline, int   iyspline,
-                    int & pxspline, int & pyspline
-                ) const;
-                
-                bool mapFromPanel
-                (
-                    int & ixspline, int & iyspline,
-                    int   pxspline, int   pyspline
-                ) const;
-                
                 Bspline xspline_inner;  // inner x-axis B-spline basis
                 Bspline yspline_inner;  // inner y-axis B-spline basis
                 
                 Bspline xspline_full;   // full x-axis B-spline basis
                 Bspline yspline_full;   // full y-axis B-spline basis
                 
-                CsrMatrix<LU_int_t,Complex> SFx, SFy;   // overlaps of panel and full basis
-                CsrMatrix<LU_int_t,Complex> Sxx, Syy;   // panel B-spline self-overlap matrices
-                
-                std::shared_ptr<LUft> lu_Sxx, lu_Syy;   // LU decomposition of the panel overlaps
-                
-                ColMatrix<Complex> SFFm1SFx; // solution reconstruction operator (x-axis)
-                ColMatrix<Complex> SFFm1SFy; // solution reconstruction operator (y-axis)
-                
                 cBlockArray r;  // original source
                 cBlockArray z;  // solution
-                
-                std::array<cArrays,nNbrs> ssrc;  // surrogate sources from neighbour panels
-                std::array<cArrays,nNbrs> outf;  // outgoing field to neighbour panels
                 
                 int ixpanel;   // which panel (x-dir)
                 int iypanel;   // which panel (y-dir)
                 
                 int xoffset;   // x-offset of the real basis of panel
                 int yoffset;   // y-offset of the real basis of panel
+                
+                int minpxspline, maxpxspline; // B-splines that have a counterpart in the global basis (x-dir)
+                int minpyspline, maxpyspline; // B-splines that have a counterpart in the global basis (x-dir)
         };
         
         // find solution on a sub-domain
@@ -195,8 +175,20 @@ class DOMPreconditioner : public NoPreconditioner
             int i, int j
         ) const;
         
-        // construct the surrogate source for panel's boundary
-        void surrogateSource (PanelSolution * panel, std::array<PanelSolution*,nNbrs> & leftnbr) const;
+        // add neighbour field interfaces
+        void correctSource
+        (
+            cBlockArray & chi,
+            std::vector<PanelSolution> const & panels,
+            int ipanel, int jpanel
+        ) const;
+        
+        // evaluate matrix element
+        Complex couplingMatrixElement
+        (
+            int ill, int illp,
+            int i, int j, int k, int l
+        ) const;
         
         // get knot sub-sequences
         void knotSubsequence

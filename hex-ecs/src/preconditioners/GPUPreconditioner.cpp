@@ -336,7 +336,7 @@ void GPUCGPreconditioner::setup ()
     // create OpenCL representation of the one-electron matrices + transfer data to GPU memory
     S_inner_p_.reset(rad_inner_->S_x().data().size(), rad_inner_->S_x().data().data());                   S_inner_p_.connect(context_, smallDataFlags_);
     D_inner_p_.reset(rad_inner_->D_x().data().size(), rad_inner_->D_x().data().data());                   D_inner_p_.connect(context_, smallDataFlags_);
-    Mm1_tr_inner_p_.reset(rad_inner_->Mm1_tr_x().data().size(), rad_inner_->Mm1_tr_x().data().data());    Mm1_tr_inner_p_.connect(context_, smallDataFlags_);
+    Mm1_inner_p_.reset(rad_inner_->Mm1_x().data().size(), rad_inner_->Mm1_x().data().data());             Mm1_inner_p_.connect(context_, smallDataFlags_);
     Mm2_inner_p_.reset(rad_inner_->Mm2_x().data().size(), rad_inner_->Mm2_x().data().data());             Mm2_inner_p_.connect(context_, smallDataFlags_);
     
     // create OpenCL representation of the one-electron partial integral moments + transfer data to GPU memory
@@ -401,11 +401,11 @@ void GPUCGPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Co
             clSetKernelArg(mml1_, 0, sizeof(Real),   &E_);
             clSetKernelArg(mml1_, 1, sizeof(cl_mem), &S_inner_p_.handle());
             clSetKernelArg(mml1_, 2, sizeof(cl_mem), &D_inner_p_.handle());
-            clSetKernelArg(mml1_, 3, sizeof(cl_mem), &Mm1_tr_inner_p_.handle());
+            clSetKernelArg(mml1_, 3, sizeof(cl_mem), &Mm1_inner_p_.handle());
             clSetKernelArg(mml1_, 4, sizeof(cl_mem), &Mm2_inner_p_.handle());
             clSetKernelArg(mml1_, 5, sizeof(cl_mem), &S_inner_p_.handle());
             clSetKernelArg(mml1_, 6, sizeof(cl_mem), &D_inner_p_.handle());
-            clSetKernelArg(mml1_, 7, sizeof(cl_mem), &Mm1_tr_inner_p_.handle());
+            clSetKernelArg(mml1_, 7, sizeof(cl_mem), &Mm1_inner_p_.handle());
             clSetKernelArg(mml1_, 8, sizeof(cl_mem), &Mm2_inner_p_.handle());
             clSetKernelArg(mml1_, 9, sizeof(int),    &l1);
             clSetKernelArg(mml1_,10, sizeof(int),    &l2);
@@ -565,11 +565,11 @@ void GPUCGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArra
             clSetKernelArg(mml1_, 0, sizeof(Real),   &E_);
             clSetKernelArg(mml1_, 1, sizeof(cl_mem), &S_inner_p_.handle());
             clSetKernelArg(mml1_, 2, sizeof(cl_mem), &D_inner_p_.handle());
-            clSetKernelArg(mml1_, 3, sizeof(cl_mem), &Mm1_tr_inner_p_.handle());
+            clSetKernelArg(mml1_, 3, sizeof(cl_mem), &Mm1_inner_p_.handle());
             clSetKernelArg(mml1_, 4, sizeof(cl_mem), &Mm2_inner_p_.handle());
             clSetKernelArg(mml1_, 5, sizeof(cl_mem), &S_inner_p_.handle());
             clSetKernelArg(mml1_, 6, sizeof(cl_mem), &D_inner_p_.handle());
-            clSetKernelArg(mml1_, 7, sizeof(cl_mem), &Mm1_tr_inner_p_.handle());
+            clSetKernelArg(mml1_, 7, sizeof(cl_mem), &Mm1_inner_p_.handle());
             clSetKernelArg(mml1_, 8, sizeof(cl_mem), &Mm2_inner_p_.handle());
             clSetKernelArg(mml1_, 9, sizeof(int),    &l1);
             clSetKernelArg(mml1_,10, sizeof(int),    &l2);
@@ -814,7 +814,7 @@ void GPUCGPreconditioner::finish ()
     tmA_.disconnect();
     D_inner_p_.disconnect();        D_inner_p_.disconnect();
     S_inner_p_.disconnect();        S_inner_p_.disconnect();
-    Mm1_tr_inner_p_.disconnect();   Mm1_tr_inner_p_.disconnect();
+    Mm1_inner_p_.disconnect();      Mm1_inner_p_.disconnect();
     Mm2_inner_p_.disconnect();      Mm2_inner_p_.disconnect();
     for (int lambda = 0; lambda <= rad_inner_->maxlambda(); lambda++)
     {

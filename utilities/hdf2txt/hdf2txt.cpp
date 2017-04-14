@@ -48,7 +48,7 @@ int main (int argc, char *argv[])
         {
             cpx = true;
         }
-        if (strcmp(argv[iarg],"--dataset") == 0)
+        else if (strcmp(argv[iarg],"--dataset") == 0)
         {
             dataset = argv[++iarg];
         }

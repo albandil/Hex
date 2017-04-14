@@ -116,7 +116,7 @@ class Bspline
         /** 
          * @brief B-spline.
          * 
-         * Evaluates single B-spline at several points at one. This results in
+         * Evaluates single B-spline at several points at once. This results in
          * increased speed, because some data need to be computed only once.
          * Also, some operation have been reorganized to a form that allows
          * SIMD auto-vectorization.
@@ -174,6 +174,16 @@ class Bspline
             // real part
             return z.real();
         };
+        
+        /**
+         * @brief Restrict value into a given range.
+         * 
+         * Returns the value unchanged if it fits into the given range,
+         * or one of the bounds (the nearer one) if it doesn't.
+         * The bounds @c a and @c b are (unrotated) coordinates along the
+         * contour.
+         */
+        Complex clamp (Complex z, Real a, Real b) const;
         
         /**
          * @brief Zip 1D expansion.

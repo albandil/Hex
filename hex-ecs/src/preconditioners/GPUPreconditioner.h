@@ -175,7 +175,7 @@ class GPUCGPreconditioner : public virtual KPACGPreconditioner
         mutable clArray<Complex> tmp_, tmA_;
         mutable clArray<Real> nrm_;
         clArrayView<Complex> t_inner_;
-        clArrayView<Complex> S_inner_p_, D_inner_p_, Mm1_tr_inner_p_, Mm2_inner_p_;
+        clArrayView<Complex> S_inner_p_, D_inner_p_, Mm1_inner_p_, Mm2_inner_p_;
         std::vector<clArrayView<Complex>> Mi_L_inner_, Mi_mLm1_inner_, M_L_inner_, M_mLm1_inner_;
         std::vector<clArrayView<Complex>> Rdia_;
         

@@ -6,7 +6,7 @@
 //                    / /   / /    \_\      / /  \ \                                 //
 //                                                                                   //
 //                                                                                   //
-//  Copyright (c) 2016, Jakub Benda, Charles University in Prague                    //
+//  Copyright (c) 2017, Jakub Benda, Charles University in Prague                    //
 //                                                                                   //
 // MIT License:                                                                      //
 //                                                                                   //
@@ -32,14 +32,25 @@
 #include <algorithm>
 #include <vector>
 
+// --------------------------------------------------------------------------------- //
+
 #ifdef _OPENMP
 #include <omp.h>
 #endif
 
+// --------------------------------------------------------------------------------- //
+
+
 #include "hex-arrays.h"
 #include "hex-memory.h"
+#include "hex-special.h"
+
+// --------------------------------------------------------------------------------- //
 
 #include "bspline.h"
+
+// --------------------------------------------------------------------------------- //
+
 
 const std::size_t Bspline::work_size_ = 1024;
 
@@ -506,4 +517,16 @@ std::size_t Bspline::hash () const
         seed ^= *(i + (char*)&theta_) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
     
     return seed % 65536;
+}
+
+Complex Bspline::clamp (Complex z, Real a, Real b) const
+{
+    return rotate
+    (
+        special::clamp
+        (
+            unrotate(z),
+            a, b
+        )
+    );
 }

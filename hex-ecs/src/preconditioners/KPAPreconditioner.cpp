@@ -122,8 +122,8 @@ void KPACGPreconditioner::CG_mmul (int iblock, const cArrayView p, cArrayView q)
         
         // multiply 'p' by the diagonal block (except for the two-electron term)
         kron_dot(0., q,  1., p, Complex(E_) * rad_inner_->S_x(), rad_inner_->S_y());
-        kron_dot(1., q, -1., p, Complex(0.5) * rad_inner_->D_x() - rad_inner_->Mm1_tr_x() + Complex(0.5*(l1+1)*l1) * rad_inner_->Mm2_x(), rad_inner_->S_y());
-        kron_dot(1., q, -1., p, rad_inner_->S_x(), Complex(0.5) * rad_inner_->D_y() + Complex(inp_->Zp) * rad_inner_->Mm1_tr_y() + Complex(0.5*(l2+1)*l2) * rad_inner_->Mm2_y());
+        kron_dot(1., q, -1., p, Complex(0.5) * rad_inner_->D_x() - rad_inner_->Mm1_x() + Complex(0.5*(l1+1)*l1) * rad_inner_->Mm2_x(), rad_inner_->S_y());
+        kron_dot(1., q, -1., p, rad_inner_->S_x(), Complex(0.5) * rad_inner_->D_y() + Complex(inp_->Zp) * rad_inner_->Mm1_y() + Complex(0.5*(l2+1)*l2) * rad_inner_->Mm2_y());
         
         // multiply 'p' by the two-electron integrals
         for (int lambda = 0; lambda <= rad_full_->maxlambda(); lambda++)

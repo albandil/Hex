@@ -130,14 +130,6 @@ class RadialIntegrals
         void setupTwoElectronIntegrals (Parallel const & par, CommandLine const & cmd);
         
         /**
-         * @brief Copy values of two-electron integrals from large matrix.
-         * 
-         * This function is used instead of calculation of the two-electron integrals
-         * on sub-domains. The values are just copied from the full-domain integral matrix.
-         */
-        void subsetTwoElectronIntegrals (Parallel const & par, CommandLine const & cmd, RadialIntegrals const & rad);
-        
-        /**
          * @brief Verbosity control.
          * 
          * Setting this to false will inhibit standard output messages from this class.
@@ -195,7 +187,6 @@ class RadialIntegrals
          * Compute derivative overlap for B-splines @f$ B_i @f$ and @f$ B_j @f$.
          * @param i B-spline index.
          * @param j B-spline index.
-         * @param maxknot Right-most knot of any integration.
          */
         Complex computeD
         (
@@ -222,6 +213,7 @@ class RadialIntegrals
             GaussLegendre const & g,
             int a, int i, int j,
             int iknot,
+            Real rmin, Real rmax,
             Real scale
         ) const;
         
@@ -239,7 +231,7 @@ class RadialIntegrals
             Bspline const & bspline,
             GaussLegendre const & g,
             int a, int i, int j,
-            bool truncate = false,
+            Real rmin, Real rmax,
             bool scale = false
         ) const;
         
@@ -257,9 +249,9 @@ class RadialIntegrals
             Bspline const & bspline,
             GaussLegendre const & g,
             int a, int i, int j,
-            int begin_knot,
-            int end_knot,
-            bool scale
+            int begin_knot, int end_knot,
+            Real rmin, Real rmax,
+            bool scale = false
         ) const;
         
         /**
@@ -277,19 +269,9 @@ class RadialIntegrals
         (
             Bspline const & bspline,
             GaussLegendre const & g,
-            int a
+            int a,
+            Real rmin, Real rmax
         ) const;
-        
-        /**
-         * @brief Two-electron integral for multipole @f$ lambda @f$ - diagonal knots contribution.
-         * 
-         * The two-electron integral calculated using @ref computeR is calculated
-         * as a sum of contributions from individual 2D parcels bounded by Cartesian product
-         * of the relevant knots. The two-electron integral on a chosen parcel often separates
-         * to a product of one-dimensional integrals. This function returns the contribution from
-         * all 2D knot parcels, where it does NOT separate.
-         */
-        cArray diagonalR (int lambda) const;
         
         /**
          * @brief Two-electron integral for multipole @f$ lambda @f$.
@@ -299,33 +281,6 @@ class RadialIntegrals
          * contributions calculated from products of the partial moments.
          */
         Complex computeR (int lambda, int i, int j, int k, int l) const;
-        
-        /**
-         * @brief Diagonal contribution to R-integral.
-         * 
-         * Calculates integral
-         * @f[
-         *     R_{ijkl}^\lambda = \int\limits_{t_i}^{t_{i+1}} \int\limits_{t_i}^{t_{i+1}}
-         *     B_a(r_1) B_b(r_2) \frac{r_<^\lambda}{r_>^{\lambda+1}} B_c(r_1) B_d(r_2)
-         *     \mathrm{d}r_1 \mathrm{d}r_2 \,.
-         * @f]
-         * 
-         * The integral is computed as a sum of two triangular integrals, see @ref computeRtri.
-         * 
-         * @param L The multipole (@f$ \lambda @f$).
-         * @param a First B-spline index.
-         * @param b Second B-spline index.
-         * @param c Third B-spline index.
-         * @param d Fourth B-spline index.
-         * @param iknot Integration interval (t[iknot] ... t[iknot+1]).
-         * @param iknotmax Truncation knot for use in damping factor.
-         */
-        Complex computeRdiag
-        (
-            int L,
-            int a, int b, int c, int d,
-            int iknot, int iknotmax
-        ) const;
         
         /**
          * @brief Triangular R-integral.
@@ -348,74 +303,25 @@ class RadialIntegrals
          * 
          * Uses functions @ref R_outer_integrand and @ref R_inner_integrand.
          * 
-         * @param L The multipole (@f$ \lambda @f$).
-         * @param a First B-spline index.
-         * @param b Second B-spline index.
-         * @param c Third B-spline index.
-         * @param d Fourth B-spline index.
-         * @param iknot Integration interval (t[iknot] ... t[iknot+1]).
-         * @param iknotmax Truncation knot for use in damping factor.
+         * @param lambda The multipole (@f$ \lambda @f$).
+         * @param k First B-spline index.
+         * @param l Second B-spline index.
+         * @param iknotx Integration interval (tx[iknotx] ... tx[iknotx+1]).
+         * @param tx1 Left integration bound.
+         * @param tx2 Right integration bound.
+         * @param m Third B-spline index.
+         * @param n Fourth B-spline index.
+         * @param iknoty Integration interval (ty[iknoty] ... ty[iknoty+1]).
+         * @param ty1 Left integration bound.
+         * @param ty2 Right integration bound.
          */
         Complex computeRtri
         (
-            int L,
-            int k, int l,
-            int m, int n,
-            int iknot, int iknotmax
-        ) const;
-        
-        /**
-         * @brief Evaluates inner integrand of the triangular R-integral.
-         * 
-         * Calculates for a set of coordinates @f$ r_2 @f$ (and given coordinate @f$ r_1 @f$) the expression
-         * @f[
-         *     g_{ij}^\lambda(r_1;r_2) = B_i(r_2) B_j(r_2) \left(\frac{r_2}{r_1}\right)^\lambda \xi(r_2) \,,
-         * @f]
-         * where @f$ \xi(r) @f$ is the damping function; see @ref damp.
-         * 
-         * @param n Number of evaluation points.
-         * @param in Pointer to input array of (complex) evaluation points.
-         * @param out Pointer to output array of (complex) evaluations.
-         * @param i First B-spline index.
-         * @param j Second B-spline index.
-         * @param L Multipole (@f$ \lambda @f$).
-         * @param iknot Integration interval.
-         * @param iknotmax Damping parameter.
-         * @param x Fixed value of @f$ r_1 @f$.
-         */
-        void R_inner_integrand
-        (
-            int n, Complex* in, Complex* out,
-            int i, int j,
-            int L, int iknot, int iknotmax, Complex x
-        ) const;
-        
-        /**
-         * @brief Evaluates outer integrand of the triangular R-integral.
-         * 
-         * Calculates for a set of coordinates @f$ r_1 @f$ the expression
-         * @f[
-         *     f_{ijkl}^\lambda(r_1) = B_i(r_1) B_j(r_1) \frac{1}{r_1} \xi(r_1) \int g_{kl}^\lambda(r_1;r_2) \mathrm{d}r_2 \,,
-         * @f]
-         * where @f$ \xi(r) @f$ is the damping function (see @ref damp) and @f$ g_{kl}^\lambda(x,y) @f$
-         * is the inner integrand (see @ref R_inner_integrand).
-         * 
-         * @param n Number of evaluation points.
-         * @param in Pointer to input array of (complex) evaluation points.
-         * @param out Pointer to output array of (complex) evaluations.
-         * @param i First B-spline index.
-         * @param j Second B-spline index.
-         * @param L Multipole (@f$ \lambda @f$).
-         * @param iknot Integration interval.
-         * @param iknotmax Damping parameter.
-         * @param x Fixed value of @f$ r_1 @f$.
-         */
-        void R_outer_integrand
-        (
-            int n, Complex* in, Complex* out,
-            int i, int j,
-            int k, int l,
-            int L, int iknot, int iknotmax
+            int lambda,
+            Bspline const & xspline, GaussLegendre const & xg,
+            int k, int l, int iknotx, Complex tx1, Complex tx2,
+            Bspline const & yspline, GaussLegendre const & yg,
+            int m, int n, int iknoty, Complex ty1, Complex ty2
         ) const;
         
         /**
@@ -488,7 +394,6 @@ class RadialIntegrals
          * @param g Gauss-Legendre integrator adapted to the B-spline basis.
          * @param n Principal quantum number.
          * @param l Orbital quantum number.
-         * @param weightf Weight function to multiply every value of the hydrogenic function (Complex -> Real).
          */
         cArray overlapP
         (
@@ -504,7 +409,6 @@ class RadialIntegrals
          * 
          * @param maxell Maximal degree of the Riccati-Bessel function.
          * @param vk Array containing linear momenta.
-         * @param weightf Weight function to multiply every value of the Bessel function (Complex -> Real).
          * @return Array of shape [vk.size() × (maxell + 1) × Nspline] in column-major format.
          */
         cArray overlapj
@@ -537,7 +441,6 @@ class RadialIntegrals
         OneElectronMatrixAccessors(D)
         OneElectronMatrixAccessors(S)
         OneElectronMatrixAccessors(Mm1)
-        OneElectronMatrixAccessors(Mm1_tr)
         OneElectronMatrixAccessors(Mm2)
         
         #define OneElectronMatrixArrayAccessors(M) \
@@ -581,13 +484,23 @@ class RadialIntegrals
         Bspline bspline_x_;
         Bspline bspline_y_;
         
+        // Asymptotic radiuses
+        // - These are somewhat arbitrary radiuses that restrict position dependence of the Coulombic
+        //   interaction. When either of the coordinates exceeds the limit, it is assumed to be exactly equal
+        //   to the bound instead, making the potential constant with respect to further change of that
+        //   coordinate. These bounds are sufficiently far from the real grid to avoid corruption of the
+        //   physical solution. In single-domain problem it just stops position dependence of the potential
+        //   for large distances, which is irrelevant. The importance lies in the multi-domain solution,
+        //   where the potential may diverge in prepended complex grid.
+        Real rxmin_, rymin_, rxmax_, rymax_;
+        
         // Gauss-Legendre integrator
         GaussLegendre g_x_;
         GaussLegendre g_y_;
         
         // one-electron moment and overlap matrices
-        SymBandMatrix<Complex> D_x_, S_x_, Mm1_x_, Mm1_tr_x_, Mm2_x_;
-        SymBandMatrix<Complex> D_y_, S_y_, Mm1_y_, Mm1_tr_y_, Mm2_y_;
+        SymBandMatrix<Complex> D_x_, S_x_, Mm1_x_, Mm2_x_;
+        SymBandMatrix<Complex> D_y_, S_y_, Mm1_y_, Mm2_y_;
         
         // one-electron full integral moments for various orders (used to calculate R-integrals)
         std::vector<SymBandMatrix<Complex>> Mtr_L_x_, Mtr_mLm1_x_;

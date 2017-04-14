@@ -38,6 +38,12 @@
 
 // --------------------------------------------------------------------------------- //
 
+#ifdef __linux__
+    #include <fenv.h>
+#endif
+
+// --------------------------------------------------------------------------------- //
+
 #include <gsl/gsl_errno.h>
 
 // --------------------------------------------------------------------------------- //
@@ -82,6 +88,11 @@ int main (int argc, char* argv[])
         
         // turn off GSL exceptions
         gsl_set_error_handler_off();
+        
+#ifdef __linux__
+        // abort on non-numerical values
+        feenableexcept(FE_INVALID | FE_OVERFLOW);
+#endif
         
         // disable buffering of the standard output (-> immediate logging)
         std::setvbuf(stdout, nullptr, _IONBF, 0);

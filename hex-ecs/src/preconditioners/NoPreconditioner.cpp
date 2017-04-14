@@ -116,7 +116,7 @@ void NoPreconditioner::setup ()
     // calculate/copy all radial integrals on panel
     rad_panel_->verbose(verbose_);
     rad_panel_->setupOneElectronIntegrals(*par_, *cmd_);
-    rad_panel_->subsetTwoElectronIntegrals(*par_, *cmd_, *rad_inner_);
+    rad_panel_->setupTwoElectronIntegrals(*par_, *cmd_);
     
     // number of basis B-splines
     std::size_t Nspline_inner = bspline_inner.Nspline();
@@ -225,9 +225,9 @@ void NoPreconditioner::setup ()
                 // compose the symmetrical one-electron hamiltonian
                 ColMatrix<Complex> tHl;
                 if (i == 0)
-                    tHl = (Complex(0.5) * rad_inner_->D_x() + Complex(Z) * rad_inner_->Mm1_tr_x() + Complex(0.5*l*(l+1)) * rad_inner_->Mm2_x()).torow().T();
+                    tHl = (Complex(0.5) * rad_inner_->D_x() + Complex(Z) * rad_inner_->Mm1_x() + Complex(0.5*l*(l+1)) * rad_inner_->Mm2_x()).torow().T();
                 else
-                    tHl = (Complex(0.5) * rad_inner_->D_y() + Complex(Z) * rad_inner_->Mm1_tr_y() + Complex(0.5*l*(l+1)) * rad_inner_->Mm2_y()).torow().T();
+                    tHl = (Complex(0.5) * rad_inner_->D_y() + Complex(Z) * rad_inner_->Mm1_y() + Complex(0.5*l*(l+1)) * rad_inner_->Mm2_y()).torow().T();
                 
                 // symmetrically transform by inverse square root of the overlap matrix, tHl <- invsqrtS * tHl * invsqrtS
                 blas::gemm(1., invsqrtS, tHl, 0., S);
@@ -682,8 +682,8 @@ void NoPreconditioner::update (Real E)
                          - 0.5_r * rad_full_->S_x()(i,k) * rad_full_->D_y()(j,l)
                          - 0.5_r * (l1 * (l1 + 1.0_r)) * rad_full_->Mm2_x()(i,k) * rad_full_->S_y()(j,l)
                          - 0.5_r * (l2 * (l2 + 1.0_r)) * rad_full_->S_x()(i,k) * rad_full_->Mm2_y()(j,l)
-                         + rad_full_->Mm1_tr_x()(i,k) * rad_full_->S_y()(j,l)
-                         - inp_->Zp * rad_full_->S_x()(i,k) * rad_full_->Mm1_tr_y()(j,l);
+                         + rad_full_->Mm1_x()(i,k) * rad_full_->S_y()(j,l)
+                         - inp_->Zp * rad_full_->S_x()(i,k) * rad_full_->Mm1_y()(j,l);
                 }
                 
                 Real r1 = rad_full_->bspline_x().t(std::min(i,k) + order + 1).real();
@@ -717,8 +717,8 @@ void NoPreconditioner::update (Real E)
                          - 0.5_r * rad_full_->S_x()(i,k) * rad_full_->D_y()(j,l)
                          - 0.5_r * (l1 * (l1 + 1.0_r)) * rad_full_->Mm2_x()(i,k) * rad_full_->S_y()(j,l)
                          - 0.5_r * (l2 * (l2 + 1.0_r)) * rad_full_->S_x()(i,k) * rad_full_->Mm2_y()(j,l)
-                         + rad_full_->Mm1_tr_x()(i,k) * rad_full_->S_y()(j,l)
-                         - inp_->Zp * rad_full_->S_x()(i,k) * rad_full_->Mm1_tr_y()(j,l);
+                         + rad_full_->Mm1_x()(i,k) * rad_full_->S_y()(j,l)
+                         - inp_->Zp * rad_full_->S_x()(i,k) * rad_full_->Mm1_y()(j,l);
                 }
                 
                 Real r1 = rad_full_->bspline_x().t(std::min(i,k) + order + 1).real();
@@ -1197,25 +1197,6 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
         
         // use the calculated block
         chi[ill] = chi_block;
-        
-        /// v --- v DEBUG
-        /*std::ofstream out (format("chi-%d.vtk", ill));
-        writeVTK_points
-        (
-            out,
-            Bspline::zip
-            (
-                rad_full().bspline_x(),
-                rad_full().bspline_y(),
-                chi_block,
-                linspace(rad_full().bspline_x().Rmin(), rad_full().bspline_x().Rmax(), 1001),
-                linspace(rad_full().bspline_y().Rmin(), rad_full().bspline_y().Rmax(), 1001)
-            ),
-            linspace(rad_full().bspline_x().Rmin(), rad_full().bspline_x().Rmax(), 1001),
-            linspace(rad_full().bspline_y().Rmin(), rad_full().bspline_y().Rmax(), 1001),
-            rArray{ 0. }
-        );*/
-        /// ^ --- ^ DEBUG
         
         // optionally transfer to disk
         if (not chi.inmemory())
