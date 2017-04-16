@@ -170,7 +170,6 @@ class DOMPreconditioner : public NoPreconditioner
         void solvePanel
         (
             int cycle, int cycles,
-            int n,
             std::vector<PanelSolution> & p,
             int i, int j
         ) const;

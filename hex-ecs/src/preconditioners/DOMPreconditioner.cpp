@@ -67,7 +67,7 @@ DOMPreconditioner::DOMPreconditioner
         bspline_inner, bspline_full,
         bspline_panel_x, bspline_panel_y
     ),
-    gap_(bspline_inner.order() + 1)
+    gap_(2*bspline_inner.order())
 {
     // nothing more to do
 }
@@ -152,7 +152,34 @@ void DOMPreconditioner::precondition (BlockArray<Complex> const & r, BlockArray<
     for (int cycle = 0; cycle < cycles; cycle++)
     for (int ixpanel = 0; ixpanel < xpanels; ixpanel++)
     for (int iypanel = 0; iypanel < ypanels; iypanel++)
-        solvePanel(cycle, cycles, xpanels, p, ixpanel, iypanel);
+    {
+        solvePanel(cycle, cycles, p, ixpanel, iypanel);
+#ifdef DOM_DEBUG
+        collectSolution(z, p);
+        
+        cArray res (z[0].size());
+        A_blocks_[0].dot(1.0, z[0], 0.0, res);
+        res -= r[0];
+        
+        std::ofstream ofs (format("dom-%d-%d-%d-res.vtk", cycle, ixpanel, iypanel));
+        writeVTK_points
+        (
+            ofs,
+            Bspline::zip
+            (
+                rad_inner().bspline_x(),
+                rad_inner().bspline_y(),
+                res,
+                linspace(0., rad_inner().bspline_x().Rmax(), 1001),
+                linspace(0., rad_inner().bspline_y().Rmax(), 1001)
+            ),
+            linspace(0., rad_inner().bspline_x().Rmax(), 1001),
+            linspace(0., rad_inner().bspline_y().Rmax(), 1001),
+            rArray{ 0. }
+        );
+        ofs.close();
+#endif
+    }
     
     // interpolate the solution from sub-domains
     collectSolution(z, p);
@@ -166,7 +193,7 @@ void DOMPreconditioner::finish ()
     NoPreconditioner::finish();
 }
 
-void DOMPreconditioner::solvePanel (int cycle, int cycles, int n, std::vector<PanelSolution> & p, int ipanel, int jpanel) const
+void DOMPreconditioner::solvePanel (int cycle, int cycles, std::vector<PanelSolution> & p, int ipanel, int jpanel) const
 {
     std::cout << std::endl;
     std::cout << "\t-------------------------------------------" << std::endl;
@@ -175,7 +202,7 @@ void DOMPreconditioner::solvePanel (int cycle, int cycles, int n, std::vector<Pa
     std::cout << std::endl;
     
     // get reference to the current panel
-    PanelSolution * pCentre = &p[ipanel * n + jpanel];
+    PanelSolution * pCentre = &p[ipanel * ypanels + jpanel];
     
     // create the preconditioner object
     PreconditionerBase * prec = PreconditionerBase::Choose
@@ -206,6 +233,7 @@ void DOMPreconditioner::solvePanel (int cycle, int cycles, int n, std::vector<Pa
     cBlockArray   chi = pCentre->r;
     
     // correct right-hand side from the neighbour domains
+    if (ipanel != 0 or jpanel != 0) chi[0].fill(0.); /// <-- DEBUG
     correctSource(chi, p, ipanel, jpanel);
     
 #ifdef DOM_DEBUG
@@ -303,6 +331,52 @@ void DOMPreconditioner::solvePanel (int cycle, int cycles, int n, std::vector<Pa
     CG.solve(chi, psi, cmd_->itertol, 0, 1000);
     
 #ifdef DOM_DEBUG
+    int order = pCentre->xspline_inner.order();
+    std::ofstream ofs;
+    ofs.open(format("psi-int-%d-%d-%d-%d.txt", cycle, ipanel, jpanel, 0));
+    for (int iy = 0; iy < pCentre->yspline_inner.Nspline(); iy++)
+    {
+        for (int ix = 0; ix < pCentre->xspline_inner.Nspline(); ix++)
+        {
+            if (ix >= pCentre->minpxspline and ix <= pCentre->maxpxspline and iy >= pCentre->minpyspline and iy <= pCentre->maxpyspline)
+                ofs << psi[0][ix * pCentre->yspline_inner.Nspline() + iy].real() << "\t";
+            else
+                ofs << 0 << "\t";
+        }
+        ofs << std::endl;
+    }
+    ofs.close();
+    ofs.open(format("psi-cpx-%d-%d-%d-%d.txt", cycle, ipanel, jpanel, 0));
+    for (int iy = 0; iy < pCentre->yspline_inner.Nspline(); iy++)
+    {
+        for (int ix = 0; ix < pCentre->xspline_inner.Nspline(); ix++)
+        {
+            if (ix < pCentre->xspline_inner.iR1() or ix >= pCentre->xspline_inner.iR2() - order or
+                iy < pCentre->yspline_inner.iR1() or iy >= pCentre->yspline_inner.iR2() - order)
+                ofs << psi[0][ix * pCentre->yspline_inner.Nspline() + iy].real() << "\t";
+            else
+                ofs << 0 << "\t";
+        }
+        ofs << std::endl;
+    }
+    ofs.close();
+    ofs.open(format("psi-gap-%d-%d-%d-%d.txt", cycle, ipanel, jpanel, 0));
+    for (int iy = 0; iy < pCentre->yspline_inner.Nspline(); iy++)
+    {
+        for (int ix = 0; ix < pCentre->xspline_inner.Nspline(); ix++)
+        {
+            if (ix >= pCentre->minpxspline and ix <= pCentre->maxpxspline and iy >= pCentre->minpyspline and iy <= pCentre->maxpyspline)
+                ofs << 0 << "\t";
+            else if (ix < pCentre->xspline_inner.iR1() or ix >= pCentre->xspline_inner.iR2() - order or
+                iy < pCentre->yspline_inner.iR1() or iy >= pCentre->yspline_inner.iR2() - order)
+                ofs << 0 << "\t";
+            else
+                ofs << psi[0][ix * pCentre->yspline_inner.Nspline() + iy].real() << "\t";
+        }
+        ofs << std::endl;
+    }
+    ofs.close();
+    
     rArray grid_x = linspace(pCentre->xspline_inner.Rmin(), pCentre->xspline_inner.Rmax(), 1001);
     rArray grid_y = linspace(pCentre->yspline_inner.Rmin(), pCentre->yspline_inner.Rmax(), 1001);
     for (unsigned ill = 0; ill < psi.size(); ill++)
@@ -361,13 +435,13 @@ void DOMPreconditioner::correctSource
         );
         int bxmax = std::min
         (
-            std::min(p.maxpxspline + order, p.xspline_inner.Nspline() - 1) + p.xoffset,
-            std::min(n.maxpxspline + order, n.xspline_inner.Nspline() - 1) + n.xoffset
+            ipanel + 1 == xpanels ? p.xspline_inner.Nspline() - 1 + p.xoffset : p.xspline_inner.iR2() - order - 1 + p.xoffset,
+            kpanel + 1 == xpanels ? n.xspline_inner.Nspline() - 1 + n.xoffset : n.xspline_inner.iR2() - order - 1 + n.xoffset
         );
         int bymax = std::min
         (
-            std::min(p.maxpyspline + order, p.yspline_inner.Nspline() - 1) + p.yoffset,
-            std::min(n.maxpyspline + order, n.yspline_inner.Nspline() - 1) + n.yoffset
+            jpanel + 1 == ypanels ? p.yspline_inner.Nspline() - 1 + p.yoffset : p.yspline_inner.iR2() - order - 1 + p.yoffset,
+            lpanel + 1 == ypanels ? n.yspline_inner.Nspline() - 1 + n.yoffset : n.yspline_inner.iR2() - order - 1 + n.yoffset
         );
         
         // for all (target) B-splines shared by these two panels
@@ -401,11 +475,12 @@ void DOMPreconditioner::correctSource
                 for (unsigned ill  = 0; ill  < chi.size(); ill ++)
                 for (unsigned illp = 0; illp < chi.size(); illp++)
                 {
-                    Complex coupl = couplingMatrixElement(ill, illp, i, j, k, l);
+                    Complex coupl = A_blocks_[0](i,j,k,l); //couplingMatrixElement(ill, illp, i, j, k, l);
                     Complex & rhs = chi[ill ][pi * p.yspline_inner.Nspline() + pj];
+                    Complex  lsrc = p.z[illp][pk * p.yspline_inner.Nspline() + pl];
                     Complex   src = n.z[illp][nk * n.yspline_inner.Nspline() + nl];
                     
-                    if (centraltgt) rhs -= coupl * src;
+                    if (centraltgt) rhs -= coupl * (src - lsrc);
                     if (centralsrc) rhs += coupl * src;
                 }
             }
@@ -466,8 +541,8 @@ void DOMPreconditioner::knotSubsequence (int i, int n, Bspline const & bspline, 
     // - 'order' knots to tail to enable coupling to the next basis (if any)
     // - 'order' knots to front to enable coupling to the previous basis (if any)
     // - 'order' knots to front to add cut B-splines to the basis (if any)
-    iRa = std::max(iR1, iRa - 2 * bspline.order());
-    iRb = std::min(iR2, iRb +     bspline.order());
+    iRa = std::max(iR1, iRa - gap_ - bspline.order());
+    iRb = std::min(iR2, iRb + gap_);
     
     // new knot sub-sequence
     rknots = inp_->rknots.slice(iRa, iRb + 1);
@@ -537,7 +612,8 @@ void DOMPreconditioner::collectSolution (cBlockArray & z, std::vector<PanelSolut
         }
         
 #ifdef DOM_DEBUG
-        std::ofstream out (format("combined-%d.vtk", ill));
+        static int n = 0;
+        std::ofstream out (format("combined-%d-%d.vtk", ill, n++));
         writeVTK_points
         (
             out,
@@ -582,11 +658,13 @@ DOMPreconditioner::PanelSolution::PanelSolution
     xoffset = xspline.knot(xspline_inner.R1()) - xspline_inner.iR1();
     yoffset = yspline.knot(yspline_inner.R1()) - yspline_inner.iR1();
     
+    int gap = 2*order;
+    
     // B-splines that have a counterpart in the global basis
-    minpxspline = (ixpanel == 0 ? 0 : xspline_inner.iR1() + order);
-    minpyspline = (iypanel == 0 ? 0 : yspline_inner.iR1() + order);
-    maxpxspline = (ixpanel + 1 == xpanels ? xspline_inner.Nspline() - 1 : xspline_inner.iR2() - 2 * order - 1);
-    maxpyspline = (iypanel + 1 == ypanels ? yspline_inner.Nspline() - 1 : yspline_inner.iR2() - 2 * order - 1);
+    minpxspline = (ixpanel == 0 ? 0 : xspline_inner.iR1() + gap);
+    minpyspline = (iypanel == 0 ? 0 : yspline_inner.iR1() + gap);
+    maxpxspline = (ixpanel + 1 == xpanels ? xspline_inner.Nspline() - 1 : xspline_inner.iR2() - order - 1 - gap);
+    maxpyspline = (iypanel + 1 == ypanels ? yspline_inner.Nspline() - 1 : yspline_inner.iR2() - order - 1 - gap);
 }
 
 // --------------------------------------------------------------------------------- //

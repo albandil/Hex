@@ -72,8 +72,7 @@ RadialIntegrals::RadialIntegrals
     Mm1_y_(bspline_y.Nspline(), bspline_y.order() + 1),
     Mm2_y_(bspline_y.Nspline(), bspline_y.order() + 1),
     verbose_(true),
-    Nlambdas_(Nlambdas),
-    rad_(nullptr)
+    Nlambdas_(Nlambdas)
 {
     // maximal number of evaluation points (quadrature rule)
     int npts = std::max(EXPANSION_QUADRATURE_POINTS, bspline_x_.order() + Nlambdas + 2);

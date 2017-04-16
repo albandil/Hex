@@ -521,9 +521,6 @@ class RadialIntegrals
         
         // number of multipole matrices
         int Nlambdas_;
-        
-        // superset of the radial integrals
-        RadialIntegrals const * rad_;
 };
 
 #endif // HEX_ECS_RADIAL_H
