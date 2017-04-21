@@ -154,8 +154,8 @@ void DOMPreconditioner::precondition (BlockArray<Complex> const & r, BlockArray<
     for (int iypanel = 0; iypanel < ypanels; iypanel++)
     {
         solvePanel(cycle, cycles, p, ixpanel, iypanel);
-#ifdef DOM_DEBUG
         collectSolution(z, p);
+#ifdef DOM_DEBUG
         
         cArray res (z[0].size());
         A_blocks_[0].dot(1.0, z[0], 0.0, res);
@@ -233,7 +233,6 @@ void DOMPreconditioner::solvePanel (int cycle, int cycles, std::vector<PanelSolu
     cBlockArray   chi = pCentre->r;
     
     // correct right-hand side from the neighbour domains
-    if (ipanel != 0 or jpanel != 0) chi[0].fill(0.); /// <-- DEBUG
     correctSource(chi, p, ipanel, jpanel);
     
 #ifdef DOM_DEBUG
@@ -402,6 +401,7 @@ void DOMPreconditioner::solvePanel (int cycle, int cycles, std::vector<PanelSolu
 #endif
     
     prec->finish();
+    delete prec;
 }
 
 void DOMPreconditioner::correctSource
@@ -415,34 +415,22 @@ void DOMPreconditioner::correctSource
     
     int order = rad_inner().bspline().order();
     
-    // loop over all potential neighbour panels (skip self)
+    // loop over all potential neighbour panels (skip self and edge-adjacent neighbours)
     for (int kpanel = std::max(0, ipanel - 1); kpanel <= std::min(xpanels - 1, ipanel + 1); kpanel++)
     for (int lpanel = std::max(0, jpanel - 1); lpanel <= std::min(ypanels - 1, jpanel + 1); lpanel++)
-    if (kpanel != ipanel or lpanel != jpanel)
+    if ((kpanel != ipanel) or (lpanel != jpanel))
     {
         PanelSolution const & n = panels[kpanel * ypanels + lpanel];
         
         // shared B-spline bounds
-        int bxmin = std::max
-        (
-            p.xspline_inner.iR1() + p.xoffset,
-            n.xspline_inner.iR1() + n.xoffset
-        );
-        int bymin = std::max
-        (
-            p.yspline_inner.iR1() + p.yoffset,
-            n.yspline_inner.iR1() + n.yoffset
-        );
-        int bxmax = std::min
-        (
-            ipanel + 1 == xpanels ? p.xspline_inner.Nspline() - 1 + p.xoffset : p.xspline_inner.iR2() - order - 1 + p.xoffset,
-            kpanel + 1 == xpanels ? n.xspline_inner.Nspline() - 1 + n.xoffset : n.xspline_inner.iR2() - order - 1 + n.xoffset
-        );
-        int bymax = std::min
-        (
-            jpanel + 1 == ypanels ? p.yspline_inner.Nspline() - 1 + p.yoffset : p.yspline_inner.iR2() - order - 1 + p.yoffset,
-            lpanel + 1 == ypanels ? n.yspline_inner.Nspline() - 1 + n.yoffset : n.yspline_inner.iR2() - order - 1 + n.yoffset
-        );
+        int bxmin = kpanel == ipanel ? p.xoffset + 0
+            : std::max(p.xspline_inner.iR1() + p.xoffset, n.xspline_inner.iR1() + n.xoffset);
+        int bymin = lpanel == jpanel ? p.yoffset + 0
+            : std::max(p.yspline_inner.iR1() + p.yoffset, n.yspline_inner.iR1() + n.yoffset);
+        int bxmax = kpanel == ipanel ? p.xoffset + p.xspline_inner.Nspline() - 1
+            : std::min(p.xspline_inner.iR2() - order - 1 + p.xoffset, n.xspline_inner.iR2() - order - 1 + n.xoffset);
+        int bymax = lpanel == jpanel ? p.yoffset + p.yspline_inner.Nspline() - 1
+            : std::min(p.yspline_inner.iR2() - order - 1 + p.yoffset, n.yspline_inner.iR2() - order - 1 + n.yoffset);
         
         // for all (target) B-splines shared by these two panels
         for (int i = bxmin; i <= bxmax; i++)
@@ -453,7 +441,9 @@ void DOMPreconditioner::correctSource
             int pj = j - p.yoffset;
             
             // is this B-spline owned by the central panel?
-            bool centraltgt = p.minpxspline <= pi and pi <= p.maxpxspline and p.minpyspline <= pj and pj <= p.maxpyspline;
+            bool centraltgt =
+                (lpanel == jpanel and p.minpxspline <= pi and pi <= p.maxpxspline) or
+                (kpanel == ipanel and p.minpyspline <= pj and pj <= p.maxpyspline);
             
             // for all (source) B-splines shared by these two panels
             for (int k = std::max(bxmin, i - order); k <= std::min(bxmax, i + order); k++)
@@ -468,14 +458,16 @@ void DOMPreconditioner::correctSource
                 int nl = l - n.yoffset;
                 
                 // is this B-spline owned by the central panel?
-                bool centralsrc = p.minpxspline <= pk and pk <= p.maxpxspline and p.minpyspline <= pl and pl <= p.maxpyspline;
+                bool centralsrc = 
+                    (lpanel == jpanel and p.minpxspline <= pk and pk <= p.maxpxspline) or
+                    (kpanel == ipanel and p.minpyspline <= pl and pl <= p.maxpyspline);
                 
                 // update the source
                 if (centralsrc xor centraltgt)
                 for (unsigned ill  = 0; ill  < chi.size(); ill ++)
                 for (unsigned illp = 0; illp < chi.size(); illp++)
                 {
-                    Complex coupl = A_blocks_[0](i,j,k,l); //couplingMatrixElement(ill, illp, i, j, k, l);
+                    Complex coupl = couplingMatrixElement(ill, illp, i, j, k, l);
                     Complex & rhs = chi[ill ][pi * p.yspline_inner.Nspline() + pj];
                     Complex  lsrc = p.z[illp][pk * p.yspline_inner.Nspline() + pl];
                     Complex   src = n.z[illp][nk * n.yspline_inner.Nspline() + nl];
@@ -622,11 +614,11 @@ void DOMPreconditioner::collectSolution (cBlockArray & z, std::vector<PanelSolut
                 rad_inner().bspline(),
                 rad_inner().bspline(),
                 z[ill],
-                linspace(rad_inner().bspline().Rmin(), rad_inner().bspline().Rmax(), 1001),
-                linspace(rad_inner().bspline().Rmin(), rad_inner().bspline().Rmax(), 1001)
+                linspace(rad_inner().bspline().Rmin(), rad_inner().bspline().Rmax(), 2001),
+                linspace(rad_inner().bspline().Rmin(), rad_inner().bspline().Rmax(), 2001)
             ),
-            linspace(rad_inner().bspline().Rmin(), rad_inner().bspline().Rmax(), 1001),
-            linspace(rad_inner().bspline().Rmin(), rad_inner().bspline().Rmax(), 1001),
+            linspace(rad_inner().bspline().Rmin(), rad_inner().bspline().Rmax(), 2001),
+            linspace(rad_inner().bspline().Rmin(), rad_inner().bspline().Rmax(), 2001),
             rArray{ 0. }
         );
 #endif

@@ -74,6 +74,9 @@ Complex RadialIntegrals::computeRtri
     Complex * Bym = &workspace[0] + points * 6;
     Complex * Byn = &workspace[0] + points * 7;
     
+    // restrict the x-integration interval to a subset, where y < x is possible
+    xmin = bsplinex.rotate(std::max(bsplinex.unrotate(xmin), bspliney.unrotate(ymin)));
+    
     // x evaluation points and evaluated B-splines
     gx.scaled_nodes_and_weights(points, xmin, xmax, xs, wxs);
     bsplinex.B(k, ixknot, points, xs, Bxk);
@@ -82,23 +85,18 @@ Complex RadialIntegrals::computeRtri
     // resulting integral
     Complex result = 0;
     
-//     std::cout << "        xmin = " << xmin << ", xmax = " << xmax << ", x = " << cArrayView(points, xs) << std::endl;
-//     std::cout << "        ymin = " << ymin << ", ymax = " << ymax << std::endl;
-    
     // for all x points
     for (int ixpoint = 0; ixpoint < points; ixpoint++)
     {
         // The integration over 'y' goes from 'ymin' to 'x'. But, generally,
         // 'y' and 'x' lie on distinct ECS contours. So we need, first,
         // to transform the current 'x' to the 'y' contour.
-        ymax = bspliney.rotate(bsplinex.unrotate(xs[ixpoint]));
+        Complex ytop = bspliney.rotate(std::min(bsplinex.unrotate(xs[ixpoint]), bspliney.unrotate(ymax)));
         
-        // get y evaluation points satisfyng ymin < y < ytop
-        gy.scaled_nodes_and_weights(points, ymin, ymax, ys, wys);
+        // get y evaluation points satisfyng ymin < y < top
+        gy.scaled_nodes_and_weights(points, ymin, ytop, ys, wys);
         bspliney.B(m, iyknot, points, ys, Bym);
         bspliney.B(n, iyknot, points, ys, Byn);
-        
-//         std::cout << "        ymin = " << ymin << ", ymax = " << ymax << ", y = " << cArrayView(points, ys) << std::endl;
         
         // restrict effective x-radius
         Complex x = bsplinex.clamp(xs[ixpoint], rxmin_, rxmax_);
@@ -181,57 +179,56 @@ Complex RadialIntegrals::computeR (int lambda, int a, int b, int c, int d) const
         // result
         Complex R = 0;
         
-        // shorthands
+        // shorthands for per-knot reduced integral moments
         Complex const * const restrict Mi_L_ac    = Mitr_L_x(lambda).data()    + (a * (2*order+1) + c - (a-order)) * (order+1);
         Complex const * const restrict Mi_mLm1_ac = Mitr_mLm1_x(lambda).data() + (a * (2*order+1) + c - (a-order)) * (order+1);
         Complex const * const restrict Mi_L_bd    = Mitr_L_y(lambda).data()    + (b * (2*order+1) + d - (b-order)) * (order+1);
         Complex const * const restrict Mi_mLm1_bd = Mitr_mLm1_y(lambda).data() + (b * (2*order+1) + d - (b-order)) * (order+1);
         
-//         std::cout << "R[" << lambda << "](" << a << "," << b << "," << c << "," << d << ")" << std::endl;
-        
-        // for all knot pairs of the Cartesian product of same-coordinate overlaps
+        // for all non-empty sub-intervals of the B-spline overlaps
         for (int ix = std::max(a,c); ix <= std::min(a,c) + order; ix++) if (bspline_x_.t(ix) != bspline_x_.t(ix + 1))
         for (int iy = std::max(b,d); iy <= std::min(b,d) + order; iy++) if (bspline_y_.t(iy) != bspline_y_.t(iy + 1))
         {
-            // get position of the rectangle to integrate
-            Complex tx1 = bspline_x_.t(ix    );
-            Complex ty1 = bspline_y_.t(iy    );
-            Complex tx2 = bspline_x_.t(ix + 1);
-            Complex ty2 = bspline_y_.t(iy + 1);
+            // get integration rectangle
+            Complex tx1 = bspline_x_.t(ix    );  Real rx1 = bspline_x_.unrotate(tx1);
+            Complex ty1 = bspline_y_.t(iy    );  Real ry1 = bspline_y_.unrotate(ty1);
+            Complex tx2 = bspline_x_.t(ix + 1);  Real rx2 = bspline_x_.unrotate(tx2);
+            Complex ty2 = bspline_y_.t(iy + 1);  Real ry2 = bspline_y_.unrotate(ty2);
             
-            // get effective scaling distances
-            Real rx = special::clamp(bspline_x_.unrotate(tx2), rxmin_, rxmax_);
-            Real ry = special::clamp(bspline_y_.unrotate(ty2), rymin_, rymax_);
+            // avoid negative radii (happens only in multi-domain calculation for some complex absorption grids)
+            if (rx1 < 0 or rx2 < 0 or ry1 < 0 or ry2 < 0)
+                continue;
             
-            // decoupled [a,c] << [b,d]
-            if (bspline_x_.unrotate(tx2) <= bspline_y_.unrotate(ty1))
+            // restrict effective radius to potential truncation bounds
+            Real rx = special::clamp(rx2, rxmin_, rxmax_);
+            Real ry = special::clamp(ry2, rymin_, rymax_);
+            
+            // interval fully decoupled (x < y) ...?
+            if (rx2 <= ry1)
             {
                 Real scale = special::pow_int(rx / ry, lambda) / ry;
                 R += Mi_L_ac[ix - a] * Mi_mLm1_bd[iy - b] * scale;
-//                 std::cout << "    1 : " << ix << " " << iy << " " << R << std::endl;
             }
             
-            // decoupled [b,d] << [a,c]
-            else if (bspline_y_.unrotate(ty2) <= bspline_x_.unrotate(tx1))
+            // inteval fully decoupled (y < x) ...?
+            else if (ry2 <= rx1)
             {
                 Real scale = special::pow_int(ry / rx, lambda) / rx;
                 R += Mi_L_bd[iy - b] * Mi_mLm1_ac[ix - a] * scale;
-//                 std::cout << "    2 : " << ix << " " << iy << " " << R << std::endl;
             }
             
-            // coupled [a,c] ~ [b,d]
+            // interval partially coupled (x ~ y)
             else
             {
                 R += computeRtri(lambda, bspline_x_, g_x_, a, c, ix, tx1, tx2, bspline_y_, g_y_, b, d, iy, ty1, ty2);
-//                 std::cout << "    3a : " << ix << " " << iy << " " << R << std::endl;
                 R += computeRtri(lambda, bspline_y_, g_y_, b, d, iy, ty1, ty2, bspline_x_, g_x_, a, c, ix, tx1, tx2);
-//                 std::cout << "    3b : " << ix << " " << iy << " " << R << std::endl;
             }
         }
     
     if (std::abs(R) > 1000)
     {
-        std::cout << "Abort!" << std::endl;
+        std::cout << "Error in calculation of radial integral!" << std::endl;
+        std::cout << "R[" << lambda << "](" << a << "," << b << "," << c << "," << d << ") = " << R << std::endl;
         std::exit(0);
     }
     return R;
