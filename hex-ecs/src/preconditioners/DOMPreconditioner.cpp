@@ -67,7 +67,7 @@ DOMPreconditioner::DOMPreconditioner
         bspline_inner, bspline_full,
         bspline_panel_x, bspline_panel_y
     ),
-    gap_(2*bspline_inner.order())
+    gap_(0)
 {
     // nothing more to do
 }
@@ -529,12 +529,36 @@ void DOMPreconditioner::knotSubsequence (int i, int n, Bspline const & bspline, 
     int iRa = iR1 + (iR2 - iR1) * i / n;
     int iRb = iR1 + (iR2 - iR1) * (i + 1) / n;
     
-    // add some more real knots to both sides, if available
-    // - 'order' knots to tail to enable coupling to the next basis (if any)
-    // - 'order' knots to front to enable coupling to the previous basis (if any)
-    // - 'order' knots to front to add cut B-splines to the basis (if any)
-    iRa = std::max(iR1, iRa - gap_ - bspline.order());
-    iRb = std::min(iR2, iRb + gap_);
+    // Add some more real knots to both sides. The reason for this is to conserve
+    // the total number of B-splines. For order = 2 we need at least this situation
+    // at the end of a grid
+    //                   |___
+    //                ___/   \___
+    //    ...+...+...+...+...+...+...+...+~~~
+    //                   |
+    // and this situation at the beginning of the next panel's grid
+    //                   |    ___
+    //                   |___/   \___
+    //        ~~~+...+...+...+...+...+...+...+...
+    //                   |
+    // where the '+' symbols denote the knots, the vertical line is the panel separation
+    // knot, the dots are real intervals and '~' marks the complex grid part. Displayed
+    // are the last B-spline owned by first grid and the first B-spline owned by the
+    // following grid. In the global basis the latter immediately follows the former.
+    // To allow proper continuity and coupling between the grids it was necessary to
+    // add '2*order' knots after the separation knot in the first grid, and 'order' knots
+    // before the separation knot in the connected grid. This results in 'order'
+    // additional B-spline elements both in the former and latter grid. Of course,
+    // then there are also arbitrary number of complex B-splines in the damping area.
+    // For obscure numerical reasons there can be also any number of additional real knots
+    // apart from those pictured above.
+    //
+    // In brief:
+    //    - Unless this is to be the first grid, add 1*order knots (+ arbitrary gap) at the beginning of the grid.
+    //    - Unless this is to be the last grid, add 2*order knots (+ arbitrary gap) at the end of the grid.
+    
+    iRa = std::max(iR1, iRa - gap_ - 1 * bspline.order());
+    iRb = std::min(iR2, iRb + gap_ + 2 * bspline.order());
     
     // new knot sub-sequence
     rknots = inp_->rknots.slice(iRa, iRb + 1);
@@ -650,13 +674,13 @@ DOMPreconditioner::PanelSolution::PanelSolution
     xoffset = xspline.knot(xspline_inner.R1()) - xspline_inner.iR1();
     yoffset = yspline.knot(yspline_inner.R1()) - yspline_inner.iR1();
     
-    int gap = 2*order;
+    int gap = 0;
     
-    // B-splines that have a counterpart in the global basis
-    minpxspline = (ixpanel == 0 ? 0 : xspline_inner.iR1() + gap);
-    minpyspline = (iypanel == 0 ? 0 : yspline_inner.iR1() + gap);
-    maxpxspline = (ixpanel + 1 == xpanels ? xspline_inner.Nspline() - 1 : xspline_inner.iR2() - order - 1 - gap);
-    maxpyspline = (iypanel + 1 == ypanels ? yspline_inner.Nspline() - 1 : yspline_inner.iR2() - order - 1 - gap);
+    // this panel's B-splines that have a counterpart in the global basis; the rest is specific to this panel
+    minpxspline = (ixpanel == 0 ? 0 : xspline_inner.iR1() + gap + order);
+    minpyspline = (iypanel == 0 ? 0 : yspline_inner.iR1() + gap + order);
+    maxpxspline = (ixpanel + 1 == xpanels ? xspline_inner.Nspline() - 1 : xspline_inner.iR2() - 2*order - 1 - gap);
+    maxpyspline = (iypanel + 1 == ypanels ? yspline_inner.Nspline() - 1 : yspline_inner.iR2() - 2*order - 1 - gap);
 }
 
 // --------------------------------------------------------------------------------- //
