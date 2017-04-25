@@ -47,7 +47,7 @@
 #define DOM_DEBUG
 
 /// DEBUG : fixed division into sub-panels
-int xpanels = 2, ypanels = 2;
+int xpanels = 1, ypanels = 4;
 
 // --------------------------------------------------------------------------------- //
 
@@ -148,7 +148,7 @@ void DOMPreconditioner::precondition (BlockArray<Complex> const & r, BlockArray<
     
     // find the solution on sub-domains
     std::cout << std::endl;
-    int cycles = 2;
+    int cycles = std::max(xpanels,ypanels);
     for (int cycle = 0; cycle < cycles; cycle++)
     for (int ixpanel = 0; ixpanel < xpanels; ixpanel++)
     for (int iypanel = 0; iypanel < ypanels; iypanel++)
@@ -327,7 +327,7 @@ void DOMPreconditioner::solvePanel (int cycle, int cycles, std::vector<PanelSolu
     
     std::cout << "\tPanel solution" << std::endl;
     std::cout << "\t   i | time        | residual        | min  max  avg  block precond. iter." << std::endl;
-    CG.solve(chi, psi, cmd_->itertol, 0, 1000);
+    CG.solve(chi, psi, cmd_->prec_itertol, 0, 1000);
     
 #ifdef DOM_DEBUG
     int order = pCentre->xspline_inner.order();
