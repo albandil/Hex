@@ -163,7 +163,7 @@ class DOMPreconditioner : public NoPreconditioner
                 int yoffset;   // y-offset of the real basis of panel
                 
                 int minpxspline, maxpxspline; // B-splines that have a counterpart in the global basis (x-dir)
-                int minpyspline, maxpyspline; // B-splines that have a counterpart in the global basis (x-dir)
+                int minpyspline, maxpyspline; // B-splines that have a counterpart in the global basis (y-dir)
         };
         
         // find solution on a sub-domain
