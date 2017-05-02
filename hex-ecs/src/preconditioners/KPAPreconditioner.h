@@ -104,6 +104,8 @@ class KPACGPreconditioner : public virtual CGPreconditioner
         using CGPreconditioner::rhs;
         using CGPreconditioner::multiply;
         using CGPreconditioner::precondition;
+        using CGPreconditioner::CG_mmul;
+        using CGPreconditioner::CG_constrain;
         
         // declare own definitions
         virtual void setup ();
@@ -111,10 +113,8 @@ class KPACGPreconditioner : public virtual CGPreconditioner
         
         // inner CG callback (needed by parent)
         virtual void CG_init (int iblock) const;
-        virtual void CG_mmul (int iblock, const cArrayView r, cArrayView z) const;
         virtual void CG_prec (int iblock, const cArrayView r, cArrayView z) const;
         virtual void CG_exit (int iblock) const;
-        virtual void CG_constrain (cArrayView r) const;
         
     protected:
         

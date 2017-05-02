@@ -1196,14 +1196,22 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
             // near-origin part multiplication
             if (cmd_->lightweight_full)
             {
-                // only one-electron contribution; the rest is below
-                calc_A_block(ill, illp, false).dot
-                (
-                    1.0_z, cArrayView(p[illp], 0, Nspline_inner * Nspline_inner),
-                    1.0_z, cArrayView(q[ill], 0, Nspline_inner * Nspline_inner),
-                    true,
-                    selection
-                );
+                // get block angular momemnta
+                int l1 = ang_->states()[ill].first;
+                int l2 = ang_->states()[ill].second;
+                
+                // multiply 'p' by the diagonal block (except for the two-electron term, which is done later)
+                if (ill == illp)
+                {
+                    // FIXME : triangle selection not supported (needed by GMG only)
+                    kron_dot(0., q[ill], E_,             p[ill], rad_->S_inner(),      rad_->S_inner());
+                    kron_dot(1., q[ill], -0.5,           p[ill], rad_->D_inner(),      rad_->S_inner());
+                    kron_dot(1., q[ill], -0.5*l1*(l1+1), p[ill], rad_->Mm2_inner(),    rad_->S_inner());
+                    kron_dot(1., q[ill], +1,             p[ill], rad_->Mm1_tr_inner(), rad_->S_inner());
+                    kron_dot(1., q[ill], -0.5,           p[ill], rad_->S_inner(),      rad_->D_inner());
+                    kron_dot(1., q[ill], -0.5*l2*(l2+1), p[ill], rad_->S_inner(),      rad_->Mm2_inner());
+                    kron_dot(1., q[ill], +1,             p[ill], rad_->S_inner(),      rad_->Mm1_tr_inner());
+                }
             }
             else
             {
