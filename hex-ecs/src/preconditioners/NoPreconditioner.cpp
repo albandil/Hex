@@ -509,8 +509,8 @@ void NoPreconditioner::update (Real E)
         
         // initialize diagonal block of the inner problem
         // - do not precompute off-diagonal blocks in lightweight mode
-        if (not cmd_->lightweight_full or ill == illp)
-            A_blocks_[ill * Nang + illp] = calc_A_block(ill, illp);
+        if (not cmd_->lightweight_full)
+            A_blocks_[ill * Nang + illp];
         
         // create inner-outer coupling blocks
         Cu_blocks_[ill * Nang + illp] = CooMatrix<LU_int_t,Complex>
