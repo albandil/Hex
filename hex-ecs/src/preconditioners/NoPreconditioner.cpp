@@ -587,8 +587,8 @@ void NoPreconditioner::update (Real E)
         
         // initialize diagonal block of the inner problem
         // - do not precompute off-diagonal blocks in lightweight mode
-        if (not cmd_->lightweight_full or ill == illp)
-            A_blocks_[ill * Nang + illp] = calc_A_block(ill, illp);
+        if (not cmd_->lightweight_full)
+            A_blocks_[ill * Nang + illp] = std::move(calc_A_block(ill, illp));
         
         // create inner-outer coupling blocks
         Cu_blocks_[ill * Nang + illp] = CooMatrix<LU_int_t,Complex>
@@ -1276,14 +1276,22 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
             // inner region part multiplication
             if (cmd_->lightweight_full)
             {
-                // only one-electron contribution; the rest is below
-                calc_A_block(ill, illp, false).dot
-                (
-                    1.0_z, cArrayView(p[illp], 0, Nspline_x_inner * Nspline_y_inner),
-                    1.0_z, cArrayView(q[ill],  0, Nspline_x_inner * Nspline_y_inner),
-                    true,
-                    selection
-                );
+                // get block angular momemnta
+                int l1 = ang_->states()[ill].first;
+                int l2 = ang_->states()[ill].second;
+                
+                // multiply 'p' by the diagonal block (except for the two-electron term, which is done later)
+                if (ill == illp)
+                {
+                    // FIXME : triangle selection not supported (needed by GMG only)
+                    kron_dot(0., q[ill], E_,             p[ill], rad_panel_->S_x(),   rad_panel_->S_y());
+                    kron_dot(1., q[ill], -0.5,           p[ill], rad_panel_->D_x(),   rad_panel_->S_y());
+                    kron_dot(1., q[ill], -0.5*l1*(l1+1), p[ill], rad_panel_->Mm2_x(), rad_panel_->S_y());
+                    kron_dot(1., q[ill], +1,             p[ill], rad_panel_->Mm1_x(), rad_panel_->S_y());
+                    kron_dot(1., q[ill], -0.5,           p[ill], rad_panel_->S_x(),   rad_panel_->D_y());
+                    kron_dot(1., q[ill], -0.5*l2*(l2+1), p[ill], rad_panel_->S_x(),   rad_panel_->Mm2_y());
+                    kron_dot(1., q[ill], +1,             p[ill], rad_panel_->S_x(),   rad_panel_->Mm1_y());
+                }
             }
             else
             {
