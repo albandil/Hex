@@ -44,10 +44,10 @@
 
 // --------------------------------------------------------------------------------- //
 
-#define DOM_DEBUG
+//#define DOM_DEBUG
 
 /// DEBUG : fixed division into sub-panels
-int xpanels = 1, ypanels = 4;
+int xpanels = 4, ypanels = 4;
 
 // --------------------------------------------------------------------------------- //
 
@@ -207,7 +207,7 @@ void DOMPreconditioner::solvePanel (int cycle, int cycles, std::vector<PanelSolu
     // create the preconditioner object
     PreconditionerBase * prec = PreconditionerBase::Choose
     (
-        "ILU", // TODO : Make (wisely) runtime selectable.
+        "KPA", // TODO : Make (wisely) runtime selectable.
         *cmd_, *inp_, *par_, *ang_,
         rad_inner().bspline(),  // inner region basis
         rad_full().bspline(),   // full domain basis

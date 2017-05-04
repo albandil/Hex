@@ -127,7 +127,7 @@ void NoPreconditioner::setup ()
     std::size_t Nspline_y = bspline_y.Nspline();
     
     // is this panel the full solution domain?
-    bool full_domain = (bspline_x.hash() == bspline_full.hash() and bspline_y.hash() == bspline_y.hash());
+    bool full_domain = (bspline_x.hash() == bspline_full.hash() and bspline_y.hash() == bspline_full.hash());
     
     // angular momenta of electrons needed by angular blocks
     std::array<std::vector<int>,2> ells;
@@ -156,123 +156,124 @@ void NoPreconditioner::setup ()
     Sp_[1].resize(ells[1].back() + 1);  Sp_[1].fill(cArrays());
     Eb_[1].resize(ells[1].back() + 1);  Eb_[1].fill(cArray());
     
-    // If the preconditioner is called for full domain, diagonalize the overlap matrix and
-    // find the eigenvectors of the one-electron hamiltonian. It will be needed to construct
-    // matrix of the system.
+    // Diagonalize the overlap matrix and find the eigenvectors of the one-electron hamiltonian.
+    // It will be needed to construct matrix of the system and/or for the KPA preconditioner.
     
-    if (full_domain)
+    for (int i = 0; i < 2; i++)
     {
-        if (verbose_) std::cout << "Setting up the hydrogen eigenstates..." << std::endl << std::endl;
+        // shorthands
+        RadialIntegrals const * rint = full_domain ? rad_inner_ : rad_panel_;
+        Bspline const & bspline = (i == 0 ? rint->bspline_x() : rint->bspline_y());
+        std::size_t Nspline = bspline.Nspline();
         
-        cArray D (Nspline_inner);
-        ColMatrix<Complex> CR (Nspline_inner, Nspline_inner);
-        ColMatrix<Complex> invCR (Nspline_inner, Nspline_inner);
-        ColMatrix<Complex> invsqrtS (Nspline_inner, Nspline_inner);
+        // particle charge (first is electron, second is either electron or positron)
+        Real Z = (i == 0 ? -1.0 : inp_->Zp);
         
-        if (verbose_) std::cout << "\t- inner region basis overlap matrix diagonalization" << std::endl;
+        // link all factorizations to the corresponding disk files
+        for (int l : ells[i])
+            Hl_[i][l].hdflink(format("Hl%+g-%d-%.4x.hdf", Z, l, bspline.hash()).c_str());
+        
+        // if all diagonalizations exist, do not do anything
+        if (std::all_of(ells[i].begin(), ells[i].end(), [&](int l){ return Hl_[i][l].hdfcheck(); }))
+            continue;
+        
+        if (verbose_) std::cout << "Setting up the hydrogen eigenstates for electron #" << i + 1 << " ..." << std::endl << std::endl;
+        
+        cArray D (Nspline);
+        ColMatrix<Complex> CR (Nspline, Nspline);
+        ColMatrix<Complex> invCR (Nspline, Nspline);
+        ColMatrix<Complex> invsqrtS (Nspline, Nspline);
+        
+        if (verbose_) std::cout << "\t- basis overlap matrix diagonalization" << std::endl;
         Timer timer;
         
-        ColMatrix<Complex> S = rad_inner_->S_x().torow().T();
+        SymBandMatrix<Complex> const & S_sym = (i == 0 ? rint->S_x() : rint->S_y());
+        ColMatrix<Complex> S = S_sym.torow().T();
         S.diagonalize(D, nullptr, &CR);
         CR.invert(invCR);
         
         // Now S = CR * (D * CR⁻¹)
         if (verbose_) std::cout << "\t\t- time: " << timer.nice_time() << std::endl;
-        for (std::size_t i = 0; i < (std::size_t)Nspline_inner * (std::size_t)Nspline_inner; i++)
-            invCR.data()[i] *= D[i % Nspline_inner];
+        for (std::size_t i = 0; i < Nspline * Nspline; i++)
+            invCR.data()[i] *= D[i % Nspline];
         
         // S = S - CR * invCR
         blas::gemm(-1., CR, invCR, 1., S);
         if (verbose_) std::cout << "\t\t- residual: " << S.data().norm() << std::endl;
         
         // compute √S⁻¹
-        for (std::size_t i = 0; i < (std::size_t)Nspline_inner * (std::size_t)Nspline_inner; i++)
-            invCR.data()[i] /= std::pow(D.data()[i % Nspline_inner], 1.5);
+        for (std::size_t i = 0; i < Nspline * Nspline; i++)
+            invCR.data()[i] /= std::pow(D.data()[i % Nspline], 1.5);
         blas::gemm(1., CR, invCR, 0., invsqrtS);
         
         if (verbose_) std::cout << std::endl;
         
-        //
-        // now calculate the eigenstates of the inner one-electron hamiltonian
-        // (these will be used in the asymptotic expansion in the outer region)
-        //
-        
-        // diagonalize the one-electron hamiltonians for both the atomic and projectile particle
-        for (int i = 0; i < 2; i++)
+        // for all one-electron angular momenta
+        bool written = false;
+        for (int l : ells[i])
         {
-            // particle charge (first is electron, second is either electron or positron)
-            Real Z = (i == 0 ? -1.0 : inp_->Zp);
+            // do not calculate if this work is supposed to be done by someone else
+            if (cmd_->shared_scratch and not (par_->isMyGroupWork(l) and par_->IamGroupMaster()))
+                continue;
             
-            // for all one-electron angular momenta
-            bool written = false;
-            for (int l : ells[i])
-            {
-                // compose name of the file containing the hamiltonian data
-                Hl_[i][l].hdflink(format("Hl%+g-%d-%.4x.hdf", Z, l, bspline_inner.hash()).c_str());
-                
-                // do not calculate if this work is supposed to be done by someone else
-                if (cmd_->shared_scratch and not (par_->isMyGroupWork(l) and par_->IamGroupMaster()))
-                    continue;
-                
-                // check if the file already exists; skip calculation in that case
-                if (Hl_[i][l].hdfcheck())
-                    continue;
-                
-                written = true;
-                if (verbose_) std::cout << "\t- inner region one-electron Hamiltonian matrix diagonalization (Z = " << Z << ", l = " << l << ")" << std::endl;
-                timer.reset();
-                
-                // compose the symmetrical one-electron hamiltonian
-                ColMatrix<Complex> tHl;
-                if (i == 0)
-                    tHl = (Complex(0.5) * rad_inner_->D_x() + Complex(Z) * rad_inner_->Mm1_x() + Complex(0.5*l*(l+1)) * rad_inner_->Mm2_x()).torow().T();
-                else
-                    tHl = (Complex(0.5) * rad_inner_->D_y() + Complex(Z) * rad_inner_->Mm1_y() + Complex(0.5*l*(l+1)) * rad_inner_->Mm2_y()).torow().T();
-                
-                // symmetrically transform by inverse square root of the overlap matrix, tHl <- invsqrtS * tHl * invsqrtS
-                blas::gemm(1., invsqrtS, tHl, 0., S);
-                blas::gemm(1., S, invsqrtS, 0., tHl);
-                
-                // diagonalize the transformed matrix
-                tHl.diagonalize(D, nullptr, &CR);
-                CR.invert(invCR);
-                
-                // store the KPA preconditioner data
-                Hl_[i][l].Dl = D;
-                Hl_[i][l].invsqrtS_Cl = RowMatrix<Complex>(Nspline_inner, Nspline_inner);
-                Hl_[i][l].invCl_invsqrtS = RowMatrix<Complex>(Nspline_inner, Nspline_inner);
-                blas::gemm(1., invsqrtS, CR, 0., Hl_[i][l].invsqrtS_Cl);
-                blas::gemm(1., invCR, invsqrtS, 0., Hl_[i][l].invCl_invsqrtS);
-                
-                // Now Hl = ClR * D * ClR⁻¹
-                if (verbose_) std::cout << "\t\t- time: " << timer.nice_time() << std::endl;
-                for (std::size_t i = 0; i < (std::size_t)Nspline_inner * (std::size_t)Nspline_inner; i++)
-                    invCR.data()[i] *= D[i % Nspline_inner];
-                
-                // Hl <- Hl - CR * invCR
-                blas::gemm(-1., CR, invCR, 1., tHl);
-                if (verbose_) std::cout << "\t\t- residual: " << tHl.data().norm() << std::endl;
-                
-                // copy the eigenvectors as columns
-                // - already normalized by xGEEV to "Euclidean norm equal to 1 and largest component real"
-                Hl_[i][l].Cl = ColMatrix<Complex>(Hl_[i][l].invsqrtS_Cl);
-                
-                // write to disk and abandon for now
-                Hl_[i][l].hdfsave();
-                Hl_[i][l].drop();
-            }
-            if (written)
-            {
-                if (verbose_) std::cout << std::endl;
-            }
+            // check if the file already exists; skip calculation in that case
+            if (Hl_[i][l].hdfcheck())
+                continue;
+            
+            written = true;
+            if (verbose_) std::cout << "\t- one-electron Hamiltonian matrix diagonalization (Z = " << Z << ", l = " << l << ")" << std::endl;
+            timer.reset();
+            
+            // compose the symmetrical one-electron hamiltonian
+            ColMatrix<Complex> tHl;
+            if (i == 0)
+                tHl = (Complex(0.5) * rint->D_x() + Complex(Z) * rint->Mm1_x() + Complex(0.5*l*(l+1)) * rint->Mm2_x()).torow().T();
+            else
+                tHl = (Complex(0.5) * rint->D_y() + Complex(Z) * rint->Mm1_y() + Complex(0.5*l*(l+1)) * rint->Mm2_y()).torow().T();
+            
+            // symmetrically transform by inverse square root of the overlap matrix, tHl <- invsqrtS * tHl * invsqrtS
+            blas::gemm(1., invsqrtS, tHl, 0., S);
+            blas::gemm(1., S, invsqrtS, 0., tHl);
+            
+            // diagonalize the transformed matrix
+            tHl.diagonalize(D, nullptr, &CR);
+            CR.invert(invCR);
+            
+            // store the KPA preconditioner data
+            Hl_[i][l].Dl = D;
+            Hl_[i][l].invsqrtS_Cl = RowMatrix<Complex>(Nspline, Nspline);
+            Hl_[i][l].invCl_invsqrtS = RowMatrix<Complex>(Nspline, Nspline);
+            blas::gemm(1., invsqrtS, CR, 0., Hl_[i][l].invsqrtS_Cl);
+            blas::gemm(1., invCR, invsqrtS, 0., Hl_[i][l].invCl_invsqrtS);
+            
+            // Now Hl = ClR * D * ClR⁻¹
+            if (verbose_) std::cout << "\t\t- time: " << timer.nice_time() << std::endl;
+            for (std::size_t i = 0; i < Nspline * Nspline; i++)
+                invCR.data()[i] *= D[i % Nspline];
+            
+            // Hl <- Hl - CR * invCR
+            blas::gemm(-1., CR, invCR, 1., tHl);
+            if (verbose_) std::cout << "\t\t- residual: " << tHl.data().norm() << std::endl;
+            
+            // copy the eigenvectors as columns
+            // - already normalized by xGEEV to "Euclidean norm equal to 1 and largest component real"
+            Hl_[i][l].Cl = ColMatrix<Complex>(Hl_[i][l].invsqrtS_Cl);
+            
+            // write to disk and abandon for now
+            Hl_[i][l].hdfsave();
+            Hl_[i][l].drop();
+        }
+        if (written)
+        {
+            if (verbose_) std::cout << std::endl;
         }
         
         // wait for all processes so that all Hlxxx files get written
         par_->wait();
     }
     
-    // load the requested one-electron eigenstates from disk files
-    for (int i = 0; i < 2; i++)
+    // load the requested one-electron eigenstates from disk files (only needed for full domain, where the RHS is constructed)
+    if (full_domain) for (int i = 0; i < 2; i++)
     {
         // particle charge (first is electron, second is either electron or positron)
         Real Z = (i == 0 ? -1.0 : inp_->Zp);
@@ -281,9 +282,6 @@ void NoPreconditioner::setup ()
         bool written = false;
         for (int l : ells[i])
         {
-            // compose name of the file containing the hamiltonian data
-            Hl_[i][l].hdflink(format("Hl%+g-%d-%.4x.hdf", Z, l, bspline_inner.hash()).c_str());
-            
             // load the factorization file
             if (not Hl_[i][l].hdfload())
                 HexException("Failed to load one-electron diagonalization file %s for Z = %g, l = %d.", Hl_[i][l].filename.c_str(), Z, l);

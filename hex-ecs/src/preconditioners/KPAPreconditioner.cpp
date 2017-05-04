@@ -117,9 +117,17 @@ void KPACGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z)
     int l1 = ang_->states()[iblock].first;
     int l2 = ang_->states()[iblock].second;
     
+    // get the right radial integrals (interior of the full domain, or full panel)
+    RadialIntegrals const * rint;
+    if (rad_panel_->bspline_x().hash() == rad_full_->bspline_x().hash() and
+        rad_panel_->bspline_y().hash() == rad_full_->bspline_y().hash())
+        rint = rad_inner_;
+    else
+        rint = rad_panel_;
+    
     // dimension of the matrices
-    std::size_t Nspline_inner_x = rad_inner_->bspline_x().Nspline();
-    std::size_t Nspline_inner_y = rad_inner_->bspline_y().Nspline();
+    std::size_t Nspline_inner_x = rint->bspline_x().Nspline();
+    std::size_t Nspline_inner_y = rint->bspline_y().Nspline();
     
     // get workspace
     int ithread = 0;
