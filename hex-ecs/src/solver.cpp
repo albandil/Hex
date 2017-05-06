@@ -60,7 +60,7 @@ void Solver::choose_preconditioner ()
     
     // check success
     if (prec_ == nullptr)
-        HexException("Preconditioner %d not implemented.", cmd_.preconditioner);
+        HexException("Preconditioner %s not implemented.", cmd_.preconditioner.c_str());
 }
 
 void Solver::setup_preconditioner ()
