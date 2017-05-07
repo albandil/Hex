@@ -137,6 +137,7 @@ class DOMPreconditioner : public NoPreconditioner
                 PanelSolution
                 (
                     int ixpanel, int iypanel,
+                    int xpanels, int ypanels,
                     int order,
                     Real theta,
                     Bspline const & xspline, Bspline const & yspline,

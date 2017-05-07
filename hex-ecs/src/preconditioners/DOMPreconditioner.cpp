@@ -46,9 +46,6 @@
 
 //#define DOM_DEBUG
 
-/// DEBUG : fixed division into sub-panels
-int xpanels = 4, ypanels = 4;
-
 // --------------------------------------------------------------------------------- //
 
 DOMPreconditioner::DOMPreconditioner
@@ -95,16 +92,16 @@ void DOMPreconditioner::precondition (BlockArray<Complex> const & r, BlockArray<
     
     // construct sub-domain bases
     std::vector<PanelSolution> p;
-    for (int ixpanel = 0; ixpanel < xpanels; ixpanel++)
-    for (int iypanel = 0; iypanel < ypanels; iypanel++)
+    for (int ixpanel = 0; ixpanel < cmd_->dom_x_panels; ixpanel++)
+    for (int iypanel = 0; iypanel < cmd_->dom_y_panels; iypanel++)
     {
         // knot sub-sequences
         rArray rxknots, cxknots1, cxknots2;
         rArray ryknots, cyknots1, cyknots2;
         
         // calculate the knot sub-sequences
-        knotSubsequence(ixpanel, xpanels, rad_inner().bspline(), rxknots, cxknots1, cxknots2);
-        knotSubsequence(iypanel, ypanels, rad_inner().bspline(), ryknots, cyknots1, cyknots2);
+        knotSubsequence(ixpanel, cmd_->dom_x_panels, rad_inner().bspline(), rxknots, cxknots1, cxknots2);
+        knotSubsequence(iypanel, cmd_->dom_y_panels, rad_inner().bspline(), ryknots, cyknots1, cyknots2);
         
         if (ixpanel == 0) cxknots1.drop();
         if (iypanel == 0) cyknots1.drop();
@@ -113,6 +110,8 @@ void DOMPreconditioner::precondition (BlockArray<Complex> const & r, BlockArray<
         p.emplace_back
         (
             ixpanel, iypanel,
+            cmd_->dom_x_panels,
+            cmd_->dom_y_panels,
             order,
             theta,
             rad_inner().bspline_x(),
@@ -148,10 +147,10 @@ void DOMPreconditioner::precondition (BlockArray<Complex> const & r, BlockArray<
     
     // find the solution on sub-domains
     std::cout << std::endl;
-    int cycles = std::max(xpanels,ypanels);
+    int cycles = std::max(cmd_->dom_x_panels,cmd_->dom_y_panels);
     for (int cycle = 0; cycle < cycles; cycle++)
-    for (int ixpanel = 0; ixpanel < xpanels; ixpanel++)
-    for (int iypanel = 0; iypanel < ypanels; iypanel++)
+    for (int ixpanel = 0; ixpanel < cmd_->dom_x_panels; ixpanel++)
+    for (int iypanel = 0; iypanel < cmd_->dom_y_panels; iypanel++)
     {
         solvePanel(cycle, cycles, p, ixpanel, iypanel);
         collectSolution(z, p);
@@ -202,12 +201,12 @@ void DOMPreconditioner::solvePanel (int cycle, int cycles, std::vector<PanelSolu
     std::cout << std::endl;
     
     // get reference to the current panel
-    PanelSolution * pCentre = &p[ipanel * ypanels + jpanel];
+    PanelSolution * pCentre = &p[ipanel * cmd_->dom_y_panels + jpanel];
     
     // create the preconditioner object
     PreconditionerBase * prec = PreconditionerBase::Choose
     (
-        "KPA", // TODO : Make (wisely) runtime selectable.
+        cmd_->dom_preconditioner,
         *cmd_, *inp_, *par_, *ang_,
         rad_inner().bspline(),  // inner region basis
         rad_full().bspline(),   // full domain basis
@@ -411,16 +410,16 @@ void DOMPreconditioner::correctSource
     int ipanel, int jpanel
 ) const
 {
-    PanelSolution const & p = panels[ipanel * ypanels + jpanel];
+    PanelSolution const & p = panels[ipanel * cmd_->dom_y_panels + jpanel];
     
     int order = rad_inner().bspline().order();
     
     // loop over all potential neighbour panels (skip self and edge-adjacent neighbours)
-    for (int kpanel = std::max(0, ipanel - 1); kpanel <= std::min(xpanels - 1, ipanel + 1); kpanel++)
-    for (int lpanel = std::max(0, jpanel - 1); lpanel <= std::min(ypanels - 1, jpanel + 1); lpanel++)
+    for (int kpanel = std::max(0, ipanel - 1); kpanel <= std::min(cmd_->dom_x_panels - 1, ipanel + 1); kpanel++)
+    for (int lpanel = std::max(0, jpanel - 1); lpanel <= std::min(cmd_->dom_y_panels - 1, jpanel + 1); lpanel++)
     if ((kpanel != ipanel) or (lpanel != jpanel))
     {
-        PanelSolution const & n = panels[kpanel * ypanels + lpanel];
+        PanelSolution const & n = panels[kpanel * cmd_->dom_y_panels + lpanel];
         
         // shared B-spline bounds
         int bxmin = kpanel == ipanel ? p.xoffset + 0
@@ -568,11 +567,11 @@ void DOMPreconditioner::knotSubsequence (int i, int n, Bspline const & bspline, 
 
 void DOMPreconditioner::splitResidual (cBlockArray const & r, std::vector<PanelSolution> & panels) const
 {
-    for (int ixpanel = 0; ixpanel < xpanels; ixpanel++)
-    for (int iypanel = 0; iypanel < ypanels; iypanel++)
+    for (int ixpanel = 0; ixpanel < cmd_->dom_x_panels; ixpanel++)
+    for (int iypanel = 0; iypanel < cmd_->dom_y_panels; iypanel++)
     for (unsigned ill = 0; ill < r.size(); ill++)
     {
-        PanelSolution & p = panels[ixpanel * ypanels + iypanel];
+        PanelSolution & p = panels[ixpanel * cmd_->dom_y_panels + iypanel];
         
         std::size_t Nfxspline = rad_inner().bspline_x().Nspline();
         std::size_t Nfyspline = rad_inner().bspline_y().Nspline();
@@ -606,10 +605,10 @@ void DOMPreconditioner::collectSolution (cBlockArray & z, std::vector<PanelSolut
     {
         z[ill].fill(0.0);
         
-        for (int ixpanel = 0; ixpanel < xpanels; ixpanel++)
-        for (int iypanel = 0; iypanel < ypanels; iypanel++)
+        for (int ixpanel = 0; ixpanel < cmd_->dom_x_panels; ixpanel++)
+        for (int iypanel = 0; iypanel < cmd_->dom_y_panels; iypanel++)
         {
-            PanelSolution & p = panels[ixpanel * ypanels + iypanel];
+            PanelSolution & p = panels[ixpanel * cmd_->dom_y_panels + iypanel];
             
             std::size_t Nfyspline = rad_inner().bspline_y().Nspline();
             std::size_t Npyspline = p.yspline_inner.Nspline();
@@ -651,7 +650,7 @@ void DOMPreconditioner::collectSolution (cBlockArray & z, std::vector<PanelSolut
 
 DOMPreconditioner::PanelSolution::PanelSolution
 (
-    int ix, int iy,
+    int ix, int iy, int xpanels, int ypanels,
     int order,
     Real theta,
     Bspline const & xspline, Bspline const & yspline,
