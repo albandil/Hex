@@ -49,6 +49,10 @@
 // Derived variables.
 #define NROW (NSPLINE_ATOM * NSPLINE_PROJ)
 
+// These are sometimes not defined for double.
+// #define min(x,y) (x < y ? x : y)
+// #define max(x,y) (x > y ? x : y)
+
 /**
  * @brief Complex multiplication.
  * 

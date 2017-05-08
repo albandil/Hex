@@ -29,8 +29,8 @@
 //                                                                                   //
 //  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
-#ifndef HEX_NOPRECONDITIONER_H
-#define HEX_NOPRECONDITIONER_H
+#ifndef HEX_ECS_NOPRECONDITIONER_H
+#define HEX_ECS_NOPRECONDITIONER_H
 
 // --------------------------------------------------------------------------------- //
 
@@ -65,12 +65,14 @@ class NoPreconditioner : public PreconditionerBase
         // constructor
         NoPreconditioner
         (
-            Parallel const & par,
-            InputFile const & inp,
-            AngularBasis const & ll,
+            CommandLine  const & cmd,
+            InputFile    const & inp,
+            Parallel     const & par,
+            AngularBasis const & ang,
             Bspline const & bspline_inner,
             Bspline const & bspline_full,
-            CommandLine const & cmd
+            Bspline const & bspline_panel_x,
+            Bspline const & bspline_panel_y
         );
         
         // destructor
@@ -90,7 +92,11 @@ class NoPreconditioner : public PreconditionerBase
         
         // internal routines
         BlockSymBandMatrix<Complex> calc_A_block (int ill, int illp, bool twoel = true) const;
-        RadialIntegrals const & rad () const { return *rad_; }
+        
+        // access to the radial integrals
+        RadialIntegrals const & rad_inner () const { return *rad_inner_; }
+        RadialIntegrals const & rad_full () const { return *rad_full_; }
+        RadialIntegrals const & rad_panel () const { return *rad_panel_; }
         
     protected:
         
@@ -148,8 +154,8 @@ class NoPreconditioner : public PreconditionerBase
         // number of channels considered when r1 -> inf and r2 -> inf, respectively
         std::vector<std::pair<int,int>> Nchan_;
         
-        // radial integrals for the solution
-        RadialIntegrals * rad_;
+        // radial integrals for inner, full and panel basis
+        RadialIntegrals *rad_inner_, *rad_full_, *rad_panel_;
         
         // Eigenstates (expansions) of the inner one-electron hamiltonian for all relevant angular momenta and their overlaps.
         // They are normalized so that
@@ -168,4 +174,4 @@ class NoPreconditioner : public PreconditionerBase
 
 // --------------------------------------------------------------------------------- //
 
-#endif
+#endif // HEX_ECS_NOPRECONDITIONER_H

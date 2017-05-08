@@ -69,10 +69,10 @@ std::vector<std::pair<std::string,std::string>> CollisionStrength::params ()
     {
         {"ni", "Initial atomic principal quantum number."},
         {"li", "Initial atomic orbital quantum number."},
-        {"mi", "Initial atomic magnetic quantum number."},
+//         {"mi", "Initial atomic magnetic quantum number."},
         {"nf", "Final atomic principal quantum number."},
         {"lf", "Final atomic orbital quantum number."},
-        {"mf", "Final atomic magnetic quantum number."},
+//         {"mf", "Final atomic magnetic quantum number."},
         {"S", "Total spin of atomic + projectile electron."},
         {"Ei", "Projectile impact energy (Rydberg)."}
     };

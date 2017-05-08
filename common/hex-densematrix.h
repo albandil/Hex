@@ -799,6 +799,35 @@ cArray kron_dot (RowMatrix<Complex,Base1> const & A, RowMatrix<Complex,Base2> co
     return w;
 }
 
+/**
+ * @brief Dot product of kronecker product and a vector
+ * 
+ * This function will compute the following expression, given two matrices and a vector,
+ * @f[
+ *     \mathbf{w} = (\mathsf{A} \otimes \mathsf{B}) \cdot \mathbf{v} \,,
+ * @f]
+ * witnout the need of evaluating (and storing) the Kronecker product.
+ */
+template <class Base1, class Base2>
+cArray kron_dot (ColMatrix<Complex,Base1> const & A, ColMatrix<Complex,Base2> const & B, cArrayView const v)
+{
+    // allocate output array and a temporary array
+    cArray w (A.rows() * B.rows());
+    cArray z (A.rows() * B.cols());
+    
+    // reshape vectors
+    RowMatrixView<Complex> V (A.cols(), B.cols(), v);
+    RowMatrixView<Complex> W (A.rows(), B.rows(), w);
+    RowMatrixView<Complex> Z (A.rows(), B.cols(), z);
+    
+    // calculate the contraction
+    blas::gemm(1., A, V, 0., Z);
+    blas::gemm(1., Z, B.T(), 0., W);
+    
+    // return result
+    return w;
+}
+
 template <class Type>
 NumberArray<Type> operator | (DenseMatrixView<Type> const & A, ArrayView<Type> v)
 {
@@ -829,6 +858,30 @@ NumberArray<Type> operator * (ArrayView<Complex> v, RowMatrixView<Complex> const
     NumberArray<Type> w (A.cols());
     blas::gemv(1., A.T(), v, 0., w);
     return w;
+}
+
+/**
+ * @brief General dense matrix transposition.
+ * 
+ * Transposes a dense matrix with given dimensions.
+ * 
+ * @param A Dense matrix elements array to transpose of length @c ldA0 x @c ldA.
+ * @param ldA0 Original leading dimension.
+ * @param ldA New leading dimensions.
+ */
+template <class Type>
+void transpose (ArrayView<Type> A, std::size_t ldA0, std::size_t ldA)
+{
+    // the matrix size must be divisible by the leading dimension
+    assert(A.size() == ldA * ldA0);
+    
+    // backup the original matrix
+    NumberArray<Type> A0 = A;
+    
+    // fill transposed elements
+    for (std::size_t i = 0; i < ldA0; i++)
+    for (std::size_t j = 0; j < ldA; j++)
+        A[i * ldA + j] = A0[j * ldA0 + i];
 }
 
 #endif // HEX_DENSEMATRIX_H

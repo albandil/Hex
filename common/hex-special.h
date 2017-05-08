@@ -222,6 +222,17 @@ template <class T> T pow_int (T x, int n)
 }
 
 /**
+ * @brief Restrict value into a given range.
+ * 
+ * Returns the value unchanged if it fits into the given range,
+ * or one of the bounds (the nearer one) if it doesn't.
+ */
+template <class T> T clamp (T x, T a, T b)
+{
+    return std::min(std::max(x, a), b);
+}
+
+/**
  * @brief Incomplete gamma function.
  * 
  * This function calculates the value of the upper incomplete Gamma function

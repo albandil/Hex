@@ -36,17 +36,26 @@
 #include <string>
 #include <tuple>
 
+// --------------------------------------------------------------------------------- //
+
 #include "hex-arrays.h"
 #include "hex-cmdline.h"
 #include "hex-csrmatrix.h"
 #include "hex-matrix.h"
+#include "hex-vtkfile.h"
+
+// --------------------------------------------------------------------------------- //
 
 #include "io.h"
 #include "preconditioners.h"
 
+// --------------------------------------------------------------------------------- //
+
 #ifdef WITH_OPENCL
     #include <CL/cl.h>
 #endif
+
+// --------------------------------------------------------------------------------- //
 
 const std::string sample_input =
     "# This is a sample input file for the program hex-ecs.\n"
@@ -193,7 +202,7 @@ void CommandLine::parse (int argc, char* argv[])
                     "\t--lu <name>                (-F)  Factorization library (one of" + f.str() + "). Default is 'umfpack'.\n"
 #ifdef WITH_MUMPS
                     "\t--mumps-out-of-core              Use out-of-core capability of MUMPS (this is independent on --out-of-core option).                                     \n"
-                    "\t--mumps-verbose                  Verbosity level of the MUMPS library. Zero ('0') means no output, higher numbers increase the verbosity.               \n"
+                    "\t--mumps-verbose <number>         Verbosity level of the MUMPS library. Zero ('0') means no output, higher numbers increase the verbosity.               \n"
 #endif
                     "                                                                                                                                                          \n"
                     "Stage selection                                                                                                                                           \n"
@@ -205,7 +214,6 @@ void CommandLine::parse (int argc, char* argv[])
                     "\t--channel-max-E <number>         Maximal energy (Ry) of states considered in the outer region.                                                          \n"
                     "                                                                                                                                                          \n"
                     "Right-hand side                                                                                                                                           \n"
-                    "\t--exact-rhs                      Use a different variant of right-hand side (slower and should be almost the same as the default - faster - variant).   \n"
                     "\t--fast-bessel                    Use faster Bessel function evaluation routine (not the Steed/Barnett) when calculating RHS.                            \n"
                     "                                                                                                                                                          \n"
                     "Disk access                                                                                                                                               \n"
@@ -259,8 +267,9 @@ void CommandLine::parse (int argc, char* argv[])
                     "\t--multigrid-coarse-prec <name>   What preconditioner to use for preconditioning of the solution of the coarse problem (specified in input file).        \n"
                     "                                                                                                                                                          \n"
                     "Domain decomposition preconditioner                                                                                                                       \n"
-                    "\t--dom-panels <number>            Number of domain decomposition panels along each axis.                                                                 \n"
-                    "\t--dom-overlap <number>           Domain decomposition panel overlap. 0 = no overlap. 1 = overlap of the size equal to the non-overlapped panel size.    \n"
+                    "\t--dom-xpanels <number>           Number of domain decomposition panels along x axis (default: 1).                                                       \n"
+                    "\t--dom-ypanels <number>           Number of domain decomposition panels along y axis (default: 1).                                                       \n"
+                    "\t--dom-preconditioner <name>      Panel preconditioner for domain decomposition (default: ILU).                                                          \n"
                     "                                                                                                                                                          \n"
                     "Post-processing                                                                                                                                           \n"
                     "\t--no-parallel-extraction         Disallow parallel extraction of T-matrices (e.g. when the whole solution does not fit into the memory).                \n"
@@ -626,12 +635,6 @@ void CommandLine::parse (int argc, char* argv[])
                 ssor = std::stod(optargs[0]);
                 return true;
             },
-        "exact-rhs", "", 0, [&](std::vector<std::string> const & optargs) -> bool
-            {
-                // use exact RHS
-                exact_rhs = true;
-                return true;
-            },
         "fast-bessel", "", 0, [&](std::vector<std::string> const & optargs) -> bool
             {
                 // use faster Bessel function evaluation routine (not the Steed/Barnett) when calculating RHS
@@ -657,21 +660,54 @@ void CommandLine::parse (int argc, char* argv[])
                     }
                 );
                 
+                // check that it exists
                 if (ip == PreconditionerBase::RTS_Table->end())
                     HexException("Unknown coarse preconditioner");
                 
                 return true;
             },
-        "dom-panels", "", 1, [&](std::vector<std::string> const & optargs) -> bool
+        "dom-xpanels", "", 1, [&](std::vector<std::string> const & optargs) -> bool
             {
-                // domain decomposition panels
-                dom_panels = std::stoi(optargs[0]);
+                // domain decomposition panels (x axis)
+                dom_x_panels = std::stoi(optargs[0]);
+                
+                // check that the number make sense
+                if (dom_x_panels < 1)
+                    HexException("There must be at least one DOM panel in direction of X axis.");
+                
                 return true;
             },
-        "dom-overlap", "", 1, [&](std::vector<std::string> const & optargs) -> bool
+        "dom-ypanels", "", 1, [&](std::vector<std::string> const & optargs) -> bool
             {
-                // domain decomposition panels
-                dom_overlap = std::stod(optargs[0]);
+                // domain decomposition panels (y axis)
+                dom_y_panels = std::stoi(optargs[0]);
+                
+                // check that the number make sense
+                if (dom_y_panels < 1)
+                    HexException("There must be at least one DOM panel in direction of Y axis.");
+                
+                return true;
+            },
+        "dom-preconditioner", "", 1, [&](std::vector<std::string> const & optargs) -> bool
+            {
+                // domain decomposition panels (y axis)
+                dom_preconditioner = optargs[0];
+                
+                // look-up the preconditioner
+                std::vector<PreconditionerBase*>::const_iterator ip = std::find_if
+                (
+                    PreconditionerBase::RTS_Table->begin(),
+                    PreconditionerBase::RTS_Table->end(),
+                    [&](PreconditionerBase* ptr)
+                    {
+                        return ptr->name() == dom_preconditioner;
+                    }
+                );
+                
+                // check that it exists
+                if (ip == PreconditionerBase::RTS_Table->end())
+                    HexException("Unknown domain decomposition panel preconditioner");
+                
                 return true;
             },
         
@@ -1001,6 +1037,7 @@ void InputFile::read (std::ifstream & inf)
     std::cout << "\tfull list: " << Etot         << std::endl;
     
     // check that all energies are allowed by the asymptotic expansion
+    max_Etot = -1;
     if (not inner_only and not Etot.empty())
     {
         max_Etot = *std::max_element(Etot.begin(), Etot.end());
@@ -1065,7 +1102,7 @@ void zip_solution
         HexException("Cannot load file %s.", cmd.zipdata.file.c_str());
     
     // get solution information
-    int l1, l2, Nchan1, Nchan2; Real E;
+    int l1, l2, Nchan1 = 0, Nchan2 = 0; Real E;
     if (not hdf.read("l1", &l1, 1) or
         not hdf.read("l2", &l2, 1) or
         not hdf.read("E", &E, 1) or
@@ -1073,9 +1110,8 @@ void zip_solution
         HexException("This is not a valid solution file.");
     
     // get number of asymptotic channels
-    int max_n = (E >= 0 ? 0 : 1.0_r / std::sqrt(-E));
-    Nchan1 = (inp.Zp < 0 and max_n >= l2 + 1 ? max_n - l2 : 0);
-    Nchan2 = (               max_n >= l1 + 1 ? max_n - l1 : 0);
+    hdf.read("Nchan1", &Nchan1, 1);
+    hdf.read("Nchan2", &Nchan2, 1);
     
     // prepare radial integrals structure
     RadialIntegrals r (bspline_inner, bspline_full, 0);
@@ -1086,7 +1122,7 @@ void zip_solution
     GaussLegendre g_inner;
     
     // factorize the overlap matrix
-    CsrMatrix<LU_int_t,Complex> S_csr = r.S_inner().tocoo<LU_int_t>().tocsr();
+    CsrMatrix<LU_int_t,Complex> S_csr = r.S_x().tocoo<LU_int_t>().tocsr();
     std::shared_ptr<LUft> S_lu;
     S_lu.reset(LUft::Choose(cmd.factorizer));
     S_lu->factorize(S_csr);
@@ -1095,12 +1131,12 @@ void zip_solution
     cArrays Xp1 (Nchan2), Sp1 (Nchan2), Xp2 (Nchan1), Sp2 (Nchan1);
     for (int n1 = l1 + 1; n1 <= l1 + Nchan2; n1++)
     {
-        Sp1[n1 - l1 - 1] = r.overlapP(bspline_inner, g_inner, n1, l1, weightEndDamp(bspline_inner));
+        Sp1[n1 - l1 - 1] = r.overlapP(bspline_inner, g_inner, n1, l1);
         Xp1[n1 - l1 - 1] = S_lu->solve(Sp1[n1 - l1 - 1]);
     }
     for (int n2 = l2 + 1; n2 <= l2 + Nchan1; n2++)
     {
-        Sp2[n2 - l2 - 1] = r.overlapP(bspline_inner, g_inner, n2, l2, weightEndDamp(bspline_inner));
+        Sp2[n2 - l2 - 1] = r.overlapP(bspline_inner, g_inner, n2, l2);
         Xp2[n2 - l2 - 1] = S_lu->solve(Sp2[n2 - l2 - 1]);
     }
     
@@ -1131,19 +1167,50 @@ void zip_solution
         }
     }
     
-    // write full solution to file
-    std::ofstream out ((cmd.zipdata.file + "-full.vtk").c_str());
-    writeVTK_points
+    // evaluate the solution
+    cArray evPsi = Bspline::zip
     (
-        out,                                // output file stream
-        Bspline::zip
-        (
-            bspline_full, bspline_full,     // B-spline bases (for x and y)
-            full_solution,                  // function expansion in those two bases
-            grid_x, grid_y                  // evaluation grids
-        ),
-        grid_x, grid_y, rArray({0.})        // x,y,z
+        bspline_full,
+        bspline_full,
+        full_solution,
+        grid_x,
+        grid_y
     );
+    
+    // evaluate the solution differentiated with respect to the first coordinate
+    cArray evDxPsi = Bspline::zip
+    (
+        bspline_full,
+        bspline_full,
+        full_solution,
+        grid_x,
+        grid_y,
+        &Bspline::dspline,
+        &Bspline::bspline
+    );
+    
+    // evaluate the solution differentiated with respect to the second coordinate
+    cArray evDyPsi = Bspline::zip
+    (
+        bspline_full,
+        bspline_full,
+        full_solution,
+        grid_x,
+        grid_y,
+        &Bspline::bspline,
+        &Bspline::dspline
+    );
+    
+    // write full solution to file
+    VTKRectGridFile vtk;
+    vtk.setGridX(grid_x);
+    vtk.setGridY(grid_y);
+    vtk.setGridZ(rArray{0.});
+    vtk.appendScalarAttribute("RePsi", realpart(evPsi));
+    vtk.appendScalarAttribute("ImPsi", imagpart(evPsi));
+    vtk.appendScalarAttribute("probDensity", sqrabs(evPsi));
+    vtk.appendVector3DAttribute("probFlux", imagpart(evPsi.conj() * evDxPsi), imagpart(evPsi.conj() * evDyPsi), rArray(evPsi.size(), 0.0_r));
+    vtk.write(cmd.zipdata.file + "-full.vtk");
     
     // expand the channel functions
     for (int n = 0; n < Nchan1; n++)
@@ -1205,7 +1272,7 @@ void write_grid (Bspline const & bspline, std::string const & basename)
     // get atomic grid
     rArray knots = bspline.rknots();
     knots.pop_back();
-    knots.append(bspline.cknots());
+    knots.append(bspline.cknots2());
     
     // output file
     std::ofstream out (basename + ".vtk");

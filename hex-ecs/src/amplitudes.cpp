@@ -403,14 +403,14 @@ void Amplitudes::writeICS_files ()
 
 cArray Amplitudes::readProjPseudoStateEnergies (int l) const
 {
-    std::string filename = format("Hl%+g-%d-%.4x.hdf", inp_.Zp, l, rad_.bspline_inner().hash());
+    std::string filename = format("Hl%+g-%d-%.4x.hdf", inp_.Zp, l, rad_.bspline_x().hash());
     
     HDFFile datafile (filename, HDFFile::readonly);
     if (not datafile.valid())
         HexException("File %s with the one-electron eigenstates was not found. Run the solver again to regenerate it.", filename.c_str());
     
     int N = datafile.size("Dl") / 2;
-    if (N != rad_.bspline_inner().Nspline())
+    if (N != rad_.bspline_x().Nspline())
         HexException("File %s is not compatible with the current basis. You should delete it.", filename.c_str());
     
     cArray energies (N);
@@ -422,14 +422,14 @@ cArray Amplitudes::readProjPseudoStateEnergies (int l) const
 
 cArray Amplitudes::readAtomPseudoState (int l, int ichan) const
 {
-    std::string filename = format("Hl-1-%d-%.4x.hdf", l, rad_.bspline_inner().hash());
+    std::string filename = format("Hl-1-%d-%.4x.hdf", l, rad_.bspline_x().hash());
     
     HDFFile datafile (filename, HDFFile::readonly);
     if (not datafile.valid())
         HexException("File %s with the one-electron eigenstates was not found. Run the solver again to regenerate it.", filename.c_str());
     
     int N = datafile.size("Dl") / 2;
-    if (N != rad_.bspline_inner().Nspline())
+    if (N != rad_.bspline_x().Nspline())
         HexException("File %s is not compatible with the current basis. You should delete it.", filename.c_str());
     if (ichan >= N)
         HexException("File %s contains only %d (<= %d) channels.", filename.c_str(), N, ichan);
@@ -442,7 +442,7 @@ cArray Amplitudes::readAtomPseudoState (int l, int ichan) const
     std::iota(indices.begin(), indices.end(), 0);
     std::sort(indices.begin(), indices.end(), [&](int i, int j){ return energies[i].real() < energies[j].real(); });
     
-    unsigned Nspline_inner = rad_.bspline_inner().Nspline();
+    unsigned Nspline_inner = rad_.bspline_x().Nspline();
     
     cArray data (Nspline_inner);
     if (not datafile.read("Cl", &data[0], Nspline_inner, indices[ichan] * Nspline_inner))
@@ -480,7 +480,7 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> &
     
     // read the appropriate projectile channel function for the final state (nf,lf,*)
     cArray Xp = readAtomPseudoState(T.lf, T.nf - T.lf - 1);
-    cArray Sp = rad_.S_inner().dot(Xp);
+    cArray Sp = rad_.S_x().dot(Xp);
     
     // The extracted T-matrix oscillates and slowly radially converges.
     // If we are far enough and only oscillations are left, we can average several uniformly spaced
@@ -488,8 +488,8 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> &
     // the trend of the T-matrix.
     
     Real wavelength = special::constant::two_pi / kf[ie];
-    Real Rb   = (cmd_.extract_rho       > 0) ? cmd_.extract_rho       : bspline_full_.R0();
-    Real Ra   = (cmd_.extract_rho_begin > 0) ? cmd_.extract_rho_begin : Rb - wavelength; Ra = std::max(bspline_full_.R0() / 2, Ra);
+    Real Rb   = (cmd_.extract_rho       > 0) ? cmd_.extract_rho       : bspline_full_.R2();
+    Real Ra   = (cmd_.extract_rho_begin > 0) ? cmd_.extract_rho_begin : Rb - wavelength; Ra = std::max(bspline_full_.R2() / 2, Ra);
     int samples = (cmd_.extract_samples   > 0) ? cmd_.extract_samples   : 10;
     
     rArray grid;
@@ -504,8 +504,8 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> &
     if (Ra > Rb)
         HexException("Wrong order of radial extraction bounds, %g > %g.", Ra, Rb);
     
-    if (Rb > bspline_full_.R0())
-        HexException("Extraction radius too far, %g > %g.", Rb, bspline_full_.R0());
+    if (Rb > bspline_full_.R2())
+        HexException("Extraction radius too far, %g > %g.", Rb, bspline_full_.R2());
     
     // evaluate radial part for all evaluation radii
     for (int i = 0; i < samples; i++)
@@ -799,9 +799,9 @@ Chebyshev<double,Complex> Amplitudes::fcheb (cArrayView const & PsiSc, Real kmax
     Chebyshev<double,Complex> CB;
     
     // avoid calculation when the extraction radius is too far
-    if (rho > bspline_inner_.R0())
+    if (rho > bspline_inner_.R2())
     {
-        std::cout << "Warning: Extraction radius rho = " << rho << " is too far; the atomic real grid ends at R0 = " << bspline_inner_.R0() << std::endl;
+        std::cout << "Warning: Extraction radius rho = " << rho << " is too far; the atomic real grid ends at R0 = " << bspline_inner_.R2() << std::endl;
     }
     else   
     {

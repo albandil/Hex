@@ -102,14 +102,30 @@ class GPUCGPreconditioner : public virtual KPACGPreconditioner
         // constructor
         GPUCGPreconditioner
         (
-            Parallel const & par,
-            InputFile const & inp,
-            AngularBasis const & ll,
+            CommandLine  const & cmd,
+            InputFile    const & inp,
+            Parallel     const & par,
+            AngularBasis const & ang,
             Bspline const & bspline_inner,
             Bspline const & bspline_full,
-            CommandLine const & cmd
-        ) : CGPreconditioner(par, inp, ll, bspline_inner, bspline_full, cmd),
-            KPACGPreconditioner(par, inp, ll, bspline_inner, bspline_full, cmd)
+            Bspline const & bspline_panel_x,
+            Bspline const & bspline_panel_y
+        ) : CGPreconditioner
+            (
+                cmd, inp, par, ang,
+                bspline_inner,
+                bspline_full,
+                bspline_panel_x,
+                bspline_panel_y
+            ),
+            KPACGPreconditioner
+            (
+                cmd, inp, par, ang,
+                bspline_inner,
+                bspline_full,
+                bspline_panel_x,
+                bspline_panel_y
+            )
         {
             // nothing more to do
         }
@@ -124,7 +140,7 @@ class GPUCGPreconditioner : public virtual KPACGPreconditioner
         // declare own definitions
         virtual void setup ();
         virtual void finish ();
-        virtual void multiply (BlockArray<Complex> const & p, BlockArray<Complex> & q) const;
+        virtual void multiply (BlockArray<Complex> const & p, BlockArray<Complex> & q, MatrixSelection::Selection tri) const;
         virtual void precondition (BlockArray<Complex> const & r, BlockArray<Complex> & z) const;
         
     protected:
@@ -159,7 +175,7 @@ class GPUCGPreconditioner : public virtual KPACGPreconditioner
         mutable clArray<Complex> tmp_, tmA_;
         mutable clArray<Real> nrm_;
         clArrayView<Complex> t_inner_;
-        clArrayView<Complex> S_inner_p_, D_inner_p_, Mm1_tr_inner_p_, Mm2_inner_p_;
+        clArrayView<Complex> S_inner_p_, D_inner_p_, Mm1_inner_p_, Mm2_inner_p_;
         std::vector<clArrayView<Complex>> Mi_L_inner_, Mi_mLm1_inner_, M_L_inner_, M_mLm1_inner_;
         std::vector<clArrayView<Complex>> Rdia_;
         

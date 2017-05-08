@@ -58,43 +58,58 @@ template <class T> NumberArray<T> dither (NumberArray<T> const & arr)
 
 GMGPreconditioner::GMGPreconditioner
 (
-    Parallel const & par,
-    InputFile const & inp,
-    AngularBasis const & ll,
-    Bspline const & bspline_inner,
-    Bspline const & bspline_full,
-    CommandLine const & cmd
-) : GMGPreconditioner(par, inp, ll, bspline_inner, bspline_full, cmd, cmd.multigrid_depth)
+    CommandLine  const & cmd,
+    InputFile    const & inp,
+    Parallel     const & par,
+    AngularBasis const & ang,
+    Bspline const & bspline_x_inner,
+    Bspline const & bspline_x_full,
+    Bspline const & bspline_y_inner,
+    Bspline const & bspline_y_full
+) : GMGPreconditioner
+    (
+        cmd, inp, par, ang,
+        bspline_x_inner, bspline_x_full,
+        bspline_y_inner, bspline_y_full,
+        cmd.multigrid_depth
+    )
 {
     // nothing
 }
 
 GMGPreconditioner::GMGPreconditioner
 (
-    Parallel const & par,
-    InputFile const & inp,
-    AngularBasis const & ll,
-    Bspline const & bspline_inner,
-    Bspline const & bspline_full,
-    CommandLine const & cmd,
+    CommandLine  const & cmd,
+    InputFile    const & inp,
+    Parallel     const & par,
+    AngularBasis const & ang,
+    Bspline const & bspline_x_inner,
+    Bspline const & bspline_x_full,
+    Bspline const & bspline_y_inner,
+    Bspline const & bspline_y_full
     int level
-) : NoPreconditioner(par, inp, ll, bspline_inner, bspline_full, cmd),
+) : NoPreconditioner
+    (
+        cmd, inp, par, ang,
+        bspline_x_inner, bspline_x_full,
+        bspline_y_inner, bspline_y_full
+    ),
     level_(level),
-    bspline_inner_fine_(bspline_inner),
-    bspline_full_fine_(bspline_full),
+    bspline_inner_fine_(bspline_x_inner),
+    bspline_full_fine_(bspline_x_full),
     bspline_inner_coarse_
     (
-        bspline_inner.order(),
-        dither(bspline_inner.rknots()),
-        bspline_inner.ECStheta(),
-        dither(bspline_inner.cknots())
+        bspline_x_inner.order(),
+        dither(bspline_x_inner.rknots()),
+        bspline_x_inner.ECStheta(),
+        dither(bspline_x_inner.cknots1())
     ),
     bspline_full_coarse_
     (
-        bspline_full.order(),
-        dither(bspline_full.rknots()),
-        bspline_full.ECStheta(),
-        dither(bspline_full.cknots())
+        bspline_x_full.order(),
+        dither(bspline_x_full.rknots()),
+        bspline_x_full.ECStheta(),
+        dither(bspline_x_full.cknots1())
     )
 {
     // setup subgrid

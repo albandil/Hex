@@ -74,12 +74,14 @@ class ILUCGPreconditioner : public virtual CGPreconditioner
         // constructor
         ILUCGPreconditioner
         (
-            Parallel const & par,
-            InputFile const & inp,
-            AngularBasis const & ll,
-            Bspline const & bspline_inner,
-            Bspline const & bspline_full,
-            CommandLine const & cmd
+            CommandLine  const & cmd,
+            InputFile    const & inp,
+            Parallel     const & par,
+            AngularBasis const & ang,
+            Bspline const & bspline_x_inner,
+            Bspline const & bspline_x_full,
+            Bspline const & bspline_y_inner,
+            Bspline const & bspline_y_full
         );
         
         // destructor

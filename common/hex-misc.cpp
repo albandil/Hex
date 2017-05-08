@@ -6,7 +6,7 @@
 //                    / /   / /    \_\      / /  \ \                                 //
 //                                                                                   //
 //                                                                                   //
-//  Copyright (c) 2015, Jakub Benda, Charles University in Prague                    //
+//  Copyright (c) 2017, Jakub Benda, Charles University in Prague                    //
 //                                                                                   //
 // MIT License:                                                                      //
 //                                                                                   //
@@ -31,17 +31,25 @@
 
 #include <iostream>
 
+// --------------------------------------------------------------------------------- //
+
 #if (defined(__linux__) && defined(__GNUC__))
     #include <execinfo.h>
     #include <unistd.h>
     #include <cxxabi.h>
 #endif
 
+// --------------------------------------------------------------------------------- //
+
 #include "hex-misc.h"
+
+// --------------------------------------------------------------------------------- //
 
 #ifdef _WIN32
     #include <windows.h>
 #endif
+
+// --------------------------------------------------------------------------------- //
 
 std::string get_executable_path ()
 {
@@ -76,7 +84,11 @@ void print_stack_trace ()
     if (addrlen == 0)
     {
         std::cerr << "  <empty, possibly corrupt>" << std::endl;
-        std::terminate();
+#ifdef NDEBUG
+        std::exit(EXIT_FAILURE);
+#else
+        std::abort();
+#endif
     }
     
     // translate the backtrace

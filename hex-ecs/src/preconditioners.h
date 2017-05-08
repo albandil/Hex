@@ -29,8 +29,8 @@
 //                                                                                   //
 //  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
-#ifndef HEX_PRECONDITIONERS
-#define HEX_PRECONDITIONERS
+#ifndef HEX_ECS_PRECONDITIONERS
+#define HEX_ECS_PRECONDITIONERS
 
 // --------------------------------------------------------------------------------- //
 
@@ -71,12 +71,14 @@ class PreconditionerBase
             (
                 PreconditionerBase,
                 (
-                    Parallel const & par,
-                    InputFile const & inp,
-                    AngularBasis const & ll,
+                    CommandLine  const & cmd,
+                    InputFile    const & inp,
+                    Parallel     const & par,
+                    AngularBasis const & ang,
                     Bspline const & bspline_inner,
                     Bspline const & bspline_full,
-                    CommandLine const & cmd
+                    Bspline const & bspline_panel_x,
+                    Bspline const & bspline_panel_y
                 )
             )
         
@@ -87,7 +89,7 @@ class PreconditionerBase
             /**
              * @brief Dummy default constructor needed by the run-time selection.
              */
-            PreconditionerBase () {}
+            PreconditionerBase () : verbose_(true) {}
             
             /**
              * @brief Virtual destructor.
@@ -157,7 +159,12 @@ class PreconditionerBase
              * This function implements matrix multiplication by the matrix of
              * the set of equations that is to be solved.
              */
-            virtual void multiply (BlockArray<Complex> const & p, BlockArray<Complex> & q, MatrixSelection::Selection tri = MatrixSelection::Both) const {}
+            virtual void multiply
+            (
+                BlockArray<Complex> const & p,
+                BlockArray<Complex> & q,
+                MatrixSelection::Selection tri = MatrixSelection::BlockBoth | MatrixSelection::Both
+            ) const {}
             
             /**
              * @brief Precondition the equation.
@@ -170,6 +177,17 @@ class PreconditionerBase
              * It may use the MPI environment.
              */
             virtual void precondition (BlockArray<Complex> const & r, BlockArray<Complex> & z) const {}
+            
+            /**
+             * @brief Set verbosity level.
+             * 
+             * Determine whether the preconditioner will produce a text output.
+             */
+            virtual void verbose (bool b) { verbose_ = b; }
+            
+    protected:
+        
+        bool verbose_;
 };
 
 // --------------------------------------------------------------------------------- //
@@ -179,25 +197,29 @@ class PreconditionerBase
     ( \
         PreconditionerBase, \
         ( \
-            Parallel const & par, \
-            InputFile const & inp, \
-            AngularBasis const & ll, \
+            CommandLine  const & cmd, \
+            InputFile    const & inp, \
+            Parallel     const & par, \
+            AngularBasis const & ang, \
             Bspline const & bspline_inner, \
-            Bspline const & bspline_full, \
-            CommandLine const & cmd \
+            Bspline const & bspline_full,  \
+            Bspline const & bspline_panel_x, \
+            Bspline const & bspline_panel_y  \
         ), \
         TYPE, \
         ( \
-            par, \
+            cmd, \
             inp, \
-            ll, \
+            par, \
+            ang, \
             bspline_inner, \
-            bspline_full, \
-            cmd \
+            bspline_full,  \
+            bspline_panel_x, \
+            bspline_panel_y  \
         ), \
         NAME \
     )
 
 // --------------------------------------------------------------------------------- //
 
-#endif // HEX_PRECONDITIONERS
+#endif // HEX_ECS_PRECONDITIONERS

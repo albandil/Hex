@@ -53,13 +53,14 @@ std::string CGPreconditioner::description () const
 int CGPreconditioner::solve_block (int ill, const cArrayView r, cArrayView z) const
 {
     // shorthands
-    int Nspline_inner = rad_->bspline_inner().Nspline();
+    int Nspline_inner_x = rad_inner_->bspline_x().Nspline();
+    int Nspline_inner_y = rad_inner_->bspline_y().Nspline();
     
     // prepare the block-preconditioner for run
     this->CG_init(ill);
     
     // maximal number of nested iterations
-    int max_iterations = Nspline_inner;
+    int max_iterations = Nspline_inner_x + Nspline_inner_y;
     
     // adjust max iterations for ILU-preconditioned blocks
     if (HybCGPreconditioner const * hp = dynamic_cast<HybCGPreconditioner const*>(this))
@@ -152,9 +153,9 @@ void CGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArray<C
             
             // subtract lower block diagonals for ill-th block row
             for (int illp = 0; illp < ill; illp++)
-            for (int lambda = 0; lambda <= rad_->maxlambda(); lambda++)
+            for (int lambda = 0; lambda <= rad_full_->maxlambda(); lambda++)
             if (ang_->f(ill, illp, lambda) != 0)
-                rad_->R_tr_dia(lambda).dot(-ang_->f(ill, illp, lambda), y[illp], 1., y[ill], true);
+                rad_full_->R_tr_dia(lambda).dot(-ang_->f(ill, illp, lambda), y[illp], 1., y[ill], true);
             
             // use (preconditioned) conjugate gradients to invert a diagonal block
             x[ill].resize(y[ill].size());
@@ -172,9 +173,9 @@ void CGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArray<C
         {
             // subtract upper block diagonals for ill-th block row
             for (int illp = ill + 1; illp < (int)ang_->states().size(); illp++)
-            for (int lambda = 0; lambda <= rad_->maxlambda(); lambda++)
+            for (int lambda = 0; lambda <= rad_full_->maxlambda(); lambda++)
             if (ang_->f(ill, illp, lambda) != 0)
-                rad_->R_tr_dia(lambda).dot(-ang_->f(ill, illp, lambda), y[illp], 1., y[ill], true);
+                rad_full_->R_tr_dia(lambda).dot(-ang_->f(ill, illp, lambda), y[illp], 1., y[ill], true);
             
             // use (preconditioned) conjugate gradients to invert a diagonal block
             n_[ill] += solve_block(ill, cmd_->ssor * y[ill], z[ill]);
@@ -237,9 +238,16 @@ void CGPreconditioner::CG_mmul (int iblock, const cArrayView p, cArrayView q) co
 {
     std::memset(q.data(), 0, q.size() * sizeof(Complex));
     
-    std::size_t Nspline_inner = rad_->bspline_inner().Nspline();
-    std::size_t Nspline_full = rad_->bspline_full().Nspline();
-    std::size_t Nspline_outer = Nspline_full - Nspline_inner;
+    std::size_t Nspline_x = rad_panel_->bspline_x().Nspline();
+    std::size_t Nspline_y = rad_panel_->bspline_y().Nspline();
+    
+    std::size_t Nspline_inner_x = rad_inner_->bspline_x().Nspline();
+    std::size_t Nspline_inner_y = rad_inner_->bspline_y().Nspline();
+    std::size_t Nspline_full_x = rad_full_->bspline_x().Nspline();
+    std::size_t Nspline_full_y = rad_full_->bspline_y().Nspline();
+    std::size_t Nspline_outer_x = Nspline_full_x - Nspline_inner_x;
+    std::size_t Nspline_outer_y = Nspline_full_y - Nspline_inner_y;
+    
     std::size_t Nang = ang_->states().size();
     std::size_t iang = iblock * Nang + iblock;
     
@@ -250,16 +258,16 @@ void CGPreconditioner::CG_mmul (int iblock, const cArrayView p, cArrayView q) co
         int l2 = ang_->states()[iblock].second;
         
         // multiply 'p' by the diagonal block (except for the two-electron term)
-        kron_dot(0., q, E_,             p, rad_->S_inner(),      rad_->S_inner());
-        kron_dot(1., q, -0.5,           p, rad_->D_inner(),      rad_->S_inner());
-        kron_dot(1., q, -0.5*l1*(l1+1), p, rad_->Mm2_inner(),    rad_->S_inner());
-        kron_dot(1., q, +1,             p, rad_->Mm1_tr_inner(), rad_->S_inner());
-        kron_dot(1., q, -0.5,           p, rad_->S_inner(),      rad_->D_inner());
-        kron_dot(1., q, -0.5*l2*(l2+1), p, rad_->S_inner(),      rad_->Mm2_inner());
-        kron_dot(1., q, +1,             p, rad_->S_inner(),      rad_->Mm1_tr_inner());
+        kron_dot(0., q, E_,             p, rad_panel_->S_x(),   rad_panel_->S_y());
+        kron_dot(1., q, -0.5,           p, rad_panel_->D_x(),   rad_panel_->S_y());
+        kron_dot(1., q, -0.5*l1*(l1+1), p, rad_panel_->Mm2_x(), rad_panel_->S_y());
+        kron_dot(1., q, +1,             p, rad_panel_->Mm1_x(), rad_panel_->S_y());
+        kron_dot(1., q, -0.5,           p, rad_panel_->S_x(),   rad_panel_->D_y());
+        kron_dot(1., q, -0.5*l2*(l2+1), p, rad_panel_->S_x(),   rad_panel_->Mm2_y());
+        kron_dot(1., q, +1,             p, rad_panel_->S_x(),   rad_panel_->Mm1_y());
         
         // multiply 'p' by the two-electron integrals
-        for (int lambda = 0; lambda <= rad_->maxlambda(); lambda++)
+        for (int lambda = 0; lambda <= rad_panel_->maxlambda(); lambda++)
         {
             // calculate angular integral
             Real f = special::computef(lambda, l1, l2, l1, l2, inp_->L);
@@ -268,7 +276,7 @@ void CGPreconditioner::CG_mmul (int iblock, const cArrayView p, cArrayView q) co
             
             // multiply
             if (f != 0.)
-                rad_->apply_R_matrix(lambda, inp_->Zp * f, p, 1., q);
+                rad_panel_->apply_R_matrix(lambda, inp_->Zp * f, p, 1., q);
         }
     }
     else
@@ -277,8 +285,8 @@ void CGPreconditioner::CG_mmul (int iblock, const cArrayView p, cArrayView q) co
         
         A_blocks_[iang].dot
         (
-            1.0_r, cArrayView(p, 0, Nspline_inner * Nspline_inner),
-            1.0_r, cArrayView(q, 0, Nspline_inner * Nspline_inner),
+            1.0_r, cArrayView(p, 0, Nspline_x * Nspline_y),
+            1.0_r, cArrayView(q, 0, Nspline_x * Nspline_y),
             !cmd_->parallel_precondition
         );
         
@@ -297,8 +305,8 @@ void CGPreconditioner::CG_mmul (int iblock, const cArrayView p, cArrayView q) co
             if (cmd_->outofcore) const_cast<SymBandMatrix<Complex>&>(B1_blocks_[iang][m * Nchan1 + n]).hdfload();
             B1_blocks_[iang][m * Nchan1 + n].dot
             (
-                1.0_r, cArrayView(p, Nspline_inner * Nspline_inner + n * Nspline_outer, Nspline_outer),
-                1.0_r, cArrayView(q, Nspline_inner * Nspline_inner + m * Nspline_outer, Nspline_outer)
+                1.0_r, cArrayView(p, Nspline_inner_x * Nspline_inner_y + n * Nspline_outer_x, Nspline_outer_x),
+                1.0_r, cArrayView(q, Nspline_inner_x * Nspline_inner_y + m * Nspline_outer_x, Nspline_outer_x)
             );
             if (cmd_->outofcore) const_cast<SymBandMatrix<Complex>&>(B1_blocks_[iang][m * Nchan1 + n]).drop();
         }
@@ -310,8 +318,8 @@ void CGPreconditioner::CG_mmul (int iblock, const cArrayView p, cArrayView q) co
             if (cmd_->outofcore) const_cast<SymBandMatrix<Complex>&>(B2_blocks_[iang][m * Nchan2 + n]).hdfload();
             B2_blocks_[iang][m * Nchan2 + n].dot
             (
-                1.0_r, cArrayView(p, Nspline_inner * Nspline_inner + (Nchan1 + n) * Nspline_outer, Nspline_outer),
-                1.0_r, cArrayView(q, Nspline_inner * Nspline_inner + (Nchan1 + m) * Nspline_outer, Nspline_outer)
+                1.0_r, cArrayView(p, Nspline_inner_x * Nspline_inner_y + (Nchan1 + n) * Nspline_outer_y, Nspline_outer_y),
+                1.0_r, cArrayView(q, Nspline_inner_x * Nspline_inner_y + (Nchan1 + m) * Nspline_outer_y, Nspline_outer_y)
             );
             if (cmd_->outofcore) const_cast<SymBandMatrix<Complex>&>(B2_blocks_[iang][m * Nchan2 + n]).drop();
         }

@@ -70,15 +70,32 @@ class HybCGPreconditioner : public ILUCGPreconditioner, public KPACGPrecondition
         // constructor
         HybCGPreconditioner
         (
-            Parallel const & par,
-            InputFile const & inp,
-            AngularBasis const & ll,
-            Bspline const & bspline_inner,
-            Bspline const & bspline_full,
-            CommandLine const & cmd
-        ) : CGPreconditioner(par, inp, ll, bspline_inner, bspline_full, cmd),
-            ILUCGPreconditioner(par, inp, ll, bspline_inner, bspline_full, cmd),
-            KPACGPreconditioner(par, inp, ll, bspline_inner, bspline_full, cmd)
+            CommandLine  const & cmd,
+            InputFile    const & inp,
+            Parallel     const & par,
+            AngularBasis const & ang,
+            Bspline const & bspline_x_inner,
+            Bspline const & bspline_x_full,
+            Bspline const & bspline_y_inner,
+            Bspline const & bspline_y_full
+        ) : CGPreconditioner
+            (
+                cmd, inp, par, ang,
+                bspline_x_inner, bspline_x_full,
+                bspline_y_inner, bspline_y_full
+            ),
+            ILUCGPreconditioner
+            (
+                cmd, inp, par, ang,
+                bspline_x_inner, bspline_x_full,
+                bspline_y_inner, bspline_y_full
+            ),
+            KPACGPreconditioner
+            (
+                cmd, inp, par, ang,
+                bspline_x_inner, bspline_x_full,
+                bspline_y_inner, bspline_y_full
+            )
         {
             // nothing more to do
         }

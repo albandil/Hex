@@ -39,9 +39,9 @@
 
 Solver::Solver
 (
-    CommandLine & cmd,
-    InputFile const & inp,
-    Parallel const & par,
+    CommandLine        & cmd,
+    InputFile    const & inp,
+    Parallel     const & par,
     AngularBasis const & ang,
     Bspline const & bspline_inner,
     Bspline const & bspline_full
@@ -56,7 +56,15 @@ Solver::Solver
 void Solver::choose_preconditioner ()
 {
     // create the preconditioner
-    prec_ = PreconditionerBase::Choose(cmd_.preconditioner, par_, inp_, ang_, bspline_inner_, bspline_full_, cmd_);
+    prec_ = PreconditionerBase::Choose
+    (
+        cmd_.preconditioner,
+        cmd_, inp_,  par_, ang_,
+        bspline_inner_, // inner region basis
+        bspline_full_,  // full basis
+        bspline_full_,  // x axis full basis
+        bspline_full_   // y axis full basis
+    );
     
     // check success
     if (prec_ == nullptr)
@@ -120,6 +128,7 @@ void Solver::solve ()
                   << " CG iterations per energy)" << std::endl;
         
         // get asymptotical bound states for each of the angular momentum pairs
+        channels_.resize(ang_.states().size());
         bstates_.clear();
         for (unsigned ill = 0; ill < ang_.states().size(); ill++)
         {
@@ -127,26 +136,26 @@ void Solver::solve ()
             int l2 = ang_.states()[ill].second;
             
             // get number of bound states for each particle at this energy
-            std::pair<int,int> bstates = prec_->bstates(std::max(inp_.Etot[ie], inp_.channel_max_E), l1, l2);
+            channels_[ill] = prec_->bstates(std::max(inp_.Etot[ie], inp_.channel_max_E), l1, l2);
+            
+            // the number of scattering channels
+            std::swap(channels_[ill].first, channels_[ill].second);
             
             // store all principal quantum numbers for given l1 or l2
             bstates_.push_back
             (
                 std::make_pair
                 (
-                    linspace<int>(l1 + 1, l1 + bstates.first,  bstates.first),
-                    linspace<int>(l2 + 1, l2 + bstates.second, bstates.second)
+                    linspace<int>(l1 + 1, l1 + channels_[ill].second, channels_[ill].second),
+                    linspace<int>(l2 + 1, l2 + channels_[ill].first,  channels_[ill].first)
                 )
             );
         }
         
         // calculate size of the hamiltonian
-        std::size_t Hsize = std::accumulate
-        (
-            bstates_.begin(), bstates_.end(),
-            Nspline_inner * Nspline_inner * ang_.states().size(),
-            [&](std::size_t n, std::pair<iArray,iArray> const & p) { return n + (p.first.size() + p.second.size()) * Nspline_outer; }
-        );
+        std::size_t Hsize = Nspline_inner * Nspline_inner * ang_.states().size();
+        for (std::pair<iArray,iArray> const & p : bstates_)
+            Hsize += (p.first.size() + p.second.size()) * Nspline_outer;
         
         // print system information
         std::cout.imbue(std::locale(std::locale::classic(), new MyNumPunct));
@@ -192,7 +201,7 @@ void Solver::solve ()
             }
             
             // check if there is some precomputed solution on the disk
-            SolutionIO reader (inp_.L, Spin, inp_.Pi, ni, li, mi, inp_.Etot[ie], ang_.states());
+            SolutionIO reader (inp_.L, Spin, inp_.Pi, ni, li, mi, inp_.Etot[ie], ang_.states(), channels_);
             std::size_t size = 0;
             reader.check(SolutionIO::All, size);
             
@@ -308,7 +317,7 @@ void Solver::solve ()
             computations_done++;
             
             // save solution to disk (if valid)
-            SolutionIO reader (ang_.L(), ang_.S(), ang_.Pi(), ni_, li_, mi_, 2 * E_, ang_.states());
+            SolutionIO reader (ang_.L(), ang_.S(), ang_.Pi(), ni_, li_, mi_, 2 * E_, ang_.states(), channels_);
             if (std::isfinite(compute_norm(psi)))
             {
                 for (unsigned ill = 0; ill < ang_.states().size(); ill++)
@@ -508,7 +517,7 @@ void Solver::process_solution_ (unsigned iteration, BlockArray<Complex> const & 
 {
     if (cmd_.write_intermediate_solutions)
     {
-        SolutionIO writer (ang_.L(), ang_.S(), ang_.Pi(), ni_, li_, mi_, 2 * E_, ang_.states(), format("tmp-%d", iteration));
+        SolutionIO writer (ang_.L(), ang_.S(), ang_.Pi(), ni_, li_, mi_, 2 * E_, ang_.states(), channels_, format("tmp-%d", iteration));
         writer.save(x);
     }
 }

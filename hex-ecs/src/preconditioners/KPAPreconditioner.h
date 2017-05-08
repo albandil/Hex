@@ -76,13 +76,24 @@ class KPACGPreconditioner : public virtual CGPreconditioner
         // constructor
         KPACGPreconditioner
         (
-            Parallel const & par,
-            InputFile const & inp,
-            AngularBasis const & ll,
+            CommandLine  const & cmd,
+            InputFile    const & inp,
+            Parallel     const & par,
+            AngularBasis const & ang,
             Bspline const & bspline_inner,
             Bspline const & bspline_full,
-            CommandLine const & cmd
-        ) : CGPreconditioner(par, inp, ll, bspline_inner, bspline_full, cmd)
+            Bspline const & bspline_panel_x,
+            Bspline const & bspline_panel_y
+        ) : CGPreconditioner
+            (
+                cmd, inp, par, ang,
+                bspline_inner,
+                bspline_full,
+                bspline_panel_x,
+                bspline_panel_y
+            ),
+            refcount_atom_(inp.maxell + 1),
+            refcount_proj_(inp.maxell + 1)
         {
 #ifdef _OPENMP
             omp_init_lock(&lck_);

@@ -32,13 +32,15 @@
 #ifndef HEX_SYMBANDMATRIX_H
 #define HEX_SYMBANDMATRIX_H
 
-#include <bitset>
+// --------------------------------------------------------------------------------- //
 
 #include "hex-arrays.h"
 #include "hex-coomatrix.h"
 #include "hex-densematrix.h"
 #include "hex-hdffile.h"
 #include "hex-openmp.h"
+
+// --------------------------------------------------------------------------------- //
 
 /**
  * @brief Matrix parts.
@@ -58,15 +60,24 @@ class MatrixSelection
         
         typedef int Selection;
         
-        static const Selection None        = 0; // = 0b000
-        static const Selection StrictLower = 1; // = 0b001
-        static const Selection StrictUpper = 2; // = 0b010
-        static const Selection StrictBoth  = 3; // = 0b011 = StrictLower | StrictUpper
-        static const Selection Diagonal    = 4; // = 0b100
-        static const Selection Lower       = 5; // = 0b101 = StrictLower | Diagonal
-        static const Selection Upper       = 6; // = 0b110 = StrictUpper | Diagonal
-        static const Selection Both        = 7; // = 0b111 = StrictLower | StrictUpper | Diagonal
+        static const Selection None        = 0; // = 0b0000
+        static const Selection StrictLower = 1; // = 0b0001
+        static const Selection StrictUpper = 2; // = 0b0010
+        static const Selection StrictBoth  = 3; // = 0b0011 = StrictLower | StrictUpper
+        static const Selection Diagonal    = 4; // = 0b0100
+        static const Selection Lower       = 5; // = 0b0101 = StrictLower | Diagonal
+        static const Selection Upper       = 6; // = 0b0110 = StrictUpper | Diagonal
+        static const Selection Both        = 7; // = 0b0111 = StrictLower | StrictUpper | Diagonal
+        static const Selection BlockStrictLower  = StrictLower << 3; // = 0b0001000
+        static const Selection BlockStrictUpper  = StrictLower << 3; // = 0b0010000
+        static const Selection BlockStrictBoth   = StrictBoth  << 3; // = 0b0011000
+        static const Selection BlockDiagonal     = Diagonal    << 3; // = 0b0100000
+        static const Selection BlockLower        = Lower       << 3; // = 0b0101000
+        static const Selection BlockUpper        = Upper       << 3; // = 0b0110000
+        static const Selection BlockBoth         = Both        << 3; // = 0b0111000
 };
+
+// --------------------------------------------------------------------------------- //
 
 /**
  * @brief Symmetric diagonal matrix.
@@ -347,13 +358,6 @@ public:
      */
     NumberArray<DataT> upperSolve (const ArrayView<DataT> b) const;
     
-    /**
-     * @brief Kronecker product.
-     * 
-     * Compute Kronecker product with other matrix.
-     */
-    SymBandMatrix kron (SymBandMatrix const & B) const;
-
     //
     // HDF interface
     //
@@ -673,8 +677,12 @@ private:
     std::string name_;
 };
 
+// --------------------------------------------------------------------------------- //
+
 template <class DataT> NumberArray<DataT> operator | (SymBandMatrix<DataT> const & A, const ArrayView<DataT> v) { return A.dot(v); }
 template <class DataT> NumberArray<DataT> operator | (const ArrayView<DataT> v, SymBandMatrix<DataT> const & A) { return A.dot(v); }
+
+// --------------------------------------------------------------------------------- //
 
 template <class DataT> class BlockSymBandMatrix
 {
@@ -707,19 +715,32 @@ template <class DataT> class BlockSymBandMatrix
         // Constructors.
         //
         
+        BlockSymBandMatrix ()
+            : diskfile_(), inmemory_(true), blockcount_(0), blockhalfbw_(0), size_(0), halfbw_(0), data_()
+        {
+            // nothing
+        }
+        
         /**
          * @brief Main constructor.
          * 
-         * @param Nblock Number of blocks in a row (column) of the block matrix.
-         * @param blocksize Number of element in a row (column) of every single block.
-         * @param blockstructure Vector of block positions; only upper part of the matrix (+ main diagonal) allowed.
+         * @param blockcount Number of blocks in a row (column) of the block matrix.
+         * @param size Number of element in a row (column) of every single block.
          * @param name Name of the optional scratch disk file.
          */
-        BlockSymBandMatrix (int blockcount = 0, int blockhalfbw = 0, int size = 0, int halfbw = 0, bool inmemory = true, std::string name = "")
+        BlockSymBandMatrix (int blockcount, int blockhalfbw, int size, int halfbw, bool inmemory = true, std::string name = "")
             : diskfile_(name), inmemory_(inmemory), blockcount_(blockcount), blockhalfbw_(blockhalfbw), size_(size), halfbw_(halfbw), data_()
         {
             if (inmemory_)
                 data_.resize(blockcount_ * size_ * blockhalfbw_ * halfbw_);
+        }
+        
+        /// Copy constructor.
+        BlockSymBandMatrix (BlockSymBandMatrix const & B)
+            : diskfile_(), inmemory_(true), blockcount_(B.blockcount_), blockhalfbw_(B.blockhalfbw_), size_(B.size_), halfbw_(B.halfbw_), data_(B.data_)
+        {
+            if (not B.inmemory())
+                HexException("Copy constructor of BlockSymBandMatrix only implemented for in-memory matrices!");
         }
         
         /// Is this object cached in memory?
@@ -730,6 +751,12 @@ template <class DataT> class BlockSymBandMatrix
         
         /// Access to the memory buffer (maay be empty if data not in memory).
         NumberArray<DataT> const & data () const { return data_; }
+        
+        // Structure information.
+        std::size_t blockcount () const { return blockcount_; }
+        std::size_t blockhalfbw () const { return blockhalfbw_; }
+        std::size_t size () const { return size_; }
+        std::size_t halfbw () const { return halfbw_; }
         
         /**
          * @brief Access block.
@@ -758,6 +785,38 @@ template <class DataT> class BlockSymBandMatrix
         DataT operator() (int i, int j, int k, int l) const
         {
             return data_[((std::min(i, k) * blockhalfbw_ + std::abs(i - k)) * size_ + std::min(j, l)) * halfbw_ + std::abs(j - l)];
+        }
+        DataT & operator() (int i, int j, int k, int l)
+        {
+            return data_[((std::min(i, k) * blockhalfbw_ + std::abs(i - k)) * size_ + std::min(j, l)) * halfbw_ + std::abs(j - l)];
+        }
+        
+        /// Reduced arithmetic operators.
+        BlockSymBandMatrix<DataT> & operator += (BlockSymBandMatrix<DataT> const & B)
+        {
+            if (blockcount_ != B.blockcount_ or blockhalfbw_ != B.blockhalfbw_ or size_ != B.size_ or halfbw_ != B.halfbw_ or data_.size() != B.data_.size())
+                HexException("The matrices supplied to operator \"+=\" have not the same structure.");
+            
+            data_ += B.data_;
+            return *this;
+        }
+        BlockSymBandMatrix<DataT> & operator -= (BlockSymBandMatrix<DataT> const & B)
+        {
+            if (blockcount_ != B.blockcount_ or blockhalfbw_ != B.blockhalfbw_ or size_ != B.size_ or halfbw_ != B.halfbw_ or data_.size() != B.data_.size())
+                HexException("The matrices supplied to operator \"-=\" have not the same structure.");
+            
+            data_ -= B.data_;
+            return *this;
+        }
+        BlockSymBandMatrix<DataT> & operator *= (DataT z)
+        {
+            data_ *= z;
+            return *this;
+        }
+        BlockSymBandMatrix<DataT> & operator /= (DataT z)
+        {
+            data_ /= z;
+            return *this;
         }
         
         /// Access individual blocks.
@@ -799,25 +858,28 @@ template <class DataT> class BlockSymBandMatrix
             }
             else
             {
-                // check that the file exists
-                HDFFile * phdf = new HDFFile (diskfile_, HDFFile::readwrite);
-                if (not phdf->valid())
+                # pragma omp critical
                 {
-                    // create a new file
-                    phdf = new HDFFile (diskfile_, HDFFile::overwrite);
+                    // check that the file exists
+                    HDFFile * phdf = new HDFFile (diskfile_, HDFFile::readwrite);
                     if (not phdf->valid())
-                        HexException("Cannot open file \"%s\" for writing.\nError stack:\n%s", diskfile_.c_str(), phdf->error().c_str());
+                    {
+                        // create a new file
+                        phdf = new HDFFile (diskfile_, HDFFile::overwrite);
+                        if (not phdf->valid())
+                            HexException("Cannot open file \"%s\" for writing.\nError stack:\n%s", diskfile_.c_str(), phdf->error().c_str());
+                        
+                        // initialize the dataset to its full length
+                        if (not phdf->write("data", (Complex*)nullptr, size_ * halfbw_ * size_ * halfbw_))
+                            HexException("Failed to initialize file \"%s\" (size %.1f).\n%s", diskfile_.c_str(), double(size_ * halfbw_)/std::pow(2,30), phdf->error().c_str());
+                    }
                     
-                    // initialize the dataset to its full length
-                    if (not phdf->write("data", (Complex*)nullptr, size_ * halfbw_ * size_ * halfbw_))
-                        HexException("Failed to initialize file \"%s\" (size %.1f).\n%s", diskfile_.c_str(), double(size_ * halfbw_)/std::pow(2,30), phdf->error().c_str());
+                    // write data
+                    if (not phdf->write("data", &data[0], size_ * halfbw_, i * size_ * halfbw_))
+                        HexException("Cannot access block %d in file \"%s\".\nError stack:\n%s", i, diskfile_.c_str(), phdf->error().c_str());
+                    
+                    delete phdf;
                 }
-                
-                // write data
-                if (not phdf->write("data", &data[0], size_ * halfbw_, i * size_ * halfbw_))
-                    HexException("Cannot access block %d in file \"%s\".\nError stack:\n%s", i, diskfile_.c_str(), phdf->error().c_str());
-                
-                delete phdf;
             }
         }
         
@@ -1146,6 +1208,72 @@ SymBandMatrix<DataT> operator * (DataT z, SymBandMatrix<DataT> const & A)
     return SymBandMatrix<DataT>(A.size(), A.halfbw(), z * A.data());
 }
 
+template <class DataT>
+BlockSymBandMatrix<DataT> kron
+(
+    SymBandMatrix<DataT> const & A,
+    SymBandMatrix<DataT> const & B
+)
+{
+    BlockSymBandMatrix<DataT> C (A.size(), A.halfbw(), B.size(), B.halfbw());
+    
+    for (std::size_t i = 0; i < A.size(); i++)
+    for (std::size_t u = 0; u < A.halfbw(); u++)
+    if (i + u < A.size())
+    for (std::size_t j = 0; j < B.size(); j++)
+    for (std::size_t v = 0; v < B.halfbw(); v++)
+    if (j + v < B.size())
+    {
+        C(i,j,i+u,j+v) = A(i,i+u) * B(j,j+v);
+    }
+    
+    return C;
+}
+
+template<class DataT>
+BlockSymBandMatrix<DataT> operator *
+(
+    DataT z,
+    BlockSymBandMatrix<DataT> const & A
+)
+{
+    BlockSymBandMatrix<DataT> C (A);
+    return C *= z;
+}
+
+template<class DataT>
+BlockSymBandMatrix<DataT> operator *
+(
+    BlockSymBandMatrix<DataT> const & A,
+    DataT z
+)
+{
+    BlockSymBandMatrix<DataT> C (A);
+    return C *= z;
+}
+
+template<class DataT>
+BlockSymBandMatrix<DataT> operator +
+(
+    BlockSymBandMatrix<DataT> const & A,
+    BlockSymBandMatrix<DataT> const & B
+)
+{
+    BlockSymBandMatrix<DataT> C (A);
+    return C += B;
+}
+
+template<class DataT>
+BlockSymBandMatrix<DataT> operator -
+(
+    BlockSymBandMatrix<DataT> const & A,
+    BlockSymBandMatrix<DataT> const & B
+)
+{
+    BlockSymBandMatrix<DataT> C (A);
+    return C -= B;
+}
+
 /**
  * @brief Kronecker product.
  * 
@@ -1185,5 +1313,7 @@ template <class DataT> void kron_dot
         w[i * B.size() + j] = a * w[i * B.size() + j] + b * res;
     }
 }
+
+// --------------------------------------------------------------------------------- //
 
 #endif // HEX_SYMBANDMATRIX_H

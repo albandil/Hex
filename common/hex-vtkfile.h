@@ -6,7 +6,7 @@
 //                    / /   / /    \_\      / /  \ \                                 //
 //                                                                                   //
 //                                                                                   //
-//  Copyright (c) 2016, Jakub Benda, Charles University in Prague                    //
+//  Copyright (c) 2017, Jakub Benda, Charles University in Prague                    //
 //                                                                                   //
 // MIT License:                                                                      //
 //                                                                                   //
@@ -29,81 +29,55 @@
 //                                                                                   //
 //  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
-#ifndef HEX_GMGPRECONDITIONER_H
-#define HEX_GMGPRECONDITIONER_H
+#ifndef HEX_VTKFILE_H
+#define HEX_VTKFILE_H
 
 // --------------------------------------------------------------------------------- //
 
-#include "NoPreconditioner.h"
+#include <string>
+#include <vector>
 
 // --------------------------------------------------------------------------------- //
 
-class GMGPreconditioner : public NoPreconditioner
+#include "hex-arrays.h"
+
+// --------------------------------------------------------------------------------- //
+
+class VTKRectGridFile
 {
     public:
         
-        // run-time selection mechanism
-        preconditionerRunTimeSelectionDefinitions(GMGPreconditioner, "GMG")
+        void setGridX (rArray const & grid);
+        void setGridY (rArray const & grid);
+        void setGridZ (rArray const & grid);
         
-        // constructor
-        GMGPreconditioner
+        void appendScalarAttribute
         (
-            CommandLine  const & cmd,
-            InputFile    const & inp,
-            Parallel     const & par,
-            AngularBasis const & ang,
-            Bspline const & bspline_x_inner,
-            Bspline const & bspline_x_full,
-            Bspline const & bspline_y_inner,
-            Bspline const & bspline_y_full
+            std::string name,
+            rArray const & array
         );
         
-        // sub-grid contructor
-        GMGPreconditioner
+        void appendVector2DAttribute
         (
-            CommandLine  const & cmd,
-            InputFile    const & inp,
-            Parallel     const & par,
-            AngularBasis const & ang,
-            Bspline const & bspline_x_inner,
-            Bspline const & bspline_x_full,
-            Bspline const & bspline_y_inner,
-            Bspline const & bspline_y_full,
-            int level
+            std::string name,
+            rArray const & xcomp,
+            rArray const & ycomp
         );
         
-        // destructor
-        virtual ~GMGPreconditioner ();
+        void appendVector3DAttribute
+        (
+            std::string name,
+            rArray const & xcomp,
+            rArray const & ycomp,
+            rArray const & zcomp
+        );
         
-        // preconditioner description
-        virtual std::string description () const;
-        
-        // reuse parent definitions
-        using NoPreconditioner::rhs;
-        using NoPreconditioner::multiply;
-        using NoPreconditioner::finish;
-        
-        // declare own definitions
-        virtual void setup ();
-        virtual void update (Real E);
-        virtual void precondition (BlockArray<Complex> const & r, BlockArray<Complex> & z) const;
+        void write (std::string filename) const;
     
     private:
         
-        int level_;
-        
-        Bspline const & bspline_inner_fine_;
-        Bspline const & bspline_full_fine_;
-        
-        Bspline bspline_inner_coarse_;
-        Bspline bspline_full_coarse_;
-        
-        RowMatrix<Complex> restrictor_inner_, restrictor_outer_;
-        RowMatrix<Complex> prolongator_inner_, prolongator_outer_;
-        
-        cArrays D;
-        
-        PreconditionerBase * subgrid_;
+        rArray xgrid_, ygrid_, zgrid_;
+        std::vector<std::pair<std::string,std::vector<rArray>>> fields_;
 };
 
 // --------------------------------------------------------------------------------- //

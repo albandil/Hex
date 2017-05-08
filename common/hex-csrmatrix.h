@@ -6,7 +6,7 @@
 //                    / /   / /    \_\      / /  \ \                                 //
 //                                                                                   //
 //                                                                                   //
-//  Copyright (c) 2015, Jakub Benda, Charles University in Prague                    //
+//  Copyright (c) 2017, Jakub Benda, Charles University in Prague                    //
 //                                                                                   //
 // MIT License:                                                                      //
 //                                                                                   //
@@ -32,15 +32,23 @@
 #ifndef HEX_CSRMATRIX_H
 #define HEX_CSRMATRIX_H
 
+// --------------------------------------------------------------------------------- //
+
 #include <memory>
+
+// --------------------------------------------------------------------------------- //
 
 #ifdef WITH_PNG
 #include <png++/png.hpp>
 #endif
 
+// --------------------------------------------------------------------------------- //
+
 #include "hex-arrays.h"
 #include "hex-coomatrix.h"
 #include "hex-densematrix.h"
+
+// --------------------------------------------------------------------------------- //
 
 /**
  * @brief Complex CSR matrix.
@@ -172,10 +180,10 @@ public:
             
             for (IdxT idx = idx1; idx < idx2; idx++)
             {
-                out << irow << "\t" << i_[idx];
+                out << irow << '\t' << i_[idx];
                 for (unsigned icomp = 0; icomp < typeinfo<DataT>::ncmpt; icomp++)
-                    out << "\t" << typeinfo<DataT>::cmpt(icomp, x_[idx]);
-                out << "\n";
+                    out << '\t' << typeinfo<DataT>::cmpt(icomp, x_[idx]);
+                out << '\n';
             }
         }
         out.close();
@@ -457,7 +465,34 @@ public:
     /**
      * Convert to COO format.
      */
-    CooMatrix<IdxT,DataT> tocoo() const;
+    CooMatrix<IdxT,DataT> tocoo () const
+    {
+        if (p().empty() or i().empty() or x().empty())
+            return CooMatrix<IdxT,DataT>();
+        
+        IdxT nz = p().back();
+        
+        NumberArray<IdxT>  I; I.reserve(nz);
+        NumberArray<IdxT>  J; J.reserve(nz);
+        NumberArray<DataT> V; V.reserve(nz);
+        
+        for (IdxT irow = 0; irow < (IdxT)rows(); irow++)
+        for (IdxT idx = p()[irow]; idx < p()[irow + 1]; idx++)
+        {
+            I.push_back(irow);
+            J.push_back(i()[idx]);
+            V.push_back(x()[idx]);
+        }
+        
+        return CooMatrix<IdxT,DataT>
+        (
+            rows(),
+            cols(),
+            std::move(I),
+            std::move(J),
+            std::move(V)
+        );
+    }
     
     /**
      * Convert to dense matrix.
@@ -676,5 +711,44 @@ CsrMatrix<IdxT,DataT> operator * (CsrMatrix<IdxT,DataT> const & A, double r)
     CsrMatrix<IdxT,DataT> C = A;
     return C *= r;
 }
+
+/**
+ * @brief Kronecker product.
+ * 
+ * Calculates the Kronecker product @f$ w = (A \otimes B) \cdot u @f$, or in
+ * components
+ * @f[
+ *     w_{i r_B + j} = A_{ik} B_{jl} u_{k c_B + l}
+ * @f]
+ * where @f$ u @f$ is a column vector and the matrices @f$ A @f$ and @f$ B @f$
+ * are of the CSR type. The dimensions of the matrices are @f$ r_A \times c_A @f$
+ * and @f$ r_B \times c_B @f$, respectively. The result is a column vector, again.
+ */
+template <class IdxT, class DataT>
+NumberArray<DataT> kron_dot (CsrMatrix<IdxT,DataT> const & A, CsrMatrix<IdxT,DataT> const & B, NumberArray<DataT> const & u)
+{
+    // dimensions
+    std::size_t rA = A.rows(), rB = B.rows();
+    std::size_t cA = A.cols(), cB = B.cols();
+    
+    // check input size
+    assert(u.size() == cA * cB);
+    
+    // V[col] = B U[col]
+    NumberArray<DataT> V (rB * cA);
+    for (std::size_t i = 0; i < cA; i++)
+        ArrayView<DataT>(V, i * rB, rB) = B.dot(ArrayView<DataT>(u, i * cB, cB));
+    transpose(V, rB, cA);
+    
+    // W = A V
+    NumberArray<DataT> W (rA * rB);
+    for (std::size_t i = 0; i < rB; i++)
+        ArrayView<DataT>(W, i * rA, rA) = A.dot(ArrayView<DataT>(u, i * cA, cA));
+    transpose(W, rA, rB);
+    
+    return W;
+}
+
+// --------------------------------------------------------------------------------- //
 
 #endif // HEX_CSRMATRIX_H

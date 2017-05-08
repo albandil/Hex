@@ -6,7 +6,7 @@
 //                    / /   / /    \_\      / /  \ \                                 //
 //                                                                                   //
 //                                                                                   //
-//  Copyright (c) 2016, Jakub Benda, Charles University in Prague                    //
+//  Copyright (c) 2017, Jakub Benda, Charles University in Prague                    //
 //                                                                                   //
 // MIT License:                                                                      //
 //                                                                                   //
@@ -32,6 +32,8 @@
 #ifndef HEX_MISC
 #define HEX_MISC
 
+// --------------------------------------------------------------------------------- //
+
 #include <algorithm> 
 #include <cassert>
 #include <cctype>
@@ -52,11 +54,17 @@
 #include <string>
 #include <vector>
 
+// --------------------------------------------------------------------------------- //
+
 #ifdef __linux__
     #include <unistd.h>
 #endif
 
+// --------------------------------------------------------------------------------- //
+
 #include "hex-numbers.h"
+
+// --------------------------------------------------------------------------------- //
 
 /**
  * @brief printf-like formatting.
@@ -115,7 +123,11 @@ template <class ...Params> [[noreturn]] void TerminateWithException (const char*
     print_stack_trace();
     
     // exit the program
+#ifdef NDEBUG
     std::exit(EXIT_FAILURE);
+#else
+    std::abort();
+#endif
 }
 
 /**
@@ -739,5 +751,7 @@ std::string nice_size (std::size_t bytes);
 
 /// Return formatted string containing current date and time.
 std::string current_time ();
+
+// --------------------------------------------------------------------------------- //
 
 #endif
