@@ -110,21 +110,37 @@ class NoPreconditioner : public PreconditionerBase
         AngularBasis const * ang_;
         
         // Sub-blocks composing the angular blocks of the full matrix:
-        //  ┏━━━━━━┯━━━━━━━━┓
-        //  ┃ A    │  Cu    ┃
-        //  ┃    A │        ┃
-        //  ┠──────┼───┬────┨
-        //  ┃      │B1 │  0 ┃
-        //  ┃ Cl   ├───┼────┨
-        //  ┃      │ 0 │ B2 ┃
-        //  ┗━━━━━━┷━━━┷━━━━┛
-        // The off-diagonal blocks Cu and Cl are actually stored as COO matrices with the dimension
-        // of the whole matrix, but only the elements of the respective blocks are non-zero.
+        //  ┏━━━━━━┯━━━━━━━┯━━━┓
+        //  ┃ A    │  Cu   │Fu ┃
+        //  ┃      │       │   ┃
+        //  ┠──────┼───┬───┼───┨
+        //  ┃      │B1 │ 0 │ 0 ┃
+        //  ┃ Cl   ├───┼───┤   ┃
+        //  ┃      │ 0 │B2 │   ┃
+        //  ┠──────┼───┴───┼───┨
+        //  ┃ Fl   │ 0     │ E ┃
+        //  ┗━━━━━━┷━━━━━━━┷━━━┛
+        // The individual sub-blocks have the following meaning:
+        //   1.  A is the rectangular inner-domain two-dimensional hamiltonian on the real grid.
+        //   2.  B1, B2 are the rectangular outer region one-electron hamiltonians on the full grid.
+        //       Each of them can be composed of diagonal blocks corresponding to the individual
+        //       scattering channels. The channels may and may not be coupled to each other.
+        //   3.  Cu, Cl is the coupling of the asymptotic channels to the inner region. They are
+        //       stored as COO matrices with the dimension of the full matrix.
+        //   4.  E is the two-dimensional hamiltonian block that supplies the non-reflective
+        //       boundary condition to other channels than those managed by B1 and B2.
+        //   5.  Fu, Fl couple the inner region to the non-reflective boundary conditiion
+        //       tail. It essentially projects out the asymptotic channels, so that the boundary
+        //       condition is applied only on the closed channels.
+        // The blocks marked with zero never contain non-zero elements.
         std::vector<BlockSymBandMatrix<Complex>> A_blocks_;
         std::vector<std::vector<SymBandMatrix<Complex>>> B1_blocks_;
         std::vector<std::vector<SymBandMatrix<Complex>>> B2_blocks_;
         std::vector<CooMatrix<LU_int_t,Complex>> Cu_blocks_;
         std::vector<CooMatrix<LU_int_t,Complex>> Cl_blocks_;
+        std::vector<BlockSymBandMatrix<Complex>> E_blocks_;
+        std::vector<CooMatrix<LU_int_t,Complex>> Fu_blocks_;
+        std::vector<CooMatrix<LU_int_t,Complex>> Fl_blocks_;
         
         // maximal bound state principal quantum number for given energy
         int max_n_;
