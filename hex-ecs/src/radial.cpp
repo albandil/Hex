@@ -61,8 +61,8 @@ RadialIntegrals::RadialIntegrals
     bspline_y_(bspline_y),
     rxmin_(bspline_x.R1() == bspline_x.Rmin() ? bspline_x.R1() : bspline_x.unrotate(bspline_x.t(bspline_x.iR1() - 2 * bspline_x.order() - 1))),
     rymin_(bspline_y.R1() == bspline_y.Rmin() ? bspline_y.R1() : bspline_y.unrotate(bspline_y.t(bspline_y.iR1() - 2 * bspline_y.order() - 1))),
-    rxmax_(bspline_x.unrotate(bspline_x.t(bspline_x.iR2() + 2 * bspline_x.order() + 1))),
-    rymax_(bspline_y.unrotate(bspline_y.t(bspline_y.iR2() + 2 * bspline_y.order() + 1))),
+    rxmax_(bspline_x.R2() == bspline_x.Rmax() ? bspline_x.R2() : bspline_x.unrotate(bspline_x.t(bspline_x.iR2() + 2 * bspline_x.order() + 1))),
+    rymax_(bspline_y.R2() == bspline_y.Rmax() ? bspline_y.R2() : bspline_y.unrotate(bspline_y.t(bspline_y.iR2() + 2 * bspline_y.order() + 1))),
     D_x_  (bspline_x.Nspline(), bspline_x.order() + 1),
     S_x_  (bspline_x.Nspline(), bspline_x.order() + 1),
     Mm1_x_(bspline_x.Nspline(), bspline_x.order() + 1),
@@ -525,24 +525,16 @@ void RadialIntegrals::setupOneElectronIntegrals (bool shared_scratch, bool IamMa
     
     if (verbose_)
         std::cout << "done in " << t.nice_time() << std::endl << std::endl;
-}
-
-void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLine const & cmd)
-{
-    // shorthands
-    int order = bspline_x_.order();
-    int Nspline_x  = bspline_x_ .Nspline();
-    int Nspline_y  = bspline_y_ .Nspline();
     
-    // set number of two-electron integrals
-    R_tr_dia_.resize(Nlambdas_);
+    int order = bspline().order();
+    t.reset();
     
     if (verbose_)
-        std::cout << "Precomputing partial integral moments (lambda = 0 .. " << Nlambdas_ - 1 << ")" << std::endl;
+        std::cout << "Precomputing partial integral moments (lambda = 0 .. " << Nlambdas_ - 1 << ") ... " << std::flush;
     
     // partial moments sizes
-    std::size_t mi_size_x = Nspline_x * (2 * order + 1) * (order + 1);
-    std::size_t mi_size_y = Nspline_y * (2 * order + 1) * (order + 1);
+    std::size_t mi_size_x = bspline_x_ .Nspline() * (2 * order + 1) * (order + 1);
+    std::size_t mi_size_y = bspline_y_ .Nspline() * (2 * order + 1) * (order + 1);
     
     // resize partial moments arrays
     Mitr_L_x_   .resize(Nlambdas_ * mi_size_x);
@@ -551,10 +543,10 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
     Mitr_mLm1_y_.resize(Nlambdas_ * mi_size_y);
     
     // resize full moments arrays, initialize with empty matrices
-    Mtr_L_x_   .resize(Nlambdas_, SymBandMatrix<Complex>(Nspline_x, order + 1));
-    Mtr_L_y_   .resize(Nlambdas_, SymBandMatrix<Complex>(Nspline_y, order + 1));
-    Mtr_mLm1_x_.resize(Nlambdas_, SymBandMatrix<Complex>(Nspline_x, order + 1));
-    Mtr_mLm1_y_.resize(Nlambdas_, SymBandMatrix<Complex>(Nspline_y, order + 1));
+    Mtr_L_x_   .resize(Nlambdas_, SymBandMatrix<Complex>(bspline_x_ .Nspline(), order + 1));
+    Mtr_L_y_   .resize(Nlambdas_, SymBandMatrix<Complex>(bspline_y_ .Nspline(), order + 1));
+    Mtr_mLm1_x_.resize(Nlambdas_, SymBandMatrix<Complex>(bspline_x_ .Nspline(), order + 1));
+    Mtr_mLm1_y_.resize(Nlambdas_, SymBandMatrix<Complex>(bspline_y_ .Nspline(), order + 1));
     
     // resize two-electron integrals array
     R_tr_dia_diag_.resize(Nlambdas_);
@@ -576,7 +568,18 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
     }
     
     if (verbose_)
-        std::cout << std::endl;
+        std::cout << "done in " << t.nice_time() << std::endl << std::endl;
+}
+
+void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLine const & cmd)
+{
+    // shorthands
+    int order = bspline_x_.order();
+    int Nspline_x  = bspline_x_ .Nspline();
+    int Nspline_y  = bspline_y_ .Nspline();
+    
+    // set number of two-electron integrals
+    R_tr_dia_.resize(Nlambdas_);
     
     // abandon their computation, if not necessary
     if (cmd.lightweight_radial_cache)

@@ -170,11 +170,15 @@ void ILUCGPreconditioner::CG_init (int iblock) const
         int Nchan1 = Nchan_[iblock].first;
         int Nchan2 = Nchan_[iblock].second;
         
-        // number of B-splines
-        LU_int_t Nspline_inner_x = rad_panel_->bspline_x().Nspline();
-        LU_int_t Nspline_inner_y = rad_panel_->bspline_y().Nspline();
-        LU_int_t Nspline_outer_x = 0; // FIXME
-        LU_int_t Nspline_outer_y = 0; // FIXME
+        // panel x basis
+        LU_int_t Nspline_x = rad_panel_->bspline_x().Nspline();
+        LU_int_t Nspline_inner_x = rad_panel_->bspline_x().knot(rad_inner_->bspline_x().R2()) - inp_->order;
+        LU_int_t Nspline_outer_x = Nspline_x - Nspline_inner_x;
+        
+        // panel y basis
+        LU_int_t Nspline_y = rad_panel_->bspline_y().Nspline();
+        LU_int_t Nspline_inner_y = rad_panel_->bspline_y().knot(rad_inner_->bspline_y().R2()) - inp_->order;
+        LU_int_t Nspline_outer_y = Nspline_y - Nspline_inner_y;
         
         // angular block
         int iang = iblock * ang_->states().size() + iblock;

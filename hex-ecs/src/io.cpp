@@ -1124,7 +1124,7 @@ void zip_solution
     // factorize the overlap matrix
     CsrMatrix<LU_int_t,Complex> S_csr = r.S_x().tocoo<LU_int_t>().tocsr();
     std::shared_ptr<LUft> S_lu;
-    S_lu.reset(LUft::Choose(cmd.factorizer));
+    S_lu.reset(LUft::Choose("lapack"));
     S_lu->factorize(S_csr);
     
     // compute all needed bound states

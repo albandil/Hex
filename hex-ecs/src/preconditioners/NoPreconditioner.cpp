@@ -118,13 +118,8 @@ void NoPreconditioner::setup ()
     rad_panel_->setupOneElectronIntegrals(*par_, *cmd_);
     rad_panel_->setupTwoElectronIntegrals(*par_, *cmd_);
     
-    // number of basis B-splines
+    // number of global inner basis B-splines
     std::size_t Nspline_inner = bspline_inner.Nspline();
-    std::size_t Nspline_full  = bspline_full .Nspline();
-    
-    // number of panel B-splines
-    std::size_t Nspline_x = bspline_x.Nspline();
-    std::size_t Nspline_y = bspline_y.Nspline();
     
     // is this panel the full solution domain?
     bool full_domain = (bspline_x.hash() == bspline_full.hash() and bspline_y.hash() == bspline_full.hash());
@@ -156,7 +151,7 @@ void NoPreconditioner::setup ()
     Sp_[1].resize(ells[1].back() + 1);  Sp_[1].fill(cArrays());
     Eb_[1].resize(ells[1].back() + 1);  Eb_[1].fill(cArray());
     
-    // Diagonalize the overlap matrix and find the eigenvectors of the one-electron hamiltonian.
+    // Diagonalize the global overlap matrix and find the eigenvectors of the one-electron hamiltonian.
     // It will be needed to construct matrix of the system and/or for the KPA preconditioner.
     
     for (int i = 0; i < 2; i++)
@@ -405,9 +400,9 @@ std::pair<int,int> NoPreconditioner::bstates (Real E, int l1, int l2) const
 
 BlockSymBandMatrix<Complex> NoPreconditioner::calc_A_block (int ill, int illp, bool twoel) const
 {
-    // number of panel B-splines common with the inner basis
-    int Nspline_x_inner = rad_panel_->bspline_x().Nspline();
-    int Nspline_y_inner = rad_panel_->bspline_y().Nspline();
+    // inner B-spline count
+    int Nspline_x_inner = rad_panel_->bspline_x().knot(rad_inner_->bspline_x().R2()) - inp_->order;
+    int Nspline_y_inner = rad_panel_->bspline_y().knot(rad_inner_->bspline_y().R2()) - inp_->order;
     
     // angular momenta
     int l1 = ang_->states()[ill].first;
@@ -493,12 +488,12 @@ void NoPreconditioner::update (Real E)
     
     // panel x basis
     int Nspline_x = rad_panel_->bspline_x().Nspline();
-    int Nspline_x_inner = rad_panel_->bspline_x().knot(rad_inner_->bspline_x().R2());
+    int Nspline_x_inner = rad_panel_->bspline_x().knot(rad_inner_->bspline_x().R2()) - order;
     int Nspline_x_outer = Nspline_x - Nspline_x_inner;
     
     // panel y basis
     int Nspline_y = rad_panel_->bspline_y().Nspline();
-    int Nspline_y_inner = rad_panel_->bspline_y().knot(rad_inner_->bspline_y().R2());
+    int Nspline_y_inner = rad_panel_->bspline_y().knot(rad_inner_->bspline_y().R2()) - order;
     int Nspline_y_outer = Nspline_y - Nspline_y_inner;
     
     // size of the A-matrix
@@ -1207,23 +1202,21 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
 
 void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Complex> & q, MatrixSelection::Selection tri) const
 {
+    // shorthands
+    unsigned Nang = ang_->states().size();
+    
     // full basis
     unsigned Nspline_inner = rad_inner_->bspline_x().Nspline();
-    unsigned Nspline_full  = rad_full_->bspline_x().Nspline();
-    unsigned Nspline_outer = Nspline_full - Nspline_inner;
     
     // panel x basis
-    unsigned Nspline_x_full  = rad_panel_->bspline_x().Nspline();
-    unsigned Nspline_x_inner = Nspline_x_full; // FIXME
-    unsigned Nspline_x_outer = Nspline_x_full - Nspline_x_inner;
+    int Nspline_x = rad_panel_->bspline_x().Nspline();
+    int Nspline_x_inner = rad_panel_->bspline_x().knot(rad_inner_->bspline_x().R2()) - inp_->order;
+    int Nspline_x_outer = Nspline_x - Nspline_x_inner;
     
     // panel y basis
-    unsigned Nspline_y_full  = rad_panel_->bspline_y().Nspline();
-    unsigned Nspline_y_inner = Nspline_y_full; // FIXME
-    unsigned Nspline_y_outer = Nspline_y_full - Nspline_y_inner;
-    
-    // number of diagonal blocks
-    unsigned Nang = ang_->states().size();
+    int Nspline_y = rad_panel_->bspline_y().Nspline();
+    int Nspline_y_inner = rad_panel_->bspline_y().knot(rad_inner_->bspline_y().R2()) - inp_->order;
+    int Nspline_y_outer = Nspline_y - Nspline_y_inner;
     
     // make sure no process is playing with the data
     par_->wait();
@@ -1376,8 +1369,8 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
         
         # pragma omp parallel for collapse (3) schedule (dynamic,1)
         for (int lambda = 0; lambda <= maxlambda; lambda++)
-        for (unsigned i = 0; i < Nspline_x_inner; i++)
-        for (unsigned d = 0; d <= (unsigned)inp_->order; d++)
+        for (int i = 0; i < Nspline_x_inner; i++)
+        for (int d = 0; d <= inp_->order; d++)
         if (i + d < Nspline_x_inner)
         {
             unsigned k = i + d;
