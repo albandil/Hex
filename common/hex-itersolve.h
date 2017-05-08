@@ -223,7 +223,7 @@ class ConjugateGradients
             std::size_t N = b.size();
             
             // residual; initialized to starting residual using the initial guess
-            TArray r (std::move(new_array(N, "cg-r")));
+            TArray r (new_array(N, "cg-r"));
             if (not recovered)
             {
                 matrix_multiply(x, r); // r = A x
@@ -250,8 +250,8 @@ class ConjugateGradients
             }
             
             // some auxiliary arrays (search directions etc.)
-            TArray p (std::move(new_array(N, "cg-p")));
-            TArray z (std::move(new_array(N, "cg-z")));
+            TArray p (new_array(N, "cg-p"));
+            TArray z (new_array(N, "cg-z"));
             
             // Iterate
             

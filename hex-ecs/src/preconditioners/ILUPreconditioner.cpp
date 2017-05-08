@@ -223,7 +223,7 @@ void ILUCGPreconditioner::CG_init (int iblock) const
         }
         
         // create the CSR block that will be factorized
-        CsrMatrix<LU_int_t,Complex> csr = std::move(coo_block.tocsr());
+        CsrMatrix<LU_int_t,Complex> csr = coo_block.tocsr();
         coo_block = CooMatrix<LU_int_t,Complex>();
         
         // set up factorization data
