@@ -202,7 +202,7 @@ void CommandLine::parse (int argc, char* argv[])
                     "\t--lu <name>                (-F)  Factorization library (one of" + f.str() + "). Default is 'umfpack'.\n"
 #ifdef WITH_MUMPS
                     "\t--mumps-out-of-core              Use out-of-core capability of MUMPS (this is independent on --out-of-core option).                                     \n"
-                    "\t--mumps-verbose                  Verbosity level of the MUMPS library. Zero ('0') means no output, higher numbers increase the verbosity.               \n"
+                    "\t--mumps-verbose <number>         Verbosity level of the MUMPS library. Zero ('0') means no output, higher numbers increase the verbosity.               \n"
 #endif
                     "                                                                                                                                                          \n"
                     "Stage selection                                                                                                                                           \n"
