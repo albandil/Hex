@@ -89,40 +89,46 @@ Amplitudes::Amplitudes
     std::vector<std::pair<int,int>> const & ang
 ) : bspline_inner_(bspline_inner), bspline_full_(bspline_full),
     rad_(bspline_inner, bspline_full, 0),
-    inp_(inp), par_(par), cmd_(cmd), ang_(ang)
+    inp_(inp), par_(par), cmd_(cmd), ang_(ang), verbose_(true)
 {
     rad_.verbose(false);
     rad_.setupOneElectronIntegrals(par, cmd);
 }
 
-void Amplitudes::extract ()
+void Amplitudes::extract (std::string directory)
 {
     par_.wait();
     
-    std::cout << std::endl;
-    if (cmd_.extract_extrapolate)
-        std::cout << "Extrapolating T-matrices ";
-    else
-        std::cout << "Averaging T-matrices ";
-    if (cmd_.extract_rho_begin > 0)
-        std::cout << "from " << cmd_.extract_rho_begin << " ";
-    if (cmd_.extract_rho > 0)
-        std::cout << "to " << cmd_.extract_rho << " ";
-    if (cmd_.extract_samples > 0)
-        std::cout << "using " << cmd_.extract_samples << " samples";
-    std::cout << std::endl;
+    if (verbose_)
+    {
+        std::cout << std::endl;
+        if (cmd_.extract_extrapolate)
+            std::cout << "Extrapolating T-matrices ";
+        else
+            std::cout << "Averaging T-matrices ";
+        if (cmd_.extract_rho_begin > 0)
+            std::cout << "from " << cmd_.extract_rho_begin << " ";
+        if (cmd_.extract_rho > 0)
+            std::cout << "to " << cmd_.extract_rho << " ";
+        if (cmd_.extract_samples > 0)
+            std::cout << "using " << cmd_.extract_samples << " samples";
+        std::cout << std::endl;
+    }
     
     for (unsigned Spin : inp_.Spin)
     {
-        if (Spin == 0)
-            std::cout << "\tSinglet" << std::endl;
-        
-        if (Spin == 1)
-            std::cout << "\tTriplet" << std::endl;
+        if (verbose_)
+        {
+            if (Spin == 0)
+                std::cout << "\tSinglet" << std::endl;
+            
+            if (Spin == 1)
+                std::cout << "\tTriplet" << std::endl;
+        }
         
         for (unsigned ie = 0; ie < inp_.Etot.size(); ie++)
         {
-            std::cout << "\t\tEi = " << inp_.Etot[ie] << std::endl;
+            if (verbose_) std::cout << "\t\tEi = " << inp_.Etot[ie] << std::endl;
             
             // for all initial states
             for (auto instate  : inp_.instates)
@@ -133,7 +139,7 @@ void Amplitudes::extract ()
                 int mi = std::get<2>(instate);
                 
                 // check existence of the solution; take into account distributed calculations
-                reader_ = SolutionIO (inp_.L, Spin, inp_.Pi, ni, li, mi, inp_.Etot[ie], ang_);
+                reader_ = SolutionIO (inp_.L, Spin, inp_.Pi, ni, li, mi, inp_.Etot[ie], ang_, std::vector<std::pair<int,int>>(), directory + "/psi");
                 BlockArray<Complex> solution (ang_.size(), true, "sol");
                 std::size_t valid_blocks = 0;
                 for (unsigned ill = 0; ill < ang_.size(); ill++) if (par_.isMyGroupWork(ill) and (not cmd_.shared_scratch or par_.IamGroupMaster()))
@@ -148,7 +154,9 @@ void Amplitudes::extract ()
                     // complain only if the solution is allowed
                     // TODO
                     
-                    std::cout << "\t\t\tSolution files for L = " << inp_.L << ", Pi = " << inp_.Pi << ", (ni,li,mi) = (" << ni << "," << li << "," << mi << ") not found." << std::endl;
+                    if (verbose_)
+                        std::cout << "\t\t\tSolution files for L = " << inp_.L << ", Pi = " << inp_.Pi << ", (ni,li,mi) = (" << ni << "," << li << "," << mi << ") not found." << std::endl;
+                    
                     continue;
                 }
                 
@@ -181,7 +189,8 @@ void Amplitudes::extract ()
                         // Discrete transition
                         //
                         
-                        std::cout << format("\t\t\texc: (%d,%d,%d) -> (%d,%d,*) ",ni, li, mi, nf, lf) << std::endl;
+                        if (verbose_)
+                            std::cout << format("\t\t\texc: (%d,%d,%d) -> (%d,%d,*) ",ni, li, mi, nf, lf) << std::endl;
                         
                         // compute radial integrals
                         for (int mf = -lf; mf <= lf; mf++)
@@ -199,7 +208,8 @@ void Amplitudes::extract ()
                         // Ionization
                         //
                         
-                        std::cout << format("\t\t\tion: (%d,%d,%d) -> ion ",ni, li, mi) /*<< std::endl*/;
+                        if (verbose_)
+                            std::cout << format("\t\t\tion: (%d,%d,%d) -> ion ",ni, li, mi) /* << std::endl */;
                         
                         // transition
                         Transition transition = { ni, li, mi, 0, 0, 0 };
@@ -226,7 +236,7 @@ void Amplitudes::extract ()
     }
 }
 
-void Amplitudes::writeSQL_files ()
+void Amplitudes::writeSQL_files (std::string directory)
 {
     // let the file be written by the master process, and by the group-masters in multi-group case
     if (not par_.IamMaster() and (cmd_.shared_scratch or not par_.IamGroupMaster()))
@@ -237,7 +247,7 @@ void Amplitudes::writeSQL_files ()
     ossfile << "tmat-L" << inp_.L << "-Pi" << inp_.Pi << ".sql";
     
     // Create SQL batch file
-    std::ofstream fsql (ossfile.str().c_str());
+    std::ofstream fsql (directory + "/" + ossfile.str().c_str());
     
     // set exponential format for floating point output
     fsql.setf(std::ios_base::scientific);
@@ -329,15 +339,15 @@ void Amplitudes::writeSQL_files ()
     fsql.close();
 }
 
-void Amplitudes::writeICS_files ()
+void Amplitudes::writeICS_files (std::string directory)
 {
     // let the file be written by the master process, and by the group-masters in multi-group case
     if (not par_.IamMaster() and (cmd_.shared_scratch or not par_.IamGroupMaster()))
         return;
     
     // open files
-    std::ofstream fS0 (format("ics-L%d-S0-Pi%d.dat", inp_.L, inp_.Pi));
-    std::ofstream fS1 (format("ics-L%d-S1-Pi%d.dat", inp_.L, inp_.Pi));
+    std::ofstream fS0 (directory + "/" + format("ics-L%d-S0-Pi%d.dat", inp_.L, inp_.Pi));
+    std::ofstream fS1 (directory + "/" + format("ics-L%d-S1-Pi%d.dat", inp_.L, inp_.Pi));
     
     // write singlet file header
     fS0 << logo("#");
@@ -813,7 +823,7 @@ void Amplitudes::computeXi_ (Amplitudes::Transition T, BlockArray<Complex> & sol
     if (Xi_Sl1l2.find(T) == Xi_Sl1l2.end())
         Xi_Sl1l2[T] = std::vector<std::pair<cArray,cArray>>(ang_.size() * inp_.Etot.size());
     
-    std::cout << ": ";
+    if (verbose_) std::cout << ": ";
     
     // for all angular states ???: (triangle ℓ₂ ≤ ℓ₁)
 //     # pragma omp parallel for schedule (dynamic, 1)
@@ -823,7 +833,7 @@ void Amplitudes::computeXi_ (Amplitudes::Transition T, BlockArray<Complex> & sol
         int l2 = ang_[ill].second;
         
 //         # pragma omp critical
-        std::cout << "(" << l1 << "," << l2 << ") " << std::flush;
+        if (verbose_) std::cout << "(" << l1 << "," << l2 << ") " << std::flush;
         
         // load solution block
         if (not solution.inmemory())
@@ -841,7 +851,7 @@ void Amplitudes::computeXi_ (Amplitudes::Transition T, BlockArray<Complex> & sol
             solution[ill].drop();
     }
     
-    std::cout << "ok" << std::endl;
+    if (verbose_) std::cout << "ok" << std::endl;
 }
 
 void Amplitudes::computeSigmaIon_ (Amplitudes::Transition T)

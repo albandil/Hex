@@ -80,7 +80,7 @@ class Amplitudes
          * end the class will contain T-matrices and partial cross sections for
          * transitions requested in the input file.
          */
-        void extract ();
+        void extract (std::string directory = ".");
         
         /**
          * @brief Write SQL batch file.
@@ -90,7 +90,7 @@ class Amplitudes
          * will be substituted by actual values of these total quantum numbers.
          * See the documentation of hex-db for details on the output format.
          */
-        void writeSQL_files ();
+        void writeSQL_files (std::string directory = ".");
         
         /**
          * @brief Write integral cross sections to file.
@@ -111,7 +111,14 @@ class Amplitudes
          * to
          * @f$ |nlm\rangle |\mathbf{k}\rangle = |2,1,1\rangle |\mathbf{k}_f\rangle @f$.
          */
-        void writeICS_files ();
+        void writeICS_files (std::string directory = ".");
+        
+        /**
+         * @brief Set verbosity level.
+         * 
+         * This function can be used to mute the text output of this class.
+         */
+        void verbose (bool b) { verbose_ = b; }
         
     private:
         
@@ -265,6 +272,9 @@ class Amplitudes
         
         // solution reader
         SolutionIO reader_;
+        
+        // standard output verbosity
+        bool verbose_;
 };
 
 #endif

@@ -33,6 +33,7 @@
 
 // --------------------------------------------------------------------------------- //
 
+#include "amplitudes.h"
 #include "solver.h"
 
 // --------------------------------------------------------------------------------- //
@@ -515,10 +516,27 @@ BlockArray<Complex> Solver::new_array_ (std::size_t N, std::string name) const
 
 void Solver::process_solution_ (unsigned iteration, BlockArray<Complex> const & x) const
 {
+    std::string dir = format("iter-%d", iteration);
+    
     if (cmd_.write_intermediate_solutions)
     {
-        SolutionIO writer (ang_.L(), ang_.S(), ang_.Pi(), ni_, li_, mi_, 2 * E_, ang_.states(), channels_, format("tmp-%d", iteration));
+        create_directory(dir);
+        
+        // write the solution
+        SolutionIO writer (ang_.L(), ang_.S(), ang_.Pi(), ni_, li_, mi_, 2 * E_, ang_.states(), channels_, dir + "/psi");
         writer.save(x);
+    }
+    
+    if (cmd_.runtime_postprocess)
+    {
+        create_directory(dir);
+        
+        // extract amplitudes
+        Amplitudes ampl (bspline_inner_, bspline_full_, inp_, par_, cmd_, ang_.states());
+        ampl.verbose(false);
+        ampl.extract(dir);
+        ampl.writeSQL_files(dir);
+        ampl.writeICS_files(dir);
     }
 }
 

@@ -66,6 +66,8 @@
 
 // --------------------------------------------------------------------------------- //
 
+void create_directory (std::string dir);
+
 /**
  * @brief printf-like formatting.
  * 

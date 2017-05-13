@@ -94,7 +94,8 @@ class CommandLine
               refine_solution(false), map_solution(), map_solution_target(), ssor(-1), noluupdate(false), coupling_limit(1000),
               gpu_host_multiply(false), mumps_outofcore(false), mumps_verbose(0), kpa_drop(-1), write_intermediate_solutions(false),
               fast_bessel(false), hyb_additional_levels(0), multigrid_depth(0), multigrid_coarse_prec(0), dom_x_panels(1), dom_y_panels(1),
-              dom_preconditioner("ILU"), scratch(std::getenv("SCRATCHDIR") ? std::getenv("SCRATCHDIR") : "."), analytic_eigenstates(false)
+              dom_preconditioner("ILU"), scratch(std::getenv("SCRATCHDIR") ? std::getenv("SCRATCHDIR") : "."), analytic_eigenstates(false),
+              runtime_postprocess(false)
         {
             // get command line options
             parse(argc, argv);
@@ -273,6 +274,9 @@ class CommandLine
         
         /// Use analytic eigenstates instead of those obtained by diagonalization.
         bool analytic_eigenstates;
+        
+        /// Calculate T-matrices after every iteration.
+        bool runtime_postprocess;
 };
 
 /**

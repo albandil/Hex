@@ -278,6 +278,7 @@ void CommandLine::parse (int argc, char* argv[])
                     "\t--extract-rho[-end]              Radius for T-matrix extraction.                                                                                        \n"
                     "\t--extract-samples                Number of evaluations of the T-matrix between --extract-rho-begin and --extract-rho.                                   \n"
                     "\t--extract-extrapolate            Radially extrapolate the extracted T-matrices instead of simple averaging.                                             \n"
+                    "\t--runtime-postprocess            Evaluate T-matrices after every iteration.                                                                             \n"
                     "\n"
                 ;
                 std::exit(EXIT_SUCCESS);
@@ -709,6 +710,12 @@ void CommandLine::parse (int argc, char* argv[])
             {
                 // use analytic eigenstates instead of those obtained from the diagonalization
                 analytic_eigenstates = true;
+                return true;
+            },
+        "runtime-postprocess", "", 0, [&](std::vector<std::string> const & optargs) -> bool
+            {
+                // use analytic eigenstates instead of those obtained from the diagonalization
+                runtime_postprocess = true;
                 return true;
             },
         

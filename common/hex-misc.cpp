@@ -33,10 +33,14 @@
 
 // --------------------------------------------------------------------------------- //
 
-#if (defined(__linux__) && defined(__GNUC__))
-    #include <execinfo.h>
+#ifdef __linux__
+    #include <sys/stat.h>
     #include <unistd.h>
-    #include <cxxabi.h>
+    
+    #ifdef __GNUC__
+        #include <execinfo.h>
+        #include <cxxabi.h>
+    #endif
 #endif
 
 // --------------------------------------------------------------------------------- //
@@ -208,4 +212,13 @@ std::string current_time ()
 {
     std::time_t result = std::time(nullptr);
     return std::asctime(std::localtime(&result));
+}
+
+void create_directory (std::string dir)
+{
+#ifdef __linux__
+    mkdir(dir.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
+#elif defined(_WIN32)
+    CreateDirectoryA(dir.c_str());
+#endif
 }
