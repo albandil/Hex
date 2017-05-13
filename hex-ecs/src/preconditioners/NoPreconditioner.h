@@ -170,6 +170,9 @@ class NoPreconditioner : public PreconditionerBase
         
         // one-electron hamiltonian data (for atomic electron and the projectile)
         mutable std::array<std::vector<HlData>,2> Hl_;
+        
+        // occasionally useful LU decomposition of the overlap matrix
+        std::shared_ptr<LUft> luS_;
 };
 
 // --------------------------------------------------------------------------------- //

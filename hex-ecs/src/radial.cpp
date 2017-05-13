@@ -569,6 +569,38 @@ void RadialIntegrals::setupOneElectronIntegrals (bool shared_scratch, bool IamMa
     
     if (verbose_)
         std::cout << "done in " << t.nice_time() << std::endl << std::endl;
+    
+    // Finally, precompute diagonal part of the two-electron integrals. These are more computationally intensive
+    // than the rest and the possibility to reuse them leads to a great speedup.
+    
+    if (bspline_x_.hash() == bspline_y_.hash())
+    {
+        R_tr_dia_diag_.resize(Nlambdas_);
+        
+        if (verbose_) std::cout << "Precomputing diagonal two-electron integrals ..." << std::endl;
+        
+        for (int lambda = 0; lambda < Nlambdas_; lambda++)
+        {
+            std::string filename = format("rad-R_tr_dia_diag_%d-%.4lx.hdf", lambda, bspline_x_.hash());
+            
+            if (not shared_scratch /* or par_->isMyWork(lambda)*/) // FIXME
+            {
+                if (R_tr_dia_diag_[lambda].hdfload(filename))
+                {
+                    if (verbose_) std::cout << "\t- integrals for lambda = " << lambda << " loaded from \"" << filename << "\"" << std::endl;
+                }
+                else
+                {
+                    Timer t;
+                    R_tr_dia_diag_[lambda] = diagonalR(lambda);
+                    if (verbose_) std::cout << "\t- integrals for lambda = " << lambda << " computed after " << t.nice_time() << std::endl;
+                    R_tr_dia_diag_[lambda].hdfsave(filename);
+                }
+            }
+        }
+        
+        if (verbose_) std::cout << std::endl;
+    }
 }
 
 void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLine const & cmd)
@@ -584,6 +616,11 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
     // abandon their computation, if not necessary
     if (cmd.lightweight_radial_cache)
         return;
+    
+    // Precompute the full two-electron integrals. These matrices span a lot of memory and it may be
+    // advantageous to use --lightweight-radial-cache to avoid their computation altogether. Or one
+    // can use --no-radial-cache/--own-radial-cache to keep them on disk, though that may slow down
+    // the calculation unnecessarily.
     
     // allocate storage and associate names
     for (int lambda = 0; lambda < Nlambdas_; lambda++)
@@ -731,7 +768,7 @@ void RadialIntegrals::apply_R_matrix
     for (std::size_t k = i; k < Nxspline and k <= i + order; k++)
     {
         // (i,k)-block data (= concatenated non-zero upper diagonals)
-        SymBandMatrix<Complex> block_ik = std::move ( calc_R_tr_dia_block(lambda, i, k) );
+        SymBandMatrix<Complex> block_ik = calc_R_tr_dia_block(lambda, i, k);
         
         // multiply source vector by this block
         block_ik.dot(1., cArrayView(src, k * Nyspline, Nyspline), 0., prod);
@@ -883,7 +920,7 @@ cArray RadialIntegrals::overlap
     return res;
 }
 
-cArray RadialIntegrals::overlapP (Bspline const & bspline, GaussLegendre const & g, int n, int l) const
+cArray RadialIntegrals::overlapP (Bspline const & bspline, GaussLegendre const & g, int n, int l)
 {
     // result
     cArray res (bspline.Nspline());

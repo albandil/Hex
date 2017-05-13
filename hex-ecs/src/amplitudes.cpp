@@ -133,12 +133,12 @@ void Amplitudes::extract ()
                 int mi = std::get<2>(instate);
                 
                 // check existence of the solution; take into account distributed calculations
-                SolutionIO reader (inp_.L, Spin, inp_.Pi, ni, li, mi, inp_.Etot[ie], ang_);
+                reader_ = SolutionIO (inp_.L, Spin, inp_.Pi, ni, li, mi, inp_.Etot[ie], ang_);
                 BlockArray<Complex> solution (ang_.size(), true, "sol");
                 std::size_t valid_blocks = 0;
                 for (unsigned ill = 0; ill < ang_.size(); ill++) if (par_.isMyGroupWork(ill) and (not cmd_.shared_scratch or par_.IamGroupMaster()))
                 {
-                    if (reader.load(solution, ill))
+                    if (reader_.load(solution, ill))
                         valid_blocks++;
                 }
                 par_.syncsum(&valid_blocks, 1);
@@ -401,25 +401,6 @@ void Amplitudes::writeICS_files ()
     fS1.close();
 }
 
-cArray Amplitudes::readProjPseudoStateEnergies (int l) const
-{
-    std::string filename = format("Hl%+g-%d-%.4x.hdf", inp_.Zp, l, rad_.bspline_x().hash());
-    
-    HDFFile datafile (filename, HDFFile::readonly);
-    if (not datafile.valid())
-        HexException("File %s with the one-electron eigenstates was not found. Run the solver again to regenerate it.", filename.c_str());
-    
-    int N = datafile.size("Dl") / 2;
-    if (N != rad_.bspline_x().Nspline())
-        HexException("File %s is not compatible with the current basis. You should delete it.", filename.c_str());
-    
-    cArray energies (N);
-    if (not datafile.read("Dl", &energies[0], N))
-        HexException("File %s does not contain the requested dataset \"Dl\".", filename.c_str());
-    
-    return 2.0 * energies; // a.u. -> Ry
-}
-
 cArray Amplitudes::readAtomPseudoState (int l, int ichan) const
 {
     std::string filename = format("Hl-1-%d-%.4x.hdf", l, rad_.bspline_x().hash());
@@ -479,8 +460,16 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> &
         return;
     
     // read the appropriate projectile channel function for the final state (nf,lf,*)
-    cArray Xp = readAtomPseudoState(T.lf, T.nf - T.lf - 1);
-    cArray Sp = rad_.S_x().dot(Xp);
+    cArray Xp, Sp;
+    if (cmd_.analytic_eigenstates)
+    {
+        Sp = RadialIntegrals::overlapP(bspline_inner_, rad_.gaussleg(), T.nf, T.lf);
+    }
+    else
+    {
+        Xp = readAtomPseudoState(T.lf, T.nf - T.lf - 1);
+        Sp = rad_.S_x().dot(Xp);
+    }
     
     // The extracted T-matrix oscillates and slowly radially converges.
     // If we are far enough and only oscillations are left, we can average several uniformly spaced
@@ -548,16 +537,7 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> &
             // get projectile angular momentum
             int ell = ang_[ill].second;
             
-            // calculate number of exchange scattering channels that are stored in the solution file
-            int nProjE = 0;
-            cArray Ed = readProjPseudoStateEnergies(ell);
-            Real maxEtot = std::max(inp_.channel_max_E, inp_.Etot[ie]);
-            for (Complex E : Ed)
-            {
-                if (E.real() <= maxEtot)
-                    nProjE++;
-            }
-            
+            // evaluate radial integrals
             Complex lambda = 0;
             if (inp_.inner_only)
             {
@@ -579,7 +559,7 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> &
                 cArrayView PsiScFf
                 (
                     solution[ill],  // data
-                    Nspline_inner * Nspline_inner + (nProjE + T.nf - T.lf - 1) * Nspline_outer, // offset
+                    Nspline_inner * Nspline_inner + (reader_.channels()[ill].first + T.nf - T.lf - 1) * Nspline_outer, // offset
                     Nspline_outer   // elements
                 );
                 

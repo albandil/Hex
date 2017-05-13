@@ -170,15 +170,21 @@ void ILUCGPreconditioner::CG_init (int iblock) const
         int Nchan1 = Nchan_[iblock].first;
         int Nchan2 = Nchan_[iblock].second;
         
+        // B-spline bases
+        Bspline const & bspline_full  = rad_full_ ->bspline();
+        Bspline const & bspline_inner = rad_inner_->bspline();
+        Bspline const & bspline_x     = rad_panel_->bspline_x();
+        Bspline const & bspline_y     = rad_panel_->bspline_y();
+        
         // panel x basis
-        LU_int_t Nspline_x = rad_panel_->bspline_x().Nspline();
-        LU_int_t Nspline_inner_x = rad_panel_->bspline_x().knot(rad_inner_->bspline_x().R2()) - inp_->order;
-        LU_int_t Nspline_outer_x = Nspline_x - Nspline_inner_x;
+        LU_int_t Nspline_full_x  = bspline_x.Nspline();
+        LU_int_t Nspline_inner_x = bspline_x.hash() == bspline_full.hash() ? bspline_inner.Nspline() : bspline_x.Nspline();
+        LU_int_t Nspline_outer_x = Nspline_full_x - Nspline_inner_x;
         
         // panel y basis
-        LU_int_t Nspline_y = rad_panel_->bspline_y().Nspline();
-        LU_int_t Nspline_inner_y = rad_panel_->bspline_y().knot(rad_inner_->bspline_y().R2()) - inp_->order;
-        LU_int_t Nspline_outer_y = Nspline_y - Nspline_inner_y;
+        LU_int_t Nspline_full_y  = bspline_y.Nspline();
+        LU_int_t Nspline_inner_y = bspline_y.hash() == bspline_full.hash() ? bspline_inner.Nspline() : bspline_y.Nspline();
+        LU_int_t Nspline_outer_y = Nspline_full_y - Nspline_inner_y;
         
         // angular block
         int iang = iblock * ang_->states().size() + iblock;

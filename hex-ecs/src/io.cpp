@@ -214,6 +214,7 @@ void CommandLine::parse (int argc, char* argv[])
                     "\t--channel-max-E <number>         Maximal energy (Ry) of states considered in the outer region.                                                          \n"
                     "                                                                                                                                                          \n"
                     "Right-hand side                                                                                                                                           \n"
+                    "\t--analytic-eigenstates           Use analytic formulae for initial/final states instead of diagonalization.                                             \n"
                     "\t--fast-bessel                    Use faster Bessel function evaluation routine (not the Steed/Barnett) when calculating RHS.                            \n"
                     "                                                                                                                                                          \n"
                     "Disk access                                                                                                                                               \n"
@@ -456,12 +457,6 @@ void CommandLine::parse (int argc, char* argv[])
             {
                 // write intermediate solutions
                 write_intermediate_solutions = true;
-                return true;
-            },
-        "channel-max-E", "", 1, [&](std::vector<std::string> const & optargs) -> bool
-            {
-                // maximal energy of states unsed in the outer region (-> a.u.)
-                channel_max_E = 0.5 * (std::stod(optargs[0]) - 1);
                 return true;
             },
         "kpa-simple-rad", "R", 0, [&](std::vector<std::string> const & optargs) -> bool
@@ -708,6 +703,12 @@ void CommandLine::parse (int argc, char* argv[])
                 if (ip == PreconditionerBase::RTS_Table->end())
                     HexException("Unknown domain decomposition panel preconditioner");
                 
+                return true;
+            },
+        "analytic-eigenstates", "", 0, [&](std::vector<std::string> const & optargs) -> bool
+            {
+                // use analytic eigenstates instead of those obtained from the diagonalization
+                analytic_eigenstates = true;
                 return true;
             },
         

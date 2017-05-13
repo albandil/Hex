@@ -53,8 +53,8 @@ std::string CGPreconditioner::description () const
 int CGPreconditioner::solve_block (int ill, const cArrayView r, cArrayView z) const
 {
     // shorthands
-    int Nspline_inner_x = rad_inner_->bspline_x().Nspline();
-    int Nspline_inner_y = rad_inner_->bspline_y().Nspline();
+    int Nspline_inner_x = rad_panel_->bspline_x().hash() == rad_full_->bspline().hash() ? rad_inner_->bspline().Nspline() : rad_panel_->bspline_x().Nspline();
+    int Nspline_inner_y = rad_panel_->bspline_y().hash() == rad_full_->bspline().hash() ? rad_inner_->bspline().Nspline() : rad_panel_->bspline_y().Nspline();
     
     // prepare the block-preconditioner for run
     this->CG_init(ill);
@@ -238,13 +238,12 @@ void CGPreconditioner::CG_mmul (int iblock, const cArrayView p, cArrayView q) co
 {
     std::memset(q.data(), 0, q.size() * sizeof(Complex));
     
-    std::size_t Nspline_full_x = rad_panel_->bspline_x().Nspline();
-    std::size_t Nspline_full_y = rad_panel_->bspline_y().Nspline();
-    
-    std::size_t Nspline_inner_x = rad_panel_->bspline_x().knot(rad_inner_->bspline_x().R2()) - inp_->order;
-    std::size_t Nspline_inner_y = rad_panel_->bspline_y().knot(rad_inner_->bspline_y().R2()) - inp_->order;
-    
+    std::size_t Nspline_full_x  = rad_panel_->bspline_x().Nspline();
+    std::size_t Nspline_inner_x = rad_panel_->bspline_x().hash() == rad_full_->bspline().hash() ? rad_inner_->bspline().Nspline() : rad_panel_->bspline_x().Nspline();
     std::size_t Nspline_outer_x = Nspline_full_x - Nspline_inner_x;
+    
+    std::size_t Nspline_full_y  = rad_panel_->bspline_y().Nspline();
+    std::size_t Nspline_inner_y = rad_panel_->bspline_y().hash() == rad_full_->bspline().hash() ? rad_inner_->bspline().Nspline() : rad_panel_->bspline_y().Nspline();
     std::size_t Nspline_outer_y = Nspline_full_y - Nspline_inner_y;
     
     std::size_t Nang = ang_->states().size();

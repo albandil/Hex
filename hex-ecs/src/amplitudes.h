@@ -242,7 +242,6 @@ class Amplitudes
         Chebyshev<double,Complex> fcheb (cArrayView const & PsiSc, Real kmax, int l1, int l2);
         void computeSigmaIon_ (Transition T);
         
-        cArray readProjPseudoStateEnergies (int lf) const;
         cArray readAtomPseudoState (int lf, int ichan) const;
         
         // B-spline environment
@@ -263,6 +262,9 @@ class Amplitudes
         
         // angular basis
         std::vector<std::pair<int,int>> const & ang_;
+        
+        // solution reader
+        SolutionIO reader_;
 };
 
 #endif

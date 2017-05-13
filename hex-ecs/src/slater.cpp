@@ -119,6 +119,29 @@ Complex RadialIntegrals::computeRtri
     return result;
 }
 
+cArray RadialIntegrals::diagonalR (int lambda) const
+{
+    // assume bspline_atom == bspline_proj
+    int order   = bspline_x_.order();
+    int Nspline = bspline_x_.Nspline();
+    
+    // allocate space
+    std::size_t O = order + 1;
+    cArray R (Nspline * O * O * O, 0.);
+    
+    // calculate elements
+    # pragma omp parallel for
+    for (int a = 0; a < Nspline; a++)
+    for (int b = a; b < Nspline and b <= a + order; b++)
+    for (int c = a; c < Nspline and c <= a + order; c++)
+    for (int d = a; d < Nspline and d <= a + order; d++)
+    {
+        R[((a * O + (b-a)) * O + (c-a)) * O + (d-a)] = computeR(lambda, a, b, c, d);
+    }
+    
+    return R;
+}
+
 Complex RadialIntegrals::computeR (int lambda, int a, int b, int c, int d) const
 {
     //
@@ -127,7 +150,35 @@ Complex RadialIntegrals::computeR (int lambda, int a, int b, int c, int d) const
     
         // shorthands
         int order = bspline().order();
-        
+        std::size_t O = order + 1;
+        int e = mmin(a,b,c,d);
+    
+    //
+    // This integral might be already precomputed.
+    //
+    
+        if
+        (
+            lambda < (int)R_tr_dia_diag_.size() and
+            not R_tr_dia_diag_[lambda].empty() and
+            a - e <= order and b - e <= order and
+            c - e <= order and d - e <= order
+        )
+        {
+            if (a <= b and a <= c and a <= d)
+                return R_tr_dia_diag_[lambda][((a * O + (b-a)) * O + (c-a)) * O + (d-a)];
+            else if (b <= a and b <= c and b <= d)
+                return R_tr_dia_diag_[lambda][((b * O + (a-b)) * O + (d-b)) * O + (c-b)];
+            else if (c <= a and c <= b and c <= d)
+                return R_tr_dia_diag_[lambda][((c * O + (b-c)) * O + (a-c)) * O + (d-c)];
+            else // (d <= a and d <= b and d <= c)
+                return R_tr_dia_diag_[lambda][((d * O + (a-d)) * O + (b-d)) * O + (c-d)];
+        }
+    
+    //
+    // Get bounding knots.
+    //
+    
         // leading knots of the B-splines
         Real ta1 = bspline_x_.unrotate(bspline_x_.t(a));
         Real tb1 = bspline_y_.unrotate(bspline_y_.t(b));

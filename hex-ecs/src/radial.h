@@ -282,6 +282,8 @@ class RadialIntegrals
          */
         Complex computeR (int lambda, int i, int j, int k, int l) const;
         
+        cArray diagonalR (int lambda) const;
+        
         /**
          * @brief Triangular R-integral.
          * 
@@ -395,12 +397,12 @@ class RadialIntegrals
          * @param n Principal quantum number.
          * @param l Orbital quantum number.
          */
-        cArray overlapP
+        static cArray overlapP
         (
             Bspline const & bspline,
             GaussLegendre const & g,
             int n, int l
-        ) const;
+        );
         
         /**
          * @brief Compute j-overlaps

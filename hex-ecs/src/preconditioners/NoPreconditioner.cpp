@@ -49,6 +49,7 @@
 
 #include "NoPreconditioner.h"
 #include "CGPreconditioner.h"
+#include "KPAPreconditioner.h"
 
 // --------------------------------------------------------------------------------- //
 
@@ -79,7 +80,8 @@ NoPreconditioner::NoPreconditioner
     Cl_blocks_(ang.states().size() * ang.states().size()),
     rad_inner_(new RadialIntegrals(bspline_inner,   bspline_inner,   ang.maxlambda() + 1)),
     rad_full_ (new RadialIntegrals(bspline_full,    bspline_full,    ang.maxlambda() + 1)),
-    rad_panel_(new RadialIntegrals(bspline_panel_x, bspline_panel_y, ang.maxlambda() + 1))
+    rad_panel_(new RadialIntegrals(bspline_panel_x, bspline_panel_y, ang.maxlambda() + 1)),
+    luS_(LUft::Choose("lapack"))
 {
     // nothing to do
 }
@@ -122,7 +124,8 @@ void NoPreconditioner::setup ()
     std::size_t Nspline_inner = bspline_inner.Nspline();
     
     // is this panel the full solution domain?
-    bool full_domain = (bspline_x.hash() == bspline_full.hash() and bspline_y.hash() == bspline_full.hash());
+    bool full_domain = bspline_x.hash() == bspline_full.hash()
+                   and bspline_y.hash() == bspline_full.hash();
     
     // angular momenta of electrons needed by angular blocks
     std::array<std::vector<int>,2> ells;
@@ -152,8 +155,10 @@ void NoPreconditioner::setup ()
     Eb_[1].resize(ells[1].back() + 1);  Eb_[1].fill(cArray());
     
     // Diagonalize the global overlap matrix and find the eigenvectors of the one-electron hamiltonian.
-    // It will be needed to construct matrix of the system and/or for the KPA preconditioner.
+    // The diagonalized Hamiltonians are used by the KPA preconditioner and the eigenstates
+    // for the initial and final state and also to match the inner and outer problems.
     
+    if (dynamic_cast<KPACGPreconditioner*>(this) or not cmd_->analytic_eigenstates)
     for (int i = 0; i < 2; i++)
     {
         // shorthands
@@ -267,6 +272,10 @@ void NoPreconditioner::setup ()
         par_->wait();
     }
     
+    // LU decomposition of the overlap matrix
+    CsrMatrix<LU_int_t,Complex> csr_S = rad_inner_->S().tocoo<LU_int_t>().tocsr();
+    luS_->factorize(csr_S);
+    
     // load the requested one-electron eigenstates from disk files (only needed for full domain, where the RHS is constructed)
     if (full_domain) for (int i = 0; i < 2; i++)
     {
@@ -277,55 +286,53 @@ void NoPreconditioner::setup ()
         bool written = false;
         for (int l : ells[i])
         {
-            // load the factorization file
-            if (not Hl_[i][l].hdfload())
-                HexException("Failed to load one-electron diagonalization file %s for Z = %g, l = %d.", Hl_[i][l].filename.c_str(), Z, l);
-            
-            written = true;
-            if (verbose_) std::cout << "\t- one-electron Hamiltonian data loaded (Z = " << Z << ", l = " << l << ")" << std::endl;
-            
-            // get sorted energies (ascending real parts)
             std::vector<int> indices (Nspline_inner);
-            std::iota(indices.begin(), indices.end(), 0);
-            std::sort(indices.begin(), indices.end(), [=](int a, int b){ return Hl_[i][l].Dl[a].real() < Hl_[i][l].Dl[b].real(); });
             
-            // get maximal element that has accurate bound state energy
-            int max_nr = -1;
-            for (unsigned nr = 0; nr < Nspline_inner; nr++)
+            // load the factorization file
+            bool loaded = Hl_[i][l].hdfload();
+            
+            if (not loaded)
             {
-                Real E = Hl_[i][l].Dl[indices[nr]].real();
-                Real E0 = -0.5 / ((nr + l + 1) * (nr + l + 1));
-                
-                if (E < 0 and std::abs(E0 - E) < 1e-3 * std::abs(E0))
-                    max_nr = nr;
-                else
-                    break;
+                if (not cmd_->analytic_eigenstates)
+                    HexException("Failed to load one-electron diagonalization file %s for Z = %g, l = %d.", Hl_[i][l].filename.c_str(), Z, l);
             }
-            if (max_nr >= 0)
+            else
             {
-                if (verbose_) std::cout << "\t\t- bound states with energy within 0.1 % from exact value: " << l + 1 << " <= n <= " << max_nr + l + 1 << std::endl;
+                written = true;
+                if (verbose_) std::cout << "\t- one-electron Hamiltonian data loaded (Z = " << Z << ", l = " << l << ")" << std::endl;
+            
+                // get sorted energies (ascending real parts)
+                std::iota(indices.begin(), indices.end(), 0);
+                std::sort(indices.begin(), indices.end(), [=](int a, int b){ return Hl_[i][l].Dl[a].real() < Hl_[i][l].Dl[b].real(); });
+                
+                // get maximal element that has accurate bound state energy
+                int max_nr = -1;
+                for (unsigned nr = 0; nr < Nspline_inner; nr++)
+                {
+                    Real E = Hl_[i][l].Dl[indices[nr]].real();
+                    Real E0 = -0.5 / ((nr + l + 1) * (nr + l + 1));
+                    
+                    if (E < 0 and std::abs(E0 - E) < 1e-3 * std::abs(E0))
+                        max_nr = nr;
+                    else
+                        break;
+                }
+                if (max_nr >= 0)
+                {
+                    if (verbose_) std::cout << "\t\t- bound states with energy within 0.1 % from exact value: " << l + 1 << " <= n <= " << max_nr + l + 1 << std::endl;
+                }
             }
             
             // get all valid asymptotic states
             for (unsigned nr = 0; nr < Nspline_inner; nr++)
             {
-                // bound energy of the state (a.u. -> Ry)
-                Complex Eb = 2.0_r * Hl_[i][l].Dl[indices[nr]];
-                
-                // maximal bound state energy allowed in the asymptotic expantion (or at least the bound energy allowed by impact channels)
-                Real Em = std::max(inp_->channel_max_E, inp_->max_Etot);
+                // bound energy of the state (Ry)
+                Complex Eb = loaded ? 2.0_r * Hl_[i][l].Dl[indices[nr]] : -1.0_r / ((nr + l + 1) * (nr + l + 1));
                 
                 // add all requested channels
-                if (Eb.real() <= Em)
+                if (not inp_->inner_only and (Eb.real() <= std::max(inp_->channel_max_E, inp_->max_Etot)))
                 {
-                    // bound energy of the state (a.u. -> Ry)
-                    Complex Eb = 2.0_r * Hl_[i][l].Dl[indices[nr]];
-                    
-                    // maximal bound state energy allowed in the asymptotic expantion (or at least the bound energy allowed by impact channels)
-                    Real Em = std::max(inp_->channel_max_E, inp_->max_Etot);
-                    
-                    // add all requested channels
-                    if (Eb.real() <= Em)
+                    if (loaded)
                     {
                         Xp_[i][l].push_back(Hl_[i][l].Cl.col(indices[nr]));
                         Sp_[i][l].push_back(rad_inner_->S().dot(Xp_[i][l][nr]));
@@ -344,8 +351,14 @@ void NoPreconditioner::setup ()
                     }
                     else
                     {
-                        // there will be no more states (the energy rises with 'nr')
-                        break;
+                        // Evaluate the analytic formula for the bound state. This is useful for inner-region-only calculation,
+                        // where only the initial and final states need to be calculated, and for channel-reduced calculation
+                        // sufficiently below zero, where not much states exist. Otherwise this will blow the memory of the
+                        // computer.
+                        
+                        Sp_[i][l].push_back(RadialIntegrals::overlapP(rad_inner_->bspline(), rad_inner_->gaussleg(), nr + l + 1, l));
+                        Xp_[i][l].push_back(luS_->solve(Sp_[i][l].back(), 1));
+                        Eb_[i][l].push_back(Eb);
                     }
                 }
                 else
@@ -356,6 +369,7 @@ void NoPreconditioner::setup ()
             }
             if (Xp_[i][l].size() >= 1)
             {
+                written = true;
                 if (verbose_) std::cout << "\t\t- eigenstates used in asymptotic (outer) domain: " << l + 1 << " <= n <= " << l + Xp_[i][l].size() << std::endl;
             }
             
@@ -401,8 +415,8 @@ std::pair<int,int> NoPreconditioner::bstates (Real E, int l1, int l2) const
 BlockSymBandMatrix<Complex> NoPreconditioner::calc_A_block (int ill, int illp, bool twoel) const
 {
     // inner B-spline count
-    int Nspline_x_inner = rad_panel_->bspline_x().knot(rad_inner_->bspline_x().R2()) - inp_->order;
-    int Nspline_y_inner = rad_panel_->bspline_y().knot(rad_inner_->bspline_y().R2()) - inp_->order;
+    int Nspline_x_inner = rad_panel_->bspline_x().hash() == rad_full_->bspline().hash() ? rad_inner_->bspline().Nspline() : rad_panel_->bspline_x().Nspline();
+    int Nspline_y_inner = rad_panel_->bspline_y().hash() == rad_full_->bspline().hash() ? rad_inner_->bspline().Nspline() : rad_panel_->bspline_y().Nspline();
     
     // angular momenta
     int l1 = ang_->states()[ill].first;
@@ -461,7 +475,7 @@ BlockSymBandMatrix<Complex> NoPreconditioner::calc_A_block (int ill, int illp, b
             else
             {
                 // compute the data anew
-                subblock.data() += inp_->Zp * ang_->f(ill,illp,lambda) * rad_full_->calc_R_tr_dia_block(lambda, i, k).data().slice(0, Nspline_y_inner * (inp_->order + 1));
+                subblock.data() += inp_->Zp * ang_->f(ill,illp,lambda) * rad_panel_->calc_R_tr_dia_block(lambda, i, k).data().slice(0, Nspline_y_inner * (inp_->order + 1));
             }
         }
         
@@ -481,20 +495,26 @@ void NoPreconditioner::update (Real E)
     int order = inp_->order;
     int Nang = ang_->states().size();
     
+    // B-spline bases
+    Bspline const & bspline_full  = rad_full_ ->bspline();
+    Bspline const & bspline_inner = rad_inner_->bspline();
+    Bspline const & bspline_x     = rad_panel_->bspline_x();
+    Bspline const & bspline_y     = rad_panel_->bspline_y();
+    
     // global basis
-    int Nspline_full = rad_full_->bspline().Nspline();
-    int Nspline_inner = rad_inner_->bspline().Nspline();
+    int Nspline_full  = bspline_full.Nspline();
+    int Nspline_inner = bspline_inner.Nspline();
     int Nspline_outer = Nspline_full - Nspline_inner;
     
     // panel x basis
-    int Nspline_x = rad_panel_->bspline_x().Nspline();
-    int Nspline_x_inner = rad_panel_->bspline_x().knot(rad_inner_->bspline_x().R2()) - order;
-    int Nspline_x_outer = Nspline_x - Nspline_x_inner;
+    int Nspline_x_full  = bspline_x.Nspline();
+    int Nspline_x_inner = bspline_x.hash() == bspline_full.hash() ? bspline_inner.Nspline() : bspline_x.Nspline();
+    int Nspline_x_outer = Nspline_x_full - Nspline_x_inner;
     
     // panel y basis
-    int Nspline_y = rad_panel_->bspline_y().Nspline();
-    int Nspline_y_inner = rad_panel_->bspline_y().knot(rad_inner_->bspline_y().R2()) - order;
-    int Nspline_y_outer = Nspline_y - Nspline_y_inner;
+    int Nspline_y_full  = bspline_y.Nspline();
+    int Nspline_y_inner = bspline_y.hash() == bspline_full.hash() ? bspline_inner.Nspline() : bspline_y.Nspline();
+    int Nspline_y_outer = Nspline_y_full - Nspline_y_inner;
     
     // size of the A-matrix
     std::size_t A_size = std::size_t(Nspline_x_inner) * std::size_t(Nspline_y_inner);
@@ -809,7 +829,9 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
     rArray ki = { std::sqrt(inp_->Etot[ie] + 1.0_r/(ni*ni)) };
     
     // get the initial bound pseudo-state B-spline expansion
-    cArray Xp = Hl_[0][li].readPseudoState(li, ni - li - 1);
+    cArray Xp = cmd_->analytic_eigenstates ?
+        luS_->solve(RadialIntegrals::overlapP(rad_inner_->bspline(), rad_inner_->gaussleg(), ni, li), 1) :
+        Hl_[0][li].readPseudoState(li, ni - li - 1);
     
     // (anti)symmetrization
     Real Sign = ((ang_->S() + ang_->Pi()) % 2 == 0) ? 1. : -1.;
@@ -1205,18 +1227,21 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
     // shorthands
     unsigned Nang = ang_->states().size();
     
-    // full basis
-    unsigned Nspline_inner = rad_inner_->bspline_x().Nspline();
+    // B-spline bases
+    Bspline const & bspline_full  = rad_full_ ->bspline();
+    Bspline const & bspline_inner = rad_inner_->bspline();
+    Bspline const & bspline_x     = rad_panel_->bspline_x();
+    Bspline const & bspline_y     = rad_panel_->bspline_y();
     
     // panel x basis
-    int Nspline_x = rad_panel_->bspline_x().Nspline();
-    int Nspline_x_inner = rad_panel_->bspline_x().knot(rad_inner_->bspline_x().R2()) - inp_->order;
-    int Nspline_x_outer = Nspline_x - Nspline_x_inner;
+    int Nspline_x_full  = bspline_x.Nspline();
+    int Nspline_x_inner = bspline_x.hash() == bspline_full.hash() ? bspline_inner.Nspline() : bspline_x.Nspline();
+    int Nspline_x_outer = Nspline_x_full - Nspline_x_inner;
     
     // panel y basis
-    int Nspline_y = rad_panel_->bspline_y().Nspline();
-    int Nspline_y_inner = rad_panel_->bspline_y().knot(rad_inner_->bspline_y().R2()) - inp_->order;
-    int Nspline_y_outer = Nspline_y - Nspline_y_inner;
+    int Nspline_y_full  = bspline_y.Nspline();
+    int Nspline_y_inner = bspline_y.hash() == bspline_full.hash() ? bspline_inner.Nspline() : bspline_y.Nspline();
+    int Nspline_y_outer = Nspline_y_full - Nspline_y_inner;
     
     // make sure no process is playing with the data
     par_->wait();
@@ -1365,7 +1390,7 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
     {
         OMP_CREATE_LOCKS(Nang * Nspline_x_inner);
         
-        int maxlambda = rad_full_->maxlambda();
+        int maxlambda = rad_panel_->maxlambda();
         
         # pragma omp parallel for collapse (3) schedule (dynamic,1)
         for (int lambda = 0; lambda <= maxlambda; lambda++)
@@ -1375,7 +1400,7 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
         {
             unsigned k = i + d;
             
-            SymBandMatrix<Complex> R = rad_full_->calc_R_tr_dia_block(lambda, i, k);
+            SymBandMatrix<Complex> R = rad_panel_->calc_R_tr_dia_block(lambda, i, k);
             
             for (unsigned ill = 0; ill < Nang; ill++) if (par_->isMyGroupWork(ill))
             for (unsigned illp = 0; illp < Nang; illp++) if (par_->igroupproc() == (int)illp % par_->groupsize())
@@ -1415,12 +1440,12 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
                             1.0_z,        cArrayView(q[ill],  i * Nspline_y_inner, Nspline_y_inner)
                         );
                         
-                        OMP_UNLOCK_LOCK(ill * Nspline_inner + i);
+                        OMP_UNLOCK_LOCK(ill * Nspline_x_inner + i);
                     }
                     
                     if (tri & MatrixSelection::StrictLower)
                     {
-                        OMP_LOCK_LOCK(ill * Nspline_inner + k);
+                        OMP_LOCK_LOCK(ill * Nspline_x_inner + k);
                         
                         R.dot
                         (

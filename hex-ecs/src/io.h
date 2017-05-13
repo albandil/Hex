@@ -94,7 +94,7 @@ class CommandLine
               refine_solution(false), map_solution(), map_solution_target(), ssor(-1), noluupdate(false), coupling_limit(1000),
               gpu_host_multiply(false), mumps_outofcore(false), mumps_verbose(0), kpa_drop(-1), write_intermediate_solutions(false),
               fast_bessel(false), hyb_additional_levels(0), multigrid_depth(0), multigrid_coarse_prec(0), dom_x_panels(1), dom_y_panels(1),
-              dom_preconditioner("ILU"), scratch(std::getenv("SCRATCHDIR") ? std::getenv("SCRATCHDIR") : "."), channel_max_E(-1)
+              dom_preconditioner("ILU"), scratch(std::getenv("SCRATCHDIR") ? std::getenv("SCRATCHDIR") : "."), analytic_eigenstates(false)
         {
             // get command line options
             parse(argc, argv);
@@ -270,9 +270,9 @@ class CommandLine
         
         /// Scratch directory for out-of-core data.
         std::string scratch;
-
-        /// Maximal energy of the states included in outer region.
-        Real channel_max_E;
+        
+        /// Use analytic eigenstates instead of those obtained by diagonalization.
+        bool analytic_eigenstates;
 };
 
 /**
@@ -396,6 +396,8 @@ class SolutionIO
 {
     public:
         
+        SolutionIO () {}
+        
         SolutionIO
         (
             int L, int S, int Pi,
@@ -406,8 +408,23 @@ class SolutionIO
             std::string prefix = "psi"
         ) : L_(L), S_(S), Pi_(Pi),
             ni_(ni), li_(li), mi_(mi),
-            E_(E), ang_(ang), chann_(chann), prefix_(prefix)
-        {}
+            E_(E), ang_(ang), prefix_(prefix)
+        {
+            if (chann.empty())
+            {
+                // initialize channel counts to zero
+                chann_.resize(ang.size(), std::make_pair(0,0));
+            }
+            else
+            {
+                // check consistency of the parameters
+                if (ang.size() != chann.size())
+                    HexException("Incompatible size of angular momentum pairs list and channel count list.");
+                
+                // use the supplied channel counts
+                chann_ = chann;
+            }
+        }
         
         /// All blocks flag.
         static const int All = -1;
@@ -514,6 +531,14 @@ class SolutionIO
                             solution.hdfsave(i);
                             solution[i].drop();
                         }
+                        
+                        // read numbers of channels
+                        HDFFile hdf (name(i), HDFFile::readonly);
+                        if (hdf.valid())
+                        {
+                            hdf.read("Nchan1", &chann_[i].first,  1);
+                            hdf.read("Nchan2", &chann_[i].second, 1);
+                        }
                     }
             }
             
@@ -580,6 +605,8 @@ class SolutionIO
             success = (success and hdf.write("array", solution.data(), solution.size()));
             return success;
         }
+        
+        std::vector<std::pair<int,int>> const & channels () const { return chann_; }
     
     private:
         
