@@ -91,7 +91,7 @@ int main (int argc, char* argv[])
         
 #ifdef __linux__
         // abort on non-numerical values
-        feenableexcept(FE_INVALID | FE_OVERFLOW);
+        feenableexcept(FE_INVALID);
 #endif
         
         // disable buffering of the standard output (-> immediate logging)
