@@ -169,9 +169,11 @@ void LUft_SUPERLU_DIST::solve (const cArrayView b, cArrayView x, int eqs) const
     // Create matrix of the system.
     //
     
+        typedef std::complex<double> dComplex;
+        
         NCformat AStore;
         AStore.nnz    = X_.size();                      // number of non-zero elements
-        AStore.nzval  = const_cast<Complex*>(&X_[0]);   // pointer to the array of non-zero elements
+        AStore.nzval  = const_cast<dComplex*>(&X_[0]);  // pointer to the array of non-zero elements
         AStore.rowind = const_cast<int_t*>(&I_[0]);     // row indices
         AStore.colptr = const_cast<int_t*>(&P_[0]);     // column pointers
         
