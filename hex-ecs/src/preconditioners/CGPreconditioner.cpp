@@ -249,23 +249,29 @@ void CGPreconditioner::CG_mmul (int iblock, const cArrayView p, cArrayView q) co
     std::size_t Nang = ang_->states().size();
     std::size_t iang = iblock * Nang + iblock;
     
+    // inner-region subset of the vectors
+    cArrayView p_inner (p, 0, Nspline_inner_x * Nspline_inner_y);
+    cArrayView q_inner (q, 0, Nspline_inner_x * Nspline_inner_y);
+    
     if (cmd_->lightweight_full)
     {
         // get block angular momemnta
         int l1 = ang_->states()[iblock].first;
         int l2 = ang_->states()[iblock].second;
         
-        // multiply 'p' by the diagonal block (except for the two-electron term)
-        kron_dot(0., q, E_,             p, rad_panel_->S_x(),   rad_panel_->S_y());
-        kron_dot(1., q, -0.5,           p, rad_panel_->D_x(),   rad_panel_->S_y());
-        kron_dot(1., q, -0.5*l1*(l1+1), p, rad_panel_->Mm2_x(), rad_panel_->S_y());
-        kron_dot(1., q, +1,             p, rad_panel_->Mm1_x(), rad_panel_->S_y());
-        kron_dot(1., q, -0.5,           p, rad_panel_->S_x(),   rad_panel_->D_y());
-        kron_dot(1., q, -0.5*l2*(l2+1), p, rad_panel_->S_x(),   rad_panel_->Mm2_y());
-        kron_dot(1., q, +1,             p, rad_panel_->S_x(),   rad_panel_->Mm1_y());
+        // multiply 'p' by the diagonal block
+        // - except for the two-electron term
+        // - restrict to inner region
+        kron_dot(0., q_inner, E_,                 p_inner, rad_panel_->S_x(),   rad_panel_->S_y(),    Nspline_inner_x, Nspline_inner_y);
+        kron_dot(1., q_inner, -0.5,               p_inner, rad_panel_->D_x(),   rad_panel_->S_y(),    Nspline_inner_x, Nspline_inner_y);
+        kron_dot(1., q_inner, -0.5*l1*(l1+1),     p_inner, rad_panel_->Mm2_x(), rad_panel_->S_y(),    Nspline_inner_x, Nspline_inner_y);
+        kron_dot(1., q_inner, +inp_->Za,          p_inner, rad_panel_->Mm1_x(), rad_panel_->S_y(),    Nspline_inner_x, Nspline_inner_y);
+        kron_dot(1., q_inner, -0.5,               p_inner, rad_panel_->S_x(),   rad_panel_->D_y(),    Nspline_inner_x, Nspline_inner_y);
+        kron_dot(1., q_inner, -0.5*l2*(l2+1),     p_inner, rad_panel_->S_x(),   rad_panel_->Mm2_y(),  Nspline_inner_x, Nspline_inner_y);
+        kron_dot(1., q_inner, -inp_->Za*inp_->Zp, p_inner, rad_panel_->S_x(),   rad_panel_->Mm1_y(),  Nspline_inner_x, Nspline_inner_y);
         
         // multiply 'p' by the two-electron integrals
-        for (int lambda = 0; lambda <= rad_panel_->maxlambda(); lambda++)
+        for (int lambda = 0; lambda <= rad_inner_->maxlambda(); lambda++)
         {
             // calculate angular integral
             Real f = special::computef(lambda, l1, l2, l1, l2, inp_->L);
@@ -274,7 +280,9 @@ void CGPreconditioner::CG_mmul (int iblock, const cArrayView p, cArrayView q) co
             
             // multiply
             if (f != 0.)
-                rad_panel_->apply_R_matrix(lambda, inp_->Zp * f, p, 1., q);
+            {
+                rad_panel_->apply_R_matrix(lambda, inp_->Zp * f, p_inner, 1.0, q_inner, Nspline_inner_x, Nspline_inner_y);
+            }
         }
     }
     else
@@ -283,8 +291,8 @@ void CGPreconditioner::CG_mmul (int iblock, const cArrayView p, cArrayView q) co
         
         A_blocks_[iang].dot
         (
-            1.0_r, cArrayView(p, 0, Nspline_inner_x * Nspline_inner_y),
-            1.0_r, cArrayView(q, 0, Nspline_inner_x * Nspline_inner_y),
+            1.0_r, p_inner,
+            1.0_r, q_inner,
             !cmd_->parallel_precondition
         );
         

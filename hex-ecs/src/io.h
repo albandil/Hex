@@ -379,6 +379,9 @@ class InputFile
             // initial and final atomic states
             std::vector<std::tuple<int,int,int>> instates, outstates;
             
+            // atom charge (must be positive integer)
+            Real Za;
+            
             // projectile charge (only sign)
             Real Zp;
             

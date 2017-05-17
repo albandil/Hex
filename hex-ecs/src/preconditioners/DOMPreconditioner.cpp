@@ -502,8 +502,8 @@ Complex DOMPreconditioner::couplingMatrixElement
         Aijkl -= (0.5_r * l1 * (l1 + 1)) * rad_inner().Mm2_x()(i,k) * rad_inner().S_y()(j,l);
         Aijkl -= (0.5_r * l2 * (l2 + 1)) * rad_inner().S_x()(i,k) * rad_inner().Mm2_y()(j,l);
         
-        Aijkl -= rad_inner().Mm1_x()(i,k) * rad_inner().S_y()(j,l) * (-1.0_r);
-        Aijkl -= rad_inner().S_x()(i,k) * rad_inner().Mm1_y()(j,l) * inp_->Zp;
+        Aijkl -= rad_inner().Mm1_x()(i,k) * rad_inner().S_y()(j,l) * (inp_->Za * -1.0_r);
+        Aijkl -= rad_inner().S_x()(i,k) * rad_inner().Mm1_y()(j,l) * (inp_->Za * inp_->Zp);
     }
     
     // angular off-diagonal contribution

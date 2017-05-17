@@ -350,9 +350,11 @@ class RadialIntegrals
          */
         void apply_R_matrix
         (
-            unsigned lambda,
+            unsigned int lambda,
             Complex a, const cArrayView src,
-            Complex b,       cArrayView dst
+            Complex b,       cArrayView dst,
+            int x_row_limit = -1,
+            int y_row_limit = -1
         ) const;
         
         /** 
@@ -401,7 +403,7 @@ class RadialIntegrals
         (
             Bspline const & bspline,
             GaussLegendre const & g,
-            int n, int l
+            Real Z, int n, int l
         );
         
         /**

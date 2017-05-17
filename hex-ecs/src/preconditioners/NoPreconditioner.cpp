@@ -107,15 +107,18 @@ void NoPreconditioner::setup ()
     Bspline const & bspline_y     = rad_panel_->bspline_y();
     
     // calculate all radial integrals in inner region
+    if (verbose_) std::cout << "[ Inner region radial integrals ]" << std::endl << std::endl;
     rad_inner_->verbose(verbose_);
     rad_inner_->setupOneElectronIntegrals(*par_, *cmd_);
     rad_inner_->setupTwoElectronIntegrals(*par_, *cmd_);
     
     // calculate one-electron integrals in full domain
+    if (verbose_) std::cout << "[ Full-domain radial integrals ]" << std::endl << std::endl;
     rad_full_->verbose(verbose_);
     rad_full_->setupOneElectronIntegrals(*par_, *cmd_);
     
-    // calculate/copy all radial integrals on panel
+    // calculate all radial integrals on panel
+    if (verbose_) std::cout << "[ Current panel full radial integrals ]" << std::endl << std::endl;
     rad_panel_->verbose(verbose_);
     rad_panel_->setupOneElectronIntegrals(*par_, *cmd_);
     rad_panel_->setupTwoElectronIntegrals(*par_, *cmd_);
@@ -227,9 +230,9 @@ void NoPreconditioner::setup ()
             // compose the symmetrical one-electron hamiltonian
             ColMatrix<Complex> tHl;
             if (i == 0)
-                tHl = (Complex(0.5) * rint->D_x() + Complex(Z) * rint->Mm1_x() + Complex(0.5*l*(l+1)) * rint->Mm2_x()).torow().T();
+                tHl = (Complex(0.5) * rint->D_x() + Complex(inp_->Za * Z) * rint->Mm1_x() + Complex(0.5*l*(l+1)) * rint->Mm2_x()).torow().T();
             else
-                tHl = (Complex(0.5) * rint->D_y() + Complex(Z) * rint->Mm1_y() + Complex(0.5*l*(l+1)) * rint->Mm2_y()).torow().T();
+                tHl = (Complex(0.5) * rint->D_y() + Complex(inp_->Za * Z) * rint->Mm1_y() + Complex(0.5*l*(l+1)) * rint->Mm2_y()).torow().T();
             
             // symmetrically transform by inverse square root of the overlap matrix, tHl <- invsqrtS * tHl * invsqrtS
             blas::gemm(1., invsqrtS, tHl, 0., S);
@@ -279,11 +282,12 @@ void NoPreconditioner::setup ()
     // load the requested one-electron eigenstates from disk files (only needed for full domain, where the RHS is constructed)
     if (full_domain) for (int i = 0; i < 2; i++)
     {
+        if (verbose_) std::cout << "Loading the hydrogen eigenstates for electron #" << i + 1 << " ..." << std::endl;
+        
         // particle charge (first is electron, second is either electron or positron)
         Real Z = (i == 0 ? -1.0 : inp_->Zp);
         
         // for all one-electron angular momenta needed by this particle
-        bool written = false;
         for (int l : ells[i])
         {
             std::vector<int> indices (Nspline_inner);
@@ -294,13 +298,19 @@ void NoPreconditioner::setup ()
             if (not loaded)
             {
                 if (not cmd_->analytic_eigenstates)
+                {
                     HexException("Failed to load one-electron diagonalization file %s for Z = %g, l = %d.", Hl_[i][l].filename.c_str(), Z, l);
+                }
+                else
+                {
+                    if (verbose_)
+                        std::cout << "\t- one-electron Hamiltonian data skipped (Z = " << Z << ", l = " << l << ")" << std::endl;
+                }
             }
             else
             {
-                written = true;
                 if (verbose_) std::cout << "\t- one-electron Hamiltonian data loaded (Z = " << Z << ", l = " << l << ")" << std::endl;
-            
+                
                 // get sorted energies (ascending real parts)
                 std::iota(indices.begin(), indices.end(), 0);
                 std::sort(indices.begin(), indices.end(), [=](int a, int b){ return Hl_[i][l].Dl[a].real() < Hl_[i][l].Dl[b].real(); });
@@ -356,7 +366,7 @@ void NoPreconditioner::setup ()
                         // sufficiently below zero, where not much states exist. Otherwise this will blow the memory of the
                         // computer.
                         
-                        Sp_[i][l].push_back(RadialIntegrals::overlapP(rad_inner_->bspline(), rad_inner_->gaussleg(), nr + l + 1, l));
+                        Sp_[i][l].push_back(RadialIntegrals::overlapP(rad_inner_->bspline(), rad_inner_->gaussleg(), inp_->Za, nr + l + 1, l));
                         Xp_[i][l].push_back(luS_->solve(Sp_[i][l].back(), 1));
                         Eb_[i][l].push_back(Eb);
                     }
@@ -369,17 +379,13 @@ void NoPreconditioner::setup ()
             }
             if (Xp_[i][l].size() >= 1)
             {
-                written = true;
                 if (verbose_) std::cout << "\t\t- eigenstates used in asymptotic (outer) domain: " << l + 1 << " <= n <= " << l + Xp_[i][l].size() << std::endl;
             }
             
             // unload the factorization file
             Hl_[i][l].drop();
         }
-        if (written)
-        {
-            if (verbose_) std::cout << std::endl;
-        }
+        if (verbose_) std::cout << std::endl;
     }
 }
 
@@ -453,11 +459,11 @@ BlockSymBandMatrix<Complex> NoPreconditioner::calc_A_block (int ill, int illp, b
             (
                 [&](int j, int l)
                 {
-                    return E_ * rad_panel_->S_x()(i,k) * rad_panel_->S_y()(j,l)
-                            - (0.5_z * rad_panel_->D_x()(i,k) - rad_panel_->Mm1_x()(i,k)) * rad_panel_->S_y()(j,l)
-                            - 0.5_r * l1 * (l1 + 1) * rad_panel_->Mm2_x()(i,k) * rad_panel_->S_y()(j,l)
-                            - rad_panel_->S_x()(i,k) * (0.5_z * rad_panel_->D_y()(j,l) + inp_->Zp * rad_panel_->Mm1_y()(j,l))
-                            - 0.5_r * l2 * (l2 + 1) * rad_panel_->S_x()(i,k) * rad_panel_->Mm2_y()(j,l);
+                    Complex Sx = rad_panel_->S_x()(i,k), Dx = rad_panel_->D_x()(i,k), Mm1x = rad_panel_->Mm1_x()(i,k), Mm2x = rad_panel_->Mm2_x()(i,k);
+                    Complex Sy = rad_panel_->S_y()(j,l), Dy = rad_panel_->D_y()(j,l), Mm1y = rad_panel_->Mm1_y()(j,l), Mm2y = rad_panel_->Mm2_y()(j,l);
+                    
+                    return E_ * Sx * Sy - 0.5_r * Dx * Sy + inp_->Za *            Mm1x * Sy - 0.5_r * l1 * (l1 + 1) * Mm2x * Sy
+                                        - 0.5_r * Dy * Sx - inp_->Za * inp_->Zp * Mm1y * Sx - 0.5_r * l2 * (l2 + 1) * Mm2y * Sx;
                 }
             );
         }
@@ -695,8 +701,8 @@ void NoPreconditioner::update (Real E)
                          - 0.5_r * rad_full_->S_x()(i,k) * rad_full_->D_y()(j,l)
                          - 0.5_r * (l1 * (l1 + 1.0_r)) * rad_full_->Mm2_x()(i,k) * rad_full_->S_y()(j,l)
                          - 0.5_r * (l2 * (l2 + 1.0_r)) * rad_full_->S_x()(i,k) * rad_full_->Mm2_y()(j,l)
-                         + rad_full_->Mm1_x()(i,k) * rad_full_->S_y()(j,l)
-                         - inp_->Zp * rad_full_->S_x()(i,k) * rad_full_->Mm1_y()(j,l);
+                         + inp_->Za * rad_full_->Mm1_x()(i,k) * rad_full_->S_y()(j,l)
+                         - inp_->Za * inp_->Zp * rad_full_->S_x()(i,k) * rad_full_->Mm1_y()(j,l);
                 }
                 
                 Real r1 = rad_full_->bspline_x().t(std::min(i,k) + order + 1).real();
@@ -730,8 +736,8 @@ void NoPreconditioner::update (Real E)
                          - 0.5_r * rad_full_->S_x()(i,k) * rad_full_->D_y()(j,l)
                          - 0.5_r * (l1 * (l1 + 1.0_r)) * rad_full_->Mm2_x()(i,k) * rad_full_->S_y()(j,l)
                          - 0.5_r * (l2 * (l2 + 1.0_r)) * rad_full_->S_x()(i,k) * rad_full_->Mm2_y()(j,l)
-                         + rad_full_->Mm1_x()(i,k) * rad_full_->S_y()(j,l)
-                         - inp_->Zp * rad_full_->S_x()(i,k) * rad_full_->Mm1_y()(j,l);
+                         + inp_->Za * rad_full_->Mm1_x()(i,k) * rad_full_->S_y()(j,l)
+                         - inp_->Za * inp_->Zp * rad_full_->S_x()(i,k) * rad_full_->Mm1_y()(j,l);
                 }
                 
                 Real r1 = rad_full_->bspline_x().t(std::min(i,k) + order + 1).real();
@@ -830,7 +836,7 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
     
     // get the initial bound pseudo-state B-spline expansion
     cArray Xp = cmd_->analytic_eigenstates ?
-        luS_->solve(RadialIntegrals::overlapP(rad_inner_->bspline(), rad_inner_->gaussleg(), ni, li), 1) :
+        luS_->solve(RadialIntegrals::overlapP(rad_inner_->bspline(), rad_inner_->gaussleg(), inp_->Za, ni, li), 1) :
         Hl_[0][li].readPseudoState(li, ni - li - 1);
     
     // (anti)symmetrization
@@ -912,12 +918,14 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
             for (int ixknot = ixspline; ixknot <= ixspline + order and ixknot < rad_full_->bspline().Nreknot() - 1; ixknot++)
                 rad_full_->bspline().B(ixspline, ixknot, points, &xs[ixknot * points], &B_x[(ixspline * (order + 1) + ixknot - ixspline) * points]);
             
-            // precompute radial functions and Riccati-Bessel functions
+            // precompute hydrogen radial functions
             rArray Pi_x = realpart(rad_inner_->bspline().zip(Xp, realpart(xs)));
+            
+            // evaluate projectile radial functions (Ricatti-Bessel or Coulomb)
             rArray ji_x (xs.size());
             # pragma omp parallel for
             for (unsigned ix = 0; ix < xs.size(); ix++)
-                ji_x[ix] = special::ric_j(l, ki[0] * xs[ix].real());
+                ji_x[ix] = special::ric_j(l, ki[0] * xs[ix].real()); // FIXME : Coulomb for charge (inp_->Za - 1)
             
             // precompute integral moments
             cArrays M_L_P (rad_full_->maxlambda() + 1), M_mLm1_P (rad_full_->maxlambda() + 1);
@@ -1132,7 +1140,7 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
                                         Real Pix = Pi_x[ixknot * points + ix];
                                         Real Piy = rad_inner_->bspline().eval(Xp, ry).real();
                                         Real jix = ji_x[ixknot * points + ix];
-                                        Real jiy = special::ric_j(l, ki[0] * ry);
+                                        Real jiy = special::ric_j(l, ki[0] * ry); // FIXME : Coulomb
                                         Complex wx = xws[ixknot * points + ix];
                                         Complex wy = yws[iy];
                                         
@@ -1172,7 +1180,7 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
                                         Real Pix = Pi_x[ixknot * points + ix];
                                         Real Piy = rad_inner_->bspline().eval(Xp, ry).real();
                                         Real jix = ji_x[ixknot * points + ix];
-                                        Real jiy = special::ric_j(l, ki[0] * ry);
+                                        Real jiy = special::ric_j(l, ki[0] * ry); // FIXME : Coulomb
                                         Complex wx = xws[ixknot * points + ix];
                                         Complex wy = yws[iy];
                                         
@@ -1225,6 +1233,7 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
 void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Complex> & q, MatrixSelection::Selection tri) const
 {
     // shorthands
+    unsigned order = inp_->order;
     unsigned Nang = ang_->states().size();
     
     // B-spline bases
@@ -1234,14 +1243,14 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
     Bspline const & bspline_y     = rad_panel_->bspline_y();
     
     // panel x basis
-    int Nspline_x_full  = bspline_x.Nspline();
-    int Nspline_x_inner = bspline_x.hash() == bspline_full.hash() ? bspline_inner.Nspline() : bspline_x.Nspline();
-    int Nspline_x_outer = Nspline_x_full - Nspline_x_inner;
+    std::size_t Nspline_x_full  = bspline_x.Nspline();
+    std::size_t Nspline_x_inner = bspline_x.hash() == bspline_full.hash() ? bspline_inner.Nspline() : bspline_x.Nspline();
+    std::size_t Nspline_x_outer = Nspline_x_full - Nspline_x_inner;
     
     // panel y basis
-    int Nspline_y_full  = bspline_y.Nspline();
-    int Nspline_y_inner = bspline_y.hash() == bspline_full.hash() ? bspline_inner.Nspline() : bspline_y.Nspline();
-    int Nspline_y_outer = Nspline_y_full - Nspline_y_inner;
+    std::size_t Nspline_y_full  = bspline_y.Nspline();
+    std::size_t Nspline_y_inner = bspline_y.hash() == bspline_full.hash() ? bspline_inner.Nspline() : bspline_y.Nspline();
+    std::size_t Nspline_y_outer = Nspline_y_full - Nspline_y_inner;
     
     // make sure no process is playing with the data
     par_->wait();
@@ -1299,14 +1308,18 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
                 // multiply 'p' by the diagonal block (except for the two-electron term, which is done later)
                 if (ill == illp)
                 {
-                    // FIXME : triangle selection not supported (needed by GMG only)
-                    kron_dot(0., q[ill], E_,             p[ill], rad_panel_->S_x(),   rad_panel_->S_y());
-                    kron_dot(1., q[ill], -0.5,           p[ill], rad_panel_->D_x(),   rad_panel_->S_y());
-                    kron_dot(1., q[ill], -0.5*l1*(l1+1), p[ill], rad_panel_->Mm2_x(), rad_panel_->S_y());
-                    kron_dot(1., q[ill], +1,             p[ill], rad_panel_->Mm1_x(), rad_panel_->S_y());
-                    kron_dot(1., q[ill], -0.5,           p[ill], rad_panel_->S_x(),   rad_panel_->D_y());
-                    kron_dot(1., q[ill], -0.5*l2*(l2+1), p[ill], rad_panel_->S_x(),   rad_panel_->Mm2_y());
-                    kron_dot(1., q[ill], +1,             p[ill], rad_panel_->S_x(),   rad_panel_->Mm1_y());
+                    // inner-region subset of the vectors
+                    cArrayView p_inner (p[ill], 0, Nspline_x_inner * Nspline_y_inner);
+                    cArrayView q_inner (q[ill], 0, Nspline_x_inner * Nspline_y_inner);
+                    
+                    // multiply 'p' by the diagonal block (except for the two-electron term)
+                    kron_dot(0., q_inner, E_,                 p_inner, rad_panel_->S_x(),   rad_panel_->S_y(),    Nspline_x_inner, Nspline_y_inner);
+                    kron_dot(1., q_inner, -0.5,               p_inner, rad_panel_->D_x(),   rad_panel_->S_y(),    Nspline_x_inner, Nspline_y_inner);
+                    kron_dot(1., q_inner, -0.5*l1*(l1+1),     p_inner, rad_panel_->Mm2_x(), rad_panel_->S_y(),    Nspline_x_inner, Nspline_y_inner);
+                    kron_dot(1., q_inner, +inp_->Za,          p_inner, rad_panel_->Mm1_x(), rad_panel_->S_y(),    Nspline_x_inner, Nspline_y_inner);
+                    kron_dot(1., q_inner, -0.5,               p_inner, rad_panel_->S_x(),   rad_panel_->D_y(),    Nspline_x_inner, Nspline_y_inner);
+                    kron_dot(1., q_inner, -0.5*l2*(l2+1),     p_inner, rad_panel_->S_x(),   rad_panel_->Mm2_y(),  Nspline_x_inner, Nspline_y_inner);
+                    kron_dot(1., q_inner, -inp_->Za*inp_->Zp, p_inner, rad_panel_->S_x(),   rad_panel_->Mm1_y(),  Nspline_x_inner, Nspline_y_inner);
                 }
             }
             else
@@ -1394,13 +1407,18 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
         
         # pragma omp parallel for collapse (3) schedule (dynamic,1)
         for (int lambda = 0; lambda <= maxlambda; lambda++)
-        for (int i = 0; i < Nspline_x_inner; i++)
+        for (std::size_t i = 0; i < Nspline_x_inner; i++)
         for (int d = 0; d <= inp_->order; d++)
         if (i + d < Nspline_x_inner)
         {
             unsigned k = i + d;
             
-            SymBandMatrix<Complex> R = rad_panel_->calc_R_tr_dia_block(lambda, i, k);
+            SymBandMatrix<Complex> R
+            (
+                Nspline_y_inner,
+                order + 1,
+                rad_panel_->calc_R_tr_dia_block(lambda, i, k).data().slice(0, Nspline_y_inner * (order + 1))
+            );
             
             for (unsigned ill = 0; ill < Nang; ill++) if (par_->isMyGroupWork(ill))
             for (unsigned illp = 0; illp < Nang; illp++) if (par_->igroupproc() == (int)illp % par_->groupsize())

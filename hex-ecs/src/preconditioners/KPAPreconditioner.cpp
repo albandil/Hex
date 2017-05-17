@@ -100,8 +100,10 @@ void KPACGPreconditioner::CG_init (int iblock) const
     }
     unlock_kpa_access();
     
-    // calculate workspace size
-    std::size_t size = rad_inner_->bspline_x().Nspline() * rad_inner_->bspline_y().Nspline();
+    // dimension of the matrices
+    std::size_t Nspline_inner_x = rad_inner_->bspline_x().Nspline();
+    std::size_t Nspline_inner_y = rad_inner_->bspline_y().Nspline();
+    std::size_t size = Nspline_inner_x * Nspline_inner_y;
     
     // allocate thread workspace
     unsigned ithread = 0;
@@ -136,7 +138,7 @@ void KPACGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z)
 #endif
     
     // encapsulated memory chunks
-    ColMatrix<Complex> U (Nspline_inner_x, Nspline_inner_y, workspace_[ithread]);
+    ColMatrixView<Complex> U (Nspline_inner_x, Nspline_inner_y, workspace_[ithread]);
     RowMatrixView<Complex> R (Nspline_inner_x, Nspline_inner_y, r);
     RowMatrixView<Complex> Z (Nspline_inner_x, Nspline_inner_y, z);
     

@@ -746,7 +746,9 @@ void RadialIntegrals::apply_R_matrix
 (
     unsigned lambda,
     Complex a, const cArrayView src,
-    Complex b,       cArrayView dst
+    Complex b,       cArrayView dst,
+    int x_row_limit,
+    int y_row_limit
 ) const
 {
     // shorthands
@@ -754,45 +756,60 @@ void RadialIntegrals::apply_R_matrix
     std::size_t Nyspline = bspline_y_.Nspline();
     std::size_t order = bspline_x_.order();
     
+    // get expected number of blocks/rows
+    std::size_t x_rows = x_row_limit >= 0 ? std::min<std::size_t>(x_row_limit, Nxspline) : Nxspline;
+    std::size_t y_rows = y_row_limit >= 0 ? std::min<std::size_t>(y_row_limit, Nyspline) : Nyspline;
+    
+    // check compatibility
+    if (x_rows * y_rows != src.size())
+        HexException("Incompatible sizes %ldx%ld != %ld (src) passed to apply_R_matrix.", x_rows, y_rows, src.size());
+    if (x_rows * y_rows != dst.size())
+        HexException("Incompatible sizes %ldx%ld != %ld (dst) passed to apply_R_matrix.", x_rows, y_rows, dst.size());
+    
     // update destination vector
     # pragma omp simd
     for (std::size_t j = 0; j < dst.size(); j++)
         dst[j] *= b;
     
     // workspace
-    cArray prod (Nyspline);
+    cArray prod (y_rows);
     
     // for all blocks of the radial matrix
     # pragma omp parallel for firstprivate (prod) schedule (dynamic, 1)
-    for (std::size_t i = 0; i < Nxspline; i++)
-    for (std::size_t k = i; k < Nxspline and k <= i + order; k++)
+    for (std::size_t i = 0; i < x_rows; i++)
+    for (std::size_t k = i; k < x_rows and k <= i + order; k++)
     {
         // (i,k)-block data (= concatenated non-zero upper diagonals)
-        SymBandMatrix<Complex> block_ik = calc_R_tr_dia_block(lambda, i, k);
+        SymBandMatrix<Complex> block_ik
+        (
+            y_rows,
+            order + 1,
+            calc_R_tr_dia_block(lambda, i, k).data().slice(0, y_rows * (order + 1))
+        );
         
         // multiply source vector by this block
-        block_ik.dot(1., cArrayView(src, k * Nyspline, Nyspline), 0., prod);
+        block_ik.dot(1., cArrayView(src, k * y_rows, y_rows), 0., prod);
         
         // update destination vector
         # pragma omp critical
         {
             # pragma omp simd
-            for (std::size_t j  = 0; j < Nyspline; j++)
-                dst[i * Nyspline + j] += a * prod[j];
+            for (std::size_t j  = 0; j < y_rows; j++)
+                dst[i * y_rows + j] += a * prod[j];
         }
         
         // also handle symmetric case
         if (i != k)
         {
             // multiply source vector by this block
-            block_ik.dot(1., cArrayView(src, i * Nyspline, Nyspline), 0., prod);
+            block_ik.dot(1., cArrayView(src, i * y_rows, y_rows), 0., prod);
             
             // update destination vector
             # pragma omp critical
             {
                 # pragma omp simd
-                for (std::size_t j  = 0; j < Nyspline; j++)
-                    dst[k * Nyspline + j] += a * prod[j];
+                for (std::size_t j  = 0; j < y_rows; j++)
+                    dst[k * y_rows + j] += a * prod[j];
             }
         }
     }
@@ -920,7 +937,7 @@ cArray RadialIntegrals::overlap
     return res;
 }
 
-cArray RadialIntegrals::overlapP (Bspline const & bspline, GaussLegendre const & g, int n, int l)
+cArray RadialIntegrals::overlapP (Bspline const & bspline, GaussLegendre const & g, Real Z, int n, int l)
 {
     // result
     cArray res (bspline.Nspline());
@@ -952,7 +969,7 @@ cArray RadialIntegrals::overlapP (Bspline const & bspline, GaussLegendre const &
             [ = ](Complex x) -> Complex
             {
                 gsl_sf_result R;
-                if (gsl_sf_hydrogenicR_e(n, l, 1., x.real(), &R) == GSL_EUNDRFLW)
+                if (gsl_sf_hydrogenicR_e(n, l, Z, x.real(), &R) == GSL_EUNDRFLW)
                     return 0.;
                 else
                     return /* weightf(x) * */ x * Real(R.val);

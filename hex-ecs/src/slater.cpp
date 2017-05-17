@@ -276,11 +276,12 @@ Complex RadialIntegrals::computeR (int lambda, int a, int b, int c, int d) const
             }
         }
     
-    if (std::abs(R) > 1000)
+    if (sqrabs(R) > 1e+6)
     {
-        std::cout << "Error in calculation of radial integral!" << std::endl;
-        std::cout << "R[" << lambda << "](" << a << "," << b << "," << c << "," << d << ") = " << R << std::endl;
-        std::exit(0);
+        std::cout << "Warning: Radial integral too large!" << std::endl;
+        std::cout << "         R[" << lambda << "](" << a << "," << b << "," << c << "," << d << ") = " << R << std::endl;
+        std::cout << "         If this happens on panel in the DOM preconditioner, most likely the domains are too small." << std::endl;
     }
+    
     return R;
 }

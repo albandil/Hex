@@ -1024,6 +1024,7 @@ void InputFile::read (std::ifstream & inf)
     std::cout << "\tnL = " << levels << std::endl;
     std::cout << "\tlimit = " << limit << std::endl;
     
+    Za = 1;
     Zp = ReadNext<int>(inf).val;
     
     if (Zp == 0)
@@ -1139,12 +1140,12 @@ void zip_solution
     cArrays Xp1 (Nchan2), Sp1 (Nchan2), Xp2 (Nchan1), Sp2 (Nchan1);
     for (int n1 = l1 + 1; n1 <= l1 + Nchan2; n1++)
     {
-        Sp1[n1 - l1 - 1] = r.overlapP(bspline_inner, g_inner, n1, l1);
+        Sp1[n1 - l1 - 1] = r.overlapP(bspline_inner, g_inner, inp.Za, n1, l1);
         Xp1[n1 - l1 - 1] = S_lu->solve(Sp1[n1 - l1 - 1]);
     }
     for (int n2 = l2 + 1; n2 <= l2 + Nchan1; n2++)
     {
-        Sp2[n2 - l2 - 1] = r.overlapP(bspline_inner, g_inner, n2, l2);
+        Sp2[n2 - l2 - 1] = r.overlapP(bspline_inner, g_inner, inp.Za, n2, l2);
         Xp2[n2 - l2 - 1] = S_lu->solve(Sp2[n2 - l2 - 1]);
     }
     

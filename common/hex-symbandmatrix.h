@@ -1287,30 +1287,35 @@ template <class DataT> void kron_dot
     Real a,       ArrayView<DataT> w,
     Real b, const ArrayView<DataT> v,
     SymBandMatrix<DataT> const & A,
-    SymBandMatrix<DataT> const & B
+    SymBandMatrix<DataT> const & B,
+    int A_row_limit = -1,
+    int B_row_limit = -1
 )
 {
-    std::size_t A_size = A.size();
-    std::size_t B_size = B.size();
+    std::size_t A_rows = A.size();
+    std::size_t B_rows = B.size();
+    
+    if (A_row_limit >= 0) A_rows = std::min<std::size_t>(A_row_limit, A_rows);
+    if (B_row_limit >= 0) B_rows = std::min<std::size_t>(B_row_limit, B_rows);
     
     # pragma omp parallel for collapse (2)
-    for (std::size_t i = 0; i < A_size; i++)
-    for (std::size_t j = 0; j < B_size; j++)
+    for (std::size_t i = 0; i < A_rows; i++)
+    for (std::size_t j = 0; j < B_rows; j++)
     {
         // iteration bounds
         std::size_t kmin = (i >= A.halfbw() ? i - A.halfbw() : 0);
         std::size_t lmin = (j >= B.halfbw() ? j - B.halfbw() : 0);
-        std::size_t kmax = std::min(A.size() - 1, i + A.halfbw() - 1);
-        std::size_t lmax = std::min(B.size() - 1, j + B.halfbw() - 1);
+        std::size_t kmax = std::min(A_rows - 1, i + A.halfbw() - 1);
+        std::size_t lmax = std::min(B_rows - 1, j + B.halfbw() - 1);
         
         // calculate the scalar product
         DataT res = 0;
         for (std::size_t k = kmin; k <= kmax; k++)
         for (std::size_t l = lmin; l <= lmax; l++)
-            res += A(i,k) * B(j,l) * v[k * B.size() + l];
+            res += A(i,k) * B(j,l) * v[k * B_rows + l];
         
         // save result
-        w[i * B.size() + j] = a * w[i * B.size() + j] + b * res;
+        w[i * B_rows + j] = a * w[i * B_rows + j] + b * res;
     }
 }
 

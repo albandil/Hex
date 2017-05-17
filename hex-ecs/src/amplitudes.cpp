@@ -473,7 +473,7 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> &
     cArray Xp, Sp;
     if (cmd_.analytic_eigenstates)
     {
-        Sp = RadialIntegrals::overlapP(bspline_inner_, rad_.gaussleg(), T.nf, T.lf);
+        Sp = RadialIntegrals::overlapP(bspline_inner_, rad_.gaussleg(), inp_.Za, T.nf, T.lf);
     }
     else
     {
@@ -487,8 +487,8 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> &
     // the trend of the T-matrix.
     
     Real wavelength = special::constant::two_pi / kf[ie];
-    Real Rb   = (cmd_.extract_rho       > 0) ? cmd_.extract_rho       : bspline_full_.R2();
-    Real Ra   = (cmd_.extract_rho_begin > 0) ? cmd_.extract_rho_begin : Rb - wavelength; Ra = std::max(bspline_full_.R2() / 2, Ra);
+    Real Rb     = (cmd_.extract_rho       > 0) ? cmd_.extract_rho       : bspline_full_.R2();
+    Real Ra     = (cmd_.extract_rho_begin > 0) ? cmd_.extract_rho_begin : Rb - wavelength; Ra = std::max(bspline_full_.R2() / 2, Ra);
     int samples = (cmd_.extract_samples   > 0) ? cmd_.extract_samples   : 10;
     
     rArray grid;
@@ -517,6 +517,7 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> &
         int eval_knot = bspline_full_.knot(eval_r);
         
         // evaluate j and dj at far radius for all angular momenta up to maxell
+        // FIXME : Coulomb for charge (inp_->Za - 1)
         cArray j_R0 = special::ric_jv(inp_.maxell, kf[ie] * eval_r);
         cArray dj_R0 = special::dric_jv(inp_.maxell, kf[ie] * eval_r) * kf[ie];
         
