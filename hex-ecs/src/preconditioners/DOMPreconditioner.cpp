@@ -153,8 +153,8 @@ void DOMPreconditioner::precondition (BlockArray<Complex> const & r, BlockArray<
     for (int iypanel = 0; iypanel < cmd_->dom_y_panels; iypanel++)
     {
         solvePanel(cycle, cycles, p, ixpanel, iypanel);
-        collectSolution(z, p);
 #ifdef DOM_DEBUG
+        collectSolution(z, p);
         
         cArray res (z[0].size());
         A_blocks_[0].dot(1.0, z[0], 0.0, res);
@@ -202,6 +202,42 @@ void DOMPreconditioner::solvePanel (int cycle, int cycles, std::vector<PanelSolu
     
     // get reference to the current panel
     PanelSolution * pCentre = &p[ipanel * cmd_->dom_y_panels + jpanel];
+    
+    // Sometimes all we need to do is to mirror panel solutions that have been already found.
+    // This is possible only when calculating with exchange enabled, when we have
+    // access to all angular symmetries. Of course, both particles must be electrons.
+    if (inp_->exchange and inp_->Zp == -1 and cmd_->dom_x_panels == cmd_->dom_y_panels and ipanel > jpanel)
+    {
+        PanelSolution * pMirror = &p[jpanel * cmd_->dom_y_panels + ipanel];
+        
+        std::cout << "\tMirroring (" << jpanel << "," << ipanel << ") ..." << std::endl;
+        
+        // for all angular components of the central and mirror panel
+        for (unsigned ill = 0; ill < ang_->states().size(); ill++)
+        for (unsigned illp = 0; illp < ang_->states().size(); illp++)
+        {
+            // get particles' angular momenta
+            int l1 = ang_->states()[ill].first;
+            int l2 = ang_->states()[ill].second;
+            int l1p = ang_->states()[illp].first;
+            int l2p = ang_->states()[illp].second;
+            
+            // if this is the correct symmetry, use the mirror panel
+            if (l1 == l2p and l2 == l1p)
+            {
+                assert(pCentre->z[ill].size() == pMirror->z[illp].size());
+                
+                // copy data from the mirror panel and change sign
+                pCentre->z[ill] = pMirror->z[illp];
+                pCentre->z[ill] *= (l1 + l2 + inp_->L + ang_->S()) % 2 == 0 ? 1.0_r : -1.0_r;
+                
+                // mirror the elements of the solution (i.e. swap B-spline indices)
+                transpose(pCentre->z[ill], pCentre->xspline_inner.Nspline(), pCentre->yspline_inner.Nspline());
+            }
+        }
+        
+        return;
+    }
     
     // create the preconditioner object
     PreconditionerBase * prec = PreconditionerBase::Choose
@@ -374,7 +410,8 @@ void DOMPreconditioner::solvePanel (int cycle, int cycles, std::vector<PanelSolu
         ofs << std::endl;
     }
     ofs.close();
-    
+#endif
+#ifdef DOM_DEBUG
     rArray grid_x = linspace(pCentre->xspline_inner.Rmin(), pCentre->xspline_inner.Rmax(), 1001);
     rArray grid_y = linspace(pCentre->yspline_inner.Rmin(), pCentre->yspline_inner.Rmax(), 1001);
     for (unsigned ill = 0; ill < psi.size(); ill++)
@@ -414,66 +451,72 @@ void DOMPreconditioner::correctSource
     
     int order = rad_inner().bspline().order();
     
-    // loop over all potential neighbour panels (skip self and edge-adjacent neighbours)
-    for (int kpanel = std::max(0, ipanel - 1); kpanel <= std::min(cmd_->dom_x_panels - 1, ipanel + 1); kpanel++)
-    for (int lpanel = std::max(0, jpanel - 1); lpanel <= std::min(cmd_->dom_y_panels - 1, jpanel + 1); lpanel++)
-    if ((kpanel != ipanel) or (lpanel != jpanel))
+    // loop over all B-spline elements of the target panel
+    for (int pi = 0; pi < p.xspline_inner.Nspline(); pi++)
+    for (int pj = 0; pj < p.yspline_inner.Nspline(); pj++)
     {
-        PanelSolution const & n = panels[kpanel * cmd_->dom_y_panels + lpanel];
+        // transform position from local index space to global index space
+        int i = pi + p.xoffset;
+        int j = pj + p.yoffset;
         
-        // shared B-spline bounds
-        int bxmin = kpanel == ipanel ? p.xoffset + 0
-            : std::max(p.xspline_inner.iR1() + p.xoffset, n.xspline_inner.iR1() + n.xoffset);
-        int bymin = lpanel == jpanel ? p.yoffset + 0
-            : std::max(p.yspline_inner.iR1() + p.yoffset, n.yspline_inner.iR1() + n.yoffset);
-        int bxmax = kpanel == ipanel ? p.xoffset + p.xspline_inner.Nspline() - 1
-            : std::min(p.xspline_inner.iR2() - order - 1 + p.xoffset, n.xspline_inner.iR2() - order - 1 + n.xoffset);
-        int bymax = lpanel == jpanel ? p.yoffset + p.yspline_inner.Nspline() - 1
-            : std::min(p.yspline_inner.iR2() - order - 1 + p.yoffset, n.yspline_inner.iR2() - order - 1 + n.yoffset);
+        // determine position of the central (target) B-spline index
+        bool tgtInP0 = p.minpxspline + order < pi and pi < p.maxpxspline - order and
+                       p.minpyspline + order < pj and pj < p.maxpyspline - order;
+        bool tgtInP  = p.minpxspline <= pi and pi <= p.maxpxspline and
+                       p.minpyspline <= pj and pj <= p.maxpyspline;
+        bool tgtInQ  = tgtInP and not tgtInP0;
+        bool tgtInR  = p.minpxspline - order < pi and pi < p.maxpxspline + order and
+                       p.minpyspline - order < pj and pj < p.maxpyspline + order and not tgtInP;
+        assert(!tgtInQ || !tgtInR);
         
-        // for all (target) B-splines shared by these two panels
-        for (int i = bxmin; i <= bxmax; i++)
-        for (int j = bymin; j <= bymax; j++)
+        // loop over all surrounding (source) B-spline elements
+        if (tgtInQ or tgtInR)
+        for (int pk = std::max(pi - order, 0); pk <= std::min(pi + order, p.xspline_inner.Nspline() - 1); pk++)
+        for (int pl = std::max(pj - order, 0); pl <= std::min(pj + order, p.yspline_inner.Nspline() - 1); pl++)
         {
-            // central panel local indices
-            int pi = i - p.xoffset;
-            int pj = j - p.yoffset;
+            // transform position from local index space to global index space
+            int k = pk + p.xoffset;
+            int l = pl + p.yoffset;
             
-            // is this B-spline owned by the central panel?
-            bool centraltgt =
-                (lpanel == jpanel and p.minpxspline <= pi and pi <= p.maxpxspline) or
-                (kpanel == ipanel and p.minpyspline <= pj and pj <= p.maxpyspline);
+            // determine position of the source B-spline index
+            bool srcInP0 = p.minpxspline + order < pk and pk < p.maxpxspline - order and
+                           p.minpyspline + order < pl and pl < p.maxpyspline - order;
+            bool srcInP  = p.minpxspline <= pk and pk <= p.maxpxspline and
+                           p.minpyspline <= pl and pl <= p.maxpyspline;
+            bool srcInQ  = srcInP and not srcInP0;
+            bool srcInR  = p.minpxspline - order < pk and pk < p.maxpxspline + order and
+                           p.minpyspline - order < pl and pl < p.maxpyspline + order and not srcInP;
+            assert(!srcInQ || !srcInR);
             
-            // for all (source) B-splines shared by these two panels
-            for (int k = std::max(bxmin, i - order); k <= std::min(bxmax, i + order); k++)
-            for (int l = std::max(bymin, j - order); l <= std::min(bymax, j + order); l++)
+            // determine the source B-spline owning panel
+            int ix = tgtInQ ? pk : pi;
+            int iy = tgtInQ ? pl : pj;
+            int kpanel = ix < p.minpxspline ? ipanel - 1 : ix <= p.maxpxspline ? ipanel : ipanel + 1;
+            int lpanel = iy < p.minpyspline ? jpanel - 1 : iy <= p.maxpyspline ? jpanel : jpanel + 1;
+            
+            // get neighbour panel info structure
+            PanelSolution const & n = panels[kpanel * cmd_->dom_y_panels + lpanel];
+            
+            // transform source B-spline index to neighbour panel index space
+            int nk = k - n.xoffset;
+            int nl = l - n.yoffset;
+            
+            // update the field source elements
+            for (unsigned ill  = 0; ill  < chi.size(); ill ++)
+            for (unsigned illp = 0; illp < chi.size(); illp++)
             {
-                // central panel local indices
-                int pk = k - p.xoffset;
-                int pl = l - p.yoffset;
+                Complex Aijkl = couplingMatrixElement(ill, illp, i, j, k, l);
+                Complex & rhs = chi[ill ][pi * p.yspline_inner.Nspline() + pj];
+                Complex   own = p.z[illp][pk * p.yspline_inner.Nspline() + pl];
+                Complex   nbr = n.z[illp][nk * n.yspline_inner.Nspline() + nl];
                 
-                // neighbour panel local indices
-                int nk = k - n.xoffset;
-                int nl = l - n.yoffset;
+                // update the field source with the neighbour field (use only incoming component)
+                if (tgtInQ and srcInR)
+                    rhs -= Aijkl * (nbr - own);
                 
-                // is this B-spline owned by the central panel?
-                bool centralsrc = 
-                    (lpanel == jpanel and p.minpxspline <= pk and pk <= p.maxpxspline) or
-                    (kpanel == ipanel and p.minpyspline <= pl and pl <= p.maxpyspline);
-                
-                // update the source
-                if (centralsrc xor centraltgt)
-                for (unsigned ill  = 0; ill  < chi.size(); ill ++)
-                for (unsigned illp = 0; illp < chi.size(); illp++)
-                {
-                    Complex coupl = couplingMatrixElement(ill, illp, i, j, k, l);
-                    Complex & rhs = chi[ill ][pi * p.yspline_inner.Nspline() + pj];
-                    Complex  lsrc = p.z[illp][pk * p.yspline_inner.Nspline() + pl];
-                    Complex   src = n.z[illp][nk * n.yspline_inner.Nspline() + nl];
-                    
-                    if (centraltgt) rhs -= coupl * (src - lsrc);
-                    if (centralsrc) rhs += coupl * src;
-                }
+                // update the field source with the neighbour field (already just the incoming component)
+                if (tgtInR and srcInQ)
+                    rhs += Aijkl * nbr;
             }
         }
     }
