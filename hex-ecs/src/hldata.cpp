@@ -56,14 +56,15 @@ bool HlData::hdfload (const char* file)
         return false;
     
     // read matrices
+    std::size_t vol = std::size_t(size) * std::size_t(size);
     Cl = ColMatrix<Complex>(size,size);
-    if (not hdf.read("Cl", Cl.data().data(), size * size))
+    if (not hdf.read("Cl", Cl.data().data(), vol))
         return false;
     invCl_invsqrtS = RowMatrix<Complex>(size,size);
-    if (not hdf.read("invCl_invsqrtS", invCl_invsqrtS.data().data(), size * size))
+    if (not hdf.read("invCl_invsqrtS", invCl_invsqrtS.data().data(), vol))
         return false;
     invsqrtS_Cl = RowMatrix<Complex>(size,size);
-    if (not hdf.read("invsqrtS_Cl", invsqrtS_Cl.data().data(), size * size))
+    if (not hdf.read("invsqrtS_Cl", invsqrtS_Cl.data().data(), vol))
         return false;
     
     // read eigenvalues
@@ -90,11 +91,12 @@ bool HlData::hdfsave (const char* file) const
         return false;
     
     // write matrices
-    if (not hdf.write("Cl", Cl.data().data(), size * size))
+    std::size_t vol = std::size_t(size) * std::size_t(size);
+    if (not hdf.write("Cl", Cl.data().data(), vol))
         return false;
-    if (not hdf.write("invCl_invsqrtS", invCl_invsqrtS.data().data(), size * size))
+    if (not hdf.write("invCl_invsqrtS", invCl_invsqrtS.data().data(), vol))
         return false;
-    if (not hdf.write("invsqrtS_Cl", invsqrtS_Cl.data().data(), size * size))
+    if (not hdf.write("invsqrtS_Cl", invsqrtS_Cl.data().data(), vol))
         return false;
     
     // write eigenvalues
@@ -136,7 +138,7 @@ cArray HlData::readPseudoState (unsigned l, unsigned ichan) const
     
     // read the right genstate
     cArray data (n);
-    if (not datafile.read("Cl", &data[0], n, indices[ichan] * n))
+    if (not datafile.read("Cl", &data[0], n, indices[ichan] * std::size_t(n)))
         HexException("Failed to read the pseudostate l = %d, ichan = %d from the dataset \"Cl\" in file %s.", l, ichan, filename.c_str());
     
     return data;
