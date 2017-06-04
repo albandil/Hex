@@ -239,58 +239,55 @@ void hex_tmat_pw_transform
                     
                     // default to Akima spline interpolation, but fall back to linear if not enough points
                     gsl_interp_type const * interp = gsl_interp_akima;
-                    if (gsl_interp_type_min_size(interp) <= energies_db.size() or gsl_interp_type_min_size(interp = gsl_interp_linear) <= energies_db.size())
+                    bool enoughPoints = gsl_interp_type_min_size(interp) <= energies_db.size() or gsl_interp_type_min_size(interp = gsl_interp_linear) <= energies_db.size();
+                    
+                    // create interpolators
+                    gsl_interp* spline_Re = enoughPoints ? gsl_interp_alloc(interp, energies_db.size()) : nullptr;
+                    gsl_interp* spline_Im = enoughPoints ? gsl_interp_alloc(interp, energies_db.size()) : nullptr;
+                    if (spline_Re) gsl_interp_init(spline_Re, energies_db.data(), reT_db.data(), energies_db.size());
+                    if (spline_Im) gsl_interp_init(spline_Im, energies_db.data(), imT_db.data(), energies_db.size());
+                    gsl_interp_accel* accel_Re = spline_Re ? gsl_interp_accel_alloc() : nullptr;
+                    gsl_interp_accel* accel_Im = spline_Im ? gsl_interp_accel_alloc() : nullptr;
+                    
+                    // interpolate retrieved data at requested energies
+                    for (int i = 0; i < nEnergies; i++) if (status[S][i] == 0)
                     {
-                        // create interpolators
-                        gsl_interp* spline_Re = gsl_interp_alloc(interp, energies_db.size());
-                        gsl_interp* spline_Im = gsl_interp_alloc(interp, energies_db.size());
-                        gsl_interp_init(spline_Re, energies_db.data(), reT_db.data(), energies_db.size());
-                        gsl_interp_init(spline_Im, energies_db.data(), imT_db.data(), energies_db.size());
-                        gsl_interp_accel* accel_Re = gsl_interp_accel_alloc();
-                        gsl_interp_accel* accel_Im = gsl_interp_accel_alloc();
-                        
-                        // interpolate retrieved data at requested energies
-                        for (int i = 0; i < nEnergies; i++) if (status[S][i] == 0)
+                        std::size_t j = std::lower_bound(energies_db.begin(), energies_db.end(), energies[i]) - energies_db.begin();
+                        if (j < energies_db.size() and energies_db[j] == energies[i])
                         {
-                            if (energies_db.empty() or energies[i] < energies_db.front() or energies_db.back() < energies[i])
-                            {
-                                // not available -> incomplete data for this partial wave
-                                complete[S][i] = false;
-                            }
-                            else
-                            {
-                                int err_re = gsl_interp_eval_e(spline_Re, energies_db.data(), reT_db.data(), energies[i], accel_Re, &ReT);
-                                int err_im = gsl_interp_eval_e(spline_Im, energies_db.data(), imT_db.data(), energies[i], accel_Im, &ImT);
-                                
-                                if (err_re != GSL_SUCCESS)
-                                {
-                                    std::cout << "Warning: Failed to interpolate real data for transition (" << ni << "," << li << "," << mi << ") -> (" << nf << "," << lf << "," << mf << "), "
-                                        "L = " << L << ", ell = " << ell << ", Ei = " << energies[i] << " (" << gsl_strerror(err_re) << ")" << std::endl;
-                                }
-                                
-                                if (err_im != GSL_SUCCESS)
-                                {
-                                    std::cout << "Warning: Failed to interpolate imag data for transition (" << ni << "," << li << "," << mi << ") -> (" << nf << "," << lf << "," << mf << "), "
-                                        "L = " << L << ", ell = " << ell << ", Ei = " << energies[i] << " (" << gsl_strerror(err_re) << ")" << std::endl;
-                                }
-                                
-                                tmatrices[S][i] += Complex(ReT, ImT) / std::sqrt(energies[i]);
-                            }
+                            tmatrices[S][i] += Complex(reT_db[j], imT_db[j]) / std::sqrt(energies[i]);
                         }
-                        
-                        // delete interpolators
-                        gsl_interp_accel_free(accel_Re);
-                        gsl_interp_accel_free(accel_Im);
-                        gsl_interp_free(spline_Re);
-                        gsl_interp_free(spline_Im);
-                    }
-                    else
-                    {
-                        // not enough data for interpolation -> all T-matrices deemed incomplete
-                        for (int i = 0; i < nEnergies; i++) if (status[S][i] == 0)
+                        else if (not energies_db.empty() and energies_db.front() <= energies[i] and energies[i] <= energies_db.back() and enoughPoints)
+                        {
+                            int err_re = gsl_interp_eval_e(spline_Re, energies_db.data(), reT_db.data(), energies[i], accel_Re, &ReT);
+                            int err_im = gsl_interp_eval_e(spline_Im, energies_db.data(), imT_db.data(), energies[i], accel_Im, &ImT);
+                            
+                            if (err_re != GSL_SUCCESS)
+                            {
+                                std::cout << "Warning: Failed to interpolate real data for transition (" << ni << "," << li << "," << mi << ") -> (" << nf << "," << lf << "," << mf << "), "
+                                    "L = " << L << ", ell = " << ell << ", Ei = " << energies[i] << " (" << gsl_strerror(err_re) << ")" << std::endl;
+                            }
+                            
+                            if (err_im != GSL_SUCCESS)
+                            {
+                                std::cout << "Warning: Failed to interpolate imag data for transition (" << ni << "," << li << "," << mi << ") -> (" << nf << "," << lf << "," << mf << "), "
+                                    "L = " << L << ", ell = " << ell << ", Ei = " << energies[i] << " (" << gsl_strerror(err_re) << ")" << std::endl;
+                            }
+                            
+                            tmatrices[S][i] += Complex(ReT, ImT) / std::sqrt(energies[i]);
+                        }
+                        else
+                        {
+                            // not available
                             complete[S][i] = false;
-                        break;
+                        }
                     }
+                    
+                    // delete interpolators
+                    if (accel_Re) gsl_interp_accel_free(accel_Re);
+                    if (accel_Im) gsl_interp_accel_free(accel_Im);
+                    if (spline_Re) gsl_interp_free(spline_Re);
+                    if (spline_Im) gsl_interp_free(spline_Im);
                 }
             
             //

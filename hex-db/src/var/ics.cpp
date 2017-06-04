@@ -293,7 +293,8 @@ bool IntegralCrossSection::updateTable ()
             st4 << "SELECT Ei,Re_T_ell,Im_T_ell FROM 'tmat' "
                 "WHERE ni = :ni AND li = :li AND mi = :mi "
                 "  AND nf = :nf AND lf = :lf AND mf = :mf "
-                "  AND S  = :S  AND ell = :ell AND L = :L",
+                "  AND S  = :S  AND ell = :ell AND L = :L "
+                "ORDER BY Ei ASC",
                 sqlitepp::into(E), sqlitepp::into(ret), sqlitepp::into(imt),
                 sqlitepp::use(ni), sqlitepp::use(li), sqlitepp::use(mi),
                 sqlitepp::use(nf), sqlitepp::use(lf), sqlitepp::use(mf),
@@ -308,25 +309,33 @@ bool IntegralCrossSection::updateTable ()
             
             // default to Akima spline interpolation, but fall back to linear if not enough points
             gsl_interp_type const * interp = gsl_interp_akima;
-            if (energies.size() < gsl_interp_type_min_size(interp) and energies.size() < gsl_interp_type_min_size(interp = gsl_interp_linear))
-                continue;
+            bool enoughPoints = energies.size() >= gsl_interp_type_min_size(interp) or energies.size() >= gsl_interp_type_min_size(interp = gsl_interp_linear);
             
             // interpolate data
-            gsl_interp* spline_Re = gsl_interp_alloc(interp, energies.size());
-            gsl_interp* spline_Im = gsl_interp_alloc(interp, energies.size());
-            gsl_interp_init(spline_Re, energies.data(), Re_T.data(), energies.size());
-            gsl_interp_init(spline_Im, energies.data(), Im_T.data(), energies.size());
+            gsl_interp* spline_Re = enoughPoints ? gsl_interp_alloc(interp, energies.size()) : nullptr;
+            gsl_interp* spline_Im = enoughPoints ? gsl_interp_alloc(interp, energies.size()) : nullptr;
+            if (spline_Re) gsl_interp_init(spline_Re, energies.data(), Re_T.data(), energies.size());
+            if (spline_Im) gsl_interp_init(spline_Im, energies.data(), Im_T.data(), energies.size());
             # pragma omp parallel
             {
-                gsl_interp_accel* accel_Re = gsl_interp_accel_alloc();
-                gsl_interp_accel* accel_Im = gsl_interp_accel_alloc();
+                gsl_interp_accel* accel_Re = spline_Re ? gsl_interp_accel_alloc() : nullptr;
+                gsl_interp_accel* accel_Im = spline_Im ? gsl_interp_accel_alloc() : nullptr;
                 
                 double ret, imt;
                 
                 # pragma omp for
                 for (std::size_t i = 0; i < merged_energies.size(); i++)
                 {
-                    if (energies.front() <= merged_energies[i] and merged_energies[i] <= energies.back())
+                    // try to find this merged energy within the data for this angular momentum
+                    std::size_t j = std::lower_bound(energies.begin(), energies.end(), merged_energies[i]) - energies.begin();
+                    if (j < energies.size() and energies[j] == merged_energies[j])
+                    {
+                        // great, no need to interpolate -- let's just use the value
+                        merged_T[i] = Complex(Re_T[j], Im_T[j]) / k[j];
+                    }
+                    
+                    // interpolate if within dataset
+                    else if (energies.front() <= merged_energies[i] and merged_energies[i] <= energies.back() and enoughPoints)
                     {
                         int err_re = gsl_interp_eval_e(spline_Re, energies.data(), Re_T.data(), merged_energies[i], accel_Re, &ret);
                         int err_im = gsl_interp_eval_e(spline_Im, energies.data(), Im_T.data(), merged_energies[i], accel_Im, &imt);
@@ -347,11 +356,11 @@ bool IntegralCrossSection::updateTable ()
                     }
                 }
                 
-                gsl_interp_accel_free(accel_Re);
-                gsl_interp_accel_free(accel_Im);
+                if (accel_Re) gsl_interp_accel_free(accel_Re);
+                if (accel_Im) gsl_interp_accel_free(accel_Im);
             }
-            gsl_interp_free(spline_Re);
-            gsl_interp_free(spline_Im);
+            if (spline_Re) gsl_interp_free(spline_Re);
+            if (spline_Im) gsl_interp_free(spline_Im);
         }
         
         // write interpolated data to the database
