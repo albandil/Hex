@@ -1312,14 +1312,16 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
                     cArrayView p_inner (p[ill], 0, Nspline_x_inner * Nspline_y_inner);
                     cArrayView q_inner (q[ill], 0, Nspline_x_inner * Nspline_y_inner);
                     
+                    // one-electron matrices
+                    SymBandMatrix<Complex> const & Sx = rad_panel_->S_x();
+                    SymBandMatrix<Complex> const & Sy = rad_panel_->S_y();
+                    SymBandMatrix<Complex> Hx = 0.5_z * rad_panel_->D_x() + (0.5_z * (l1 * (l1 + 1.))) * rad_panel_->Mm2_x() + Complex(inp_->Za *   -1.0_r) * rad_panel_->Mm1_x();
+                    SymBandMatrix<Complex> Hy = 0.5_z * rad_panel_->D_y() + (0.5_z * (l2 * (l2 + 1.))) * rad_panel_->Mm2_y() + Complex(inp_->Za * inp_->Zp) * rad_panel_->Mm1_y();
+                    
                     // multiply 'p' by the diagonal block (except for the two-electron term)
-                    kron_dot(0., q_inner, E_,                 p_inner, rad_panel_->S_x(),   rad_panel_->S_y(),    Nspline_x_inner, Nspline_y_inner);
-                    kron_dot(1., q_inner, -0.5,               p_inner, rad_panel_->D_x(),   rad_panel_->S_y(),    Nspline_x_inner, Nspline_y_inner);
-                    kron_dot(1., q_inner, -0.5*l1*(l1+1),     p_inner, rad_panel_->Mm2_x(), rad_panel_->S_y(),    Nspline_x_inner, Nspline_y_inner);
-                    kron_dot(1., q_inner, +inp_->Za,          p_inner, rad_panel_->Mm1_x(), rad_panel_->S_y(),    Nspline_x_inner, Nspline_y_inner);
-                    kron_dot(1., q_inner, -0.5,               p_inner, rad_panel_->S_x(),   rad_panel_->D_y(),    Nspline_x_inner, Nspline_y_inner);
-                    kron_dot(1., q_inner, -0.5*l2*(l2+1),     p_inner, rad_panel_->S_x(),   rad_panel_->Mm2_y(),  Nspline_x_inner, Nspline_y_inner);
-                    kron_dot(1., q_inner, -inp_->Za*inp_->Zp, p_inner, rad_panel_->S_x(),   rad_panel_->Mm1_y(),  Nspline_x_inner, Nspline_y_inner);
+                    kron_dot(0., q_inner, E_, p_inner, Sx, Sy, Nspline_x_inner, Nspline_y_inner);
+                    kron_dot(1., q_inner, -1, p_inner, Hx, Sy, Nspline_x_inner, Nspline_y_inner);
+                    kron_dot(1., q_inner, -1, p_inner, Sx, Hy, Nspline_x_inner, Nspline_y_inner);
                 }
             }
             else

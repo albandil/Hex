@@ -234,6 +234,9 @@ void CommandLine::parse (int argc, char* argv[])
                     "\t--tolerance <number>       (-T)  Set tolerance for the conjugate gradients solver (default: 1e-8).                                                      \n"
                     "\t--prec-tolerance <number>  (-t)  Set tolerance for the conjugate gradients preconditioner (default: 1e-8).                                              \n"
                     "\t--drop-tolerance <number>  (-d)  Set drop tolerance for the ILU preconditioner (default: 1e-15).                                                        \n"
+                    "\t--sub-prec-iter <number>         Maximal number of inner preconditioner iterations before giving up. Default is number of unknowns.                     \n"
+                    "\t--sub-prec-nofail                Makes the solver continue with the calculation even when some of the inner preconditioners fails to converge.          \n"
+                    "\t--sub-prec-verbose               Display convergence information for inner preconditioners.                                                             \n"
 #ifndef DISABLE_PARALLEL_PRECONDITION
                     "\t--parallel-precondition          Apply multiple block preconditioners in parallel.                                                                      \n"
 #endif
@@ -482,6 +485,24 @@ void CommandLine::parse (int argc, char* argv[])
             {
                 // maximal number of ILU preconditioner iterations
                 ilu_max_iter = std::atoi(optargs[0].c_str());
+                return true;
+            },
+        "sub-prec-iter", "", 1, [&](std::vector<std::string> const & optargs) -> bool
+            {
+                // maximal number of preconditioner iterations
+                max_sub_iter = std::atoi(optargs[0].c_str());
+                return true;
+            },
+        "sub-prec-nofail", "", 0, [&](std::vector<std::string> const & optargs) -> bool
+            {
+                // continue calculation even when some of the preconditioners fails to converge
+                fail_on_sub_iter = false;
+                return true;
+            },
+        "sub-prec-verbose", "", 0, [&](std::vector<std::string> const & optargs) -> bool
+            {
+                // verbose inner preconditioners
+                sub_prec_verbose = true;
                 return true;
             },
 #ifdef WITH_MUMPS

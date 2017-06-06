@@ -60,7 +60,7 @@ int CGPreconditioner::solve_block (int ill, const cArrayView r, cArrayView z) co
     this->CG_init(ill);
     
     // maximal number of nested iterations
-    int max_iterations = Nspline_inner_x + Nspline_inner_y;
+    int max_iterations = cmd_->max_sub_iter > 0 ? cmd_->max_sub_iter : std::size_t(Nspline_inner_x) * std::size_t(Nspline_inner_y);
     
     // adjust max iterations for ILU-preconditioned blocks
     if (HybCGPreconditioner const * hp = dynamic_cast<HybCGPreconditioner const*>(this))
@@ -77,7 +77,7 @@ int CGPreconditioner::solve_block (int ill, const cArrayView r, cArrayView z) co
     // solve using the CG solver
     ConjugateGradients < Complex, cArray, cArrayView > CG;
     CG.reset();
-    CG.verbose              = false;
+    CG.verbose              = cmd_->sub_prec_verbose;
     CG.apply_preconditioner = [&](const cArrayView a, cArrayView b)
                               {
                                   par_->wait_g();
@@ -125,8 +125,13 @@ int CGPreconditioner::solve_block (int ill, const cArrayView r, cArrayView z) co
                               };
     int n = CG.solve(r, z, cmd_->prec_itertol, 0, max_iterations);
     
-    if (n == max_iterations)
-        HexException("Maximal number of iterations (%d) reached in the sub-preconditioner.", max_iterations);
+    if (n >= max_iterations)
+    {
+        if (cmd_->fail_on_sub_iter)
+            HexException("Error: Maximal number of iterations (%d) reached in the sub-preconditioner.", max_iterations);
+        else
+            std::cout << "\tWarning: Maximal number of iterations (" << max_iterations << ") reached in the sub-preconditioner." << std::endl;
+    }
     
     // release block-preconditioner block-specific data
     this->CG_exit(ill);
@@ -259,16 +264,18 @@ void CGPreconditioner::CG_mmul (int iblock, const cArrayView p, cArrayView q) co
         int l1 = ang_->states()[iblock].first;
         int l2 = ang_->states()[iblock].second;
         
+        // one-electron matrices
+        SymBandMatrix<Complex> const & Sx = rad_panel_->S_x();
+        SymBandMatrix<Complex> const & Sy = rad_panel_->S_y();
+        SymBandMatrix<Complex> Hx = 0.5_z * rad_panel_->D_x() + (0.5_z * (l1 * (l1 + 1.))) * rad_panel_->Mm2_x() + Complex(inp_->Za *   -1.0_r) * rad_panel_->Mm1_x();
+        SymBandMatrix<Complex> Hy = 0.5_z * rad_panel_->D_y() + (0.5_z * (l2 * (l2 + 1.))) * rad_panel_->Mm2_y() + Complex(inp_->Za * inp_->Zp) * rad_panel_->Mm1_y();
+        
         // multiply 'p' by the diagonal block
         // - except for the two-electron term
         // - restrict to inner region
-        kron_dot(0., q_inner, E_,                 p_inner, rad_panel_->S_x(),   rad_panel_->S_y(),    Nspline_inner_x, Nspline_inner_y);
-        kron_dot(1., q_inner, -0.5,               p_inner, rad_panel_->D_x(),   rad_panel_->S_y(),    Nspline_inner_x, Nspline_inner_y);
-        kron_dot(1., q_inner, -0.5*l1*(l1+1),     p_inner, rad_panel_->Mm2_x(), rad_panel_->S_y(),    Nspline_inner_x, Nspline_inner_y);
-        kron_dot(1., q_inner, +inp_->Za,          p_inner, rad_panel_->Mm1_x(), rad_panel_->S_y(),    Nspline_inner_x, Nspline_inner_y);
-        kron_dot(1., q_inner, -0.5,               p_inner, rad_panel_->S_x(),   rad_panel_->D_y(),    Nspline_inner_x, Nspline_inner_y);
-        kron_dot(1., q_inner, -0.5*l2*(l2+1),     p_inner, rad_panel_->S_x(),   rad_panel_->Mm2_y(),  Nspline_inner_x, Nspline_inner_y);
-        kron_dot(1., q_inner, -inp_->Za*inp_->Zp, p_inner, rad_panel_->S_x(),   rad_panel_->Mm1_y(),  Nspline_inner_x, Nspline_inner_y);
+        kron_dot(0., q_inner, E_, p_inner, Sx, Sy, Nspline_inner_x, Nspline_inner_y);
+        kron_dot(1., q_inner, -1, p_inner, Hx, Sy, Nspline_inner_x, Nspline_inner_y);
+        kron_dot(1., q_inner, -1, p_inner, Sx, Hy, Nspline_inner_x, Nspline_inner_y);
         
         // multiply 'p' by the two-electron integrals
         for (int lambda = 0; lambda <= rad_inner_->maxlambda(); lambda++)
@@ -366,7 +373,7 @@ Real CGPreconditioner::CG_compute_norm (const cArrayView a) const
     par_->syncsum_g(&norm2, 1);
     return std::sqrt(norm2);
 }
-    
+
 Complex CGPreconditioner::CG_scalar_product (const cArrayView a, const cArrayView b) const
 {
     // compute scalar product (part will be computed by every process in group, result will be synchronized)

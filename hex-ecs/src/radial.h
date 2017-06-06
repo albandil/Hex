@@ -282,7 +282,7 @@ class RadialIntegrals
          */
         Complex computeR (int lambda, int i, int j, int k, int l) const;
         
-        cArray diagonalR (int lambda) const;
+        void diagonalR (int lambda);
         
         /**
          * @brief Triangular R-integral.
@@ -321,9 +321,9 @@ class RadialIntegrals
         (
             int lambda,
             Bspline const & xspline, GaussLegendre const & xg,
-            int k, int l, int iknotx, Complex tx1, Complex tx2,
+            int k, int l, int iknotx, Real tx1, Real tx2,
             Bspline const & yspline, GaussLegendre const & yg,
-            int m, int n, int iknoty, Complex ty1, Complex ty2
+            int m, int n, int iknoty, Real ty1, Real ty2
         ) const;
         
         /**
@@ -476,9 +476,6 @@ class RadialIntegrals
         OneElectronPartialMatrixAccessors(Mitr_L)
         OneElectronPartialMatrixAccessors(Mitr_mLm1)
         
-        // Return reference to the precomputed array of diagonal contributions to two-electron integrals.
-        cArray const & R_tr_dia_diag (unsigned i) const { return R_tr_dia_diag_[i]; }
-        
         // Return reference to the precomputed matrix of two-electron integrals for given multipole.
         BlockSymBandMatrix<Complex> const & R_tr_dia (unsigned i) const { return R_tr_dia_[i]; }
         
@@ -514,10 +511,71 @@ class RadialIntegrals
         cArray Mitr_L_x_, Mitr_mLm1_x_;
         cArray Mitr_L_y_, Mitr_mLm1_y_;
         
-        // diagonal contributions to R_tr_dia
-        cArrays R_tr_dia_diag_;
+        /**
+         * @brief Diagonal contributions to two-electron integrals.
+         * 
+         * This is the multipole integral of four B-splines over a two-dimensional cell bounded by
+         * two adjacent knots in each dimension. When the grids for the two dimensions differ, the
+         * indexing of this data structure is quite awkward.
+         *
+         * Only contributions from purely real cells are considered.
+         */
+        struct RDiagData
+        {
+            /**
+             * @brief X-pointers
+             * 
+             * An array of length equal to the number of purely real
+             * intervals within the x-axis knot sequence, plus one. The elements are
+             * addressing into the 'i' array of individual cells.
+             */
+            iArray p;
+            
+            /**
+             * @brief Y-values
+             * 
+             * The indices of leading knot of integration cells. When
+             * the x == y line crosses N cells with the same x-position ix, this array
+             * will contain corresponding iy-s in the slice i[ p[ix] : p[ix+1] ],
+             * excluding the last element. Of course, there can be zero such cells;
+             * then p[ix] == p[ix+1]. The length of this array is equal to last element
+             * of 'p', and to the number of cells crossed by the x == y line.
+             * At most (Nrexintval + Nreyintval - 1) cells can be cut by a line, so 'i'
+             * should never exceed that length.
+             */
+            iArray i;
+            
+            /**
+             * @brief Values of the integrals.
+             *
+             * For every integration cell (ix,iy), where 'ix' is
+             * the number used to index 'p', and 'iy' is one of the values of 'i' from the
+             * interval i[ p[ix] : p[ix+1] ], specifically iy = i[idx], this array 'r'
+             * contains integrals of all integrals over this cell. While we theoretically
+             * could use the symmetry
+               \code
+                    R[abcd] = R[cbad] = R[adcb] = R[cdab]
+               \endcode
+             * here, it is avoided for clarity of indexing. Hence this array is exactly
+             * [(O + 1)^4]-times longer than 'i' and can be addressed in the following way
+               \code
+                    R[abcd] = r[(((idx * (O+1) + A) * (O+1) + B) * (O+1) + C) * (O+1) + D]
+               \endcode
+             * where 'idx' is the address into 'i', 'O' is the B-spline order, and the indices
+             * have been relabeled relative to the lowest possible B-spline that reaches
+             * to the (ix,iy) cell, i.e.
+               \code
+                    A = a - (ix - O - 1)
+                    B = b - (iy - O - 1)
+                    C = c - (ix - O - 1)
+                    D = d - (iy - O - 1)
+               \endcode
+             */
+            cArray r;
+        };
         
         // two-electron integral matrices
+        std::vector<RDiagData> R_diag_;
         std::vector<BlockSymBandMatrix<Complex>> R_tr_dia_;
         
         // verbose output

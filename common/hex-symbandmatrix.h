@@ -1298,24 +1298,30 @@ template <class DataT> void kron_dot
     if (A_row_limit >= 0) A_rows = std::min<std::size_t>(A_row_limit, A_rows);
     if (B_row_limit >= 0) B_rows = std::min<std::size_t>(B_row_limit, B_rows);
     
-    # pragma omp parallel for collapse (2)
+    w *= a;
+    
+    # pragma omp parallel for
     for (std::size_t i = 0; i < A_rows; i++)
-    for (std::size_t j = 0; j < B_rows; j++)
     {
         // iteration bounds
         std::size_t kmin = (i >= A.halfbw() ? i - A.halfbw() : 0);
-        std::size_t lmin = (j >= B.halfbw() ? j - B.halfbw() : 0);
         std::size_t kmax = std::min(A_rows - 1, i + A.halfbw() - 1);
-        std::size_t lmax = std::min(B_rows - 1, j + B.halfbw() - 1);
         
-        // calculate the scalar product
-        DataT res = 0;
         for (std::size_t k = kmin; k <= kmax; k++)
-        for (std::size_t l = lmin; l <= lmax; l++)
-            res += A(i,k) * B(j,l) * v[k * B_rows + l];
-        
-        // save result
-        w[i * B_rows + j] = a * w[i * B_rows + j] + b * res;
+        for (std::size_t j = 0; j < B_rows; j++)
+        {
+            // iteration bounds
+            std::size_t lmin = (j >= B.halfbw() ? j - B.halfbw() : 0);
+            std::size_t lmax = std::min(B_rows - 1, j + B.halfbw() - 1);
+            
+            // calculate the scalar product
+            DataT res = 0;
+            for (std::size_t l = lmin; l <= lmax; l++)
+                res += B(j,l) * v[k * B_rows + l];
+            
+            // save result
+            w[i * B_rows + j] += b * A(i,k) * res;
+        }
     }
 }
 

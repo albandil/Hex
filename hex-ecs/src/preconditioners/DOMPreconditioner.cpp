@@ -32,8 +32,6 @@
 #include "hex-csrmatrix.h"
 #include "hex-itersolve.h"
 
-#include <csignal>
-
 // --------------------------------------------------------------------------------- //
 
 #include "radial.h"
@@ -196,7 +194,7 @@ void DOMPreconditioner::solvePanel (int cycle, int cycles, std::vector<PanelSolu
 {
     std::cout << std::endl;
     std::cout << "\t-------------------------------------------" << std::endl;
-    std::cout << "\tSolve panel " << ipanel << " " << jpanel << " (cycle " << cycle + 1 << " of " << cycles << ")" << std::endl;
+    std::cout << "\tSolve panel " << ipanel << " " << jpanel << " (sweep " << cycle + 1 << " of " << cycles << ")" << std::endl;
     std::cout << "\t-------------------------------------------" << std::endl;
     std::cout << std::endl;
     
@@ -465,8 +463,8 @@ void DOMPreconditioner::correctSource
         bool tgtInP  = p.minpxspline <= pi and pi <= p.maxpxspline and
                        p.minpyspline <= pj and pj <= p.maxpyspline;
         bool tgtInQ  = tgtInP and not tgtInP0;
-        bool tgtInR  = p.minpxspline - order < pi and pi < p.maxpxspline + order and
-                       p.minpyspline - order < pj and pj < p.maxpyspline + order and not tgtInP;
+        bool tgtInR  = p.minpxspline - order <= pi and pi <= p.maxpxspline + order and
+                       p.minpyspline - order <= pj and pj <= p.maxpyspline + order and not tgtInP;
         assert(!tgtInQ || !tgtInR);
         
         // loop over all surrounding (source) B-spline elements
@@ -484,8 +482,8 @@ void DOMPreconditioner::correctSource
             bool srcInP  = p.minpxspline <= pk and pk <= p.maxpxspline and
                            p.minpyspline <= pl and pl <= p.maxpyspline;
             bool srcInQ  = srcInP and not srcInP0;
-            bool srcInR  = p.minpxspline - order < pk and pk < p.maxpxspline + order and
-                           p.minpyspline - order < pl and pl < p.maxpyspline + order and not srcInP;
+            bool srcInR  = p.minpxspline - order <= pk and pk <= p.maxpxspline + order and
+                           p.minpyspline - order <= pl and pl <= p.maxpyspline + order and not srcInP;
             assert(!srcInQ || !srcInR);
             
             // determine the source B-spline owning panel
@@ -602,10 +600,16 @@ void DOMPreconditioner::knotSubsequence (int i, int n, Bspline const & bspline, 
     iRa = std::max(iR1, iRa - gap_ - 1 * bspline.order());
     iRb = std::min(iR2, iRb + gap_ + 2 * bspline.order());
     
-    // new knot sub-sequence
+    // new real knot sub-sequence
     rknots = inp_->rknots.slice(iRa, iRb + 1);
-    cknots1 = inp_->cknots - inp_->cknots.back() + rknots.front();
+    
+    // trailing complex knots
     cknots2 = inp_->cknots + rknots.back();
+    
+    // leading complex knots (need to reverse order to preserve interval stretching)
+    cknots1 = -inp_->cknots;
+    std::reverse(cknots1.begin(), cknots1.end());
+    cknots1 += rknots.front();
 }
 
 void DOMPreconditioner::splitResidual (cBlockArray const & r, std::vector<PanelSolution> & panels) const

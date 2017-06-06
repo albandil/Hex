@@ -39,6 +39,7 @@
 
 #include "hex-arrays.h"
 #include "hex-csrmatrix.h"
+#include "hex-hdffile.h"
 #include "hex-special.h"
 #include "hex-symbandmatrix.h"
 
@@ -59,10 +60,10 @@ RadialIntegrals::RadialIntegrals
 )
   : bspline_x_(bspline_x),
     bspline_y_(bspline_y),
-    rxmin_(bspline_x.R1() == bspline_x.Rmin() ? bspline_x.R1() : bspline_x.unrotate(bspline_x.t(bspline_x.iR1() - 2 * bspline_x.order() - 1))),
-    rymin_(bspline_y.R1() == bspline_y.Rmin() ? bspline_y.R1() : bspline_y.unrotate(bspline_y.t(bspline_y.iR1() - 2 * bspline_y.order() - 1))),
-    rxmax_(bspline_x.R2() == bspline_x.Rmax() ? bspline_x.R2() : bspline_x.unrotate(bspline_x.t(bspline_x.iR2() + 2 * bspline_x.order() + 1))),
-    rymax_(bspline_y.R2() == bspline_y.Rmax() ? bspline_y.R2() : bspline_y.unrotate(bspline_y.t(bspline_y.iR2() + 2 * bspline_y.order() + 1))),
+    rxmin_(bspline_x.R1()),
+    rymin_(bspline_y.R1()),
+    rxmax_(bspline_x.R2()),
+    rymax_(bspline_y.R2()),
     D_x_  (bspline_x.Nspline(), bspline_x.order() + 1),
     S_x_  (bspline_x.Nspline(), bspline_x.order() + 1),
     Mm1_x_(bspline_x.Nspline(), bspline_x.order() + 1),
@@ -115,16 +116,18 @@ cArray RadialIntegrals::computeMi (Bspline const & bspline, GaussLegendre const 
     # pragma omp parallel for
     for (int iknot = 0; iknot < Nknot - 1; iknot++)
     if (bspline.t(iknot).real() != bspline.t(iknot + 1).real())
-    for (int ipoint = 0; ipoint < points; ipoint++)
     {
-        // get restricted radius
-        Complex r = bspline.clamp(xs[iknot * points + ipoint], rmin, rmax);
-        
-        // get scale factor
+        // get restricted scale factor
         Real scale = special::clamp(bspline.unrotate(bspline.t(iknot + 1)), rmin, rmax);
         
-        // calculate effective power
-        x_a[iknot * points + ipoint] = special::pow_int(r / scale, a);
+        for (int ipoint = 0; ipoint < points; ipoint++)
+        {
+            // get restricted radius
+            Complex r = bspline.clamp(xs[iknot * points + ipoint], rmin, rmax);
+            
+            // calculate effective power
+            x_a[iknot * points + ipoint] = special::pow_int(r / scale, a);
+        }
     }
     
     // evaluate all B-splines in all points
@@ -489,6 +492,79 @@ Complex RadialIntegrals::computeM
 void RadialIntegrals::setupOneElectronIntegrals (Parallel const & par, CommandLine const & cmd)
 {
     setupOneElectronIntegrals(cmd.shared_scratch, par.IamMaster());
+    
+    // Precompute also diagonal parts of the two-electron integrals. These are more computationally intensive
+    // than the rest and the possibility to reuse them leads to a great speedup.
+    
+    R_diag_.resize(Nlambdas_);
+    
+    if (verbose_) std::cout << "Precomputing diagonal two-electron integrals ..." << std::endl;
+    
+    for (int lambda = 0; lambda < Nlambdas_; lambda++)
+    {
+        std::string filename = format("rad-R-diag-%d-%.4lx-%.4lx.hdf", lambda, bspline_x_.hash(), bspline_y_.hash());
+        
+        if (not cmd.shared_scratch or par.isMyWork(lambda))
+        {
+            HDFFile hdf (filename, HDFFile::readonly);
+            
+            // try to load the data from disk
+            if
+            (
+                hdf.valid()
+                and R_diag_[lambda].p.resize(hdf.size("p"))   and hdf.read("p", &R_diag_[lambda].p[0], R_diag_[lambda].p.size())
+                and R_diag_[lambda].i.resize(hdf.size("i"))   and hdf.read("i", &R_diag_[lambda].i[0], R_diag_[lambda].i.size())
+                and R_diag_[lambda].r.resize(hdf.size("r")/2) and hdf.read("r", &R_diag_[lambda].r[0], R_diag_[lambda].r.size())
+            )
+            {
+                if (verbose_) std::cout << "\t- integrals for lambda = " << lambda << " loaded from \"" << filename << "\"" << std::endl;
+            }
+            
+            // calculate new integrals
+            else
+            {
+                Timer t;
+                diagonalR(lambda);
+                if (verbose_) std::cout << "\t- integrals for lambda = " << lambda << " computed after " << t.nice_time() << std::endl;
+                
+                HDFFile hdf (filename, HDFFile::overwrite);
+                hdf.write("p", &R_diag_[lambda].p[0], R_diag_[lambda].p.size());
+                hdf.write("i", &R_diag_[lambda].i[0], R_diag_[lambda].i.size());
+                hdf.write("r", &R_diag_[lambda].r[0], R_diag_[lambda].r.size());
+            }
+        }
+    }
+    
+    par.wait();
+    
+    // Load the integrals from disk in case of distributed shared-scratch mode.
+    
+    for (int lambda = 0; lambda < Nlambdas_; lambda++)
+    {
+        std::string filename = format("rad-R-diag-%d-%.4lx-%.4lx.hdf", lambda, bspline_x_.hash(), bspline_y_.hash());
+        
+        if (cmd.shared_scratch and not par.isMyWork(lambda))
+        {
+            HDFFile hdf (filename, HDFFile::readonly);
+            
+            if
+            (
+                hdf.valid()
+                and R_diag_[lambda].p.resize(hdf.size("p"))   and hdf.read("p", &R_diag_[lambda].p[0], R_diag_[lambda].p.size())
+                and R_diag_[lambda].i.resize(hdf.size("i"))   and hdf.read("i", &R_diag_[lambda].i[0], R_diag_[lambda].i.size())
+                and R_diag_[lambda].r.resize(hdf.size("r")/2) and hdf.read("r", &R_diag_[lambda].r[0], R_diag_[lambda].r.size())
+            )
+            {
+                if (verbose_) std::cout << "\t- integrals for lambda = " << lambda << " loaded from \"" << filename << "\"" << std::endl;
+            }
+            else
+            {
+                HexException("Failed to load radial integrals calculated by other process.");
+            }
+        }
+    }
+    
+    if (verbose_) std::cout << std::endl;
 }
 
 void RadialIntegrals::setupOneElectronIntegrals (bool shared_scratch, bool IamMaster)
@@ -548,9 +624,6 @@ void RadialIntegrals::setupOneElectronIntegrals (bool shared_scratch, bool IamMa
     Mtr_mLm1_x_.resize(Nlambdas_, SymBandMatrix<Complex>(bspline_x_ .Nspline(), order + 1));
     Mtr_mLm1_y_.resize(Nlambdas_, SymBandMatrix<Complex>(bspline_y_ .Nspline(), order + 1));
     
-    // resize two-electron integrals array
-    R_tr_dia_diag_.resize(Nlambdas_);
-    
     // for all multipole moments
     for (int lambda = 0; lambda < Nlambdas_; lambda++)
     {
@@ -569,38 +642,6 @@ void RadialIntegrals::setupOneElectronIntegrals (bool shared_scratch, bool IamMa
     
     if (verbose_)
         std::cout << "done in " << t.nice_time() << std::endl << std::endl;
-    
-    // Finally, precompute diagonal part of the two-electron integrals. These are more computationally intensive
-    // than the rest and the possibility to reuse them leads to a great speedup.
-    
-    if (bspline_x_.hash() == bspline_y_.hash())
-    {
-        R_tr_dia_diag_.resize(Nlambdas_);
-        
-        if (verbose_) std::cout << "Precomputing diagonal two-electron integrals ..." << std::endl;
-        
-        for (int lambda = 0; lambda < Nlambdas_; lambda++)
-        {
-            std::string filename = format("rad-R_tr_dia_diag_%d-%.4lx.hdf", lambda, bspline_x_.hash());
-            
-            if (not shared_scratch /* or par_->isMyWork(lambda)*/) // FIXME
-            {
-                if (R_tr_dia_diag_[lambda].hdfload(filename))
-                {
-                    if (verbose_) std::cout << "\t- integrals for lambda = " << lambda << " loaded from \"" << filename << "\"" << std::endl;
-                }
-                else
-                {
-                    Timer t;
-                    R_tr_dia_diag_[lambda] = diagonalR(lambda);
-                    if (verbose_) std::cout << "\t- integrals for lambda = " << lambda << " computed after " << t.nice_time() << std::endl;
-                    R_tr_dia_diag_[lambda].hdfsave(filename);
-                }
-            }
-        }
-        
-        if (verbose_) std::cout << std::endl;
-    }
 }
 
 void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLine const & cmd)
@@ -629,7 +670,7 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
         bool keep_in_memory = ((par.isMyWork(lambda) and cmd.cache_own_radint) or cmd.cache_all_radint);
         
         // compose the file name
-        std::string filename = format("rad-R_tr_dia_%d-%.4lx-%.4lx.hdf", lambda, bspline_x_.hash(), bspline_y_.hash());
+        std::string filename = format("rad-R-%d-%.4lx-%.4lx.hdf", lambda, bspline_x_.hash(), bspline_y_.hash());
         
         // create the block matrix for radial integrals of this multipole
         R_tr_dia_[lambda] = BlockSymBandMatrix<Complex>
