@@ -69,7 +69,8 @@ void KPACGPreconditioner::setup ()
     // get maximal number of threads that will run the preconditioning routines concurrently
     unsigned n = 1;
 #ifdef _OPENMP
-    n = omp_get_max_threads();
+    if (cmd_->parallel_precondition)
+        n = omp_get_max_threads();
 #endif
     
     // allocate workspaces
@@ -108,7 +109,8 @@ void KPACGPreconditioner::CG_init (int iblock) const
     // allocate thread workspace
     unsigned ithread = 0;
 #ifdef _OPENMP
-    ithread = omp_get_thread_num();
+    if (cmd_->parallel_precondition)
+        ithread = omp_get_thread_num();
 #endif
     workspace_[ithread].resize(size);
 }
@@ -134,7 +136,8 @@ void KPACGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z)
     // get workspace
     int ithread = 0;
 #ifdef _OPENMP
-    ithread = omp_get_thread_num();
+    if (cmd_->parallel_precondition)
+        ithread = omp_get_thread_num();
 #endif
     
     // encapsulated memory chunks
