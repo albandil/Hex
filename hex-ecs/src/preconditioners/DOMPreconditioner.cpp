@@ -143,39 +143,47 @@ void DOMPreconditioner::precondition (BlockArray<Complex> const & r, BlockArray<
     // interpolate the residual into sub-domains
     splitResidual(r, p);
     
+    // reset the solution
+    for (cArray & Z : z)
+        Z.fill(0.);
+    
     // find the solution on sub-domains
     std::cout << std::endl;
     int cycles = std::max(cmd_->dom_x_panels,cmd_->dom_y_panels);
     for (int cycle = 0; cycle < cycles; cycle++)
-    for (int ixpanel = 0; ixpanel < cmd_->dom_x_panels; ixpanel++)
-    for (int iypanel = 0; iypanel < cmd_->dom_y_panels; iypanel++)
     {
-        solvePanel(cycle, cycles, p, ixpanel, iypanel);
+        for (int ixpanel = 0; ixpanel < cmd_->dom_x_panels; ixpanel++)
+        for (int iypanel = 0; iypanel < cmd_->dom_y_panels; iypanel++)
+        {
+            solvePanel(cycle, cycles, p, ixpanel, iypanel);
+            
 #ifdef DOM_DEBUG
-        collectSolution(z, p);
-        
-        cArray res (z[0].size());
-        A_blocks_[0].dot(1.0, z[0], 0.0, res);
-        res -= r[0];
-        
-        std::ofstream ofs (format("dom-%d-%d-%d-res.vtk", cycle, ixpanel, iypanel));
-        writeVTK_points
-        (
-            ofs,
-            Bspline::zip
+            collectSolution(z, p);
+            cArray res (z[0].size());
+            A_blocks_[0].dot(1.0, z[0], 0.0, res);
+            res -= r[0];
+            
+            std::ofstream ofs (format("dom-%d-%d-%d-res.vtk", cycle, ixpanel, iypanel));
+            writeVTK_points
             (
-                rad_inner().bspline_x(),
-                rad_inner().bspline_y(),
-                res,
+                ofs,
+                Bspline::zip
+                (
+                    rad_inner().bspline_x(),
+                    rad_inner().bspline_y(),
+                    res,
+                    linspace(0., rad_inner().bspline_x().Rmax(), 1001),
+                    linspace(0., rad_inner().bspline_y().Rmax(), 1001)
+                ),
                 linspace(0., rad_inner().bspline_x().Rmax(), 1001),
-                linspace(0., rad_inner().bspline_y().Rmax(), 1001)
-            ),
-            linspace(0., rad_inner().bspline_x().Rmax(), 1001),
-            linspace(0., rad_inner().bspline_y().Rmax(), 1001),
-            rArray{ 0. }
-        );
-        ofs.close();
+                linspace(0., rad_inner().bspline_y().Rmax(), 1001),
+                rArray{ 0. }
+            );
+            ofs.close();
 #endif
+        }
+        
+        collectSolution(z, p); // <-- DEBUG
     }
     
     // interpolate the solution from sub-domains
@@ -192,14 +200,17 @@ void DOMPreconditioner::finish ()
 
 void DOMPreconditioner::solvePanel (int cycle, int cycles, std::vector<PanelSolution> & p, int ipanel, int jpanel) const
 {
-    std::cout << std::endl;
-    std::cout << "\t-------------------------------------------" << std::endl;
-    std::cout << "\tSolve panel " << ipanel << " " << jpanel << " (sweep " << cycle + 1 << " of " << cycles << ")" << std::endl;
-    std::cout << "\t-------------------------------------------" << std::endl;
-    std::cout << std::endl;
-    
     // get reference to the current panel
     PanelSolution * pCentre = &p[ipanel * cmd_->dom_y_panels + jpanel];
+    
+    std::cout << std::endl;
+    std::cout << "\t-------------------------------------------" << std::endl;
+    std::cout << "\tSolve panel " << ipanel << " " << jpanel
+              << " (bases " << format("%4x %4x", pCentre->xspline_inner.hash(), pCentre->yspline_inner.hash())
+              << ", sweep " << cycle + 1 << " of " << cycles << ")"
+              << std::endl;
+    std::cout << "\t-------------------------------------------" << std::endl;
+    std::cout << std::endl;
     
     // Sometimes all we need to do is to mirror panel solutions that have been already found.
     // This is possible only when calculating with exchange enabled, when we have
@@ -253,7 +264,7 @@ void DOMPreconditioner::solvePanel (int cycle, int cycles, std::vector<PanelSolu
               << std::endl;
     
     // construct the matrix of the equations etc.
-    prec->verbose(false);
+    prec->verbose(true);
     prec->setup();
     prec->update(E_);
     
@@ -268,12 +279,12 @@ void DOMPreconditioner::solvePanel (int cycle, int cycles, std::vector<PanelSolu
     // correct right-hand side from the neighbour domains
     correctSource(chi, p, ipanel, jpanel);
     
-#ifdef DOM_DEBUG
+// #ifdef DOM_DEBUG
     cBlockArray col (chi.size()), mul (chi.size());
     for (unsigned ill = 0; ill < chi.size(); ill++)
     {
-        rArray grid_x = linspace(pCentre->xspline_inner.Rmin(), pCentre->xspline_inner.Rmax(), 1001);
-        rArray grid_y = linspace(pCentre->yspline_inner.Rmin(), pCentre->yspline_inner.Rmax(), 1001);
+        rArray grid_x = linspace(pCentre->xspline_inner.Rmin(), pCentre->xspline_inner.Rmax(), 2001);
+        rArray grid_y = linspace(pCentre->yspline_inner.Rmin(), pCentre->yspline_inner.Rmax(), 2001);
         std::ofstream ofs (format("dom-%d-%d-%d-chi-%d.vtk", cycle, ipanel, jpanel, ill));
         writeVTK_points
         (
@@ -292,7 +303,7 @@ void DOMPreconditioner::solvePanel (int cycle, int cycles, std::vector<PanelSolu
         );
         ofs.close();
     }
-#endif
+// #endif
     
     // reset the solution
     for (cArray & segment : psi)
@@ -409,9 +420,9 @@ void DOMPreconditioner::solvePanel (int cycle, int cycles, std::vector<PanelSolu
     }
     ofs.close();
 #endif
-#ifdef DOM_DEBUG
-    rArray grid_x = linspace(pCentre->xspline_inner.Rmin(), pCentre->xspline_inner.Rmax(), 1001);
-    rArray grid_y = linspace(pCentre->yspline_inner.Rmin(), pCentre->yspline_inner.Rmax(), 1001);
+// #ifdef DOM_DEBUG
+    rArray grid_x = linspace(pCentre->xspline_inner.Rmin(), pCentre->xspline_inner.Rmax(), 2001);
+    rArray grid_y = linspace(pCentre->yspline_inner.Rmin(), pCentre->yspline_inner.Rmax(), 2001);
     for (unsigned ill = 0; ill < psi.size(); ill++)
     {
         std::ofstream ofs (format("dom-%d-%d-%d-psi-%d.vtk", cycle, ipanel, jpanel, ill));
@@ -432,7 +443,7 @@ void DOMPreconditioner::solvePanel (int cycle, int cycles, std::vector<PanelSolu
         );
         ofs.close();
     }
-#endif
+// #endif
     
     prec->finish();
     delete prec;
@@ -673,7 +684,7 @@ void DOMPreconditioner::collectSolution (cBlockArray & z, std::vector<PanelSolut
             }
         }
         
-#ifdef DOM_DEBUG
+// #ifdef DOM_DEBUG
         static int n = 0;
         std::ofstream out (format("combined-%d-%d.vtk", ill, n++));
         writeVTK_points
@@ -684,14 +695,14 @@ void DOMPreconditioner::collectSolution (cBlockArray & z, std::vector<PanelSolut
                 rad_inner().bspline(),
                 rad_inner().bspline(),
                 z[ill],
-                linspace(rad_inner().bspline().Rmin(), rad_inner().bspline().Rmax(), 2001),
-                linspace(rad_inner().bspline().Rmin(), rad_inner().bspline().Rmax(), 2001)
+                linspace(rad_inner().bspline().Rmin(), rad_inner().bspline().Rmax(), 6451),
+                linspace(rad_inner().bspline().Rmin(), rad_inner().bspline().Rmax(), 6451)
             ),
-            linspace(rad_inner().bspline().Rmin(), rad_inner().bspline().Rmax(), 2001),
-            linspace(rad_inner().bspline().Rmin(), rad_inner().bspline().Rmax(), 2001),
+            linspace(rad_inner().bspline().Rmin(), rad_inner().bspline().Rmax(), 6451),
+            linspace(rad_inner().bspline().Rmin(), rad_inner().bspline().Rmax(), 6451),
             rArray{ 0. }
         );
-#endif
+// #endif
     }
 }
 

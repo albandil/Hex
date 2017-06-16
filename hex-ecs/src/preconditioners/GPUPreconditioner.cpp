@@ -357,7 +357,7 @@ void GPUCGPreconditioner::setup ()
     Rdia_.resize(rad_inner_->maxlambda() + 1);
     for (int lambda = 0; lambda <= rad_inner_->maxlambda(); lambda++)
     {
-        Rdia_[lambda].reset(rad_inner_->R_tr_dia_diag(lambda).size(), rad_inner_->R_tr_dia_diag(lambda).data());
+        //Rdia_[lambda].reset(rad_inner_->R_tr_dia_diag(lambda).size(), rad_inner_->R_tr_dia_diag(lambda).data()); // FIXME
         Rdia_[lambda].connect(context_, largeDataFlags_);
     }
 }
