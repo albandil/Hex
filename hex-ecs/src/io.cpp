@@ -273,6 +273,7 @@ void CommandLine::parse (int argc, char* argv[])
                     "Domain decomposition preconditioner\n"
                     "\t--dom-xpanels <number>           Number of domain decomposition panels along x axis (default: 1).\n"
                     "\t--dom-ypanels <number>           Number of domain decomposition panels along y axis (default: 1).\n"
+                    "\t--dom-sweeps <number>            Number of domain decomposition solution sweeps, default is the larger of xpanels, ypanels.\n"
                     "\t--dom-preconditioner <name>      Panel preconditioner for domain decomposition (default: ILU).\n"
                     "\n"
                     "Post-processing\n"
@@ -681,6 +682,12 @@ void CommandLine::parse (int argc, char* argv[])
                 if (ip == PreconditionerBase::RTS_Table->end())
                     HexException("Unknown coarse preconditioner");
                 
+                return true;
+            },
+        "dom-sweeps", "", 1, [&](std::vector<std::string> const & optargs) -> bool
+            {
+                // domain decomposition sweeps
+                dom_sweeps = std::stoi(optargs[0]);
                 return true;
             },
         "dom-xpanels", "", 1, [&](std::vector<std::string> const & optargs) -> bool

@@ -149,7 +149,7 @@ void DOMPreconditioner::precondition (BlockArray<Complex> const & r, BlockArray<
     
     // find the solution on sub-domains
     std::cout << std::endl;
-    int cycles = std::max(cmd_->dom_x_panels,cmd_->dom_y_panels);
+    int cycles = cmd_->dom_sweeps > 0 ? cmd_->dom_sweeps : std::max(cmd_->dom_x_panels,cmd_->dom_y_panels);
     for (int cycle = 0; cycle < cycles; cycle++)
     {
         for (int ixpanel = 0; ixpanel < cmd_->dom_x_panels; ixpanel++)
