@@ -261,17 +261,12 @@ class ConjugateGradients
             {
                 if (verbose)
                 {
-                    /// DEBUG
-                    matrix_multiply(x, w);
-                    axby(-1., w, 1., b);
-                    double wnorm = compute_norm(w);
-                    
                     std::cout << '\t';
                     std::cout << std::setw(4) << std::right << k;
                     std::cout << " | ";
                     std::cout << std::setw(11) << std::left << timer.nice_time();
                     std::cout << " | ";
-                    std::cout << std::setw(15) << std::left << rnorm / bnorm << "(" << wnorm / bnorm << ")";
+                    std::cout << std::setw(15) << std::left << rnorm / bnorm;
                 }
                 
                 time_offset = timer.seconds();
@@ -333,7 +328,8 @@ class ConjugateGradients
                 if (k >= min_iterations and residual < eps)
                 {
                     ok = true;
-                    std::cout << "Convergence reached, final residual " << residual << std::endl;
+                    if (verbose)
+                        std::cout << "\tConvergence reached, final residual " << residual << std::endl;
                     break;
                 }
                 
