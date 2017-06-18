@@ -103,13 +103,13 @@ void GPUCGPreconditioner::setup ()
             clGetPlatformInfo(platforms[i], CL_PLATFORM_VENDOR, sizeof(platform_vendor), platform_vendor, nullptr);
             clGetPlatformInfo(platforms[i], CL_PLATFORM_VERSION, sizeof(platform_version), platform_version, nullptr);
 #ifdef __linux__
-                if (i == cmd_->ocl_platform and isatty(STDOUT_FILENO))
-                    std::cout << "\x1B[1;37m";
+            if (i == cmd_->ocl_platform and isatty(STDOUT_FILENO))
+                std::cout << "\x1B[1;37m";
 #endif
             std::cout << "\t- Platform " << i << ": " << platform_name << " (" << platform_vendor << ", " << platform_version << ")" << std::endl;
 #ifdef __linux__
-                if (i == cmd_->ocl_platform and isatty(STDOUT_FILENO))
-                    std::cout << "\x1B[0m";
+            if (i == cmd_->ocl_platform and isatty(STDOUT_FILENO))
+                std::cout << "\x1B[0m";
 #endif
             clGetDeviceIDs(platforms[i], CL_DEVICE_TYPE_ALL, 10, devices, &ndevices);
             for (cl_uint j = 0; j < ndevices; j++)
