@@ -64,7 +64,8 @@ void KPACGPreconditioner::setup ()
     refcount_atom_.fill(0);
     refcount_proj_.fill(0);
     
-    std::cout << "Set up KPA preconditioner" << std::endl << std::endl;
+    if (verbose_)
+        std::cout << "Set up KPA preconditioner" << std::endl << std::endl;
     
     // get maximal number of threads that will run the preconditioning routines concurrently
     unsigned n = 1;
