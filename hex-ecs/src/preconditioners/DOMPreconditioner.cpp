@@ -31,6 +31,7 @@
 
 #include "hex-csrmatrix.h"
 #include "hex-itersolve.h"
+#include "hex-misc.h"
 
 // --------------------------------------------------------------------------------- //
 
@@ -204,18 +205,18 @@ void DOMPreconditioner::solvePanel (int cycle, int cycles, std::vector<PanelSolu
     PanelSolution * pCentre = &p[ipanel * cmd_->dom_y_panels + jpanel];
     
     std::cout << std::endl;
-    std::cout << "\t-------------------------------------------" << std::endl;
+    std::cout << "\t-----------------------------------------------" << std::endl;
     std::cout << "\tSolve panel " << ipanel << " " << jpanel
               << " (bases " << format("%4x %4x", pCentre->xspline_inner.hash(), pCentre->yspline_inner.hash())
               << ", sweep " << cycle + 1 << " of " << cycles << ")"
               << std::endl;
-    std::cout << "\t-------------------------------------------" << std::endl;
+    std::cout << "\t-----------------------------------------------" << std::endl;
     std::cout << std::endl;
     
     // Sometimes all we need to do is to mirror panel solutions that have been already found.
     // This is possible only when calculating with exchange enabled, when we have
     // access to all angular symmetries. Of course, both particles must be electrons.
-    if (inp_->exchange and inp_->Zp == -1 and cmd_->dom_x_panels == cmd_->dom_y_panels and ipanel > jpanel)
+    /*if (inp_->exchange and inp_->Zp == -1 and cmd_->dom_x_panels == cmd_->dom_y_panels and ipanel > jpanel)
     {
         PanelSolution * pMirror = &p[jpanel * cmd_->dom_y_panels + ipanel];
         
@@ -246,7 +247,7 @@ void DOMPreconditioner::solvePanel (int cycle, int cycles, std::vector<PanelSolu
         }
         
         return;
-    }
+    }*/
     
     // create the preconditioner object
     PreconditionerBase * prec = PreconditionerBase::Choose
@@ -259,12 +260,14 @@ void DOMPreconditioner::solvePanel (int cycle, int cycles, std::vector<PanelSolu
         pCentre->yspline_full   // panel y basis
     );
     
+    std::cout.imbue(std::locale(std::locale::classic(), new MyNumPunct));
     std::cout << "\tPanel hamiltonian size: "
               << ang_->states().size() * pCentre->xspline_full.Nspline() * pCentre->yspline_full.Nspline()
               << std::endl;
+    std::cout.imbue(std::locale::classic());
     
     // construct the matrix of the equations etc.
-    prec->verbose(true);
+    prec->verbose(false);
     prec->setup();
     prec->update(E_);
     
@@ -497,35 +500,44 @@ void DOMPreconditioner::correctSource
                            p.minpyspline - order <= pl and pl <= p.maxpyspline + order and not srcInP;
             assert(!srcInQ || !srcInR);
             
-            // determine the source B-spline owning panel
-            int ix = tgtInQ ? pk : pi;
-            int iy = tgtInQ ? pl : pj;
-            int kpanel = ix < p.minpxspline ? ipanel - 1 : ix <= p.maxpxspline ? ipanel : ipanel + 1;
-            int lpanel = iy < p.minpyspline ? jpanel - 1 : iy <= p.maxpyspline ? jpanel : jpanel + 1;
-            
-            // get neighbour panel info structure
-            PanelSolution const & n = panels[kpanel * cmd_->dom_y_panels + lpanel];
-            
-            // transform source B-spline index to neighbour panel index space
-            int nk = k - n.xoffset;
-            int nl = l - n.yoffset;
-            
-            // update the field source elements
-            for (unsigned ill  = 0; ill  < chi.size(); ill ++)
-            for (unsigned illp = 0; illp < chi.size(); illp++)
+            // loop over all neighbour panels
+            for (int kpanel = std::max(0, ipanel - 1); kpanel <= std::min(cmd_->dom_x_panels - 1, ipanel + 1); kpanel++)
+            for (int lpanel = std::max(0, jpanel - 1); lpanel <= std::min(cmd_->dom_y_panels - 1, jpanel + 1); lpanel++)
             {
-                Complex Aijkl = couplingMatrixElement(ill, illp, i, j, k, l);
-                Complex & rhs = chi[ill ][pi * p.yspline_inner.Nspline() + pj];
-                Complex   own = p.z[illp][pk * p.yspline_inner.Nspline() + pl];
-                Complex   nbr = n.z[illp][nk * n.yspline_inner.Nspline() + nl];
+                // get neighbour panel info structure
+                PanelSolution const & n = panels[kpanel * cmd_->dom_y_panels + lpanel];
                 
-                // update the field source with the neighbour field (use only incoming component)
-                if (tgtInQ and srcInR)
-                    rhs -= Aijkl * (nbr - own);
+                // transform source B-spline index to neighbour panel index space
+                int nk = k - n.xoffset;
+                int nl = l - n.yoffset;
                 
-                // update the field source with the neighbour field (already just the incoming component)
-                if (tgtInR and srcInQ)
-                    rhs += Aijkl * nbr;
+                // locate the source B-spline in the neighbour panel
+                bool nP = n.minpxspline <= nk and nk <= n.maxpxspline and
+                          n.minpyspline <= nl and nl <= n.maxpyspline;
+                bool nR = n.minpxspline - order <= nk and nk <= n.maxpxspline + order and
+                          n.minpyspline - order <= nl and nl <= n.maxpyspline + order and not nP;
+                
+                // skip this panel if the source B-spline is not included in this panel
+                if (not nP and not nR)
+                    continue;
+                
+                // update the field source elements
+                for (unsigned ill  = 0; ill  < chi.size(); ill ++)
+                for (unsigned illp = 0; illp < chi.size(); illp++)
+                {
+                    Complex Aijkl = couplingMatrixElement(ill, illp, i, j, k, l);
+                    Complex & rhs = chi[ill ][pi * p.yspline_inner.Nspline() + pj];
+                    Complex   own = p.z[illp][pk * p.yspline_inner.Nspline() + pl];
+                    Complex   nbr = n.z[illp][nk * n.yspline_inner.Nspline() + nl];
+                    
+                    // update the field source with the neighbour field (use only incoming component)
+                    if (tgtInQ and srcInR and nP)
+                        rhs -= Aijkl * (nbr - own);
+                    
+                    // update the field source with the neighbour field (already just the incoming component)
+                    if (tgtInR and srcInQ and nR)
+                        rhs += Aijkl * nbr;
+                }
             }
         }
     }

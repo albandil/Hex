@@ -163,7 +163,6 @@ class GPUCGPreconditioner : public virtual KPACGPreconditioner
         // computational kernels
         cl_kernel mabt_;
         cl_kernel mml1_;
-        cl_kernel mml2_;
         cl_kernel mml2_dcpl_, mml2_cpld_;
         cl_kernel mml2_dcpl_offset_, mml2_cpld_offset_;
         cl_kernel axby_;
@@ -174,10 +173,13 @@ class GPUCGPreconditioner : public virtual KPACGPreconditioner
         // device data connections
         mutable clArray<Complex> tmp_, tmA_;
         mutable clArray<Real> nrm_;
-        clArrayView<Complex> t_inner_;
+        clArrayView<Complex> t_inner_a_, t_inner_p_;
+        clArrayView<Complex> S_inner_a_, D_inner_a_, Mm1_inner_a_, Mm2_inner_a_;
         clArrayView<Complex> S_inner_p_, D_inner_p_, Mm1_inner_p_, Mm2_inner_p_;
-        std::vector<clArrayView<Complex>> Mi_L_inner_, Mi_mLm1_inner_, M_L_inner_, M_mLm1_inner_;
-        std::vector<clArrayView<Complex>> Rdia_;
+        std::vector<clArrayView<Complex>> M_L_inner_a_, M_mLm1_inner_a_;
+        std::vector<clArrayView<Complex>> M_L_inner_p_, M_mLm1_inner_p_;
+        std::vector<clArrayView<LU_int_t>> R_coupled_p_, R_coupled_i_;
+        std::vector<clArrayView<Complex>> R_coupled_x_;
         
         cl_short nsrcseg_, ndstseg_;
 };

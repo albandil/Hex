@@ -479,6 +479,7 @@ class RadialIntegrals
         
         // Return reference to the precomputed matrix of two-electron integrals for given multipole.
         BlockSymBandMatrix<Complex> const & R_tr_dia (unsigned i) const { return R_tr_dia_[i]; }
+        CsrMatrix<LU_int_t,Complex> const & R_coupled (unsigned i) const { return R_coupled_[i]; }
         
     private:
         

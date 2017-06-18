@@ -32,70 +32,58 @@
 // Enable double precision (redundant in OpenCL 2.0).
 #pragma OPENCL EXTENSION cl_khr_fp64: enable
 
-// Necessary compile-time definitions:
-// -D ORDER=... (implies local size in "mmul_2el")
-// -D NSPLINE_ATOM=... (needed by "mmul_1el", "mmul_2el", "mul_ABt" and "kron_div")
-// -D NSPLINE_PROJ=... (needed by "mmul_1el", "mmul_2el", "mul_ABt" and "kron_div")
-// -D NREKNOT_ATOM=... (needed by "mmul_2el")
-// -D NREKNOT_PROJ=... (needed by "mmul_2el")
-// -D NLOCAL=... (local size in "scalar_product", "norm" and "mmul_1el")
-// -D NBLOCK_SIZE=... (block size and local size in "mul_ABt")
-// -D ANGULAR_BASIS_SIZE=... (number of coupled angular states, used in offset routines)
-// -D PROJECTILE_BASIS_OFFSET=... (skipped projectile basis splines, used in "mmul_2el")
-// -D NSRCSEG=...
-// -D NDSTSEG=...
-// -D ZA=... (atom nucleus charge, hydrogen = +1)
-// -D ZP=... (projectile charge, electron = -1)
+// --------------------------------------------------------------------------------- //
 
-// The following section is only for the syntax highlighting purposes in KDevelop:
-#ifndef ORDER
+// This section is here only for purposes of syntax highlighting in KDevelop.
+#ifdef SYNTAX_CHECK
 
     #include <clc/clc.h>
 
-    #ifndef Real
-    #define Real float
-    #endif
-
-    #ifndef Complex
-    #define Complex float2
-    #endif
-
-    #ifndef ORDER
-    #define ORDER 4
-    #endif
-
-    #ifndef NLOCAL
-    #define NLOCAL 1
-    #endif
-
-    #ifndef NSPLINE_ATOM
-    #define NSPLINE_ATOM 1
-    #endif
-
-    #ifndef NSPLINE_PROJ
-    #define NSPLINE_PROJ 1
-    #endif
-
-    #ifndef BLOCK_SIZE
-    #define BLOCK_SIZE 16
-    #endif
-
-    #ifndef ZA
-    #define ZA 1
-    #endif
-
-    #ifndef ZP
-    #define ZP -1
-    #endif
-
+    // Necessary compile-time definitions
+    
+    #define Long      long  // or int
+    #define Real     float  // or double
+    #define Complex float2  // or double2
+    #define ORDER        4  // B-spline order
+    #define NLOCAL       1  // local size in "scalar_product", "norm" and "mmul_1el"
+    #define NSPLINE_ATOM 1  // needed by "mmul_1el", "mmul_2el", "mul_ABt" and "kron_div"
+    #define NSPLINE_PROJ 1  // needed by "mmul_1el", "mmul_2el", "mul_ABt" and "kron_div"
+    #define BLOCK_SIZE  16  // block size and local size in "mul_ABt"
+    #define ZA           1  // nuclear charge, hydrogen = +1
+    #define ZP          -1  // projectile charge, electron = -1
+    #define RXMIN        0  // potential bound
+    #define RXMAX        0  // potential bound
+    #define RYMIN        0  // potential bound
+    #define RYMAX        0  // potential bound
+    #define ROTFACT      1  // rotation factor, cos(ecs_theta)
+    
 #endif
+
+// --------------------------------------------------------------------------------- //
 
 // Derived variables.
 #define NROW (NSPLINE_ATOM * NSPLINE_PROJ)
 
-// These are sometimes not defined for double.
-// #define min(x,y) (x < y ? x : y)
-// #define max(x,y) (x > y ? x : y)
+// --------------------------------------------------------------------------------- //
+
+// These functions are often not properly defined for double.
+#if 1
+
+    #undef min
+    #define min(x,y) (x < y ? x : y)
+
+    #undef max
+    #define max(x,y) (x > y ? x : y)
+
+    #undef clamp
+    Real clamp (Real x, Real a, Real b)
+    {
+        return max(a, min(x, b));
+    }
+
+#endif
+
+// --------------------------------------------------------------------------------- //
 
 /**
  * @brief Complex multiplication.
@@ -316,7 +304,7 @@ kernel void mmul_1el
         private Complex elem = E * cmul(Spa[ik],Spp[jl]);
         elem -= (Real)(0.5f) * (cmul(Dpa[ik],Spp[jl]) + cmul(Spa[ik],Dpp[jl]));
         elem -= (Real)(0.5f) * l1 * (l1 + 1) * cmul(M2pa[ik],Spp[jl]) + (Real)(0.5f) * l2 * (l2 + 1) * cmul(Spa[ik],M2pp[jl]);
-        elem += ZA * cmul(M1pa[ik],Spp[jl]) - ZP * cmul(Spa[ik],M1pp[jl]);
+        elem -= ZA * (-1) * cmul(M1pa[ik],Spp[jl]) + ZA * ZP * cmul(Spa[ik],M1pp[jl]);
         
         // multiply right-hand side by that matrix element
         y[i * NSPLINE_PROJ + j] += cmul(elem, x[k * NSPLINE_PROJ + l]);
@@ -351,14 +339,28 @@ kernel void kron_div
         y[i * NSPLINE_PROJ + j] = cdiv(y[i * NSPLINE_PROJ + j], E - D1[i] - D2[j]);
 }
 
-Real unrotate (Complex x)
+Real unrotateX (Complex A)
 {
-    return 0; // FIXME
+    // only real part
+    if (A.y == 0)      return A.x;
+    
+    // left complex part
+    if (A.x < RXMIN)   return RXMIN + (A.x - RXMIN) / ROTFACT;
+    
+    // right complex part
+    if (A.x > RXMAX)   return RXMAX + (A.x - RXMAX) / ROTFACT;
 }
 
-Real clamp (Real x, Real a, Real b)
+Real unrotateY (Complex A)
 {
-    return max(a, min(x, b));
+    // only real part
+    if (A.y == 0)      return A.x;
+    
+    // left complex part
+    if (A.x < RYMIN)   return RYMIN + (A.x - RYMIN) / ROTFACT;
+    
+    // right complex part
+    if (A.x > RYMAX)   return RYMAX + (A.x - RYMAX) / ROTFACT;
 }
 
 /**
@@ -367,15 +369,15 @@ Real clamp (Real x, Real a, Real b)
  * Multiplies the source vector by the modified two-electron matrix R,
  * where only the fully decoupled integrals are considered.
  */
-kernel void mmul_2el_decoupled_splines
+kernel void mmul_2el_decoupled
 (
     // B-spline knots (atom and projectile)
     constant Complex const * const restrict ta,
     constant Complex const * const restrict tp,
     // multipole
     private int lambda,
-    // angular integral
-    private Real f,
+    // angular integrals
+    private  Real f,
     // one-electron moments (atomic electron)
     global Complex const * const restrict MLa,
     global Complex const * const restrict MmLm1a,
@@ -390,34 +392,38 @@ kernel void mmul_2el_decoupled_splines
     // B-spline indices
     uint a = get_global_id(0) / NSPLINE_PROJ;
     uint b = get_global_id(0) % NSPLINE_PROJ;
-    uint c = get_global_id(1) / NSPLINE_PROJ;
-    uint d = get_global_id(1) % NSPLINE_PROJ;
     
     // B-spline bounding knots
-    Real ta1 = unrotate(ta[a]), ta2 = unrotate(ta[a + ORDER + 1]);
-    Real tb1 = unrotate(tp[b]), tb2 = unrotate(tp[b + ORDER + 1]);
-    Real tc1 = unrotate(ta[c]), tc2 = unrotate(ta[c + ORDER + 1]);
-    Real td1 = unrotate(tp[d]), td2 = unrotate(tp[d + ORDER + 1]);
+    Real ta1 = unrotateX(ta[a]), ta2 = unrotateX(ta[a + ORDER + 1]);
+    Real tb1 = unrotateY(tp[b]), tb2 = unrotateY(tp[b + ORDER + 1]);
     
-    // Do nothing when there is no overlap.
-    if (max(ta1,tc1) >= min(ta2,tc2) || max(tb1,td1) >= min(tb2,td2))
-        return;
-    
-    Real t_xmin = clamp(max(ta1,tc1), rxmin_, rxmax_);
-    Real t_xmax = clamp(min(ta2,tc2), rxmin_, rxmax_);
-    Real t_ymin = clamp(max(tb1,td1), rymin_, rymax_);
-    Real t_ymax = clamp(min(tb2,td2), rymin_, rymax_);
-    
-    if (t_ymax <= t_xmin)
+    // loop over free B-spline indices
+    for (uint c = a > ORDER ? a - ORDER : 0; c < NSPLINE_ATOM && c <= a + ORDER; c++)
+    for (uint d = b > ORDER ? b - ORDER : 0; d < NSPLINE_PROJ && d <= b + ORDER; c++)
     {
-        Real scale = pow_int(t_ymax / t_xmax, lambda) / t_xmax;
-        return scale * MmLm1a[lambda](a,c) * MLp[lambda](b,d);
-    }
-    
-    if (t_xmax <= t_ymin)
-    {
-        Real scale = pow_int(t_xmax / t_ymax, lambda) / t_ymax;
-        return scale * MLa[lambda](a,c) * MmLm1p[lambda](b,d);
+        // B-spline bounding knots
+        Real tc1 = unrotateX(ta[c]), tc2 = unrotateX(ta[c + ORDER + 1]);
+        Real td1 = unrotateY(tp[d]), td2 = unrotateY(tp[d + ORDER + 1]);
+        
+        // restrict effective radius
+        Real t_xmin = clamp(max(ta1,tc1), RXMIN, RXMAX);
+        Real t_xmax = clamp(min(ta2,tc2), RXMIN, RXMAX);
+        Real t_ymin = clamp(max(tb1,td1), RYMIN, RYMAX);
+        Real t_ymax = clamp(min(tb2,td2), RYMIN, RYMAX);
+        
+        // decoupled y < x
+        if (t_ymax <= t_xmin)
+        {
+            Real scale = pow_int(t_ymax / t_xmax, lambda) / t_xmax;
+            y[a * (ORDER + 1) + b] += f * scale * MmLm1a[a * (ORDER + 1) + c] * MLp[b * (ORDER + 1) + d] * x[c * (ORDER + 1) + d];
+        }
+        
+        // decoupled x < y
+        if (t_xmax <= t_ymin)
+        {
+            Real scale = pow_int(t_xmax / t_ymax, lambda) / t_ymax;
+            y[a * (ORDER + 1) + b] += f * scale * MLa[a * (ORDER + 1) + c] * MmLm1p[b * (ORDER + 1) + d] * x[c * (ORDER + 1) + d];
+        }
     }
 }
 
@@ -425,26 +431,102 @@ kernel void mmul_2el_decoupled_splines
  * @brief Multiply by two-electron integral matrix.
  * 
  * Multiplies the source vector by the modified two-electron matrix R,
- * where only the cell-decoupled part of non-decoupled integrals are considered.
+ * where only the coupled integrals are considered.
  */
-kernel void mmul_2el_decoupled_cells
+kernel void mmul_2el_coupled
 (
-    
+    // angular integral
+    private Real f,
+    // radial integrals (CSR storage)
+    global Long    const * const restrict Rp,
+    global Long    const * const restrict Ri,
+    global Complex const * const restrict Rx,
+    // source and target vector
+    global Complex const * const restrict x,
+    global Complex       * const restrict y
 )
 {
+    // get destination index
+    uint i = get_global_id(0);
     
+    // if not out of addressable size
+    if (i < NROW)
+    {
+        // compute scalar product of a single row with the source vector
+        Complex accum = 0;
+        for (uint j = Rp[i]; j < Rp[i + 1]; j++)
+            accum += Rx[j] * x[Ri[j]];
+        
+        // update the destination vector
+        y[i] = f * accum;
+    }
 }
 
+
 /**
- * @brief Multiply by two-electron integral matrix.
+ * @brief Matrix-matrix multiplication.
  * 
- * Multiplies the source vector by the modified two-electron matrix R,
- * where only the cell-coupled part of non-decoupled integrals are considered.
+ * General matrix-matrix multiplication.
+ * \f[
+ *     C_{ij} = \sum_{k} A_{ik} B_{kj}
+ * \f]
+ * @param m Row count of A.
+ * @param n Column count of B.
+ * @param k Column count of A.
+ * @param A Input m-by-k matrix in row-major storage.
+ * @param B Input k-by-n matrix in column-major(!) storage (i.e., transposed).
+ * @param C Output m-by-n matrix in row-major storage.
  */
-kernel void mmul_2el_coupled_cells
+kernel void mul_ABt
 (
-    
+    private int m, private int n, private int k,
+    global Complex const * const restrict A,
+    global Complex const * const restrict B,
+    global Complex       * const restrict C
 )
 {
+    // destination block indices
+    private int irow_block = get_group_id(0);
+    private int icol_block = get_group_id(1);
     
+    // global destination index
+    private int irow_glob = get_global_id(0);
+    private int icol_glob = get_global_id(1);
+    
+    // group worker threads; indices within the destination block
+    private int irow_loc = get_local_id(0);
+    private int icol_loc = get_local_id(1);
+    
+    // work arrays
+    local Complex Aloc[BLOCK_SIZE][BLOCK_SIZE];
+    local Complex Bloc[BLOCK_SIZE][BLOCK_SIZE];
+    
+    // aggregated scalar product of the destination element C[idy,idx]
+    private Complex res = 0;
+    
+    // calculate number of blocks
+    private int Nblock = ((k + BLOCK_SIZE - 1) / BLOCK_SIZE);
+    
+    // for all source blocks
+    for (private int iblock = 0; iblock < Nblock; iblock++)
+    {
+        // get indices of the current elements in the matrices
+        private int Arow = irow_glob, Acol = iblock * BLOCK_SIZE + icol_loc;
+        private int Bcol = icol_glob, Brow = iblock * BLOCK_SIZE + irow_loc;
+        
+        // load elements of the source blocks into the local memory, pad by zeros
+        barrier(CLK_LOCAL_MEM_FENCE);
+        Aloc[icol_loc][irow_loc] = (Arow < m && Acol < k ? A[Arow * k + Acol] : (Complex)(0.,0.));
+        Bloc[irow_loc][icol_loc] = (Brow < k && Bcol < n ? B[Brow + k * Bcol] : (Complex)(0.,0.));
+        barrier(CLK_LOCAL_MEM_FENCE);
+        
+        // each group's thread will calculate one of the scalar products
+        for (private int K = 0; K < BLOCK_SIZE; K++)
+            if (iblock * BLOCK_SIZE + K < k)
+                res += cmul(Aloc[K][irow_loc],Bloc[K][icol_loc]);
+    }
+    
+    // store result to device memory
+    if (irow_glob < m && icol_glob < n)
+        C[irow_glob * n + icol_glob] = res;
 }
