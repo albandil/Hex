@@ -30,6 +30,7 @@
 //  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
 #include "hex-hydrogen.h"
+#include "hex-misc.h"
 
 // --------------------------------------------------------------------------------- //
 
@@ -98,12 +99,6 @@ void Solver::solve ()
     std::size_t Nspline_outer = Nspline_full - Nspline_inner;
     
     // print Hamiltonian size as a number with thousands separator (apostroph used)
-    class MyNumPunct : public std::numpunct<char>
-    {
-        protected:
-            virtual char do_thousands_sep() const { return '\''; }
-            virtual std::string do_grouping() const { return "\03"; }
-    };
     std::cout.imbue(std::locale(std::locale::classic(), new MyNumPunct));
     std::cout << "Inner region hamiltonian size: " << Nspline_inner * Nspline_inner * ang_.states().size() << std::endl;
     std::cout.imbue(std::locale::classic());

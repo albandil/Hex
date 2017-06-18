@@ -133,6 +133,18 @@ template <class ...Params> [[noreturn]] void TerminateWithException (const char*
 }
 
 /**
+ * @brief Custom number format.
+ * 
+ * Used to print numbers with apostrophe as a thousand separator.
+ */
+class MyNumPunct : public std::numpunct<char>
+{
+    protected:
+        virtual char do_thousands_sep() const { return '\''; }
+        virtual std::string do_grouping() const { return "\03"; }
+};
+
+/**
  * @brief Exception class.
  * 
  * Custom exception class with easy printf-like constructor.
