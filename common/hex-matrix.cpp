@@ -338,6 +338,7 @@ CsrMatrix<LU_int_t,Complex> CooMatrix<LU_int_t,Complex>::tocsr () const
         elem_ptrs[i_[n]].push_back(n);
     
     // sort element pointers by their column index
+    # pragma omp parallel for
     for (LU_int_t n = 0; n < m_; n++)
         std::sort(elem_ptrs[n].begin(), elem_ptrs[n].end(), [&](LU_int_t a, LU_int_t b) { return j_[a] < j_[b]; });
     

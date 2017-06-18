@@ -114,14 +114,14 @@ void RadialIntegrals::coupledR (int lambda)
     std::size_t Nxspline = bspline_x_.Nspline();
     std::size_t Nyspline = bspline_y_.Nspline();
     
-    CooMatrix<LU_int_t,Complex> ucR (Nxspline * Nyspline, Nxspline * Nyspline);
+    CooMatrix<LU_int_t,Complex> ucR (Nxspline * (order + 1), Nyspline * (order + 1));
     
     # pragma omp parallel for collapse (2)
     for (std::size_t a = 0; a < Nxspline; a++)
     for (std::size_t b = 0; b < Nyspline; b++)
     {
-        for (std::size_t c = a > order ? a - order : 0; c < Nxspline and c <= a + order; c++)
-        for (std::size_t d = b > order ? b - order : 0; d < Nyspline and d <= b + order; d++)
+        for (std::size_t c = a; c < Nxspline and c <= a + order; c++)
+        for (std::size_t d = b; d < Nyspline and d <= b + order; d++)
         {
             // leading knots of the B-splines
             Real ta1 = bspline_x_.unrotate(bspline_x_.t(a));
@@ -202,7 +202,7 @@ void RadialIntegrals::coupledR (int lambda)
                 
                 // add the calculated coupled integral
                 # pragma omp critical
-                ucR.add(a * Nyspline + b, c * Nyspline + d, R);
+                ucR.add(a * (order + 1) + (c - a), b * (order + 1) + (d - b), R);
             }
         }
     }
@@ -214,7 +214,6 @@ Complex RadialIntegrals::computeR (int lambda, int a, int b, int c, int d) const
 {
     // shorthands
     int order = bspline_x_.order();
-    std::size_t Nyspline = bspline_y_.Nspline();
     
     // leading knots of the B-splines
     Real ta1 = bspline_x_.unrotate(bspline_x_.t(a));
@@ -253,5 +252,9 @@ Complex RadialIntegrals::computeR (int lambda, int a, int b, int c, int d) const
     }
     
     // coupled
-    return R_coupled_[lambda](a * Nyspline + b, c * Nyspline + d);
+    return R_coupled_[lambda]
+    (
+        std::min(a, c) * (order + 1) + std::abs(a - c),
+        std::min(b, d) * (order + 1) + std::abs(b - d)
+    );
 }

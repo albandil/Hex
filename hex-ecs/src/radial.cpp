@@ -498,7 +498,7 @@ void RadialIntegrals::setupOneElectronIntegrals (Parallel const & par, CommandLi
     
     R_coupled_.resize(Nlambdas_);
     
-    if (verbose_) std::cout << "Precomputing diagonal two-electron integrals ..." << std::endl;
+    if (verbose_) std::cout << "Precomputing coupled two-electron integrals ..." << std::endl;
     
     for (int lambda = 0; lambda < Nlambdas_; lambda++)
     {
