@@ -126,7 +126,7 @@ GIT_COMMIT = $(shell git rev-parse HEAD | cut -c -8)
 
 # DEBUG and RELEASE variants
 ifeq ($(TARGET),debug)
-CXXFLAGS = -g $(CFLAGS)
+CXXFLAGS = -g $(CFLAGS) -O0
 else ifeq ($(TARGET),release)
 CXXFLAGS = -g $(CFLAGS) -O3 -DNDEBUG
 else
