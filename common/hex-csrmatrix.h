@@ -318,27 +318,30 @@ public:
     bool hdfload (std::string name)
     {
         HDFFile hdf(name, HDFFile::readonly);
+        if (not hdf.valid()) return false;
         
         // read dimensions
-        hdf.read("m", &m_, 1);
-        hdf.read("n", &n_, 1);
+        if (not hdf.read("m", &m_, 1)) return false;
+        if (not hdf.read("n", &n_, 1)) return false;
         
         // read indices
-        if (p_.resize(hdf.size("p")))
-            hdf.read("p", &(p_[0]), p_.size());
-        if (i_.resize(hdf.size("i")))
-            hdf.read("i", &(i_[0]), i_.size());
+        if (p_.resize(hdf.size("p")) and not hdf.read("p", &(p_[0]), p_.size()))
+            return false;
+        if (i_.resize(hdf.size("i")) and not hdf.read("i", &(i_[0]), i_.size()))
+            return false;
         
         // read data
-        if (x_.resize(hdf.size("x") / 2))
-        {
-            hdf.read
+        if
+        (
+            x_.resize(hdf.size("x") / 2)
+            and not hdf.read
             (
                 "x",
                 reinterpret_cast<typename typeinfo<DataT>::cmpttype*>(&(x_[0])),
                 x_.size() * typeinfo<DataT>::ncmpt
-            );
-        }
+            )
+        )
+            return false;
         
         return true;
     }

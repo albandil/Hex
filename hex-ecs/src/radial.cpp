@@ -496,7 +496,7 @@ void RadialIntegrals::setupOneElectronIntegrals (Parallel const & par, CommandLi
     // Precompute also diagonal parts of the two-electron integrals. These are more computationally intensive
     // than the rest and the possibility to reuse them leads to a great speedup.
     
-    R_diag_.resize(Nlambdas_);
+    R_coupled_.resize(Nlambdas_);
     
     if (verbose_) std::cout << "Precomputing diagonal two-electron integrals ..." << std::endl;
     
@@ -506,16 +506,8 @@ void RadialIntegrals::setupOneElectronIntegrals (Parallel const & par, CommandLi
         
         if (not cmd.shared_scratch or par.isMyWork(lambda))
         {
-            HDFFile hdf (filename, HDFFile::readonly);
-            
             // try to load the data from disk
-            if
-            (
-                hdf.valid()
-                and R_diag_[lambda].p.resize(hdf.size("p"))   and hdf.read("p", &R_diag_[lambda].p[0], R_diag_[lambda].p.size())
-                and R_diag_[lambda].i.resize(hdf.size("i"))   and hdf.read("i", &R_diag_[lambda].i[0], R_diag_[lambda].i.size())
-                and R_diag_[lambda].r.resize(hdf.size("r")/2) and hdf.read("r", &R_diag_[lambda].r[0], R_diag_[lambda].r.size())
-            )
+            if (R_coupled_[lambda].hdfload(filename))
             {
                 if (verbose_) std::cout << "\t- integrals for lambda = " << lambda << " loaded from \"" << filename << "\"" << std::endl;
             }
@@ -524,13 +516,10 @@ void RadialIntegrals::setupOneElectronIntegrals (Parallel const & par, CommandLi
             else
             {
                 Timer t;
-                diagonalR(lambda);
+                coupledR(lambda);
                 if (verbose_) std::cout << "\t- integrals for lambda = " << lambda << " computed after " << t.nice_time() << std::endl;
                 
-                HDFFile hdf (filename, HDFFile::overwrite);
-                hdf.write("p", &R_diag_[lambda].p[0], R_diag_[lambda].p.size());
-                hdf.write("i", &R_diag_[lambda].i[0], R_diag_[lambda].i.size());
-                hdf.write("r", &R_diag_[lambda].r[0], R_diag_[lambda].r.size());
+                R_coupled_[lambda].hdfsave(filename);
             }
         }
     }
@@ -545,15 +534,7 @@ void RadialIntegrals::setupOneElectronIntegrals (Parallel const & par, CommandLi
         
         if (cmd.shared_scratch and not par.isMyWork(lambda))
         {
-            HDFFile hdf (filename, HDFFile::readonly);
-            
-            if
-            (
-                hdf.valid()
-                and R_diag_[lambda].p.resize(hdf.size("p"))   and hdf.read("p", &R_diag_[lambda].p[0], R_diag_[lambda].p.size())
-                and R_diag_[lambda].i.resize(hdf.size("i"))   and hdf.read("i", &R_diag_[lambda].i[0], R_diag_[lambda].i.size())
-                and R_diag_[lambda].r.resize(hdf.size("r")/2) and hdf.read("r", &R_diag_[lambda].r[0], R_diag_[lambda].r.size())
-            )
+            if (R_coupled_[lambda].hdfload(filename))
             {
                 if (verbose_) std::cout << "\t- integrals for lambda = " << lambda << " loaded from \"" << filename << "\"" << std::endl;
             }
