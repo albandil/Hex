@@ -521,7 +521,6 @@ void GPUCGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArra
     std::size_t Nspline_inner_x = rad_panel_->bspline_x().Nspline();
     std::size_t Nspline_inner_y = rad_panel_->bspline_y().Nspline();
     std::size_t Nsegsiz = Nspline_inner_x * Nspline_inner_y;
-    std::size_t Nsegsiz2[2] = { Nsegsiz, Nsegsiz };
     
     // performance timers
     std::size_t us_prec = 0, us_spro = 0, us_axby = 0, us_norm = 0;
@@ -744,7 +743,6 @@ void GPUCGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArra
             us_spro += timer.microseconds();
             
             // sum the product of the arrays
-            std::cout << "scalar_product = " << sum(tmp_) << std::endl;
             return sum(tmp_);
         };
         

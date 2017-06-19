@@ -340,8 +340,6 @@ void CGPreconditioner::CG_mmul (int iblock, const cArrayView p, cArrayView q) co
         Cu_blocks_[iang].dot(1.0_r, p, 1.0_r, q);
         Cl_blocks_[iang].dot(1.0_r, p, 1.0_r, q);
     }
-    
-    std::cout << std::setprecision(17) << "CG: " << p.norm() << " -> " << q.norm() << std::endl;
 }
 
 void CGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z) const

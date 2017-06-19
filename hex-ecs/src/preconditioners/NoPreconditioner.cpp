@@ -1219,7 +1219,7 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
         }
         
         // use the calculated block
-        chi[ill] = chi_block;
+        chi[ill] = std::move(chi_block);
         
         // optionally transfer to disk
         if (not chi.inmemory())
@@ -1232,19 +1232,6 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
 
 void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Complex> & q, MatrixSelection::Selection tri) const
 {
-    /// DEBUG
-    if (CGPreconditioner const * CG = dynamic_cast<CGPreconditioner const*>(this))
-    {
-        std::cout << "NoPreconditioner::multiply" << std::endl;
-        CG->CG_init(0);
-        CG->CG_mmul(0, p[0], q[0]);
-        CG->CG_exit(0);
-        
-        std::cout << std::setprecision(17) << "NO: " << p[0].norm() << " -> " << q[0].norm() << std::endl;
-        
-        return;
-    }
-    
     // shorthands
     unsigned order = inp_->order;
     unsigned Nang = ang_->states().size();

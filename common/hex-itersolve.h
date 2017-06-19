@@ -253,8 +253,6 @@ class ConjugateGradients
             TArray p (new_array(N, "cg-p"));
             TArray z (new_array(N, "cg-z"));
             
-            TArray w (new_array(N, "cg-w")); ///  <-- DEBUG
-            
             // Iterate
             
             for (; k <= max_iterations; k++)

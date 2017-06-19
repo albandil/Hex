@@ -69,14 +69,14 @@
 // These functions are often not properly defined for double.
 #if 1
 
-    #undef min
-    #define min(x,y) (x < y ? x : y)
+//     #undef min
+//     #define min(x,y) (x < y ? x : y)
 
-    #undef max
-    #define max(x,y) (x > y ? x : y)
+//     #undef max
+//     #define max(x,y) (x > y ? x : y)
 
-    #undef clamp
-    Real clamp (Real x, Real a, Real b)
+//     #undef clamp
+    Real myclamp (Real x, Real a, Real b)
     {
         return max(a, min(x, b));
     }
@@ -339,7 +339,7 @@ kernel void kron_div
         y[i * NSPLINE_PROJ + j] = cdiv(y[i * NSPLINE_PROJ + j], E - D1[i] - D2[j]);
 }
 
-Real unrotateX (Complex A)
+Real unrotateX (private Complex A)
 {
     // only real part
     if (A.y == 0)      return A.x;
@@ -351,7 +351,7 @@ Real unrotateX (Complex A)
     if (A.x > RXMAX)   return RXMAX + (A.x - RXMAX) / ROTFACT;
 }
 
-Real unrotateY (Complex A)
+Real unrotateY (private Complex A)
 {
     // only real part
     if (A.y == 0)      return A.x;
@@ -390,41 +390,50 @@ kernel void mmul_2el_decoupled
 )
 {
     // B-spline indices
-    uint a = get_global_id(0) / NSPLINE_PROJ;
-    uint b = get_global_id(0) % NSPLINE_PROJ;
+    private int a = get_global_id(0) / NSPLINE_PROJ;
+    private int b = get_global_id(0) % NSPLINE_PROJ;
     
     // B-spline bounding knots
     Real ta1 = unrotateX(ta[a]), ta2 = unrotateX(ta[a + ORDER + 1]);
     Real tb1 = unrotateY(tp[b]), tb2 = unrotateY(tp[b + ORDER + 1]);
     
+    Complex accum = 0;
+    
     // loop over free B-spline indices
-    for (uint c = a > ORDER ? a - ORDER : 0; c < NSPLINE_ATOM && c <= a + ORDER; c++)
-    for (uint d = b > ORDER ? b - ORDER : 0; d < NSPLINE_PROJ && d <= b + ORDER; c++)
+    for (private int c = a > ORDER ? a - ORDER : 0; c < NSPLINE_ATOM && c <= a + ORDER; c++)
+    for (private int d = b > ORDER ? b - ORDER : 0; d < NSPLINE_PROJ && d <= b + ORDER; d++)
     {
         // B-spline bounding knots
-        Real tc1 = unrotateX(ta[c]), tc2 = unrotateX(ta[c + ORDER + 1]);
-        Real td1 = unrotateY(tp[d]), td2 = unrotateY(tp[d + ORDER + 1]);
+        private Real tc1 = unrotateX(ta[c]), tc2 = unrotateX(ta[c + ORDER + 1]);
+        private Real td1 = unrotateY(tp[d]), td2 = unrotateY(tp[d + ORDER + 1]);
+        
+        if (max(ta1,tc1) >= min(ta2,tc2) || max(tb1,td1) >= min(tb2,td2))
+            continue;
         
         // restrict effective radius
-        Real t_xmin = clamp(max(ta1,tc1), RXMIN, RXMAX);
-        Real t_xmax = clamp(min(ta2,tc2), RXMIN, RXMAX);
-        Real t_ymin = clamp(max(tb1,td1), RYMIN, RYMAX);
-        Real t_ymax = clamp(min(tb2,td2), RYMIN, RYMAX);
+        private Real t_xmin = myclamp(max(ta1,tc1), RXMIN, RXMAX);
+        private Real t_xmax = myclamp(min(ta2,tc2), RXMIN, RXMAX);
+        private Real t_ymin = myclamp(max(tb1,td1), RYMIN, RYMAX);
+        private Real t_ymax = myclamp(min(tb2,td2), RYMIN, RYMAX);
         
         // decoupled y < x
         if (t_ymax <= t_xmin)
         {
-            Real scale = pow_int(t_ymax / t_xmax, lambda) / t_xmax;
-            y[a * (ORDER + 1) + b] += f * scale * MmLm1a[a * (ORDER + 1) + c] * MLp[b * (ORDER + 1) + d] * x[c * (ORDER + 1) + d];
+            private Real scale = pow_int(t_ymax / t_xmax, lambda) / t_xmax;
+            private Complex R = scale * cmul(MmLm1a[min(a,c) * (ORDER + 1) + abs_diff(a,c)], MLp[min(b,d) * (ORDER + 1) + abs_diff(b,d)]);
+            accum += cmul(R, x[c * NSPLINE_PROJ + d]);
         }
         
         // decoupled x < y
         if (t_xmax <= t_ymin)
         {
-            Real scale = pow_int(t_xmax / t_ymax, lambda) / t_ymax;
-            y[a * (ORDER + 1) + b] += f * scale * MLa[a * (ORDER + 1) + c] * MmLm1p[b * (ORDER + 1) + d] * x[c * (ORDER + 1) + d];
+            private Real scale = pow_int(t_xmax / t_ymax, lambda) / t_ymax;
+            private Complex R = scale * cmul(MLa[min(a,c) * (ORDER + 1) + abs_diff(a,c)], MmLm1p[min(b,d) * (ORDER + 1) + abs_diff(b,d)]);
+            accum += cmul(R, x[c * NSPLINE_PROJ + d]);
         }
     }
+    
+    y[a * NSPLINE_PROJ + b] += ZP * f * accum;
 }
 
 /**
@@ -446,22 +455,28 @@ kernel void mmul_2el_coupled
     global Complex       * const restrict y
 )
 {
-    // get destination index
-    uint i = get_global_id(0);
+    private int a = get_global_id(0) / NSPLINE_PROJ;
+    private int b = get_global_id(0) % NSPLINE_PROJ;
     
-    // if not out of addressable size
-    if (i < NROW)
+    private Complex accum = 0;
+    
+    for (private int c = a > ORDER ? a - ORDER : 0; c < NSPLINE_ATOM && c <= a + ORDER; c++)
+    for (private int d = b > ORDER ? b - ORDER : 0; d < NSPLINE_PROJ && d <= b + ORDER; d++)
     {
-        // compute scalar product of a single row with the source vector
-        Complex accum = 0;
-        for (uint j = Rp[i]; j < Rp[i + 1]; j++)
-            accum += Rx[j] * x[Ri[j]];
+        private int I = min(a,c) * (ORDER + 1) + abs_diff(a,c);
+        private int J = min(b,d) * (ORDER + 1) + abs_diff(b,d);
         
-        // update the destination vector
-        y[i] = f * accum;
+        for (private int idx = Rp[I]; idx < Rp[I + 1]; idx++)
+        {
+            if (Ri[idx] == J)
+            {
+                accum += cmul(Rx[idx], x[c * NSPLINE_PROJ + d]);
+            }
+        }
     }
+    
+    y[a * NSPLINE_PROJ + b] += ZP * f * accum;
 }
-
 
 /**
  * @brief Matrix-matrix multiplication.
