@@ -265,8 +265,8 @@ void GPUCGPreconditioner::setup ()
     flags << " -D NLOCAL="       << Nlocal_      << " ";
     flags << " -D BLOCK_SIZE="   << blocksize_   << " ";
     flags << " -D ANGULAR_BASIS_SIZE=" << ang_->states().size() << " ";
-    flags << " -D NSRCSEG="      << nsrcseg_     << " ";
-    flags << " -D NDSTSEG="      << ndstseg_     << " ";
+    //flags << " -D NSRCSEG="      << nsrcseg_     << " ";
+    //flags << " -D NDSTSEG="      << ndstseg_     << " ";
     flags << " -D ZA="           << inp_->Za      << " ";
     flags << " -D ZP="           << inp_->Zp     << " ";
     flags << " -D RXMIN="        << rad_inner().bspline_x().R1() << " ";
@@ -351,9 +351,6 @@ void GPUCGPreconditioner::setup ()
     D_inner_p_  .reset(rad_panel_->D_y()  .data().size(), rad_panel_->D_y()  .data().data()); D_inner_p_  .connect(context_, smallDataFlags_);
     Mm1_inner_p_.reset(rad_panel_->Mm1_y().data().size(), rad_panel_->Mm1_y().data().data()); Mm1_inner_p_.connect(context_, smallDataFlags_);
     Mm2_inner_p_.reset(rad_panel_->Mm2_y().data().size(), rad_panel_->Mm2_y().data().data()); Mm2_inner_p_.connect(context_, smallDataFlags_);
-    
-    std::cout << "Mm2_inner_a_ " << Mm2_inner_a_.norm() << std::endl;
-    std::cout << "Mm2_inner_p_ " << Mm2_inner_p_.norm() << std::endl;
     
     // create OpenCL representation of the one-electron partial integral moments + transfer data to GPU memory
     M_L_inner_a_.resize(rad_panel_->maxlambda() + 1); M_mLm1_inner_a_.resize(rad_panel_->maxlambda() + 1);
@@ -446,29 +443,25 @@ void GPUCGPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Co
         // two-electron contribution
         for (cl_int lambda = 0; lambda <= rad_panel_->maxlambda(); lambda++) // TODO : MPI
         {
-            // memory offset
-            cl_short foffset = lambda * ang_->states().size() * ang_->states().size();
-            
             // set kernel arguments
-            clSetKernelArg(mml2_dcpl_offset_, 0, sizeof(cl_mem), &t_inner_a_.handle());
-            clSetKernelArg(mml2_dcpl_offset_, 1, sizeof(cl_mem), &t_inner_p_.handle());
-            clSetKernelArg(mml2_dcpl_offset_, 2, sizeof(cl_int), &lambda);
-            clSetKernelArg(mml2_dcpl_offset_, 3, sizeof(cl_mem), &fgpu.handle());
-            clSetKernelArg(mml2_dcpl_offset_, 4, sizeof(cl_int), &foffset);
-            clSetKernelArg(mml2_dcpl_offset_, 5, sizeof(cl_mem), &M_L_inner_a_[lambda].handle());
-            clSetKernelArg(mml2_dcpl_offset_, 6, sizeof(cl_mem), &M_mLm1_inner_a_[lambda].handle());
-            clSetKernelArg(mml2_dcpl_offset_, 7, sizeof(cl_mem), &M_L_inner_p_[lambda].handle());
-            clSetKernelArg(mml2_dcpl_offset_, 8, sizeof(cl_mem), &M_mLm1_inner_p_[lambda].handle());
-            clSetKernelArg(mml2_dcpl_offset_, 9, sizeof(cl_mem), &pgpu);
-            clSetKernelArg(mml2_dcpl_offset_,10, sizeof(cl_mem), &qgpu);
+            clSetKernelArg(mml2_dcpl_, 0, sizeof(cl_mem), &t_inner_a_.handle());
+            clSetKernelArg(mml2_dcpl_, 1, sizeof(cl_mem), &t_inner_p_.handle());
+            clSetKernelArg(mml2_dcpl_, 2, sizeof(cl_mem), &fgpu.handle());
+            clSetKernelArg(mml2_dcpl_, 3, sizeof(cl_int), &lambda);
+            clSetKernelArg(mml2_dcpl_, 4, sizeof(cl_mem), &M_L_inner_a_[lambda].handle());
+            clSetKernelArg(mml2_dcpl_, 5, sizeof(cl_mem), &M_mLm1_inner_a_[lambda].handle());
+            clSetKernelArg(mml2_dcpl_, 6, sizeof(cl_mem), &M_L_inner_p_[lambda].handle());
+            clSetKernelArg(mml2_dcpl_, 7, sizeof(cl_mem), &M_mLm1_inner_p_[lambda].handle());
+            clSetKernelArg(mml2_dcpl_, 8, sizeof(cl_mem), &pgpu);
+            clSetKernelArg(mml2_dcpl_, 9, sizeof(cl_mem), &qgpu);
             
-            clSetKernelArg(mml2_dcpl_offset_, 0, sizeof(cl_mem), &fgpu.handle());
-            clSetKernelArg(mml2_dcpl_offset_, 1, sizeof(cl_int), &foffset);
-            clSetKernelArg(mml2_cpld_offset_, 2, sizeof(cl_mem), &R_coupled_p_[lambda].handle());
-            clSetKernelArg(mml2_cpld_offset_, 3, sizeof(cl_mem), &R_coupled_i_[lambda].handle());
-            clSetKernelArg(mml2_cpld_offset_, 4, sizeof(cl_mem), &R_coupled_x_[lambda].handle());
-            clSetKernelArg(mml2_cpld_offset_, 5, sizeof(cl_mem), &pgpu);
-            clSetKernelArg(mml2_cpld_offset_, 6, sizeof(cl_mem), &qgpu);
+            clSetKernelArg(mml2_cpld_, 0, sizeof(cl_mem), &fgpu.handle());
+            clSetKernelArg(mml2_cpld_, 1, sizeof(cl_int), &lambda);
+            clSetKernelArg(mml2_cpld_, 2, sizeof(cl_mem), &R_coupled_p_[lambda].handle());
+            clSetKernelArg(mml2_cpld_, 3, sizeof(cl_mem), &R_coupled_i_[lambda].handle());
+            clSetKernelArg(mml2_cpld_, 4, sizeof(cl_mem), &R_coupled_x_[lambda].handle());
+            clSetKernelArg(mml2_cpld_, 5, sizeof(cl_mem), &pgpu);
+            clSetKernelArg(mml2_cpld_, 6, sizeof(cl_mem), &qgpu);
             
             // for all destination vector segments
             for (cl_short first_srcseg = 0; first_srcseg < (cl_short)ang_->states().size(); first_srcseg += nsrcseg_)
@@ -486,17 +479,22 @@ void GPUCGPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Co
                        clEnqueueWriteBuffer(queue_, qgpu, CL_TRUE, (ill - first_dstseg) * Nsegsiz * sizeof(Complex), Nsegsiz * sizeof(Complex), q[ill].data(), 0, nullptr, nullptr);
                     clFinish(queue_);
                     
+                    cl_short end_srcseg = std::min<cl_short>(ang_->states().size(), first_srcseg + nsrcseg_);
+                    cl_short end_dstseg = std::min<cl_short>(ang_->states().size(), first_dstseg + ndstseg_);
+                    
                     // execute the kernel
-                    clSetKernelArg(mml2_dcpl_offset_, 11, sizeof(cl_short), &first_srcseg);
-                    clSetKernelArg(mml2_dcpl_offset_, 12, sizeof(cl_short), &first_dstseg);
-                    clEnqueueNDRangeKernel(queue_, mml2_dcpl_offset_, 1, nullptr, &Nsegsiz, nullptr, 0, nullptr, nullptr);
+                    clSetKernelArg(mml2_dcpl_, 10, sizeof(cl_short), &first_srcseg);
+                    clSetKernelArg(mml2_dcpl_, 11, sizeof(cl_short), &end_srcseg);
+                    clSetKernelArg(mml2_dcpl_, 12, sizeof(cl_short), &first_dstseg);
+                    clSetKernelArg(mml2_dcpl_, 13, sizeof(cl_short), &end_dstseg);
+                    clEnqueueNDRangeKernel(queue_, mml2_dcpl_, 1, nullptr, &Nsegsiz, nullptr, 0, nullptr, nullptr);
                     clFinish(queue_);
                     
-                    std::size_t Nband = rad_panel_->bspline_x().Nspline() * (2 * rad_panel_->bspline_x().order() + 1);
-                    
-                    clSetKernelArg(mml2_cpld_offset_, 7, sizeof(cl_short), &first_srcseg);
-                    clSetKernelArg(mml2_cpld_offset_, 8, sizeof(cl_short), &first_dstseg);
-                    clEnqueueNDRangeKernel(queue_, mml2_cpld_offset_, 1, nullptr, &Nband, nullptr, 0, nullptr, nullptr);
+                    clSetKernelArg(mml2_cpld_,  7, sizeof(cl_short), &first_srcseg);
+                    clSetKernelArg(mml2_cpld_,  8, sizeof(cl_short), &end_srcseg);
+                    clSetKernelArg(mml2_cpld_,  9, sizeof(cl_short), &first_dstseg);
+                    clSetKernelArg(mml2_cpld_, 10, sizeof(cl_short), &end_dstseg);
+                    clEnqueueNDRangeKernel(queue_, mml2_cpld_, 1, nullptr, &Nsegsiz, nullptr, 0, nullptr, nullptr);
                     clFinish(queue_);
                     
                     // read back the product
@@ -561,6 +559,14 @@ void GPUCGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArra
         clArrayView<Complex> prec1b (Nspline_inner_x * Nspline_inner_x, Hl_[0][l1].invsqrtS_Cl.data().data());     prec1b.connect(context_, largeDataFlags_);
         clArrayView<Complex> prec2b (Nspline_inner_y * Nspline_inner_y, Hl_[1][l2].invsqrtS_Cl.data().data());     prec2b.connect(context_, largeDataFlags_);
         
+        // copy angular integrals
+        clArray<Real> f (ang_->f().size(), 0.);
+        for (int lambda = 0; lambda <= ang_->maxlambda(); lambda++)
+        {
+            f[lambda * ang_->states().size() * ang_->states().size()] = ang_->f(ill, ill, lambda);
+        }
+        f.connect(context_, smallDataFlags_);
+        
         // allocation (and upload) of an OpenCL array
         auto new_opencl_array = [&](std::size_t n, std::string name) -> clArray<Complex>
         {
@@ -606,30 +612,40 @@ void GPUCGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArra
             {
                 timer.reset();
                 
-                Real f = ang_->f(ill,ill,lambda);
+                cl_short zero = 0;
+                cl_short one = 1;
                 
-                clSetKernelArg(mml2_dcpl_, 0, sizeof(cl_mem), &t_inner_a_.handle());
-                clSetKernelArg(mml2_dcpl_, 1, sizeof(cl_mem), &t_inner_p_.handle());
-                clSetKernelArg(mml2_dcpl_, 2, sizeof(cl_int), &lambda);
-                clSetKernelArg(mml2_dcpl_, 3, sizeof(Real),   &f);
-                clSetKernelArg(mml2_dcpl_, 4, sizeof(cl_mem), &M_L_inner_a_[lambda].handle());
-                clSetKernelArg(mml2_dcpl_, 5, sizeof(cl_mem), &M_mLm1_inner_a_[lambda].handle());
-                clSetKernelArg(mml2_dcpl_, 6, sizeof(cl_mem), &M_L_inner_p_[lambda].handle());
-                clSetKernelArg(mml2_dcpl_, 7, sizeof(cl_mem), &M_mLm1_inner_p_[lambda].handle());
-                clSetKernelArg(mml2_dcpl_, 8, sizeof(cl_mem), &a.handle());
-                clSetKernelArg(mml2_dcpl_, 9, sizeof(cl_mem), &b.handle());
+                clSetKernelArg(mml2_dcpl_,  0, sizeof(cl_mem),   &t_inner_a_.handle());
+                clSetKernelArg(mml2_dcpl_,  1, sizeof(cl_mem),   &t_inner_p_.handle());
+                clSetKernelArg(mml2_dcpl_,  2, sizeof(cl_mem),   &f.handle());
+                clSetKernelArg(mml2_dcpl_,  3, sizeof(cl_int),   &lambda);
+                clSetKernelArg(mml2_dcpl_,  4, sizeof(cl_mem),   &M_L_inner_a_[lambda].handle());
+                clSetKernelArg(mml2_dcpl_,  5, sizeof(cl_mem),   &M_mLm1_inner_a_[lambda].handle());
+                clSetKernelArg(mml2_dcpl_,  6, sizeof(cl_mem),   &M_L_inner_p_[lambda].handle());
+                clSetKernelArg(mml2_dcpl_,  7, sizeof(cl_mem),   &M_mLm1_inner_p_[lambda].handle());
+                clSetKernelArg(mml2_dcpl_,  8, sizeof(cl_mem),   &a.handle());
+                clSetKernelArg(mml2_dcpl_,  9, sizeof(cl_mem),   &b.handle());
+                clSetKernelArg(mml2_dcpl_, 10, sizeof(cl_short), &zero);
+                clSetKernelArg(mml2_dcpl_, 11, sizeof(cl_short), &one);
+                clSetKernelArg(mml2_dcpl_, 12, sizeof(cl_short), &zero);
+                clSetKernelArg(mml2_dcpl_, 13, sizeof(cl_short), &one);
                 clEnqueueNDRangeKernel(queue_, mml2_dcpl_, 1, nullptr, &Nsegsiz, nullptr, 0, nullptr, nullptr);
                 clFinish(queue_);
                 
                 us_mmul_2_dcpl += timer.microseconds();
                 timer.reset();
                 
-                clSetKernelArg(mml2_cpld_, 0, sizeof(Real),   &f);
-                clSetKernelArg(mml2_cpld_, 1, sizeof(cl_mem), &R_coupled_p_[lambda].handle());
-                clSetKernelArg(mml2_cpld_, 2, sizeof(cl_mem), &R_coupled_i_[lambda].handle());
-                clSetKernelArg(mml2_cpld_, 3, sizeof(cl_mem), &R_coupled_x_[lambda].handle());
-                clSetKernelArg(mml2_cpld_, 4, sizeof(cl_mem), &a.handle());
-                clSetKernelArg(mml2_cpld_, 5, sizeof(cl_mem), &b.handle());
+                clSetKernelArg(mml2_cpld_,  0, sizeof(cl_mem),   &f.handle());
+                clSetKernelArg(mml2_cpld_,  1, sizeof(cl_int),   &lambda);
+                clSetKernelArg(mml2_cpld_,  2, sizeof(cl_mem),   &R_coupled_p_[lambda].handle());
+                clSetKernelArg(mml2_cpld_,  3, sizeof(cl_mem),   &R_coupled_i_[lambda].handle());
+                clSetKernelArg(mml2_cpld_,  4, sizeof(cl_mem),   &R_coupled_x_[lambda].handle());
+                clSetKernelArg(mml2_cpld_,  5, sizeof(cl_mem),   &a.handle());
+                clSetKernelArg(mml2_cpld_,  6, sizeof(cl_mem),   &b.handle());
+                clSetKernelArg(mml2_cpld_,  7, sizeof(cl_short), &zero);
+                clSetKernelArg(mml2_cpld_,  8, sizeof(cl_short), &one);
+                clSetKernelArg(mml2_cpld_,  9, sizeof(cl_short), &zero);
+                clSetKernelArg(mml2_cpld_, 10, sizeof(cl_short), &one);
                 clEnqueueNDRangeKernel(queue_, mml2_cpld_, 1, nullptr, &Nsegsiz, nullptr, 0, nullptr, nullptr);
                 clFinish(queue_);
                 

@@ -49,6 +49,7 @@
     #define NSPLINE_ATOM 1  // needed by "mmul_1el", "mmul_2el", "mul_ABt" and "kron_div"
     #define NSPLINE_PROJ 1  // needed by "mmul_1el", "mmul_2el", "mul_ABt" and "kron_div"
     #define BLOCK_SIZE  16  // block size and local size in "mul_ABt"
+    #define ANGULAR_BASIS_SIZE   1  // coupled number of angular states
     #define ZA           1  // nuclear charge, hydrogen = +1
     #define ZP          -1  // projectile charge, electron = -1
     #define RXMIN        0  // potential bound
@@ -66,22 +67,19 @@
 
 // --------------------------------------------------------------------------------- //
 
-// These functions are often not properly defined for double.
-#if 1
+// These functions are often not properly defined (at least for double):
 
-//     #undef min
-//     #define min(x,y) (x < y ? x : y)
+//- Minimum.
+//#define min(x,y) (x < y ? x : y)
 
-//     #undef max
-//     #define max(x,y) (x > y ? x : y)
+//- Maximum.
+//#define max(x,y) (x > y ? x : y)
 
-//     #undef clamp
-    Real myclamp (Real x, Real a, Real b)
-    {
-        return max(a, min(x, b));
-    }
-
-#endif
+//- Clamp function (left & right bound).
+Real myclamp (Real x, Real a, Real b)
+{
+    return max(a, min(x, b));
+}
 
 // --------------------------------------------------------------------------------- //
 
@@ -374,10 +372,10 @@ kernel void mmul_2el_decoupled
     // B-spline knots (atom and projectile)
     constant Complex const * const restrict ta,
     constant Complex const * const restrict tp,
+    // angular integrals
+    constant Real  const * const restrict f,
     // multipole
     private int lambda,
-    // angular integrals
-    private  Real f,
     // one-electron moments (atomic electron)
     global Complex const * const restrict MLa,
     global Complex const * const restrict MmLm1a,
@@ -386,7 +384,10 @@ kernel void mmul_2el_decoupled
     global Complex const * const restrict MmLm1p,
     // source and target vector
     global Complex const * const restrict x,
-    global Complex       * const restrict y
+    global Complex       * const restrict y,
+    // angular block offset and number of blocks to use
+    private short ill_start,  private short ill_end,
+    private short illp_start, private short illp_end
 )
 {
     // B-spline indices
@@ -396,8 +397,6 @@ kernel void mmul_2el_decoupled
     // B-spline bounding knots
     Real ta1 = unrotateX(ta[a]), ta2 = unrotateX(ta[a + ORDER + 1]);
     Real tb1 = unrotateY(tp[b]), tb2 = unrotateY(tp[b + ORDER + 1]);
-    
-    Complex accum = 0;
     
     // loop over free B-spline indices
     for (private int c = a > ORDER ? a - ORDER : 0; c < NSPLINE_ATOM && c <= a + ORDER; c++)
@@ -421,7 +420,14 @@ kernel void mmul_2el_decoupled
         {
             private Real scale = pow_int(t_ymax / t_xmax, lambda) / t_xmax;
             private Complex R = scale * cmul(MmLm1a[min(a,c) * (ORDER + 1) + abs_diff(a,c)], MLp[min(b,d) * (ORDER + 1) + abs_diff(b,d)]);
-            accum += cmul(R, x[c * NSPLINE_PROJ + d]);
+            
+            for (int ill = ill_start; ill < ill_end; ill++)
+            for (int illp = illp_start; illp < illp_end; illp++)
+            {
+                y[(ill * NSPLINE_ATOM + a) * NSPLINE_PROJ + b] += ZP *
+                    f[(lambda * ANGULAR_BASIS_SIZE + ill) * ANGULAR_BASIS_SIZE + illp] *
+                    cmul(R, x[(illp * NSPLINE_ATOM + c) * NSPLINE_PROJ + d]);
+            }
         }
         
         // decoupled x < y
@@ -429,11 +435,16 @@ kernel void mmul_2el_decoupled
         {
             private Real scale = pow_int(t_xmax / t_ymax, lambda) / t_ymax;
             private Complex R = scale * cmul(MLa[min(a,c) * (ORDER + 1) + abs_diff(a,c)], MmLm1p[min(b,d) * (ORDER + 1) + abs_diff(b,d)]);
-            accum += cmul(R, x[c * NSPLINE_PROJ + d]);
+            
+            for (int ill = ill_start; ill < ill_end; ill++)
+            for (int illp = illp_start; illp < illp_end; illp++)
+            {
+                y[(ill * NSPLINE_ATOM + a) * NSPLINE_PROJ + b] += ZP *
+                    f[(lambda * ANGULAR_BASIS_SIZE + ill) * ANGULAR_BASIS_SIZE + illp] *
+                    cmul(R, x[(illp * NSPLINE_ATOM + c) * NSPLINE_PROJ + d]);
+            }
         }
     }
-    
-    y[a * NSPLINE_PROJ + b] += ZP * f * accum;
 }
 
 /**
@@ -444,21 +455,24 @@ kernel void mmul_2el_decoupled
  */
 kernel void mmul_2el_coupled
 (
-    // angular integral
-    private Real f,
+    // angular integrals
+    constant Real  const * const restrict f,
+    // multipole
+    private int lambda,
     // radial integrals (CSR storage)
     global Long    const * const restrict Rp,
     global Long    const * const restrict Ri,
     global Complex const * const restrict Rx,
     // source and target vector
     global Complex const * const restrict x,
-    global Complex       * const restrict y
+    global Complex       * const restrict y,
+    // angular block offset and number of blocks to use
+    private short ill_start, private short ill_end,
+    private short illp_start, private short illp_end
 )
 {
     private int a = get_global_id(0) / NSPLINE_PROJ;
     private int b = get_global_id(0) % NSPLINE_PROJ;
-    
-    private Complex accum = 0;
     
     for (private int c = a > ORDER ? a - ORDER : 0; c < NSPLINE_ATOM && c <= a + ORDER; c++)
     for (private int d = b > ORDER ? b - ORDER : 0; d < NSPLINE_PROJ && d <= b + ORDER; d++)
@@ -470,12 +484,16 @@ kernel void mmul_2el_coupled
         {
             if (Ri[idx] == J)
             {
-                accum += cmul(Rx[idx], x[c * NSPLINE_PROJ + d]);
+                for (int ill = ill_start; ill < ill_end; ill++)
+                for (int illp = illp_start; illp < illp_end; illp++)
+                {
+                    y[(ill * NSPLINE_ATOM + a) * NSPLINE_PROJ + b] += ZP *
+                        f[(lambda * ANGULAR_BASIS_SIZE + ill) * ANGULAR_BASIS_SIZE + illp] *
+                        cmul(Rx[idx], x[(illp * NSPLINE_ATOM + c) * NSPLINE_PROJ + d]);
+                }
             }
         }
     }
-    
-    y[a * NSPLINE_PROJ + b] += ZP * f * accum;
 }
 
 /**
