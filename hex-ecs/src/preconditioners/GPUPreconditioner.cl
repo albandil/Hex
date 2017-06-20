@@ -339,26 +339,26 @@ kernel void kron_div
 
 Real unrotateX (private Complex A)
 {
-    // only real part
-    if (A.y == 0)      return A.x;
-    
     // left complex part
     if (A.x < RXMIN)   return RXMIN + (A.x - RXMIN) / ROTFACT;
     
     // right complex part
     if (A.x > RXMAX)   return RXMAX + (A.x - RXMAX) / ROTFACT;
+    
+    // only real part
+    return A.x;
 }
 
 Real unrotateY (private Complex A)
 {
-    // only real part
-    if (A.y == 0)      return A.x;
-    
     // left complex part
     if (A.x < RYMIN)   return RYMIN + (A.x - RYMIN) / ROTFACT;
     
     // right complex part
     if (A.x > RYMAX)   return RYMAX + (A.x - RYMAX) / ROTFACT;
+    
+    // only real part
+    return A.x;
 }
 
 /**
@@ -395,8 +395,8 @@ kernel void mmul_2el_decoupled
     private int b = get_global_id(0) % NSPLINE_PROJ;
     
     // B-spline bounding knots
-    Real ta1 = unrotateX(ta[a]), ta2 = unrotateX(ta[a + ORDER + 1]);
-    Real tb1 = unrotateY(tp[b]), tb2 = unrotateY(tp[b + ORDER + 1]);
+    private Real ta1 = unrotateX(ta[a]), ta2 = unrotateX(ta[a + ORDER + 1]);
+    private Real tb1 = unrotateY(tp[b]), tb2 = unrotateY(tp[b + ORDER + 1]);
     
     // loop over free B-spline indices
     for (private int c = a > ORDER ? a - ORDER : 0; c < NSPLINE_ATOM && c <= a + ORDER; c++)
@@ -421,8 +421,8 @@ kernel void mmul_2el_decoupled
             private Real scale = pow_int(t_ymax / t_xmax, lambda) / t_xmax;
             private Complex R = scale * cmul(MmLm1a[min(a,c) * (ORDER + 1) + abs_diff(a,c)], MLp[min(b,d) * (ORDER + 1) + abs_diff(b,d)]);
             
-            for (int ill = ill_start; ill < ill_end; ill++)
-            for (int illp = illp_start; illp < illp_end; illp++)
+            for (private int ill = ill_start; ill < ill_end; ill++)
+            for (private int illp = illp_start; illp < illp_end; illp++)
             {
                 y[(ill * NSPLINE_ATOM + a) * NSPLINE_PROJ + b] += ZP *
                     f[(lambda * ANGULAR_BASIS_SIZE + ill) * ANGULAR_BASIS_SIZE + illp] *
@@ -436,8 +436,8 @@ kernel void mmul_2el_decoupled
             private Real scale = pow_int(t_xmax / t_ymax, lambda) / t_ymax;
             private Complex R = scale * cmul(MLa[min(a,c) * (ORDER + 1) + abs_diff(a,c)], MmLm1p[min(b,d) * (ORDER + 1) + abs_diff(b,d)]);
             
-            for (int ill = ill_start; ill < ill_end; ill++)
-            for (int illp = illp_start; illp < illp_end; illp++)
+            for (private int ill = ill_start; ill < ill_end; ill++)
+            for (private int illp = illp_start; illp < illp_end; illp++)
             {
                 y[(ill * NSPLINE_ATOM + a) * NSPLINE_PROJ + b] += ZP *
                     f[(lambda * ANGULAR_BASIS_SIZE + ill) * ANGULAR_BASIS_SIZE + illp] *
@@ -484,8 +484,8 @@ kernel void mmul_2el_coupled
         {
             if (Ri[idx] == J)
             {
-                for (int ill = ill_start; ill < ill_end; ill++)
-                for (int illp = illp_start; illp < illp_end; illp++)
+                for (private int ill = ill_start; ill < ill_end; ill++)
+                for (private int illp = illp_start; illp < illp_end; illp++)
                 {
                     y[(ill * NSPLINE_ATOM + a) * NSPLINE_PROJ + b] += ZP *
                         f[(lambda * ANGULAR_BASIS_SIZE + ill) * ANGULAR_BASIS_SIZE + illp] *
