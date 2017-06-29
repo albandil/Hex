@@ -6,7 +6,7 @@
 //                    / /   / /    \_\      / /  \ \                                 //
 //                                                                                   //
 //                                                                                   //
-//  Copyright (c) 2015, Jakub Benda, Charles University in Prague                    //
+//  Copyright (c) 2017, Jakub Benda, Charles University in Prague                    //
 //                                                                                   //
 // MIT License:                                                                      //
 //                                                                                   //
@@ -407,13 +407,29 @@ template <class Type, class Base> class ColMatrix : public Base
         /// Change "data" from row-oriented to column-oriented.
         void reorder_ ()
         {
-            NumberArray<Type> new_data (this->rows() * this->cols());
+            std::size_t nRows = this->rows();
+            std::size_t nCols = this->cols();
             
-            for (int irow = 0; irow < this->rows(); irow++)
-            for (int icol = 0; icol < this->cols(); icol++)
-                new_data[icol * this->rows() + irow] = this->data_[irow * this->cols() + icol];
-            
-            this->data_ = new_data;
+            if (nRows == nCols)
+            {
+                // square matrices are fast to transpose, only swap upper/lower elements
+                
+                for (std::size_t irow = 0; irow < nRows; irow++)
+                for (std::size_t icol = irow + 1; icol < nCols; icol++)
+                    std::swap(this->data_[irow * nCols + icol], this->data_[icol * nRows + irow]);
+            }
+            else
+            {
+                // non-square matrix transposition needs intermediate storage
+                
+                NumberArray<Type> new_data (nRows * nCols);
+                
+                for (std::size_t icol = 0; icol < nCols; icol++)
+                for (std::size_t irow = 0; irow < nRows; irow++)
+                    new_data[icol * nRows + irow] = this->data_[irow * nCols + icol];
+                
+                this->data_ = std::move(new_data);
+            }
         }
         
         /// Leading dimension.
@@ -576,7 +592,7 @@ template <class Type, class Base> class RowMatrix : public Base
         {
             RowMatrix<Type> M (size, size);
             
-            for (int i = 0; i < 0; i++)
+            for (std::size_t i = 0; i < size; i++)
                 M.data()[i * size + i] = Type(1);
             
             return M;
@@ -706,13 +722,29 @@ template <class Type, class Base> class RowMatrix : public Base
         /// Change "data" from column-oriented to row-oriented.
         void reorder_ ()
         {
-            NumberArray<Type> new_data (this->rows_ * this->cols_);
+            std::size_t nRows = this->rows();
+            std::size_t nCols = this->cols();
             
-            for (int irow = 0; irow < this->rows_; irow++)
-            for (int icol = 0; icol < this->cols_; icol++)
-                new_data[irow * this->cols_ + icol] = this->data_[icol * this->rows() + irow];
-            
-            this->data_ = new_data;
+            if (nRows == nCols)
+            {
+                // square matrices are fast to transpose, only swap upper/lower elements
+                
+                for (std::size_t irow = 0; irow < nRows; irow++)
+                for (std::size_t icol = irow + 1; icol < nCols; icol++)
+                    std::swap(this->data_[irow * nCols + icol], this->data_[icol * nRows + irow]);
+            }
+            else
+            {
+                // non-square matrix transposition needs intermediate storage
+                
+                NumberArray<Type> new_data (nRows * nCols);
+                
+                for (std::size_t irow = 0; irow < nRows; irow++)
+                for (std::size_t icol = 0; icol < nCols; icol++)
+                    new_data[irow * nCols + icol] = this->data_[icol * nRows + irow];
+                
+                this->data_ = std::move(new_data);
+            }
         }
 };
 

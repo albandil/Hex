@@ -85,7 +85,7 @@ bool HlData::hdfsave (const char* file) const
         return false;
     
     // write size
-    unsigned size = Dl.size();
+    std::size_t size = Dl.size();
     if (not hdf.write("n", &size, 1))
         return false;
     
@@ -118,7 +118,7 @@ cArray HlData::readPseudoState (unsigned l, unsigned ichan) const
         HexException("File %s with the one-electron eigenstates was not found. Run the solver again to regenerate it.", filename.c_str());
     
     // get rank of the hamiltonian
-    unsigned n;
+    std::size_t n;
     if (not datafile.read("n", &n, 1))
         HexException("File %s does not contain the requested dataset \"n\".", filename.c_str());
     if (ichan >= n)
@@ -134,7 +134,7 @@ cArray HlData::readPseudoState (unsigned l, unsigned ichan) const
     std::iota(indices.begin(), indices.end(), 0);
     std::sort(indices.begin(), indices.end(), [&](int i, int j){ return energies[i].real() < energies[j].real(); });
     
-    // read the right genstate
+    // read the right eigenstate
     cArray data (n);
     if (not datafile.read("Cl", &data[0], n, indices[ichan] * n))
         HexException("Failed to read the pseudostate l = %d, ichan = %d from the dataset \"Cl\" in file %s.", l, ichan, filename.c_str());

@@ -191,7 +191,7 @@ void NoPreconditioner::setup ()
         Timer timer;
         
         SymBandMatrix<Complex> const & S_sym = (i == 0 ? rint->S_x() : rint->S_y());
-        ColMatrix<Complex> S = S_sym.torow().T();
+        ColMatrix<Complex> S = std::move(S_sym.torow().T());
         S.diagonalize(D, nullptr, &CR);
         CR.invert(invCR);
         
@@ -244,8 +244,8 @@ void NoPreconditioner::setup ()
             
             // store the KPA preconditioner data
             Hl_[i][l].Dl = D;
-            Hl_[i][l].invsqrtS_Cl = RowMatrix<Complex>(Nspline, Nspline);
-            Hl_[i][l].invCl_invsqrtS = RowMatrix<Complex>(Nspline, Nspline);
+            Hl_[i][l].invsqrtS_Cl = std::move(RowMatrix<Complex>(Nspline, Nspline));
+            Hl_[i][l].invCl_invsqrtS = std::move(RowMatrix<Complex>(Nspline, Nspline));
             blas::gemm(1., invsqrtS, CR, 0., Hl_[i][l].invsqrtS_Cl);
             blas::gemm(1., invCR, invsqrtS, 0., Hl_[i][l].invCl_invsqrtS);
             
@@ -260,7 +260,7 @@ void NoPreconditioner::setup ()
             
             // copy the eigenvectors as columns
             // - already normalized by xGEEV to "Euclidean norm equal to 1 and largest component real"
-            Hl_[i][l].Cl = ColMatrix<Complex>(Hl_[i][l].invsqrtS_Cl);
+            Hl_[i][l].Cl = std::move(ColMatrix<Complex>(Hl_[i][l].invsqrtS_Cl));
             
             // write to disk and abandon for now
             Hl_[i][l].hdfsave();
