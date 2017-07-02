@@ -69,13 +69,16 @@ void CoupledPreconditioner::update (Real E)
     // allocate memory
     X.resize(N);
     Y.resize(N);
-    I.reserve(NZ);
-    J.reserve(NZ);
-    V.reserve(NZ);
+    if (par_->IamMaster())
+    {
+        I.reserve(NZ);
+        J.reserve(NZ);
+        V.reserve(NZ);
+    }
     
     SymBandMatrix<Complex> subblock (Nyspline, order + 1);
     
-    for (unsigned ill = 0; ill < Nang; ill++) if (par_->isMyWork(ill))
+    for (unsigned ill = 0; ill < Nang; ill++) if (par_->IamMaster()) /*if (par_->isMyWork(ill))*/
     for (unsigned illp = 0; illp < Nang; illp++)
     {
         int l1 = ang_->states()[ill].first;
@@ -140,7 +143,7 @@ void CoupledPreconditioner::update (Real E)
 #ifdef WITH_SUPERLU_DIST
     if (cmd_->factorizer == "superlu_dist")
     {
-        HexException("Coupled preconditioner cannot be used with SuperLU_DIST yet.");
+        HexException("Coupled preconditioner cannot be used with SuperLU_DIST yet - try MUMPS.");
     }
 #endif
 #ifdef WITH_MUMPS
@@ -148,9 +151,13 @@ void CoupledPreconditioner::update (Real E)
     {
         data.out_of_core = cmd_->mumps_outofcore;
         data.verbosity = cmd_->mumps_verbose;
-        data.centralized_matrix = false;
+        data.centralized_matrix = true;
     #ifdef WITH_MPI
+        #ifdef _WIN32
+        data.fortran_comm = MPI_Comm_c2f((MPI_Fint)(std::intptr_t) par_->groupcomm());
+        #else
         data.fortran_comm = MPI_Comm_c2f((ompi_communicator_t*) par_->groupcomm());
+        #endif
     #else
         data.fortran_comm = 0;
     #endif
@@ -195,6 +202,9 @@ void CoupledPreconditioner::precondition (BlockArray<Complex> const & r, BlockAr
     
     // solve
     lu_->solve(X, Y, 1);
+    
+    // broadcast solution from master to everyone
+    par_->bcast(0, Y);
     
     // copy solution to result
     for (std::size_t ill = 0; ill < Nang; ill++)
