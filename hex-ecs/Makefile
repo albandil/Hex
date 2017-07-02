@@ -150,8 +150,7 @@ HEX_ECS_FILES   = amplitudes ang gauss bspline hldata io luft main preconditione
                   preconditioners/NoPreconditioner preconditioners/CGPreconditioner \
                   preconditioners/KPAPreconditioner preconditioners/ILUPreconditioner \
                   preconditioners/GPUPreconditioner preconditioners/HybPreconditioner \
-                  preconditioners/DOMPreconditioner \
-                  preconditioners/CoupledPreconditioner
+                  preconditioners/DOMPreconditioner preconditioners/CoupledPreconditioner
 HEX_ECS_SOURCES = $(patsubst %,src/%.cpp,$(HEX_ECS_FILES))
 HEX_ECS_OBJECTS = $(patsubst %,obj/$(BASECXX)/hex-ecs/%.o,$(HEX_ECS_FILES))
 HEX_ECS_DEPS    = $(patsubst %,obj/$(BASECXX)/hex-ecs/%.dep,$(HEX_ECS_FILES))
