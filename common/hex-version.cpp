@@ -52,9 +52,9 @@ std::string logo (std::string esc)
         "%s             UK MFF (c) 2017             \n"
         "%s                                         \n"
 #ifdef _LONGINT
-        "%s       version: 2.01 %s ILP64\n"
+        "%s       version: 2.02 %s ILP64\n"
 #else
-        "%s         version: 2.01 %s\n"
+        "%s         version: 2.02 %s\n"
 #endif
         "%s                                         \n",
         esc.c_str(),esc.c_str(),esc.c_str(),esc.c_str(),
