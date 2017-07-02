@@ -26,8 +26,8 @@ LFLAGS ?= -fopenmp -lstdc++
 # OpenMPI environment (optional)                                               #
 # ---------------------------------------------------------------------------- #
 
-OPENMPIFLAGS = -DWITH_MPI $(shell mpicxx --showme:compile)
-OPENMPILIBS  = $(shell mpicxx --showme:link)
+OPENMPIFLAGS ?= -DWITH_MPI $(shell mpicxx --showme:compile)
+OPENMPILIBS  ?= $(shell mpicxx --showme:link)
 
 # ---------------------------------------------------------------------------- #
 # BLAS & LAPACK                                                                #
@@ -41,8 +41,8 @@ OPENMPILIBS  = $(shell mpicxx --showme:link)
 # BLASLAPACKFLAGS = 
 # BLASLAPACKLIBS = -lblas -llapack
 
-BLASLAPACKFLAGS = -DDISABLE_PARALLEL_PRECONDITION
-BLASLAPACKLIBS = -lopenblas
+BLASLAPACKFLAGS ?= -DDISABLE_PARALLEL_PRECONDITION
+BLASLAPACKLIBS ?= -lopenblas
 
 # ---------------------------------------------------------------------------- #
 # LU decomposition libraries                                                   #
@@ -51,8 +51,8 @@ BLASLAPACKLIBS = -lopenblas
 
 # SuiteSparse/UMFPACK
 # - ILP64 mode needed already for medium-size matrices (-D_LONGINT)
-SUITESPARSEFLAGS = -DWITH_UMFPACK -D_LONGINT
-SUITESPARSELIBS = -lumfpack -lamd -lsuitesparseconfig
+SUITESPARSEFLAGS ?= -DWITH_UMFPACK -D_LONGINT
+SUITESPARSELIBS ?= -lumfpack -lamd -lsuitesparseconfig
 
 # Sequential SuperLU
 # SUPERLUFLAGS = -DWITH_SUPERLU
@@ -88,8 +88,8 @@ SUITESPARSELIBS = -lumfpack -lamd -lsuitesparseconfig
 # GSL                                                                          #
 # ---------------------------------------------------------------------------- #
 
-GSLFLAGS = $(shell gsl-config --cflags)
-GSLLIBS = $(shell gsl-config --libs)
+GSLFLAGS ?= $(shell gsl-config --cflags)
+GSLLIBS ?= $(shell gsl-config --libs)
 
 # ---------------------------------------------------------------------------- #
 # OpenCL (optional)                                                            #
