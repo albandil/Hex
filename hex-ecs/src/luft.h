@@ -52,6 +52,7 @@ typedef struct
     int groupsize;
     const char * ooc_dir;
     void * superlu_dist_grid;
+    bool centralized_matrix;
 }
 LUftData;
 

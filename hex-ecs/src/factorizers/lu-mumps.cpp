@@ -122,14 +122,15 @@ void LUft_MUMPS::factorize (CsrMatrix<LU_int_t,Complex> const & matrix, LUftData
         settings.ICNTL(3) = (data.verbosity == 0 ? 0 : 6); // global info to STDOUT (default: 6)
         settings.ICNTL(4) = data.verbosity; // verbosity level (default: 2)
         settings.ICNTL(5) = 0; // COO format
+        settings.ICNTL(18) = data.centralized_matrix ? 0 : 3;
         settings.ICNTL(22) = data.out_of_core; // OOC factorization
         std::strcpy(settings.ooc_tmpdir, data.ooc_dir);
         std::strcpy(settings.ooc_prefix, "ooc_");
         settings.n = n_;
-        settings.nz = nz;
-        settings.irn = I.data();
-        settings.jcn = J.data();
-        settings.a = reinterpret_cast<MUMPS_COMPLEX*>(A.data());
+        settings.nz  = settings.nz_loc  = nz;
+        settings.irn = settings.irn_loc = I.data();
+        settings.jcn = settings.jcn_loc = J.data();
+        settings.a   = settings.a_loc   = reinterpret_cast<MUMPS_COMPLEX*>(A.data());
         MUMPS_C(&settings);
     
     //

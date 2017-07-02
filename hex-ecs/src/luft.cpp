@@ -42,6 +42,7 @@ LUftData defaultLUftData =
     /* groupsize */                 , 1
     /* OOC scratch dir */           , "."
     /* superlu_dist_grid */         , nullptr
+    /* centralized matrix */        , true
 };
 
 // --------------------------------------------------------------------------------- //

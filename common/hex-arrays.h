@@ -717,7 +717,7 @@ template <class T, class Alloc_> class NumberArray : public Array<T, Alloc_>
                 
                 if (size() > 0)
                 {
-                    std::memcpy(new_array, data(), size() * sizeof(T));
+                    std::memmove(new_array, data(), size() * sizeof(T));
                     Alloc::free (ArrayView<T>::array_);
                 }
                 
@@ -798,7 +798,7 @@ template <class T, class Alloc_> class NumberArray : public Array<T, Alloc_>
                 if (size() > 0 and data() != nullptr)
                 {
                     // copy original data
-                    std::memcpy(new_array + 1, data(), size() * sizeof(T));
+                    std::memmove(new_array + 1, data(), size() * sizeof(T));
                     
                     // destroy original array
                     Alloc::free (ArrayView<T>::array_);
@@ -832,7 +832,7 @@ template <class T, class Alloc_> class NumberArray : public Array<T, Alloc_>
                 if (size() > 0 and data() != nullptr)
                 {
                     // copy original data
-                    std::memcpy(new_array, data(), size() * sizeof(T));
+                    std::memmove(new_array, data(), size() * sizeof(T));
                     
                     // destroy original array
                     Alloc::free (ArrayView<T>::array_);
@@ -866,7 +866,7 @@ template <class T, class Alloc_> class NumberArray : public Array<T, Alloc_>
          */
         template <class InputIterator> void append (InputIterator first, InputIterator last)
         {
-            if (size() + last - first > (int)Nres_)
+            if (size() + std::distance(first, last) > Nres_)
             {
                 // raise the capacity
                 Nres_ += last - first;
@@ -878,7 +878,7 @@ template <class T, class Alloc_> class NumberArray : public Array<T, Alloc_>
                 if (size() > 0 and data() != nullptr)
                 {
                     // copy original data
-                    std::memcpy(new_array, data(), size() * sizeof(T));
+                    std::memmove(new_array, data(), size() * sizeof(T));
                     
                     // destroy original array
                     Alloc::free (ArrayView<T>::array_);
@@ -1296,7 +1296,7 @@ template <class T, class Alloc_> class NumberArray : public Array<T, Alloc_>
                 int zero_end = zero_blocks[2*i+1];
                 
                 // append nonzero data before this zero block
-                std::memcpy
+                std::memmove
                 (
                     &(unpack[0]) + this_end,
                     begin() + load_end,
@@ -1309,7 +1309,7 @@ template <class T, class Alloc_> class NumberArray : public Array<T, Alloc_>
             }
             
             // append remaining data
-            std::memcpy
+            std::memmove
             (
                 &(unpack[0]) + this_end,
                 begin() + load_end,
