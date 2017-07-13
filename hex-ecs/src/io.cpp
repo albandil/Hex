@@ -1247,7 +1247,7 @@ void zip_solution
     vtk.appendScalarAttribute("ImPsi", imagpart(evPsi));
     vtk.appendScalarAttribute("probDensity", sqrabs(evPsi));
     vtk.appendVector3DAttribute("probFlux", imagpart(evPsi.conj() * evDxPsi), imagpart(evPsi.conj() * evDyPsi), rArray(evPsi.size(), 0.0_r));
-    vtk.write(cmd.zipdata.file + "-full.vtk");
+    vtk.writePoints(cmd.zipdata.file + "-full.vtk");
     
     // expand the channel functions
     for (int n = 0; n < Nchan1; n++)

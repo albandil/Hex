@@ -1819,45 +1819,6 @@ template <class Fetcher> bool write_2D_data (std::size_t m, std::size_t n, std::
     return true;
 }
 
-/**
- * @brief Write 3D dataset to a VTK file.
- * 
- * Write 3D grid data to a VTK file as a point dataset.
- * This file can be easily diplayed by the
- * free program ParaView. The expected storage of elements is
- * @f$ f(x_i, y_j, z_k) @f$ = f[i + j*nx + k*nx*ny],
- * where "nx", "ny" and "nz" are the lengths of the grids.
- */
-void writeVTK_points
-(
-    std::ofstream & out,
-    const ArrayView<Complex> f,
-    const ArrayView<Real> xgrid,
-    const ArrayView<Real> ygrid,
-    const ArrayView<Real> zgrid,
-    bool with_header = true
-);
-
-/**
- * @brief Write 3D dataset to a VTK file.
- * 
- * Write 3D grid data to a VTK file as a cell dataset.
- * This file can be easily diplayed by the
- * free program ParaView. The expected storage of elements is
- * @f$ f(\tilde{x}_i, \tilde{y}_j, \tilde{z}_k) @f$
- * = f[i + j*nx + k*nx*ny], where "nx", "ny" and "nz" are the
- * lengths of the grids and the tilded coordinates stand for the
- * centre of the [i,j,k]-th cell, not the [i,j,k]-th point (!)
- */
-void writeVTK_cells
-(
-    std::ofstream & out,
-    const ArrayView<Complex> f,
-    const ArrayView<Real> xgrid,
-    const ArrayView<Real> ygrid,
-    const ArrayView<Real> zgrid
-);
-
 //
 // aliases
 //
