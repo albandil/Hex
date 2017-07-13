@@ -6,7 +6,7 @@
 //                    / /   / /    \_\      / /  \ \                                 //
 //                                                                                   //
 //                                                                                   //
-//  Copyright (c) 2016, Jakub Benda, Charles University in Prague                    //
+//  Copyright (c) 2017, Jakub Benda, Charles University in Prague                    //
 //                                                                                   //
 // MIT License:                                                                      //
 //                                                                                   //
@@ -51,13 +51,23 @@ class CoupledPreconditioner : public NoPreconditioner
         // constructor
         CoupledPreconditioner
         (
-            Parallel const & par,
-            InputFile const & inp,
-            AngularBasis const & ll,
+            CommandLine  const & cmd,
+            InputFile    const & inp,
+            Parallel     const & par,
+            AngularBasis const & ang,
             Bspline const & bspline_inner,
             Bspline const & bspline_full,
-            CommandLine const & cmd
-        ) : NoPreconditioner(par, inp, ll, bspline_inner, bspline_full, cmd) {}
+            Bspline const & bspline_panel_x,
+            Bspline const & bspline_panel_y
+        ) : NoPreconditioner
+            (
+                cmd, inp, par, ang,
+                bspline_inner,
+                bspline_full,
+                bspline_panel_x,
+                bspline_panel_y
+            )
+        {}
         
         // preconditioner description
         virtual std::string description () const;
@@ -81,7 +91,7 @@ class CoupledPreconditioner : public NoPreconditioner
         std::shared_ptr<LUft> lu_;
         
         // Workspace used for the solution.
-        mutable cArray X;
+        mutable cArray X, Y;
 };
 
 // --------------------------------------------------------------------------------- //

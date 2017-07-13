@@ -26,8 +26,8 @@ LFLAGS ?= -fopenmp -lstdc++
 # OpenMPI environment (optional)                                               #
 # ---------------------------------------------------------------------------- #
 
-OPENMPIFLAGS = -DWITH_MPI $(shell mpicxx --showme:compile)
-OPENMPILIBS  = $(shell mpicxx --showme:link)
+OPENMPIFLAGS ?= -DWITH_MPI $(shell mpicxx --showme:compile)
+OPENMPILIBS  ?= $(shell mpicxx --showme:link)
 
 # ---------------------------------------------------------------------------- #
 # BLAS & LAPACK                                                                #
@@ -41,8 +41,8 @@ OPENMPILIBS  = $(shell mpicxx --showme:link)
 # BLASLAPACKFLAGS = 
 # BLASLAPACKLIBS = -lblas -llapack
 
-BLASLAPACKFLAGS = -DDISABLE_PARALLEL_PRECONDITION
-BLASLAPACKLIBS = -lopenblas
+BLASLAPACKFLAGS ?= -DDISABLE_PARALLEL_PRECONDITION
+BLASLAPACKLIBS ?= -lopenblas
 
 # ---------------------------------------------------------------------------- #
 # LU decomposition libraries                                                   #
@@ -51,8 +51,8 @@ BLASLAPACKLIBS = -lopenblas
 
 # SuiteSparse/UMFPACK
 # - ILP64 mode needed already for medium-size matrices (-D_LONGINT)
-SUITESPARSEFLAGS = -DWITH_UMFPACK -D_LONGINT
-SUITESPARSELIBS = -lumfpack -lamd -lsuitesparseconfig
+SUITESPARSEFLAGS ?= -DWITH_UMFPACK -D_LONGINT
+SUITESPARSELIBS ?= -lumfpack -lamd -lsuitesparseconfig
 
 # Sequential SuperLU
 # SUPERLUFLAGS = -DWITH_SUPERLU
@@ -88,8 +88,8 @@ SUITESPARSELIBS = -lumfpack -lamd -lsuitesparseconfig
 # GSL                                                                          #
 # ---------------------------------------------------------------------------- #
 
-GSLFLAGS = $(shell gsl-config --cflags)
-GSLLIBS = $(shell gsl-config --libs)
+GSLFLAGS ?= $(shell gsl-config --cflags)
+GSLLIBS ?= $(shell gsl-config --libs)
 
 # ---------------------------------------------------------------------------- #
 # OpenCL (optional)                                                            #
@@ -150,8 +150,7 @@ HEX_ECS_FILES   = amplitudes ang gauss bspline hldata io luft main preconditione
                   preconditioners/NoPreconditioner preconditioners/CGPreconditioner \
                   preconditioners/KPAPreconditioner preconditioners/ILUPreconditioner \
                   preconditioners/GPUPreconditioner preconditioners/HybPreconditioner \
-                  preconditioners/DOMPreconditioner \
-                  preconditioners/CoupledPreconditioner
+                  preconditioners/DOMPreconditioner preconditioners/CoupledPreconditioner
 HEX_ECS_SOURCES = $(patsubst %,src/%.cpp,$(HEX_ECS_FILES))
 HEX_ECS_OBJECTS = $(patsubst %,obj/$(BASECXX)/hex-ecs/%.o,$(HEX_ECS_FILES))
 HEX_ECS_DEPS    = $(patsubst %,obj/$(BASECXX)/hex-ecs/%.dep,$(HEX_ECS_FILES))

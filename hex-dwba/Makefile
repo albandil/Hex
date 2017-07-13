@@ -8,24 +8,24 @@
 # Compiler and linker + flags                                                  #
 # ---------------------------------------------------------------------------- #
 
-CXX = g++
+CXX ?= g++
 
-CFLAGS = -Wall -std=c++11 -pedantic-errors -fPIC
-LFLAGS = -lstdc++
+CFLAGS ?= -Wall -std=c++11 -pedantic-errors -fPIC
+LFLAGS ?= -lstdc++
 
 # ---------------------------------------------------------------------------- #
 # GSL                                                                          #
 # ---------------------------------------------------------------------------- #
 
-GSLFLAGS = $(shell gsl-config --cflags)
-GSLLIBS = $(shell gsl-config --libs)
+GSLFLAGS ?= $(shell gsl-config --cflags)
+GSLLIBS ?= $(shell gsl-config --libs)
 
 # ---------------------------------------------------------------------------- #
 # CLN                                                                          #
 # ---------------------------------------------------------------------------- #
 
-CLNFLAGS =
-CLNLIBS = -lcln
+CLNFLAGS ?=
+CLNLIBS ?= -lcln
                                                                                #
 ################################################################################
 
