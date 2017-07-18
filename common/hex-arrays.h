@@ -578,6 +578,11 @@ template <class T, class Alloc_> class Array : public ArrayView<T>
             
             return *this;
         }
+        
+        Array<T>& operator &= (Array<T> const & b)
+        {
+            append(b.begin(), b.end());
+        }
 };
 
 // --------------------------------------------------------------------------------- //
@@ -2208,6 +2213,22 @@ rArray threshold (const rArrayView a, double eps);
 
 /// Combine real and imaginary parts.
 cArray interleave (const rArrayView re, const rArrayView im);
+
+/// Join two Arrays.
+template <class T> Array<T> operator & (Array<T> const & a, Array<T> const & b)
+{
+    Array<T> c = a;
+    c &= b;
+    return c;
+}
+
+/// Join two NumberArrays.
+template <class T> NumberArray<T> operator & (NumberArray<T> const & a, NumberArray<T> const & b)
+{
+    NumberArray<T> c = a;
+    c &= b;
+    return c;
+}
 
 // --------------------------------------------------------------------------------- //
 
