@@ -1,3 +1,4 @@
+#include <hex-vtkfile.h>
 //  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 //                                                                                   //
 //                       / /   / /    __    \ \  / /                                 //
@@ -311,6 +312,26 @@ void Solver::solve ()
             // update progress
             iterations_done += iterations;
             computations_done++;
+            
+            // DEBUG
+            cBlockArray test = psi, resl = psi;
+            unsigned Nspline = bspline_full_.Nspline();
+            for (unsigned ixspline = 0; ixspline < 82; ixspline++)
+            for (unsigned iyspline = 0; iyspline < Nspline; iyspline++)
+            {
+                test[0][ixspline * Nspline + iyspline] = 0;
+            }
+            prec_->multiply(test, resl);
+            {
+                VTKRectGridFile vtk;
+                rArray gridx = linspace<Real>(0, Nspline, Nspline + 1);
+                rArray gridy = linspace<Real>(0, Nspline, Nspline + 1);
+                vtk.setGridX(gridx);
+                vtk.setGridY(gridy);
+                vtk.setGridZ(rArray{0});
+                vtk.appendVector2DAttribute("mul", realpart(resl[0]), imagpart(resl[0]));
+                vtk.writeCells("resl.vtk");
+            }
             
             // save solution to disk (if valid)
             SolutionIO reader (ang_.L(), ang_.S(), ang_.Pi(), ni_, li_, mi_, 2 * E_, ang_.states(), channels_);

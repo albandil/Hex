@@ -78,6 +78,10 @@ NoPreconditioner::NoPreconditioner
     B2_blocks_(ang.states().size() * ang.states().size()),
     Cu_blocks_(ang.states().size() * ang.states().size()),
     Cl_blocks_(ang.states().size() * ang.states().size()),
+    E_blocks_ (ang.states().size() * ang.states().size()),
+    Fu_blocks_(ang.states().size() * ang.states().size()),
+    Fl_blocks_(ang.states().size() * ang.states().size()),
+    G_blocks_ (ang.states().size() * ang.states().size()),
     rad_inner_(new RadialIntegrals(bspline_inner,   bspline_inner,   ang.maxlambda() + 1)),
     rad_full_ (new RadialIntegrals(bspline_full,    bspline_full,    ang.maxlambda() + 1)),
     rad_panel_(new RadialIntegrals(bspline_panel_x, bspline_panel_y, ang.maxlambda() + 1)),
@@ -230,9 +234,9 @@ void NoPreconditioner::setup ()
             // compose the symmetrical one-electron hamiltonian
             ColMatrix<Complex> tHl;
             if (i == 0)
-                tHl = (Complex(0.5) * rint->D_x() + Complex(inp_->Za * Z) * rint->Mm1_x() + Complex(0.5*l*(l+1)) * rint->Mm2_x()).torow().T();
+                tHl = (0.5_z * rint->D_x() + Complex(inp_->Za * Z) * rint->Mm1_x() + Complex(0.5*l*(l+1)) * rint->Mm2_x()).torow().T();
             else
-                tHl = (Complex(0.5) * rint->D_y() + Complex(inp_->Za * Z) * rint->Mm1_y() + Complex(0.5*l*(l+1)) * rint->Mm2_y()).torow().T();
+                tHl = (0.5_z * rint->D_y() + Complex(inp_->Za * Z) * rint->Mm1_y() + Complex(0.5*l*(l+1)) * rint->Mm2_y()).torow().T();
             
             // symmetrically transform by inverse square root of the overlap matrix, tHl <- invsqrtS * tHl * invsqrtS
             blas::gemm(1., invsqrtS, tHl, 0., S);
@@ -495,7 +499,7 @@ BlockSymBandMatrix<Complex> NoPreconditioner::calc_A_block (int ill, int illp, b
     return A;
 }
 
-void NoPreconditioner::update (Real E)
+void NoPreconditioner::update(Real E, std::vector<CooMatrix<LU_int_t,Complex>> G)
 {
     // shorthands
     int order = inp_->order;
@@ -609,17 +613,20 @@ void NoPreconditioner::update (Real E)
         if (not cmd_->lightweight_full)
             A_blocks_[ill * Nang + illp] = std::move(calc_A_block(ill, illp));
         
-        // create inner-outer coupling blocks
-        Cu_blocks_[ill * Nang + illp] = CooMatrix<LU_int_t,Complex>
+        // resize inner-outer coupling blocks (and other parts of the matrix)
+        Cu_blocks_[ill * Nang + illp] = 
+        Cl_blocks_[ill * Nang + illp] = 
+        Fu_blocks_[ill * Nang + illp] = 
+        Fl_blocks_[ill * Nang + illp] =
+        G_blocks_ [ill * Nang + illp] =
+        CooMatrix<LU_int_t,Complex>
         (
             A_size + Nchan1  * Nspline_x_outer + Nchan2  * Nspline_y_outer,
             A_size + Nchan1p * Nspline_x_outer + Nchan2p * Nspline_y_outer
         );
-        Cl_blocks_[ill * Nang + illp] = CooMatrix<LU_int_t,Complex>
-        (
-            A_size + Nchan1  * Nspline_x_outer + Nchan2  * Nspline_y_outer,
-            A_size + Nchan1p * Nspline_x_outer + Nchan2p * Nspline_y_outer
-        );
+        
+        if (not G.empty())
+            G_blocks_ = G;
         
         // setup stretched inner-outer problem
         if (not inp_->inner_only)
@@ -1396,7 +1403,13 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
                 // multiply by coupling matrices
                 Cu_blocks_[ill * Nang + illp].dot(1.0_z, p[illp], 1.0_z, q[ill]);
                 Cl_blocks_[ill * Nang + illp].dot(1.0_z, p[illp], 1.0_z, q[ill]);
+                Fu_blocks_[ill * Nang + illp].dot(1.0_z, p[illp], 1.0_z, q[ill]);
+                Fl_blocks_[ill * Nang + illp].dot(1.0_z, p[illp], 1.0_z, q[ill]);
+                //E_blocks_[ill * Nang + illp].dot(1.0_z, p[illp], 1.0_z, q[ill]);
             }
+            
+            // multiply by miscellaneous blocks
+            G_blocks_[ill * Nang + illp].dot(1.0_z, p[illp], 1.0_z, q[ill]);
         }
     }
     

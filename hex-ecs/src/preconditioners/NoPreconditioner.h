@@ -83,7 +83,7 @@ class NoPreconditioner : public PreconditionerBase
         
         // member functions
         virtual void setup ();
-        virtual void update (Real E);
+        virtual void update (Real E, std::vector<CooMatrix<LU_int_t,Complex>> G = {});
         virtual std::pair<int,int> bstates (Real E, int l1, int l2) const;
         virtual void finish ();
         virtual void rhs (BlockArray<Complex> & chi, int ienergy, int instate) const;
@@ -147,6 +147,9 @@ class NoPreconditioner : public PreconditionerBase
         std::vector<BlockSymBandMatrix<Complex>> E_blocks_;
         std::vector<CooMatrix<LU_int_t,Complex>> Fu_blocks_;
         std::vector<CooMatrix<LU_int_t,Complex>> Fl_blocks_;
+        
+        // Additional elements, possibly with symmetry constraints etc.
+        std::vector<CooMatrix<LU_int_t,Complex>> G_blocks_;
         
         // maximal bound state principal quantum number for given energy
         int max_n_;

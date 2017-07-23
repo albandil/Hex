@@ -274,16 +274,22 @@ void VTKRectGridFile::writeCells (std::string filename) const
         // check that all components have the right dimension
         for (unsigned icomp = 0; icomp < ncomp; icomp++)
         {
-            if (field.second.size() != Nc)
-                HexException("Size of field %s (component %d) is not compatible with given bases.", fieldname.c_str(), icomp);
+            if (field.second[icomp].size() != Nc)
+            {
+                HexException
+                (
+                    "Size of field %s (component %d) is not compatible with given bases (%d != %d x %d x %d).",
+                    fieldname.c_str(), icomp, field.second[icomp].size(), cx, cy, cz
+                );
+            }
         }
         
         // write data to file
         out << fieldname << " " << ncomp << " " << Nc << " float" << std::endl;
-        for (unsigned i = 0; i < cx; i++)
+        for (unsigned k = 0; k < cz; k++)
         {
             for (unsigned j = 0; j < cy; j++)
-            for (unsigned k = 0; k < cz; k++)
+            for (unsigned i = 0; i < cx; i++)
             {
                 for (unsigned icomp = 0; icomp < ncomp; icomp++)
                     out << field.second[icomp][(i * cy + j) * cz + k] << " ";

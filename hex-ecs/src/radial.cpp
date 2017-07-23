@@ -60,10 +60,10 @@ RadialIntegrals::RadialIntegrals
 )
   : bspline_x_(bspline_x),
     bspline_y_(bspline_y),
-    rxmin_(bspline_x.R1()),
-    rymin_(bspline_y.R1()),
-    rxmax_(bspline_x.R2()),
-    rymax_(bspline_y.R2()),
+    rxmin_(bspline_x.Rmin()), // FIXME: Left cknots may reach to/beyond origin.
+    rymin_(bspline_y.Rmin()), // FIXME: Left cknots may reach to/beyond origin.
+    rxmax_(bspline_x.Rmax()),
+    rymax_(bspline_y.Rmax()),
     D_x_  (bspline_x.Nspline(), bspline_x.order() + 1),
     S_x_  (bspline_x.Nspline(), bspline_x.order() + 1),
     Mm1_x_(bspline_x.Nspline(), bspline_x.order() + 1),

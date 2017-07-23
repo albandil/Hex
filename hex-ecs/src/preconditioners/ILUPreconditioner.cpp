@@ -205,9 +205,12 @@ void ILUCGPreconditioner::CG_init (int iblock) const
         
         if (not inp_->inner_only)
         {
-            // add the outer region C-blocks
+            // add the outer region blocks
             coo_block += Cu_blocks_[iang];
             coo_block += Cl_blocks_[iang];
+            coo_block += Fu_blocks_[iang];
+            coo_block += Fl_blocks_[iang];
+            //coo_block += E_blocks_[iang];
             
             // add the B-blocks
             for (int m = 0; m < Nchan1; m++)
@@ -241,6 +244,9 @@ void ILUCGPreconditioner::CG_init (int iblock) const
                 coo_block += B_coo_large;
             }
         }
+        
+        // add miscellaneous blocks
+        coo_block += G_blocks_[iang];
         
         // create the CSR block that will be factorized
         CsrMatrix<LU_int_t,Complex> csr = coo_block.tocsr();

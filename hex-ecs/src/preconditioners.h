@@ -120,7 +120,7 @@ class PreconditionerBase
              * This function updates the preconditioner for another right hand side.
              * It may use the MPI environment. The energy is in Ry.
              */
-            virtual void update (Real E) {}
+            virtual void update (Real E, std::vector<CooMatrix<LU_int_t,Complex>> G = {}) {}
             
             /**
              * @brief Get the number of allowed bound states.

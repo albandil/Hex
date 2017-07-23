@@ -179,6 +179,7 @@ class DOMPreconditioner : public NoPreconditioner
         void correctSource
         (
             cBlockArray & chi,
+            std::vector<CooMatrix<LU_int_t,Complex>> & G,
             std::vector<PanelSolution> const & panels,
             int ipanel, int jpanel
         ) const;

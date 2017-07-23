@@ -174,13 +174,13 @@ void DOMPreconditioner::precondition (BlockArray<Complex> const & r, BlockArray<
             }
             {
                 VTKRectGridFile vtk;
-                rArray gridx = linspace(0., rad_inner().bspline_x().Nspline() - 1., rad_inner().bspline_x().Nspline());
-                rArray gridy = linspace(0., rad_inner().bspline_y().Nspline() - 1., rad_inner().bspline_y().Nspline());
+                rArray gridx = linspace<Real>(0, rad_inner().bspline_x().Nspline(), rad_inner().bspline_x().Nspline() + 1);
+                rArray gridy = linspace<Real>(0, rad_inner().bspline_y().Nspline(), rad_inner().bspline_y().Nspline() + 1);
                 vtk.setGridX(gridx);
                 vtk.setGridY(gridy);
                 vtk.setGridZ(rArray{0});
                 vtk.appendVector2DAttribute("residual", realpart(res), imagpart(res));
-                vtk.writePoints(format("dom-components-%d-%d-%d-res.vtk", cycle, ixpanel, iypanel));
+                vtk.writeCells(format("dom-components-%d-%d-%d-res.vtk", cycle, ixpanel, iypanel));
             }
         }
         
@@ -266,11 +266,6 @@ void DOMPreconditioner::solvePanel (int cycle, int cycles, std::vector<PanelSolu
               << std::endl;
     std::cout.imbue(std::locale::classic());
     
-    // construct the matrix of the equations etc.
-    prec->verbose(false);
-    prec->setup();
-    prec->update(E_);
-    
     // number of B-splines in both directions of this panel
     int Nxspline = pCentre->xspline_inner.Nspline();
     int Nyspline = pCentre->yspline_inner.Nspline();
@@ -279,8 +274,24 @@ void DOMPreconditioner::solvePanel (int cycle, int cycles, std::vector<PanelSolu
     cBlockArray & psi = pCentre->z;
     cBlockArray   chi = pCentre->r;
     
+    // symmetry constraints
+    std::vector<CooMatrix<LU_int_t,Complex>> G
+    (
+        ang_->states().size() * ang_->states().size(),
+        CooMatrix<LU_int_t,Complex>
+        (
+            pCentre->xspline_full.Nspline() * pCentre->yspline_full.Nspline(),
+            pCentre->xspline_full.Nspline() * pCentre->yspline_full.Nspline()
+        )
+    );
+    
     // correct right-hand side from the neighbour domains
-    correctSource(chi, p, ipanel, jpanel);
+    correctSource(chi, G, p, ipanel, jpanel);
+    
+    // construct the matrix of the equations etc.
+    prec->verbose(false);
+    prec->setup();
+    prec->update(E_, G);
     
     /// DEBUG
     cBlockArray col (chi.size()), mul (chi.size());
@@ -294,18 +305,18 @@ void DOMPreconditioner::solvePanel (int cycle, int cycles, std::vector<PanelSolu
             vtk.setGridX(gridx);
             vtk.setGridY(gridy);
             vtk.setGridZ(rArray{0});
-            vtk.appendVector2DAttribute("residual", realpart(eval), imagpart(eval));
+            vtk.appendVector2DAttribute("rhs", realpart(eval), imagpart(eval));
             vtk.writePoints(format("dom-%d-%d-%d-chi-%d.vtk", cycle, ipanel, jpanel, ill));
         }
         {
             VTKRectGridFile vtk;
-            rArray gridx = linspace(0., pCentre->xspline_inner.Nspline() - 1., pCentre->xspline_inner.Nspline());
-            rArray gridy = linspace(0., pCentre->yspline_inner.Nspline() - 1., pCentre->yspline_inner.Nspline());
+            rArray gridx = linspace<Real>(0, pCentre->xspline_inner.Nspline(), pCentre->xspline_inner.Nspline() + 1) + pCentre->xoffset;
+            rArray gridy = linspace<Real>(0, pCentre->yspline_inner.Nspline(), pCentre->yspline_inner.Nspline() + 1) + pCentre->yoffset;
             vtk.setGridX(gridx);
             vtk.setGridY(gridy);
             vtk.setGridZ(rArray{0});
-            vtk.appendVector2DAttribute("residual", realpart(chi[ill]), imagpart(chi[ill]));
-            vtk.writePoints(format("dom-components-%d-%d-%d-chi-%d.vtk", cycle, ipanel, jpanel, ill));
+            vtk.appendVector2DAttribute("rhs", realpart(chi[ill]), imagpart(chi[ill]));
+            vtk.writeCells(format("dom-components-%d-%d-%d-chi-%d.vtk", cycle, ipanel, jpanel, ill));
         }
     }
     
@@ -436,17 +447,17 @@ void DOMPreconditioner::solvePanel (int cycle, int cycles, std::vector<PanelSolu
             vtk.setGridX(gridx);
             vtk.setGridY(gridy);
             vtk.setGridZ(rArray{0});
-            vtk.appendVector2DAttribute("residual", realpart(eval), imagpart(eval));
+            vtk.appendVector2DAttribute("solution", realpart(eval), imagpart(eval));
             vtk.writePoints(format("dom-%d-%d-%d-psi-%d.vtk", cycle, ipanel, jpanel, ill));
         }
         {
             VTKRectGridFile vtk;
-            rArray gridx = linspace(0., pCentre->xspline_inner.Nspline() - 1., pCentre->xspline_inner.Nspline());
-            rArray gridy = linspace(0., pCentre->yspline_inner.Nspline() - 1., pCentre->yspline_inner.Nspline());
+            rArray gridx = linspace<Real>(0, pCentre->xspline_inner.Nspline(), pCentre->xspline_inner.Nspline() + 1) + pCentre->xoffset;
+            rArray gridy = linspace<Real>(0, pCentre->yspline_inner.Nspline(), pCentre->yspline_inner.Nspline() + 1) + pCentre->yoffset;
             vtk.setGridX(gridx);
             vtk.setGridY(gridy);
             vtk.setGridZ(rArray{0});
-            vtk.appendVector2DAttribute("residual", realpart(psi[ill]), imagpart(psi[ill]));
+            vtk.appendVector2DAttribute("solution", realpart(psi[ill]), imagpart(psi[ill]));
             vtk.writeCells(format("dom-components-%d-%d-%d-psi-%d.vtk", cycle, ipanel, jpanel, ill));
         }
     }
@@ -458,6 +469,7 @@ void DOMPreconditioner::solvePanel (int cycle, int cycles, std::vector<PanelSolu
 void DOMPreconditioner::correctSource
 (
     cBlockArray & chi,
+    std::vector<CooMatrix<LU_int_t,Complex>> & G,
     std::vector<PanelSolution> const & panels,
     int ipanel, int jpanel
 ) const
@@ -528,18 +540,50 @@ void DOMPreconditioner::correctSource
                 for (unsigned ill  = 0; ill  < chi.size(); ill ++)
                 for (unsigned illp = 0; illp < chi.size(); illp++)
                 {
+                    unsigned illm = illp; // TODO : Mirrored angular block index.
+                    
                     Complex Aijkl = couplingMatrixElement(ill, illp, i, j, k, l);
+                    Complex Gijkl = couplingMatrixElement(ill, illm, i, j, k, l);
+                    
                     Complex & rhs = chi[ill ][pi * p.yspline_inner.Nspline() + pj];
                     Complex   own = p.z[illp][pk * p.yspline_inner.Nspline() + pl];
                     Complex   nbr = n.z[illp][nk * n.yspline_inner.Nspline() + nl];
                     
                     // update the field source with the neighbour field (use only incoming component)
                     if (tgtInQ and srcInR and nP)
-                        rhs -= Aijkl * (nbr - own);
+                    {
+                        // if the neighbour panel is actually the mirrored current panel, modify matrix elements
+                        if (ipanel != jpanel and ipanel == lpanel and jpanel == kpanel)
+                        {
+                            // erase original coupling element
+                            G[ill * chi.size() + illp].add
+                            (
+                                pi * p.yspline_inner.Nspline() + pj,
+                                pk * p.yspline_inner.Nspline() + pl,
+                                -Aijkl
+                            );
+                            
+                            // set up coupling to mirror component
+                            G[ill * chi.size() + illm].add
+                            (
+                                pi * p.yspline_inner.Nspline() + pj,
+                                pl * p.xspline_inner.Nspline() + pk,
+                                (ang_->S() + ang_->Pi()) % 2 == 0 ? Gijkl : -Gijkl
+                            );
+                        }
+                        
+                        // otherwise modify the righ-hand side
+                        else
+                        {
+                            rhs -= Aijkl * (nbr - own);
+                        }
+                    }
                     
                     // update the field source with the neighbour field (already just the incoming component)
                     if (tgtInR and srcInQ and nR)
+                    {
                         rhs += Aijkl * nbr;
+                    }
                 }
             }
         }
@@ -669,6 +713,28 @@ void DOMPreconditioner::splitResidual (cBlockArray const & r, std::vector<PanelS
             // copy the element to the panel residual
             p.r[ill][pxspline * Npyspline + pyspline] = r[ill][ixspline * Nfyspline + iyspline];
         }
+        
+        {
+            VTKRectGridFile vtk;
+            rArray gridx = linspace(p.xspline_inner.Rmin(), p.xspline_inner.Rmax(), 2001);
+            rArray gridy = linspace(p.yspline_inner.Rmin(), p.yspline_inner.Rmax(), 2001);
+            cArray eval = Bspline::zip(p.xspline_inner, p.yspline_inner, p.r[ill], gridx, gridy);
+            vtk.setGridX(gridx);
+            vtk.setGridY(gridy);
+            vtk.setGridZ(rArray{0});
+            vtk.appendVector2DAttribute("split", realpart(eval), imagpart(eval));
+            vtk.writePoints(format("dom-%d-%d-%d-split-%d.vtk", 0, ixpanel, iypanel, ill));
+        }
+        {
+            VTKRectGridFile vtk;
+            rArray gridx = linspace<Real>(0, p.xspline_inner.Nspline(), p.xspline_inner.Nspline() + 1) + p.xoffset;
+            rArray gridy = linspace<Real>(0, p.yspline_inner.Nspline(), p.yspline_inner.Nspline() + 1) + p.yoffset;
+            vtk.setGridX(gridx);
+            vtk.setGridY(gridy);
+            vtk.setGridZ(rArray{0});
+            vtk.appendVector2DAttribute("split", realpart(p.r[ill]), imagpart(p.r[ill]));
+            vtk.writeCells(format("dom-components-%d-%d-%d-split-%d.vtk", 0, ixpanel, iypanel, ill));
+        }
     }
 }
 
@@ -701,19 +767,19 @@ void DOMPreconditioner::collectSolution (cBlockArray & z, std::vector<PanelSolut
         
         static int n = 0;
         
-        /*{
+        {
             VTKRectGridFile vtk;
-            rArray grid = linspace(0., rad_inner().bspline().Rmax(), 6451);
+            rArray grid = linspace(0., rad_inner().bspline().Rmax(), 2001);
             cArray eval = Bspline::zip(rad_inner().bspline(), rad_inner().bspline(), z[ill], grid, grid);
             vtk.setGridX(grid);
             vtk.setGridY(grid);
             vtk.setGridZ(rArray{0});
             vtk.appendVector2DAttribute("combined_wavefunction", realpart(eval), imagpart(eval));
             vtk.writePoints(format("combined-%d-%d.vtk", ill, n++));
-        }*/
+        }
         {
             VTKRectGridFile vtk;
-            rArray grid = linspace(0., rad_inner().bspline().Nspline() - 1., rad_inner().bspline().Nspline());
+            rArray grid = linspace<Real>(0, rad_inner().bspline().Nspline(), rad_inner().bspline().Nspline() + 1);
             vtk.setGridX(grid);
             vtk.setGridY(grid);
             vtk.setGridZ(rArray{0});
