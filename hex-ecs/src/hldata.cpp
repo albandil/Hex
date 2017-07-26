@@ -55,14 +55,28 @@ bool HlData::hdfload (const char* file)
     if (not hdf.read("n", &size, 1))
         return false;
     
+    // allocate memory (if needed)
+    if (Cl.rows() != (int)size or Cl.cols() != (int)size)
+    {
+        Cl.drop();
+        Cl = std::move(ColMatrix<Complex>(size,size));
+    }
+    if (invCl_invsqrtS.rows() != (int)size or invCl_invsqrtS.cols() != (int)size)
+    {
+        invCl_invsqrtS.drop();
+        invCl_invsqrtS = std::move(RowMatrix<Complex>(size,size));
+    }
+    if (invsqrtS_Cl.rows() != (int)size or invsqrtS_Cl.cols() != (int)size)
+    {
+        invsqrtS_Cl.drop();
+        invsqrtS_Cl = std::move(RowMatrix<Complex>(size,size));
+    }
+    
     // read matrices
-    Cl = ColMatrix<Complex>(size,size);
     if (not hdf.read("Cl", Cl.data().data(), size * size))
         return false;
-    invCl_invsqrtS = RowMatrix<Complex>(size,size);
     if (not hdf.read("invCl_invsqrtS", invCl_invsqrtS.data().data(), size * size))
         return false;
-    invsqrtS_Cl = RowMatrix<Complex>(size,size);
     if (not hdf.read("invsqrtS_Cl", invsqrtS_Cl.data().data(), size * size))
         return false;
     
