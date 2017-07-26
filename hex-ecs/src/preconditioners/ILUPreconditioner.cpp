@@ -252,6 +252,17 @@ void ILUCGPreconditioner::CG_init (int iblock) const
         CsrMatrix<LU_int_t,Complex> csr = coo_block.tocsr();
         coo_block = CooMatrix<LU_int_t,Complex>();
         
+        /*static int bla = 0;
+        G_blocks_[iang].write(format("G-%d",bla++));
+        
+        for (LU_int_t idx = csr.p()[126*Nspline_inner_y+126]; idx < csr.p()[126*Nspline_inner_y+126+1]; idx++)
+        {
+            LU_int_t J = csr.i()[idx];
+            LU_int_t k = J / Nspline_inner_y;
+            LU_int_t l = J % Nspline_inner_y;
+            std::cout << k << " " << l << " " << csr.x()[idx] << std::endl;
+        }*/
+        
         // set up factorization data
         data_[iblock].drop_tolerance = cmd_->droptol;
         data_[iblock].groupsize = cmd_->groupsize;
@@ -290,7 +301,7 @@ void ILUCGPreconditioner::CG_init (int iblock) const
                 std::cout << std::endl << std::setw(37) << format
                 (
                     "\tLU #%d (%d,%d) in %d:%02d (%s, cond %1.0e)",
-                    iblock, ang_->states()[iblock].first, ang_->states()[iblock].second,      // block identification (id, ℓ₁, ℓ₂)
+                    iblock, ang_->states()[iblock].first, ang_->states()[iblock].second,    // block identification (id, ℓ₁, ℓ₂)
                     timer.seconds() / 60, timer.seconds() % 60,                             // factorization time
                     nice_size(lu_[iblock]->size()).c_str(),                                 // final memory size
                     lu_[iblock]->cond()                                                     // estimation of the condition number
@@ -301,7 +312,7 @@ void ILUCGPreconditioner::CG_init (int iblock) const
                 std::cout << std::endl << std::setw(37) << format
                 (
                     "\tLU #%d (%d,%d) in %d:%02d (%s)",
-                    iblock, ang_->states()[iblock].first, ang_->states()[iblock].second,      // block identification (id, ℓ₁, ℓ₂)
+                    iblock, ang_->states()[iblock].first, ang_->states()[iblock].second,    // block identification (id, ℓ₁, ℓ₂)
                     timer.seconds() / 60, timer.seconds() % 60,                             // factorization time
                     nice_size(lu_[iblock]->size()).c_str()                                  // final memory size
                 );

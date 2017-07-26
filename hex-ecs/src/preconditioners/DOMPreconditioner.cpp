@@ -147,7 +147,7 @@ void DOMPreconditioner::precondition (BlockArray<Complex> const & r, BlockArray<
     
     // find the solution on sub-domains
     std::cout << std::endl;
-    int cycles = cmd_->dom_sweeps > 0 ? cmd_->dom_sweeps : std::max(cmd_->dom_x_panels,cmd_->dom_y_panels);
+    int cycles = cmd_->dom_sweeps > 0 ? cmd_->dom_sweeps : 2*std::max(cmd_->dom_x_panels,cmd_->dom_y_panels);
     for (int cycle = 0; cycle < cycles; cycle++)
     {
         for (int ixpanel = 0; ixpanel < cmd_->dom_x_panels; ixpanel++)
@@ -545,45 +545,46 @@ void DOMPreconditioner::correctSource
                     Complex Aijkl = couplingMatrixElement(ill, illp, i, j, k, l);
                     Complex Gijkl = couplingMatrixElement(ill, illm, i, j, k, l);
                     
+                    /*if
+                    (
+                        inp_->exchange and inp_->Zp == -1                   // wave function is (anti)symmetric
+                        and cmd_->dom_x_panels == cmd_->dom_y_panels        // decomposition is symmetric
+                        and (ipanel + 1 == jpanel or ipanel == jpanel + 1)  // target sub-domain touches diagonal with a corner
+                        and ipanel == lpanel and jpanel == kpanel           // source sub-domain is placed symmetrically across diagonal
+                        and nP                                              // source element is in P-area of the symmetrical sub-domain
+                    )
+                    {
+                        // erase original matrix element that coupled source to target B-spline
+                        G[ill * chi.size() + illp].add
+                        (
+                            pi * p.yspline_inner.Nspline() + pj,
+                            pk * p.yspline_inner.Nspline() + pl,
+                            -Aijkl
+                        );
+                        
+                        // set up coupling to the same sub-domain
+                        G[ill * chi.size() + illm].add
+                        (
+                            pi * p.yspline_inner.Nspline() + pj,
+                            pl * p.xspline_inner.Nspline() + pk,
+                            (ang_->S() + ang_->Pi()) % 2 == 0 ? Gijkl : -Gijkl
+                        );
+                        
+                        // no change to right-hand side
+                        continue;
+                    }*/
+                    
                     Complex & rhs = chi[ill ][pi * p.yspline_inner.Nspline() + pj];
                     Complex   own = p.z[illp][pk * p.yspline_inner.Nspline() + pl];
                     Complex   nbr = n.z[illp][nk * n.yspline_inner.Nspline() + nl];
                     
                     // update the field source with the neighbour field (use only incoming component)
                     if (tgtInQ and srcInR and nP)
-                    {
-                        // if the neighbour panel is actually the mirrored current panel, modify matrix elements
-                        if (ipanel != jpanel and ipanel == lpanel and jpanel == kpanel)
-                        {
-                            // erase original coupling element
-                            G[ill * chi.size() + illp].add
-                            (
-                                pi * p.yspline_inner.Nspline() + pj,
-                                pk * p.yspline_inner.Nspline() + pl,
-                                -Aijkl
-                            );
-                            
-                            // set up coupling to mirror component
-                            G[ill * chi.size() + illm].add
-                            (
-                                pi * p.yspline_inner.Nspline() + pj,
-                                pl * p.xspline_inner.Nspline() + pk,
-                                (ang_->S() + ang_->Pi()) % 2 == 0 ? Gijkl : -Gijkl
-                            );
-                        }
-                        
-                        // otherwise modify the righ-hand side
-                        else
-                        {
-                            rhs -= Aijkl * (nbr - own);
-                        }
-                    }
+                        rhs -= Aijkl * (nbr - own);
                     
                     // update the field source with the neighbour field (already just the incoming component)
                     if (tgtInR and srcInQ and nR)
-                    {
                         rhs += Aijkl * nbr;
-                    }
                 }
             }
         }
