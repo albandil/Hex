@@ -513,7 +513,7 @@ void Solver::process_solution_ (unsigned iteration, BlockArray<Complex> const & 
 {
     std::string dir = format("iter-%d", iteration);
     
-    if (cmd_.write_intermediate_solutions)
+    if (cmd_.write_intermediate_solutions or cmd_.runtime_postprocess)
     {
         create_directory(dir);
         
