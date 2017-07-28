@@ -202,7 +202,7 @@ void CommandLine::parse (int argc, char* argv[])
                     "\t--lu <name>                (-F)  Factorization library (one of" + f.str() + "). Default is 'umfpack'.\n"
 #ifdef WITH_MUMPS
                     "\t--mumps-out-of-core              Use out-of-core capability of MUMPS (this is independent on --out-of-core option).                                     \n"
-                    "\t--mumps-verbose                  Verbosity level of the MUMPS library. Zero ('0') means no output, higher numbers increase the verbosity.               \n"
+                    "\t--mumps-verbose <number>         Verbosity level of the MUMPS library. Zero ('0') means no output, higher numbers increase the verbosity.               \n"
 #endif
                     "                                                                                                                                                          \n"
                     "Stage selection                                                                                                                                           \n"
@@ -267,7 +267,9 @@ void CommandLine::parse (int argc, char* argv[])
                     "\t--multigrid-coarse-prec <name>   What preconditioner to use for preconditioning of the solution of the coarse problem (specified in input file).        \n"
                     "                                                                                                                                                          \n"
                     "Domain decomposition preconditioner                                                                                                                       \n"
-                    "\t--dom-panels <number>            Number of domain decomposition panels along each axis.                                                                 \n"
+                    "\t--dom-xpanels <number>           Number of domain decomposition panels along x axis (default: 1).                                                       \n"
+                    "\t--dom-ypanels <number>           Number of domain decomposition panels along y axis (default: 1).                                                       \n"
+                    "\t--dom-preconditioner <name>      Panel preconditioner for domain decomposition (default: ILU).                                                          \n"
                     "                                                                                                                                                          \n"
                     "Post-processing                                                                                                                                           \n"
                     "\t--no-parallel-extraction         Disallow parallel extraction of T-matrices (e.g. when the whole solution does not fit into the memory).                \n"
@@ -658,15 +660,54 @@ void CommandLine::parse (int argc, char* argv[])
                     }
                 );
                 
+                // check that it exists
                 if (ip == PreconditionerBase::RTS_Table->end())
                     HexException("Unknown coarse preconditioner");
                 
                 return true;
             },
-        "dom-panels", "", 1, [&](std::vector<std::string> const & optargs) -> bool
+        "dom-xpanels", "", 1, [&](std::vector<std::string> const & optargs) -> bool
             {
-                // domain decomposition panels
-                dom_panels = std::stoi(optargs[0]);
+                // domain decomposition panels (x axis)
+                dom_x_panels = std::stoi(optargs[0]);
+                
+                // check that the number make sense
+                if (dom_x_panels < 1)
+                    HexException("There must be at least one DOM panel in direction of X axis.");
+                
+                return true;
+            },
+        "dom-ypanels", "", 1, [&](std::vector<std::string> const & optargs) -> bool
+            {
+                // domain decomposition panels (y axis)
+                dom_y_panels = std::stoi(optargs[0]);
+                
+                // check that the number make sense
+                if (dom_y_panels < 1)
+                    HexException("There must be at least one DOM panel in direction of Y axis.");
+                
+                return true;
+            },
+        "dom-preconditioner", "", 1, [&](std::vector<std::string> const & optargs) -> bool
+            {
+                // domain decomposition panels (y axis)
+                dom_preconditioner = optargs[0];
+                
+                // look-up the preconditioner
+                std::vector<PreconditionerBase*>::const_iterator ip = std::find_if
+                (
+                    PreconditionerBase::RTS_Table->begin(),
+                    PreconditionerBase::RTS_Table->end(),
+                    [&](PreconditionerBase* ptr)
+                    {
+                        return ptr->name() == dom_preconditioner;
+                    }
+                );
+                
+                // check that it exists
+                if (ip == PreconditionerBase::RTS_Table->end())
+                    HexException("Unknown domain decomposition panel preconditioner");
+                
                 return true;
             },
         

@@ -93,8 +93,8 @@ class CommandLine
               carry_initial_guess(false), gpu_multiply(false), extract_extrapolate(false), extract_rho(-1), extract_rho_begin(-1), extract_samples(-1),
               refine_solution(false), map_solution(), map_solution_target(), ssor(-1), noluupdate(false), coupling_limit(1000),
               gpu_host_multiply(false), mumps_outofcore(false), mumps_verbose(0), kpa_drop(-1), write_intermediate_solutions(false),
-              fast_bessel(false), hyb_additional_levels(0), multigrid_depth(0), multigrid_coarse_prec(0), dom_panels(1), dom_overlap(1),
-              scratch(std::getenv("SCRATCHDIR") ? std::getenv("SCRATCHDIR") : "."), channel_max_E(-1)
+              fast_bessel(false), hyb_additional_levels(0), multigrid_depth(0), multigrid_coarse_prec(0), dom_x_panels(1), dom_y_panels(1),
+              dom_preconditioner("ILU"), scratch(std::getenv("SCRATCHDIR") ? std::getenv("SCRATCHDIR") : "."), channel_max_E(-1)
         {
             // get command line options
             parse(argc, argv);
@@ -263,10 +263,10 @@ class CommandLine
         int multigrid_coarse_prec;
         
         /// Domain decomposition panels.
-        int dom_panels;
+        int dom_x_panels, dom_y_panels;
         
-        /// Domain decomposition overlap.
-        Real dom_overlap;
+        /// Domain preconditioner.
+        std::string dom_preconditioner;
         
         /// Scratch directory for out-of-core data.
         std::string scratch;
