@@ -44,6 +44,10 @@
 
 // --------------------------------------------------------------------------------- //
 
+//#define DOM_DEBUG
+
+// --------------------------------------------------------------------------------- //
+
 DOMPreconditioner::DOMPreconditioner
 (
     CommandLine  const & cmd,
@@ -155,7 +159,7 @@ void DOMPreconditioner::precondition (BlockArray<Complex> const & r, BlockArray<
         {
             solvePanel(cycle, cycles, p, ixpanel, iypanel);
             
-            /// DEBUG
+#ifdef DOM_DEBUG
             collectSolution(z, p);
             cArray res (z[0].size());
             A_blocks_[0].dot(1.0, z[0], 0.0, res);
@@ -182,9 +186,11 @@ void DOMPreconditioner::precondition (BlockArray<Complex> const & r, BlockArray<
                 vtk.appendVector2DAttribute("residual", realpart(res), imagpart(res));
                 vtk.writeCells(format("dom-components-%d-%d-%d-res.vtk", cycle, ixpanel, iypanel));
             }
+#endif
         }
-        
+#ifdef DOM_DEBUG
         collectSolution(z, p); // <-- DEBUG
+#endif
     }
     
     // interpolate the solution from sub-domains
@@ -282,7 +288,7 @@ void DOMPreconditioner::solvePanel (int cycle, int cycles, std::vector<PanelSolu
     // correct right-hand side from the neighbour domains
     correctSource(chi, p, ipanel, jpanel);
     
-    /// DEBUG
+#ifdef DOM_DEBUG
     cBlockArray col (chi.size()), mul (chi.size());
     for (unsigned ill = 0; ill < chi.size(); ill++)
     {
@@ -308,6 +314,7 @@ void DOMPreconditioner::solvePanel (int cycle, int cycles, std::vector<PanelSolu
             vtk.writeCells(format("dom-components-%d-%d-%d-chi-%d.vtk", cycle, ipanel, jpanel, ill));
         }
     }
+#endif
     
     // reset the solution
     for (cArray & segment : psi)
@@ -377,7 +384,7 @@ void DOMPreconditioner::solvePanel (int cycle, int cycles, std::vector<PanelSolu
     std::cout << "\t   i | time        | residual        | min  max  avg  block precond. iter." << std::endl;
     CG.solve(chi, psi, cmd_->prec_itertol, 0, 1000);
 
-    /// DEBUG
+#ifdef DOM_DEBUG
     for (unsigned ill = 0; ill < psi.size(); ill++)
     {
         {
@@ -402,6 +409,7 @@ void DOMPreconditioner::solvePanel (int cycle, int cycles, std::vector<PanelSolu
             vtk.writeCells(format("dom-components-%d-%d-%d-psi-%d.vtk", cycle, ipanel, jpanel, ill));
         }
     }
+#endif
     
     prec->finish();
     delete prec;
@@ -622,7 +630,7 @@ void DOMPreconditioner::splitResidual (cBlockArray const & r, std::vector<PanelS
             p.r[ill][pxspline * Npyspline + pyspline] = r[ill][ixspline * Nfyspline + iyspline];
         }
         
-        // DEBUG
+#ifdef DOM_DEBUG
         {
             VTKRectGridFile vtk;
             rArray gridx = linspace(p.xspline_inner.Rmin(), p.xspline_inner.Rmax(), 2001);
@@ -644,6 +652,7 @@ void DOMPreconditioner::splitResidual (cBlockArray const & r, std::vector<PanelS
             vtk.appendVector2DAttribute("split", realpart(p.r[ill]), imagpart(p.r[ill]));
             vtk.writeCells(format("dom-components-%d-%d-%d-split-%d.vtk", 0, ixpanel, iypanel, ill));
         }
+#endif
     }
 }
 
@@ -675,7 +684,7 @@ void DOMPreconditioner::collectSolution (cBlockArray & z, std::vector<PanelSolut
         }
         
         
-        // DEBUG
+#ifdef DOM_DEBUG
         static int n = 0;
         {
             VTKRectGridFile vtk;
@@ -696,6 +705,7 @@ void DOMPreconditioner::collectSolution (cBlockArray & z, std::vector<PanelSolut
             vtk.appendVector2DAttribute("combined_wavefunction", realpart(z[ill]), imagpart(z[ill]));
             vtk.writeCells(format("components-%d-%d.vtk", ill, n++));
         }
+#endif
     }
 }
 
