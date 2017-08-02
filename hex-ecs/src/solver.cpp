@@ -258,7 +258,11 @@ void Solver::solve ()
                     cBlockArray chiseg (chi.size());
                     prec_->rhs(chiseg, ie, i);
                     for (unsigned ill = 0; ill < chi.size(); ill++)
+                    {
+                        if (not chi.inmemory()) chi.hdfload(ill);
                         chi[ill].append(chiseg[ill]);
+                        if (not chi.inmemory()) { chi.hdfsave(ill); chi[ill].drop(); }
+                    }
                     std::cout << "done after " << t.nice_time() << std::endl;
                 }
             }
