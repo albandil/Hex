@@ -56,8 +56,8 @@ void CoupledPreconditioner::update (Real E)
     
     // shorthands
     unsigned order = inp_->order;
-    std::size_t Nxspline = rad_inner().bspline_x().Nspline();
-    std::size_t Nyspline = rad_inner().bspline_y().Nspline();
+    std::size_t Nxspline = rad_panel().bspline_x().Nspline();
+    std::size_t Nyspline = rad_panel().bspline_y().Nspline();
     std::size_t Nang = ang_->states().size();
     std::size_t N = Nang * Nxspline * Nyspline;
     std::size_t NZ = Nang * Nang * Nxspline * (2*order + 1) * Nyspline * (2*order + 1);
@@ -96,8 +96,8 @@ void CoupledPreconditioner::update (Real E)
                 (
                     [&](int j, int l)
                     {
-                        Complex Sx = rad_inner().S_x()(i,k), Dx = rad_inner().D_x()(i,k), Mm1x = rad_inner().Mm1_x()(i,k), Mm2x = rad_inner().Mm2_x()(i,k);
-                        Complex Sy = rad_inner().S_y()(j,l), Dy = rad_inner().D_y()(j,l), Mm1y = rad_inner().Mm1_y()(j,l), Mm2y = rad_inner().Mm2_y()(j,l);
+                        Complex Sx = rad_panel().S_x()(i,k), Dx = rad_panel().D_x()(i,k), Mm1x = rad_panel().Mm1_x()(i,k), Mm2x = rad_panel().Mm2_x()(i,k);
+                        Complex Sy = rad_panel().S_y()(j,l), Dy = rad_panel().D_y()(j,l), Mm1y = rad_panel().Mm1_y()(j,l), Mm2y = rad_panel().Mm2_y()(j,l);
                         
                         return E_ * Sx * Sy - 0.5_r * Dx * Sy + inp_->Za *            Mm1x * Sy - 0.5_r * l1 * (l1 + 1) * Mm2x * Sy
                                             - 0.5_r * Dy * Sx - inp_->Za * inp_->Zp * Mm1y * Sx - 0.5_r * l2 * (l2 + 1) * Mm2y * Sx;
@@ -106,11 +106,11 @@ void CoupledPreconditioner::update (Real E)
             }
             
             // two electron part
-            for (int lambda = 0; lambda <= std::min(rad_inner().maxlambda(), cmd_->coupling_limit); lambda++)
+            for (int lambda = 0; lambda <= std::min(rad_panel().maxlambda(), cmd_->coupling_limit); lambda++)
             {
                 double f = ang_->f(ill, illp, lambda);
                 if (f != 0)
-                    subblock += Complex(inp_->Zp * f) * rad_inner().calc_R_tr_dia_block(lambda, i, k);
+                    subblock += Complex(inp_->Zp * f) * rad_panel().calc_R_tr_dia_block(lambda, i, k);
             }
             
             // convert block to COO matrix
