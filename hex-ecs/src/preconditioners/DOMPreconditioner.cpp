@@ -217,7 +217,7 @@ void DOMPreconditioner::solvePanel (int cycle, int cycles, std::vector<PanelSolu
     std::cout << std::endl;
     std::cout << "\t-----------------------------------------------" << std::endl;
     std::cout << "\tSolve panel " << ipanel << " " << jpanel
-              << " (bases " << format("%4x %4x", pCentre->xspline_inner.hash(), pCentre->yspline_inner.hash())
+              << " (bases " << format("%04x %04x", pCentre->xspline_inner.hash(), pCentre->yspline_inner.hash())
               << ", sweep " << cycle + 1 << " of " << cycles << ")"
               << std::endl;
     std::cout << "\t-----------------------------------------------" << std::endl;
