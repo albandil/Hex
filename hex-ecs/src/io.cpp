@@ -210,9 +210,6 @@ void CommandLine::parse (int argc, char* argv[])
                     "\t--stg-integ-solve          (-b)  Only calculate integrals and the solution.\n"
                     "\t--stg-extract              (-c)  Only extract amplitudes (assumes that the solution files exist).\n"
                     "\n"
-                    "Channel reduction\n"
-                    "\t--channel-max-E <number>         Maximal energy (Ry) of states considered in the outer region.\n"
-                    "\n"
                     "Right-hand side\n"
                     "\t--analytic-eigenstates           Use analytic formulae for initial/final states instead of diagonalization.\n"
                     "\t--fast-bessel                    Use faster Bessel function evaluation routine (not the Steed/Barnett) when calculating RHS.\n"
@@ -256,7 +253,7 @@ void CommandLine::parse (int argc, char* argv[])
                     "Coupled preconditioner\n"
                     "\t--coupling-limit                 Maximal multipole to be considered by the coupled preconditioner.\n"
                     "\t--couple-all                     Couple all angular blocks. (This is the default behaviour.)\n"
-                    "\t--couple-channels                Only couple blocks containing all open (and additional) channels, see --channel-max-E.\n"
+                    "\t--couple-channels                Only couple blocks containing all open (and additional) channels as defined in input file.\n"
                     "\n"
 #ifdef WITH_OPENCL
                     "GPU preconditioner\n"
