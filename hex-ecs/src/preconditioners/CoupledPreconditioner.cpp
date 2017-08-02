@@ -52,7 +52,7 @@ void CoupledPreconditioner::update (Real E)
     if (par_->Nproc() != par_->groupsize())
         HexException("Coupled preconditioner must be executed with full MPI groupsize.");
     
-    NoPreconditioner::update(E);
+    KPACGPreconditioner::update(E);
     
     // shorthands
     unsigned order = inp_->order;
@@ -78,11 +78,32 @@ void CoupledPreconditioner::update (Real E)
     
     SymBandMatrix<Complex> subblock (Nyspline, order + 1);
     
+    std::vector<std::pair<int,int>> segregated;
+    
     for (unsigned ill = 0; ill < Nang; ill++) if (par_->IamMaster()) /*if (par_->isMyWork(ill))*/
     for (unsigned illp = 0; illp < Nang; illp++)
     {
         int l1 = ang_->states()[ill].first;
         int l2 = ang_->states()[ill].second;
+        
+        // when this angular state is only weakly coupled, do not include it in the matrix
+        if (not cmd_->couple_all and Xp_[0][l1].empty() and Xp_[1][l2].empty())
+        {
+            // skip coupling
+            if (ill != illp)
+                continue;
+            
+            segregated.push_back(std::make_pair(l1,l2));
+            
+            // add identity on diagonal
+            for (std::size_t i = 0; i < Nxspline; i++) // == k
+            for (std::size_t j = 0; j < Nyspline; j++) // == l
+            {
+                I.push_back((ill * Nxspline + i) * Nyspline + j);
+                J.push_back((ill * Nxspline + i) * Nyspline + j);
+                V.push_back(1.0_z);
+            }
+        }
         
         for (std::size_t i = 0; i < Nxspline; i++)
         for (std::size_t k = (i > order ? i - order : 0); k < Nxspline and k <= i + order; k++)
@@ -126,6 +147,13 @@ void CoupledPreconditioner::update (Real E)
             V.append(coo.v());
         }
     }
+    
+    std::cout << "\tUncoupled blocks:";
+    if (segregated.empty())
+        std::cout << " none";
+    else for (std::pair<int,int> const & p : segregated)
+        std::cout << " (" << p.first << "," << p.second << ")";
+    std::cout << std::endl;
     
     // construct COO matrix
     CooMatrix<LU_int_t, Complex> coo (N, N, I, J, V);
@@ -191,6 +219,23 @@ void CoupledPreconditioner::update (Real E)
     }
 }
 
+int CoupledPreconditioner::solve_block (int ill, const cArrayView r, cArrayView z) const
+{
+    int l1 = ang_->states()[ill].first;
+    int l2 = ang_->states()[ill].second;
+    
+    if (not cmd_->couple_all and Xp_[0][l1].empty() and Xp_[1][l2].empty())
+    {
+        // uncoupled block - solve using KPA
+        return CGPreconditioner::solve_block(ill, r, z);
+    }
+    else
+    {
+        // coupled block - already solved
+        return 1;
+    }
+}
+
 void CoupledPreconditioner::precondition (BlockArray<Complex> const & r, BlockArray<Complex> & z) const
 {
     // some useful constants
@@ -209,6 +254,9 @@ void CoupledPreconditioner::precondition (BlockArray<Complex> const & r, BlockAr
     // copy solution to result
     for (std::size_t ill = 0; ill < Nang; ill++)
         z[ill] = cArrayView(Y, ill * Nchunk, Nchunk);
+    
+    // use segregated KPA preconditioner to solve uncoupled blocks
+    KPACGPreconditioner::precondition(r, z);
 }
 
 void CoupledPreconditioner::finish ()
@@ -217,7 +265,7 @@ void CoupledPreconditioner::finish ()
     lu_.reset();
     
     // finish parent class
-    NoPreconditioner::finish();
+    KPACGPreconditioner::finish();
 }
 
 // --------------------------------------------------------------------------------- //
