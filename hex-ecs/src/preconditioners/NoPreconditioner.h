@@ -92,6 +92,7 @@ class NoPreconditioner : public PreconditionerBase
         
         // internal routines
         BlockSymBandMatrix<Complex> calc_A_block (int ill, int illp, bool twoel = true) const;
+        CooMatrix<LU_int_t,Complex> calc_full_block (int ill, int illp) const;
         
         // access to the radial integrals
         RadialIntegrals const & rad_inner () const { return *rad_inner_; }

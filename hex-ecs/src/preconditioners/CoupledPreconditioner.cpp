@@ -46,40 +46,29 @@ std::string CoupledPreconditioner::description () const
 
 void CoupledPreconditioner::update (Real E)
 {
-    if (not inp_->inner_only)
-        HexException("The coupled preconditioner does not yet support channel reduction");
-    
     if (par_->Nproc() != par_->groupsize())
         HexException("Coupled preconditioner must be executed with full MPI groupsize.");
     
     KPACGPreconditioner::update(E);
     
-    // shorthands
-    unsigned order = inp_->order;
-    std::size_t Nxspline = rad_panel().bspline_x().Nspline();
-    std::size_t Nyspline = rad_panel().bspline_y().Nspline();
-    std::size_t Nang = ang_->states().size();
-    std::size_t N = Nang * Nxspline * Nyspline;
-    std::size_t NZ = Nang * Nang * Nxspline * (2*order + 1) * Nyspline * (2*order + 1);
+    // number of angular blocks
+    LU_int_t Nang = ang_->states().size();
     
     // concatenate matrix blocks as a COO matrix
     NumberArray<LU_int_t> I, J;
     cArray V;
     
-    // allocate memory
-    if (par_->IamMaster())
-    {
-        I.reserve(NZ);
-        J.reserve(NZ);
-        V.reserve(NZ);
-    }
-    
-    SymBandMatrix<Complex> subblock (Nyspline, order + 1);
+    // calculate full matrix rank
+    std::size_t N = 0;
+    for (std::size_t n : block_rank_) N += n;
     
     std::vector<std::pair<int,int>> segregated;
+    std::cout << "\tAssemble full matrix of the system ... " << std::flush;
+    Timer timer;
     
-    for (unsigned ill = 0; ill < Nang; ill++) if (par_->IamMaster()) /*if (par_->isMyWork(ill))*/
-    for (unsigned illp = 0; illp < Nang; illp++)
+    if (par_->IamMaster())
+    for (LU_int_t ill  = 0, offset  = 0; ill  < Nang; offset  += block_rank_[ill ++])
+    for (LU_int_t illp = 0, offsetp = 0; illp < Nang; offsetp += block_rank_[illp++])
     {
         int l1 = ang_->states()[ill].first;
         int l2 = ang_->states()[ill].second;
@@ -87,65 +76,31 @@ void CoupledPreconditioner::update (Real E)
         // when this angular state is only weakly coupled, do not include it in the matrix
         if (not cmd_->couple_all and Xp_[0][l1].empty() and Xp_[1][l2].empty())
         {
-            // skip coupling
-            if (ill != illp)
-                continue;
-            
-            segregated.push_back(std::make_pair(l1,l2));
-            
-            // add identity on diagonal
-            for (std::size_t i = 0; i < Nxspline; i++) // == k
-            for (std::size_t j = 0; j < Nyspline; j++) // == l
-            {
-                I.push_back((ill * Nxspline + i) * Nyspline + j);
-                J.push_back((ill * Nxspline + i) * Nyspline + j);
-                V.push_back(1.0_z);
-            }
-        }
-        
-        for (std::size_t i = 0; i < Nxspline; i++)
-        for (std::size_t k = (i > order ? i - order : 0); k < Nxspline and k <= i + order; k++)
-        {
-            subblock.data().fill(0);
-            
-            // one-electron part
+            // ignore angular coupling blocks
             if (ill == illp)
             {
-                subblock.populate
-                (
-                    [&](int j, int l)
-                    {
-                        Complex Sx = rad_panel().S_x()(i,k), Dx = rad_panel().D_x()(i,k), Mm1x = rad_panel().Mm1_x()(i,k), Mm2x = rad_panel().Mm2_x()(i,k);
-                        Complex Sy = rad_panel().S_y()(j,l), Dy = rad_panel().D_y()(j,l), Mm1y = rad_panel().Mm1_y()(j,l), Mm2y = rad_panel().Mm2_y()(j,l);
-                        
-                        return E_ * Sx * Sy - 0.5_r * Dx * Sy + inp_->Za *            Mm1x * Sy - 0.5_r * l1 * (l1 + 1) * Mm2x * Sy
-                                            - 0.5_r * Dy * Sx - inp_->Za * inp_->Zp * Mm1y * Sx - 0.5_r * l2 * (l2 + 1) * Mm2y * Sx;
-                    }
-                );
+                // this block will be handled by segregated preconditioner
+                segregated.push_back(std::make_pair(l1,l2));
+                
+                // put identity on diagonal
+                I.append(identity<LU_int_t>(block_rank_[ill]) + offset);
+                J.append(identity<LU_int_t>(block_rank_[ill]) + offsetp);
+                V.append(cArray(block_rank_[ill], 1.0_z));
             }
+        }
+        else
+        {
+            // convert matrix block to COO format
+            CooMatrix<LU_int_t,Complex> coo = calc_full_block(ill, illp);
             
-            // two electron part
-            for (int lambda = 0; lambda <= std::min(rad_panel().maxlambda(), cmd_->coupling_limit); lambda++)
-            {
-                double f = ang_->f(ill, illp, lambda);
-                if (f != 0)
-                    subblock += Complex(inp_->Zp * f) * rad_panel().calc_R_tr_dia_block(lambda, i, k);
-            }
-            
-            // convert block to COO matrix
-            CooMatrix<LU_int_t, Complex> coo = subblock.tocoo<LU_int_t>();
-            
-            // block index shift
-            LU_int_t ishift = (ill  * Nxspline + i) * Nyspline;
-            LU_int_t jshift = (illp * Nxspline + k) * Nyspline;
-            
-            // update matrix
-            I.append(coo.i() + ishift);
-            J.append(coo.j() + jshift);
+            // copy elements to the assembled storage
+            I.append(coo.i() + offset);
+            J.append(coo.j() + offsetp);
             V.append(coo.v());
         }
     }
     
+    std::cout << "done after " << timer.nice_time() << std::endl;
     std::cout << "\tUncoupled blocks:";
     if (segregated.empty())
         std::cout << " none";
@@ -153,15 +108,12 @@ void CoupledPreconditioner::update (Real E)
         std::cout << " (" << p.first << "," << p.second << ")";
     std::cout << std::endl;
     
-    // construct COO matrix
-    CooMatrix<LU_int_t, Complex> coo (N, N, I, J, V);
-    
-    I.drop();
-    J.drop();
-    V.drop();
-    
     // convert the blocks to CSR
-    CsrMatrix<LU_int_t, Complex> csr = coo.tocsr();
+    CsrMatrix<LU_int_t, Complex> csr = CooMatrix<LU_int_t, Complex>
+    (
+        N, N,
+        std::move(I), std::move(J), std::move(V)
+    ).tocsr();
     
     // set up factorization data
     LUftData data;
@@ -191,7 +143,7 @@ void CoupledPreconditioner::update (Real E)
 #endif
     
     // factorize
-    Timer timer;
+    timer.reset();
     lu_.reset(LUft::Choose(cmd_->factorizer));
     lu_->factorize(csr, data);
     

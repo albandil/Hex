@@ -39,7 +39,6 @@
 
 // --------------------------------------------------------------------------------- //
 
-#define ICNTL(x) icntl[(x)-1]
 #define MUMPS_NOACTION      0
 #define MUMPS_INITIALIZE    (-1)
 #define MUMPS_FINISH        (-2)

@@ -166,85 +166,8 @@ void ILUCGPreconditioner::CG_init (int iblock) const
         // start timer
         Timer timer;
         
-        // number of asymptotic channels
-        int Nchan1 = Nchan_[iblock].first;
-        int Nchan2 = Nchan_[iblock].second;
-        
-        // B-spline bases
-        Bspline const & bspline_full  = rad_full_ ->bspline();
-        Bspline const & bspline_inner = rad_inner_->bspline();
-        Bspline const & bspline_x     = rad_panel_->bspline_x();
-        Bspline const & bspline_y     = rad_panel_->bspline_y();
-        
-        // panel x basis
-        LU_int_t Nspline_full_x  = bspline_x.Nspline();
-        LU_int_t Nspline_inner_x = bspline_x.hash() == bspline_full.hash() ? bspline_inner.Nspline() : bspline_x.Nspline();
-        LU_int_t Nspline_outer_x = Nspline_full_x - Nspline_inner_x;
-        
-        // panel y basis
-        LU_int_t Nspline_full_y  = bspline_y.Nspline();
-        LU_int_t Nspline_inner_y = bspline_y.hash() == bspline_full.hash() ? bspline_inner.Nspline() : bspline_y.Nspline();
-        LU_int_t Nspline_outer_y = Nspline_full_y - Nspline_inner_y;
-        
-        // angular block
-        int iang = iblock * ang_->states().size() + iblock;
-        
-        // convert inner region matrix block to COO matrix
-        CooMatrix<LU_int_t,Complex> coo_block;
-        if (cmd_->lightweight_full)
-            coo_block = std::move(dynamic_cast<NoPreconditioner const*>(this)->calc_A_block(iblock, iblock).tocoo<LU_int_t>());
-        else
-            coo_block = std::move(A_blocks_[iang].tocoo<LU_int_t>());
-        
-        // add the A-block
-        coo_block.resize
-        (
-            Nspline_inner_x * Nspline_inner_y + Nchan1 * Nspline_outer_x + Nchan2 * Nspline_outer_y,
-            Nspline_inner_x * Nspline_inner_y + Nchan1 * Nspline_outer_x + Nchan2 * Nspline_outer_y
-        );
-        
-        if (not inp_->inner_only)
-        {
-            // add the outer region C-blocks
-            coo_block += Cu_blocks_[iang];
-            coo_block += Cl_blocks_[iang];
-            
-            // add the B-blocks
-            for (int m = 0; m < Nchan1; m++)
-            for (int n = 0; n < Nchan1; n++)
-            {
-                if (cmd_->outofcore) const_cast<SymBandMatrix<Complex>&>(B1_blocks_[iang][m * Nchan1 + n]).hdfload();
-                CooMatrix<LU_int_t,Complex> B_coo_small = B1_blocks_[iang][m * Nchan1 + n].tocoo<LU_int_t>();
-                if (cmd_->outofcore) const_cast<SymBandMatrix<Complex>&>(B1_blocks_[iang][m * Nchan1 + n]).drop();
-                CooMatrix<LU_int_t,Complex> B_coo_large
-                (
-                    coo_block.rows(), coo_block.cols(),
-                    B_coo_small.i() + Nspline_inner_x * Nspline_inner_y + m * Nspline_outer_x,
-                    B_coo_small.j() + Nspline_inner_x * Nspline_inner_y + n * Nspline_outer_x,
-                    B_coo_small.v()
-                );
-                coo_block += B_coo_large;
-            }
-            for (int m = 0; m < Nchan2; m++)
-            for (int n = 0; n < Nchan2; n++)
-            {
-                if (cmd_->outofcore) const_cast<SymBandMatrix<Complex>&>(B2_blocks_[iang][m * Nchan2 + n]).hdfload();
-                CooMatrix<LU_int_t,Complex> B_coo_small = B2_blocks_[iang][m * Nchan2 + n].tocoo<LU_int_t>();
-                if (cmd_->outofcore) const_cast<SymBandMatrix<Complex>&>(B2_blocks_[iang][m * Nchan2 + n]).drop();
-                CooMatrix<LU_int_t,Complex> B_coo_large
-                (
-                    coo_block.rows(), coo_block.cols(),
-                    B_coo_small.i() + Nspline_inner_x * Nspline_inner_y + Nchan1 * Nspline_outer_x + m * Nspline_outer_y,
-                    B_coo_small.j() + Nspline_inner_x * Nspline_inner_y + Nchan1 * Nspline_outer_x + n * Nspline_outer_y,
-                    B_coo_small.v()
-                );
-                coo_block += B_coo_large;
-            }
-        }
-        
         // create the CSR block that will be factorized
-        CsrMatrix<LU_int_t,Complex> csr = coo_block.tocsr();
-        coo_block = CooMatrix<LU_int_t,Complex>();
+        CsrMatrix<LU_int_t,Complex> csr = calc_full_block(iblock, iblock).tocsr();
         
         // set up factorization data
         data_[iblock].drop_tolerance = cmd_->droptol;

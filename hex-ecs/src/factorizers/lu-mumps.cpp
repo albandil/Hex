@@ -31,6 +31,10 @@
 
 #ifdef WITH_MUMPS
 
+#define ICNTL(x) icntl[(x)-1]
+#define INFO(x)  info[(x)-1]
+#define INFOG(x) infog[(x)-1]
+
 // --------------------------------------------------------------------------------- //
 
 #include "lu-mumps.h"
@@ -51,12 +55,14 @@ LUft_MUMPS::~LUft_MUMPS ()
     {
         settings.job = MUMPS_FINISH;
         MUMPS_C(&settings);
+        
+        if (settings.INFOG(1) != 0)
+            HexException("MUMPS finish failed, error code: %d, detail %d", settings.INFOG(1), settings.INFOG(2));
     }
 }
 
 std::size_t LUft_MUMPS::size () const
 {
-    #define INFO(x) info[x-1]
     std::size_t elems_size = (settings.INFO(9) > 0 ? settings.INFO(9) : std::size_t{1000000} * std::abs(settings.INFO(9)));
     std::size_t index_size = settings.INFO(10);
     
@@ -115,6 +121,9 @@ void LUft_MUMPS::factorize (CsrMatrix<LU_int_t,Complex> const & matrix, LUftData
 #endif
         MUMPS_C(&settings);
         
+        if (settings.INFOG(1) != 0)
+            HexException("MUMPS initialization failed, error code: %d, detail %d", settings.INFOG(1), settings.INFOG(2));
+        
         // analyze
         settings.job = MUMPS_ANALYZE;
         settings.ICNTL(1) = (data.verbosity == 0 ? 0 : 6); // errors to STDOUT (default: 6)
@@ -132,6 +141,9 @@ void LUft_MUMPS::factorize (CsrMatrix<LU_int_t,Complex> const & matrix, LUftData
         settings.jcn = settings.jcn_loc = J.data();
         settings.a   = settings.a_loc   = reinterpret_cast<MUMPS_COMPLEX*>(A.data());
         MUMPS_C(&settings);
+        
+        if (settings.INFOG(1) != 0)
+            HexException("MUMPS analysis failed, error code: %d, detail %d", settings.INFOG(1), settings.INFOG(2));
     
     //
     // Compute the factorization.
@@ -139,6 +151,9 @@ void LUft_MUMPS::factorize (CsrMatrix<LU_int_t,Complex> const & matrix, LUftData
     
         settings.job = MUMPS_FACTORIZE;
         MUMPS_C(&settings);
+        
+        if (settings.INFOG(1) != 0)
+            HexException("MUMPS factorization failed, error code: %d, detail %d", settings.INFOG(1), settings.INFOG(2));
 }
 
 void LUft_MUMPS::solve (const cArrayView b, cArrayView x, int eqs) const
@@ -153,6 +168,9 @@ void LUft_MUMPS::solve (const cArrayView b, cArrayView x, int eqs) const
     settings.lrhs = x.size();
     settings.rhs  = reinterpret_cast<MUMPS_COMPLEX*>(x.data());
     MUMPS_C(&settings);
+    
+    if (settings.INFOG(1) != 0)
+            HexException("MUMPS backsubstitution failed, error code: %d, detail %d", settings.INFOG(1), settings.INFOG(2));
 }
 
 
