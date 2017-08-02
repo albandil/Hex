@@ -322,8 +322,11 @@ void ILUCGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z)
         omp_set_lock(&lu_lock_);
 #endif
     
+    // number of right-hand sides
+    std::size_t Nini = r.size() / block_rank_[iblock];
+    
     // precondition by LU
-    lu_[iblock]->solve(r, z, 1);
+    lu_[iblock]->solve(r, z, Nini);
     
     if (cmd_->factorizer == "mumps")
     {

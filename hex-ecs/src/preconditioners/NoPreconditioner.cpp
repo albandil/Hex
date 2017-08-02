@@ -78,6 +78,7 @@ NoPreconditioner::NoPreconditioner
     B2_blocks_(ang.states().size() * ang.states().size()),
     Cu_blocks_(ang.states().size() * ang.states().size()),
     Cl_blocks_(ang.states().size() * ang.states().size()),
+    block_rank_(ang.states().size()),
     rad_inner_(new RadialIntegrals(bspline_inner,   bspline_inner,   ang.maxlambda() + 1)),
     rad_full_ (new RadialIntegrals(bspline_full,    bspline_full,    ang.maxlambda() + 1)),
     rad_panel_(new RadialIntegrals(bspline_panel_x, bspline_panel_y, ang.maxlambda() + 1)),
@@ -594,6 +595,8 @@ void NoPreconditioner::update (Real E)
         
         Nchan_[ill].first  = Nbound.second;
         Nchan_[ill].second = Nbound.first;
+        
+        block_rank_[ill] = A_size + Nchan_[ill].first * Nspline_x_outer + Nchan_[ill].second * Nspline_y_outer;
     }
     
     // setup blocks
@@ -620,13 +623,13 @@ void NoPreconditioner::update (Real E)
         // create inner-outer coupling blocks
         Cu_blocks_[ill * Nang + illp] = CooMatrix<LU_int_t,Complex>
         (
-            A_size + Nchan1  * Nspline_x_outer + Nchan2  * Nspline_y_outer,
-            A_size + Nchan1p * Nspline_x_outer + Nchan2p * Nspline_y_outer
+            block_rank_[ill],
+            block_rank_[illp]
         );
         Cl_blocks_[ill * Nang + illp] = CooMatrix<LU_int_t,Complex>
         (
-            A_size + Nchan1  * Nspline_x_outer + Nchan2  * Nspline_y_outer,
-            A_size + Nchan1p * Nspline_x_outer + Nchan2p * Nspline_y_outer
+            block_rank_[ill],
+            block_rank_[illp]
         );
         
         // setup stretched inner-outer problem
@@ -1243,6 +1246,7 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
     // shorthands
     unsigned order = inp_->order;
     unsigned Nang = ang_->states().size();
+    unsigned Nini = p[0].size() / block_rank_[0];
     
     // B-spline bases
     Bspline const & bspline_full  = rad_full_ ->bspline();
@@ -1288,206 +1292,218 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
             q.hdfload(ill);
     }
     
-    // for all angular block rows
-    for (unsigned ill = 0; ill < Nang; ill++) if (par_->isMyGroupWork(ill))
+    // for all initial states (right-hand sides)
+    for (unsigned ini = 0; ini < Nini; ini++)
     {
-        std::memset(q[ill].data(), 0, q[ill].size() * sizeof(Complex));
-        
-        // for all angular blocks in a block row; only executed by one of the processes in a process group
-        for (unsigned illp = 0; illp < Nang; illp++) if (par_->igroupproc() == (int)illp % par_->groupsize())
+        // for all angular block rows
+        for (unsigned ill = 0; ill < Nang; ill++) if (par_->isMyGroupWork(ill))
         {
-            // skip unwanted angular blocks
-            if (ill == illp and not (tri & MatrixSelection::BlockDiagonal))    continue;
-            if (ill <  illp and not (tri & MatrixSelection::BlockStrictUpper)) continue;
-            if (ill >  illp and not (tri & MatrixSelection::BlockStrictLower)) continue;
+            std::size_t offset = block_rank_[ill] * ini;
+            cArrayView(q[ill], offset, block_rank_[ill]).fill(0.0_z);
             
-            // determine which part of the block should be considered non-zero for a particlar selection
-            MatrixSelection::Selection selection = tri;
-            if (ill < illp) selection = (tri & MatrixSelection::StrictUpper ? MatrixSelection::Both : MatrixSelection::None);
-            if (ill > illp) selection = (tri & MatrixSelection::StrictLower ? MatrixSelection::Both : MatrixSelection::None);
-            
-            // inner region part multiplication
-            if (cmd_->lightweight_full)
-            {
-                // get block angular momemnta
-                int l1 = ang_->states()[ill].first;
-                int l2 = ang_->states()[ill].second;
-                
-                // multiply 'p' by the diagonal block (except for the two-electron term, which is done later)
-                if (ill == illp)
-                {
-                    // inner-region subset of the vectors
-                    cArrayView p_inner (p[ill], 0, Nspline_x_inner * Nspline_y_inner);
-                    cArrayView q_inner (q[ill], 0, Nspline_x_inner * Nspline_y_inner);
-                    
-                    // one-electron matrices
-                    SymBandMatrix<Complex> const & Sx = rad_panel_->S_x();
-                    SymBandMatrix<Complex> const & Sy = rad_panel_->S_y();
-                    SymBandMatrix<Complex> Hx = 0.5_z * rad_panel_->D_x() + (0.5_z * (l1 * (l1 + 1.))) * rad_panel_->Mm2_x() + Complex(inp_->Za *   -1.0_r) * rad_panel_->Mm1_x();
-                    SymBandMatrix<Complex> Hy = 0.5_z * rad_panel_->D_y() + (0.5_z * (l2 * (l2 + 1.))) * rad_panel_->Mm2_y() + Complex(inp_->Za * inp_->Zp) * rad_panel_->Mm1_y();
-                    
-                    // multiply 'p' by the diagonal block (except for the two-electron term)
-                    kron_dot(0., q_inner, E_, p_inner, Sx, Sy, Nspline_x_inner, Nspline_y_inner);
-                    kron_dot(1., q_inner, -1, p_inner, Hx, Sy, Nspline_x_inner, Nspline_y_inner);
-                    kron_dot(1., q_inner, -1, p_inner, Sx, Hy, Nspline_x_inner, Nspline_y_inner);
-                }
-            }
-            else
-            {
-                // read matrix from disk
-                if (cmd_->outofcore and cmd_->wholematrix)
-                    const_cast<BlockSymBandMatrix<Complex> &>(A_blocks_[ill * Nang + illp]).hdfload();
-                
-                // full diagonal block multiplication
-                A_blocks_[ill * Nang + illp].dot
-                (
-                    1.0_z, cArrayView(p[illp], 0, Nspline_x_inner * Nspline_y_inner),
-                    1.0_z, cArrayView(q[ill],  0, Nspline_x_inner * Nspline_y_inner),
-                    true,
-                    selection
-                );
-                
-                // release memory
-                if (cmd_->outofcore and cmd_->wholematrix)
-                    const_cast<BlockSymBandMatrix<Complex> &>(A_blocks_[ill * Nang + illp]).drop();
-            }
-            
-            // channel expansion part multiplication
-            if (not inp_->inner_only)
-            {
-                int Nchan1 = Nchan_[ill].first;     // # r1 -> inf; l2 bound
-                int Nchan2 = Nchan_[ill].second;    // # r2 -> inf; l1 bound
-                int Nchan1p = Nchan_[illp].first;   // # r1 -> inf; l2p bound
-                int Nchan2p = Nchan_[illp].second;  // # r2 -> inf; l1p bound
-                
-                // r1 -> inf
-                # pragma omp parallel for
-                for (int m = 0; m < Nchan1; m++)
-                for (int n = 0; n < Nchan1p; n++)
-                {
-                    // read matrix from disk
-                    if (cmd_->outofcore)
-                        const_cast<SymBandMatrix<Complex>&>(B1_blocks_[ill * Nang + illp][m * Nchan1p + n]).hdfload();
-                    
-                    // multiply
-                    B1_blocks_[ill * Nang + illp][m * Nchan1p + n].dot
-                    (
-                        1.0_z, cArrayView(p[illp], Nspline_x_inner * Nspline_y_inner + n * Nspline_x_outer, Nspline_x_outer),
-                        1.0_z, cArrayView(q[ill],  Nspline_x_inner * Nspline_y_inner + m * Nspline_x_outer, Nspline_x_outer)
-                    );
-                    
-                    // release memory
-                    if (cmd_->outofcore)
-                        const_cast<SymBandMatrix<Complex>&>(B1_blocks_[ill * Nang + illp][m * Nchan1p + n]).drop();
-                }
-                
-                // r2 -> inf
-                # pragma omp parallel for
-                for (int m = 0; m < Nchan2; m++)
-                for (int n = 0; n < Nchan2p; n++)
-                {
-                    // read matrix from disk
-                    if (cmd_->outofcore)
-                        const_cast<SymBandMatrix<Complex>&>(B2_blocks_[ill * Nang + illp][m * Nchan2p + n]).hdfload();
-                    
-                    // multiply
-                    B2_blocks_[ill * Nang + illp][m * Nchan2p + n].dot
-                    (
-                        1.0_z, cArrayView(p[illp], Nspline_x_inner * Nspline_y_inner + Nchan1p * Nspline_x_outer + n * Nspline_y_outer, Nspline_y_outer),
-                        1.0_z, cArrayView(q[ill],  Nspline_x_inner * Nspline_y_inner + Nchan1  * Nspline_x_outer + m * Nspline_y_outer, Nspline_y_outer)
-                    );
-                    
-                    // release memory
-                    if (cmd_->outofcore) const_cast<SymBandMatrix<Complex>&>(B2_blocks_[ill * Nang + illp][m * Nchan2p + n]).drop();
-                }
-                
-                // multiply by coupling matrices
-                Cu_blocks_[ill * Nang + illp].dot(1.0_z, p[illp], 1.0_z, q[ill]);
-                Cl_blocks_[ill * Nang + illp].dot(1.0_z, p[illp], 1.0_z, q[ill]);
-            }
-        }
-    }
-    
-    // lightweight-full off-diagonal contribution
-    if (cmd_->lightweight_full)
-    {
-        OMP_CREATE_LOCKS(Nang * Nspline_x_inner);
-        
-        int maxlambda = rad_panel_->maxlambda();
-        
-        # pragma omp parallel for collapse (3) schedule (dynamic,1)
-        for (int lambda = 0; lambda <= maxlambda; lambda++)
-        for (std::size_t i = 0; i < Nspline_x_inner; i++)
-        for (int d = 0; d <= inp_->order; d++)
-        if (i + d < Nspline_x_inner)
-        {
-            unsigned k = i + d;
-            
-            SymBandMatrix<Complex> R
-            (
-                Nspline_y_inner,
-                order + 1,
-                rad_panel_->calc_R_tr_dia_block(lambda, i, k).data().slice(0, Nspline_y_inner * (order + 1))
-            );
-            
-            for (unsigned ill = 0; ill < Nang; ill++) if (par_->isMyGroupWork(ill))
+            // for all angular blocks in a block row; only executed by one of the processes in a process group
             for (unsigned illp = 0; illp < Nang; illp++) if (par_->igroupproc() == (int)illp % par_->groupsize())
-            if (Real f = ang_->f(ill, illp, lambda))
             {
+                std::size_t offsetp = block_rank_[illp] * ini;
+                
                 // skip unwanted angular blocks
                 if (ill == illp and not (tri & MatrixSelection::BlockDiagonal))    continue;
                 if (ill <  illp and not (tri & MatrixSelection::BlockStrictUpper)) continue;
                 if (ill >  illp and not (tri & MatrixSelection::BlockStrictLower)) continue;
                 
-                // diagonal blocks
-                if (d == 0)
-                {
-                    OMP_LOCK_LOCK(ill * Nspline_x_inner + i);
-                    
-                    R.dot
-                    (
-                        inp_->Zp * f, cArrayView(p[illp], i * Nspline_y_inner, Nspline_y_inner),
-                        1.0_z,        cArrayView(q[ill],  i * Nspline_y_inner, Nspline_y_inner),
-                        ill == illp ? tri : (ill < illp ? (tri & MatrixSelection::StrictUpper ? MatrixSelection::Both : MatrixSelection::None) :
-                                                          (tri & MatrixSelection::StrictLower ? MatrixSelection::Both : MatrixSelection::None))
-                    );
-                    
-                    OMP_UNLOCK_LOCK(ill * Nspline_x_inner + i);
-                }
+                // determine which part of the block should be considered non-zero for a particlar selection
+                MatrixSelection::Selection selection = tri;
+                if (ill < illp) selection = (tri & MatrixSelection::StrictUpper ? MatrixSelection::Both : MatrixSelection::None);
+                if (ill > illp) selection = (tri & MatrixSelection::StrictLower ? MatrixSelection::Both : MatrixSelection::None);
                 
-                // off-diagonal blocks
+                // inner region part multiplication
+                if (cmd_->lightweight_full)
+                {
+                    // get block angular momemnta
+                    int l1 = ang_->states()[ill].first;
+                    int l2 = ang_->states()[ill].second;
+                    
+                    // multiply 'p' by the diagonal block (except for the two-electron term, which is done later)
+                    if (ill == illp)
+                    {
+                        // inner-region subset of the vectors
+                        cArrayView p_inner (p[ill], offset, Nspline_x_inner * Nspline_y_inner);
+                        cArrayView q_inner (q[ill], offset, Nspline_x_inner * Nspline_y_inner);
+                        
+                        // one-electron matrices
+                        SymBandMatrix<Complex> const & Sx = rad_panel_->S_x();
+                        SymBandMatrix<Complex> const & Sy = rad_panel_->S_y();
+                        SymBandMatrix<Complex> Hx = 0.5_z * rad_panel_->D_x() + (0.5_z * (l1 * (l1 + 1.))) * rad_panel_->Mm2_x() + Complex(inp_->Za *   -1.0_r) * rad_panel_->Mm1_x();
+                        SymBandMatrix<Complex> Hy = 0.5_z * rad_panel_->D_y() + (0.5_z * (l2 * (l2 + 1.))) * rad_panel_->Mm2_y() + Complex(inp_->Za * inp_->Zp) * rad_panel_->Mm1_y();
+                        
+                        // multiply 'p' by the diagonal block (except for the two-electron term)
+                        kron_dot(0., q_inner, E_, p_inner, Sx, Sy, Nspline_x_inner, Nspline_y_inner);
+                        kron_dot(1., q_inner, -1, p_inner, Hx, Sy, Nspline_x_inner, Nspline_y_inner);
+                        kron_dot(1., q_inner, -1, p_inner, Sx, Hy, Nspline_x_inner, Nspline_y_inner);
+                    }
+                }
                 else
                 {
-                    if (tri & MatrixSelection::StrictUpper)
+                    // read matrix from disk
+                    if (cmd_->outofcore and cmd_->wholematrix)
+                        const_cast<BlockSymBandMatrix<Complex> &>(A_blocks_[ill * Nang + illp]).hdfload();
+                    
+                    // full diagonal block multiplication
+                    A_blocks_[ill * Nang + illp].dot
+                    (
+                        1.0_z, cArrayView(p[illp], offsetp, Nspline_x_inner * Nspline_y_inner),
+                        1.0_z, cArrayView(q[ill],  offset,  Nspline_x_inner * Nspline_y_inner),
+                        true,
+                        selection
+                    );
+                    
+                    // release memory
+                    if (cmd_->outofcore and cmd_->wholematrix)
+                        const_cast<BlockSymBandMatrix<Complex> &>(A_blocks_[ill * Nang + illp]).drop();
+                }
+                
+                // channel expansion part multiplication
+                if (not inp_->inner_only)
+                {
+                    int Nchan1 = Nchan_[ill].first;     // # r1 -> inf; l2 bound
+                    int Nchan2 = Nchan_[ill].second;    // # r2 -> inf; l1 bound
+                    int Nchan1p = Nchan_[illp].first;   // # r1 -> inf; l2p bound
+                    int Nchan2p = Nchan_[illp].second;  // # r2 -> inf; l1p bound
+                    
+                    // r1 -> inf
+                    # pragma omp parallel for
+                    for (int m = 0; m < Nchan1; m++)
+                    for (int n = 0; n < Nchan1p; n++)
+                    {
+                        // read matrix from disk
+                        if (cmd_->outofcore)
+                            const_cast<SymBandMatrix<Complex>&>(B1_blocks_[ill * Nang + illp][m * Nchan1p + n]).hdfload();
+                        
+                        // multiply
+                        B1_blocks_[ill * Nang + illp][m * Nchan1p + n].dot
+                        (
+                            1.0_z, cArrayView(p[illp], offsetp + Nspline_x_inner * Nspline_y_inner + n * Nspline_x_outer, Nspline_x_outer),
+                            1.0_z, cArrayView(q[ill],  offset  + Nspline_x_inner * Nspline_y_inner + m * Nspline_x_outer, Nspline_x_outer)
+                        );
+                        
+                        // release memory
+                        if (cmd_->outofcore)
+                            const_cast<SymBandMatrix<Complex>&>(B1_blocks_[ill * Nang + illp][m * Nchan1p + n]).drop();
+                    }
+                    
+                    // r2 -> inf
+                    # pragma omp parallel for
+                    for (int m = 0; m < Nchan2; m++)
+                    for (int n = 0; n < Nchan2p; n++)
+                    {
+                        // read matrix from disk
+                        if (cmd_->outofcore)
+                            const_cast<SymBandMatrix<Complex>&>(B2_blocks_[ill * Nang + illp][m * Nchan2p + n]).hdfload();
+                        
+                        // multiply
+                        B2_blocks_[ill * Nang + illp][m * Nchan2p + n].dot
+                        (
+                            1.0_z, cArrayView(p[illp], offsetp + Nspline_x_inner * Nspline_y_inner + Nchan1p * Nspline_x_outer + n * Nspline_y_outer, Nspline_y_outer),
+                            1.0_z, cArrayView(q[ill],  offset  + Nspline_x_inner * Nspline_y_inner + Nchan1  * Nspline_x_outer + m * Nspline_y_outer, Nspline_y_outer)
+                        );
+                        
+                        // release memory
+                        if (cmd_->outofcore) const_cast<SymBandMatrix<Complex>&>(B2_blocks_[ill * Nang + illp][m * Nchan2p + n]).drop();
+                    }
+                    
+                    // multiply by coupling matrices
+                    Cu_blocks_[ill * Nang + illp].dot(1.0_z, cArrayView(p[illp], offsetp, block_rank_[illp]), 1.0_z, cArrayView(q[ill], offset, block_rank_[ill]));
+                    Cl_blocks_[ill * Nang + illp].dot(1.0_z, cArrayView(p[illp], offsetp, block_rank_[illp]), 1.0_z, cArrayView(q[ill], offset, block_rank_[ill]));
+                }
+            }
+        }
+        
+        // lightweight-full off-diagonal contribution
+        if (cmd_->lightweight_full)
+        {
+            OMP_CREATE_LOCKS(Nang * Nspline_x_inner);
+            
+            int maxlambda = rad_panel_->maxlambda();
+            
+            # pragma omp parallel for collapse (3) schedule (dynamic,1)
+            for (int lambda = 0; lambda <= maxlambda; lambda++)
+            for (std::size_t i = 0; i < Nspline_x_inner; i++)
+            for (int d = 0; d <= inp_->order; d++)
+            if (i + d < Nspline_x_inner)
+            {
+                unsigned k = i + d;
+                
+                SymBandMatrix<Complex> R
+                (
+                    Nspline_y_inner,
+                    order + 1,
+                    rad_panel_->calc_R_tr_dia_block(lambda, i, k).data().slice(0, Nspline_y_inner * (order + 1))
+                );
+                
+                for (unsigned ill = 0; ill < Nang; ill++) if (par_->isMyGroupWork(ill))
+                for (unsigned illp = 0; illp < Nang; illp++) if (par_->igroupproc() == (int)illp % par_->groupsize())
+                if (Real f = ang_->f(ill, illp, lambda))
+                {
+                    std::size_t chunk = p[ill].size() / Nini;
+                    std::size_t chunkp = p[illp].size() / Nini;
+                    std::size_t offset = chunk * ini;
+                    std::size_t offsetp = chunkp * ini;
+                    
+                    // skip unwanted angular blocks
+                    if (ill == illp and not (tri & MatrixSelection::BlockDiagonal))    continue;
+                    if (ill <  illp and not (tri & MatrixSelection::BlockStrictUpper)) continue;
+                    if (ill >  illp and not (tri & MatrixSelection::BlockStrictLower)) continue;
+                    
+                    // diagonal blocks
+                    if (d == 0)
                     {
                         OMP_LOCK_LOCK(ill * Nspline_x_inner + i);
                         
                         R.dot
                         (
-                            inp_->Zp * f, cArrayView(p[illp], k * Nspline_y_inner, Nspline_y_inner),
-                            1.0_z,        cArrayView(q[ill],  i * Nspline_y_inner, Nspline_y_inner)
+                            inp_->Zp * f, cArrayView(p[illp], offsetp + i * Nspline_y_inner, Nspline_y_inner),
+                            1.0_z,        cArrayView(q[ill],  offset  + i * Nspline_y_inner, Nspline_y_inner),
+                            ill == illp ? tri : (ill < illp ? (tri & MatrixSelection::StrictUpper ? MatrixSelection::Both : MatrixSelection::None) :
+                                                              (tri & MatrixSelection::StrictLower ? MatrixSelection::Both : MatrixSelection::None))
                         );
                         
                         OMP_UNLOCK_LOCK(ill * Nspline_x_inner + i);
                     }
                     
-                    if (tri & MatrixSelection::StrictLower)
+                    // off-diagonal blocks
+                    else
                     {
-                        OMP_LOCK_LOCK(ill * Nspline_x_inner + k);
+                        if (tri & MatrixSelection::StrictUpper)
+                        {
+                            OMP_LOCK_LOCK(ill * Nspline_x_inner + i);
+                            
+                            R.dot
+                            (
+                                inp_->Zp * f, cArrayView(p[illp], offsetp + k * Nspline_y_inner, Nspline_y_inner),
+                                1.0_z,        cArrayView(q[ill],  offset  + i * Nspline_y_inner, Nspline_y_inner)
+                            );
+                            
+                            OMP_UNLOCK_LOCK(ill * Nspline_x_inner + i);
+                        }
                         
-                        R.dot
-                        (
-                            inp_->Zp * f, cArrayView(p[illp], i * Nspline_y_inner, Nspline_y_inner),
-                            1.0_z,        cArrayView(q[ill],  k * Nspline_y_inner, Nspline_y_inner)
-                        );
-                        
-                        OMP_UNLOCK_LOCK(ill * Nspline_x_inner + k);
+                        if (tri & MatrixSelection::StrictLower)
+                        {
+                            OMP_LOCK_LOCK(ill * Nspline_x_inner + k);
+                            
+                            R.dot
+                            (
+                                inp_->Zp * f, cArrayView(p[illp], offsetp + i * Nspline_y_inner, Nspline_y_inner),
+                                1.0_z,        cArrayView(q[ill],  offset  + k * Nspline_y_inner, Nspline_y_inner)
+                            );
+                            
+                            OMP_UNLOCK_LOCK(ill * Nspline_x_inner + k);
+                        }
                     }
                 }
             }
+            
+            OMP_DELETE_LOCKS();
         }
-        
-        OMP_DELETE_LOCKS();
     }
     
     // release source vectors

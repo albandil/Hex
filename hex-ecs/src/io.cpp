@@ -6,7 +6,7 @@
 //                    / /   / /    \_\      / /  \ \                                 //
 //                                                                                   //
 //                                                                                   //
-//  Copyright (c) 2016, Jakub Benda, Charles University in Prague                    //
+//  Copyright (c) 2017, Jakub Benda, Charles University in Prague                    //
 //                                                                                   //
 // MIT License:                                                                      //
 //                                                                                   //
@@ -213,6 +213,7 @@ void CommandLine::parse (int argc, char* argv[])
                     "Right-hand side\n"
                     "\t--analytic-eigenstates           Use analytic formulae for initial/final states instead of diagonalization.\n"
                     "\t--fast-bessel                    Use faster Bessel function evaluation routine (not the Steed/Barnett) when calculating RHS.\n"
+                    "\t--multi-rhs                      Solve for all initial states at once. Requires more memory, but might be faster. \n"
                     "\n"
                     "Disk access\n"
                     "\t--own-radial-cache         (-w)  Keep two-electron radial integrals not referenced by preconditioner only on disk (slows down only the initialization).\n"
@@ -755,6 +756,12 @@ void CommandLine::parse (int argc, char* argv[])
             {
                 // use analytic eigenstates instead of those obtained from the diagonalization
                 runtime_postprocess = true;
+                return true;
+            },
+        "multi-rhs", "", 0, [&](std::vector<std::string> const & optargs) -> bool
+            {
+                // solve for multiple initial states at once
+                multi_rhs = true;
                 return true;
             },
         

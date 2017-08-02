@@ -144,7 +144,7 @@ void CGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArray<C
     // clear timing information
     us_axby_ = us_mmul_ = us_norm_ = us_prec_ = us_spro_ = 0;
     
-    // apply SSOR
+    // apply SSOR TODO : fix for multi-rhs
     if (cmd_->ssor > 0)
     {
         // working arrays
@@ -173,7 +173,7 @@ void CGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArray<C
             this->CG_mmul(ill, (2.0_r - cmd_->ssor) / cmd_->ssor * x[ill], y[ill]);
         }
         
-        // backward SOR
+        // backward SOR TODO : fix for multi-rhs
         for (int ill = (int)ang_->states().size() - 1; ill >= 0; ill--)
         {
             // subtract upper block diagonals for ill-th block row
@@ -242,8 +242,6 @@ void CGPreconditioner::CG_init (int iblock) const
 
 void CGPreconditioner::CG_mmul (int iblock, const cArrayView p, cArrayView q) const
 {
-    std::memset(q.data(), 0, q.size() * sizeof(Complex));
-    
     std::size_t Nspline_full_x  = rad_panel_->bspline_x().Nspline();
     std::size_t Nspline_inner_x = rad_panel_->bspline_x().hash() == rad_full_->bspline().hash() ? rad_inner_->bspline().Nspline() : rad_panel_->bspline_x().Nspline();
     std::size_t Nspline_outer_x = Nspline_full_x - Nspline_inner_x;
@@ -252,94 +250,101 @@ void CGPreconditioner::CG_mmul (int iblock, const cArrayView p, cArrayView q) co
     std::size_t Nspline_inner_y = rad_panel_->bspline_y().hash() == rad_full_->bspline().hash() ? rad_inner_->bspline().Nspline() : rad_panel_->bspline_y().Nspline();
     std::size_t Nspline_outer_y = Nspline_full_y - Nspline_inner_y;
     
+    std::size_t Nini = p.size() / block_rank_[iblock];
     std::size_t Nang = ang_->states().size();
     std::size_t iang = iblock * Nang + iblock;
     
-    // inner-region subset of the vectors
-    cArrayView p_inner (p, 0, Nspline_inner_x * Nspline_inner_y);
-    cArrayView q_inner (q, 0, Nspline_inner_x * Nspline_inner_y);
-    
-    if (cmd_->lightweight_full)
+    for (std::size_t ini = 0; ini < Nini; ini++)
     {
-        // get block angular momemnta
-        int l1 = ang_->states()[iblock].first;
-        int l2 = ang_->states()[iblock].second;
+        std::size_t offset = block_rank_[iblock] * ini;
+        cArrayView(q, offset, block_rank_[iblock]).fill(0.0_z);
         
-        // one-electron matrices
-        SymBandMatrix<Complex> const & Sx = rad_panel_->S_x();
-        SymBandMatrix<Complex> const & Sy = rad_panel_->S_y();
-        SymBandMatrix<Complex> Hx = 0.5_z * rad_panel_->D_x() + (0.5_z * (l1 * (l1 + 1.))) * rad_panel_->Mm2_x() + Complex(inp_->Za *   -1.0_r) * rad_panel_->Mm1_x();
-        SymBandMatrix<Complex> Hy = 0.5_z * rad_panel_->D_y() + (0.5_z * (l2 * (l2 + 1.))) * rad_panel_->Mm2_y() + Complex(inp_->Za * inp_->Zp) * rad_panel_->Mm1_y();
+        // inner-region subset of the vectors
+        cArrayView p_inner (p, offset, Nspline_inner_x * Nspline_inner_y);
+        cArrayView q_inner (q, offset, Nspline_inner_x * Nspline_inner_y);
         
-        // multiply 'p' by the diagonal block
-        // - except for the two-electron term
-        // - restrict to inner region
-        kron_dot(0., q_inner, E_, p_inner, Sx, Sy, Nspline_inner_x, Nspline_inner_y);
-        kron_dot(1., q_inner, -1, p_inner, Hx, Sy, Nspline_inner_x, Nspline_inner_y);
-        kron_dot(1., q_inner, -1, p_inner, Sx, Hy, Nspline_inner_x, Nspline_inner_y);
-        
-        // multiply 'p' by the two-electron integrals
-        for (int lambda = 0; lambda <= rad_inner_->maxlambda(); lambda++)
+        if (cmd_->lightweight_full)
         {
-            // calculate angular integral
-            Real f = special::computef(lambda, l1, l2, l1, l2, inp_->L);
-            if (not std::isfinite(f))
-                HexException("Invalid result of computef(%d,%d,%d,%d,%d,%d).", lambda, l1, l2, l1, l2, inp_->L);
+            // get block angular momemnta
+            int l1 = ang_->states()[iblock].first;
+            int l2 = ang_->states()[iblock].second;
             
-            // multiply
-            if (f != 0.)
+            // one-electron matrices
+            SymBandMatrix<Complex> const & Sx = rad_panel_->S_x();
+            SymBandMatrix<Complex> const & Sy = rad_panel_->S_y();
+            SymBandMatrix<Complex> Hx = 0.5_z * rad_panel_->D_x() + (0.5_z * (l1 * (l1 + 1.))) * rad_panel_->Mm2_x() + Complex(inp_->Za *   -1.0_r) * rad_panel_->Mm1_x();
+            SymBandMatrix<Complex> Hy = 0.5_z * rad_panel_->D_y() + (0.5_z * (l2 * (l2 + 1.))) * rad_panel_->Mm2_y() + Complex(inp_->Za * inp_->Zp) * rad_panel_->Mm1_y();
+            
+            // multiply 'p' by the diagonal block
+            // - except for the two-electron term
+            // - restrict to inner region
+            kron_dot(0., q_inner, E_, p_inner, Sx, Sy, Nspline_inner_x, Nspline_inner_y);
+            kron_dot(1., q_inner, -1, p_inner, Hx, Sy, Nspline_inner_x, Nspline_inner_y);
+            kron_dot(1., q_inner, -1, p_inner, Sx, Hy, Nspline_inner_x, Nspline_inner_y);
+            
+            // multiply 'p' by the two-electron integrals
+            for (int lambda = 0; lambda <= rad_inner_->maxlambda(); lambda++)
             {
-                rad_panel_->apply_R_matrix(lambda, inp_->Zp * f, p_inner, 1.0, q_inner, Nspline_inner_x, Nspline_inner_y);
+                // calculate angular integral
+                Real f = special::computef(lambda, l1, l2, l1, l2, inp_->L);
+                if (not std::isfinite(f))
+                    HexException("Invalid result of computef(%d,%d,%d,%d,%d,%d).", lambda, l1, l2, l1, l2, inp_->L);
+                
+                // multiply
+                if (f != 0.)
+                {
+                    rad_panel_->apply_R_matrix(lambda, inp_->Zp * f, p_inner, 1.0, q_inner, Nspline_inner_x, Nspline_inner_y);
+                }
             }
         }
-    }
-    else
-    {
-        if (cmd_->outofcore and cmd_->wholematrix) const_cast<BlockSymBandMatrix<Complex> &>(A_blocks_[iang]).hdfload();
-        
-        A_blocks_[iang].dot
-        (
-            1.0_r, p_inner,
-            1.0_r, q_inner,
-            !cmd_->parallel_precondition
-        );
-        
-        if (cmd_->outofcore and cmd_->wholematrix) const_cast<BlockSymBandMatrix<Complex> &>(A_blocks_[iang]).drop();
-    }
-    
-    if (not inp_->inner_only)
-    {
-        std::size_t Nchan1 = Nchan_[iblock].first;
-        std::size_t Nchan2 = Nchan_[iblock].second;
-        
-        # pragma omp parallel for if (!cmd_->parallel_precondition)
-        for (std::size_t m = 0; m < Nchan1; m++)
-        for (std::size_t n = 0; n < Nchan1; n++)
+        else
         {
-            if (cmd_->outofcore) const_cast<SymBandMatrix<Complex>&>(B1_blocks_[iang][m * Nchan1 + n]).hdfload();
-            B1_blocks_[iang][m * Nchan1 + n].dot
+            if (cmd_->outofcore and cmd_->wholematrix) const_cast<BlockSymBandMatrix<Complex> &>(A_blocks_[iang]).hdfload();
+            
+            A_blocks_[iang].dot
             (
-                1.0_r, cArrayView(p, Nspline_inner_x * Nspline_inner_y + n * Nspline_outer_x, Nspline_outer_x),
-                1.0_r, cArrayView(q, Nspline_inner_x * Nspline_inner_y + m * Nspline_outer_x, Nspline_outer_x)
+                1.0_r, p_inner,
+                1.0_r, q_inner,
+                !cmd_->parallel_precondition
             );
-            if (cmd_->outofcore) const_cast<SymBandMatrix<Complex>&>(B1_blocks_[iang][m * Nchan1 + n]).drop();
+            
+            if (cmd_->outofcore and cmd_->wholematrix) const_cast<BlockSymBandMatrix<Complex> &>(A_blocks_[iang]).drop();
         }
         
-        # pragma omp parallel for if (!cmd_->parallel_precondition)
-        for (std::size_t m = 0; m < Nchan2; m++)
-        for (std::size_t n = 0; n < Nchan2; n++)
+        if (not inp_->inner_only)
         {
-            if (cmd_->outofcore) const_cast<SymBandMatrix<Complex>&>(B2_blocks_[iang][m * Nchan2 + n]).hdfload();
-            B2_blocks_[iang][m * Nchan2 + n].dot
-            (
-                1.0_r, cArrayView(p, Nspline_inner_x * Nspline_inner_y + (Nchan1 + n) * Nspline_outer_y, Nspline_outer_y),
-                1.0_r, cArrayView(q, Nspline_inner_x * Nspline_inner_y + (Nchan1 + m) * Nspline_outer_y, Nspline_outer_y)
-            );
-            if (cmd_->outofcore) const_cast<SymBandMatrix<Complex>&>(B2_blocks_[iang][m * Nchan2 + n]).drop();
+            std::size_t Nchan1 = Nchan_[iblock].first;
+            std::size_t Nchan2 = Nchan_[iblock].second;
+            
+            # pragma omp parallel for if (!cmd_->parallel_precondition)
+            for (std::size_t m = 0; m < Nchan1; m++)
+            for (std::size_t n = 0; n < Nchan1; n++)
+            {
+                if (cmd_->outofcore) const_cast<SymBandMatrix<Complex>&>(B1_blocks_[iang][m * Nchan1 + n]).hdfload();
+                B1_blocks_[iang][m * Nchan1 + n].dot
+                (
+                    1.0_r, cArrayView(p, offset + Nspline_inner_x * Nspline_inner_y + n * Nspline_outer_x, Nspline_outer_x),
+                    1.0_r, cArrayView(q, offset + Nspline_inner_x * Nspline_inner_y + m * Nspline_outer_x, Nspline_outer_x)
+                );
+                if (cmd_->outofcore) const_cast<SymBandMatrix<Complex>&>(B1_blocks_[iang][m * Nchan1 + n]).drop();
+            }
+            
+            # pragma omp parallel for if (!cmd_->parallel_precondition)
+            for (std::size_t m = 0; m < Nchan2; m++)
+            for (std::size_t n = 0; n < Nchan2; n++)
+            {
+                if (cmd_->outofcore) const_cast<SymBandMatrix<Complex>&>(B2_blocks_[iang][m * Nchan2 + n]).hdfload();
+                B2_blocks_[iang][m * Nchan2 + n].dot
+                (
+                    1.0_r, cArrayView(p, offset + Nspline_inner_x * Nspline_inner_y + (Nchan1 + n) * Nspline_outer_y, Nspline_outer_y),
+                    1.0_r, cArrayView(q, offset + Nspline_inner_x * Nspline_inner_y + (Nchan1 + m) * Nspline_outer_y, Nspline_outer_y)
+                );
+                if (cmd_->outofcore) const_cast<SymBandMatrix<Complex>&>(B2_blocks_[iang][m * Nchan2 + n]).drop();
+            }
+            
+            Cu_blocks_[iang].dot(1.0_r, cArrayView(p, offset, block_rank_[iblock]), 1.0_r, cArrayView(q, offset, block_rank_[iblock]));
+            Cl_blocks_[iang].dot(1.0_r, cArrayView(p, offset, block_rank_[iblock]), 1.0_r, cArrayView(q, offset, block_rank_[iblock]));
         }
-        
-        Cu_blocks_[iang].dot(1.0_r, p, 1.0_r, q);
-        Cl_blocks_[iang].dot(1.0_r, p, 1.0_r, q);
     }
 }
 

@@ -154,6 +154,9 @@ class NoPreconditioner : public PreconditionerBase
         // number of channels considered when r1 -> inf and r2 -> inf, respectively
         std::vector<std::pair<int,int>> Nchan_;
         
+        // rank of the angular blocks
+        std::vector<std::size_t> block_rank_;
+        
         // radial integrals for inner, full and panel basis
         RadialIntegrals *rad_inner_, *rad_full_, *rad_panel_;
         

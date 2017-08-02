@@ -67,8 +67,6 @@ void CoupledPreconditioner::update (Real E)
     cArray V;
     
     // allocate memory
-    X.resize(N);
-    Y.resize(N);
     if (par_->IamMaster())
     {
         I.reserve(NZ);
@@ -238,22 +236,47 @@ int CoupledPreconditioner::solve_block (int ill, const cArrayView r, cArrayView 
 
 void CoupledPreconditioner::precondition (BlockArray<Complex> const & r, BlockArray<Complex> & z) const
 {
-    // some useful constants
-    std::size_t Nang = r.size(), Nchunk = r[0].size();
+    // number of angular blocks
+    std::size_t Nang = r.size();
+    
+    // number of initial states (right-hand sides) solved at once
+    std::size_t Nini = r[0].size() / block_rank_[0];
+    
+    // total solution size (all blocks, all initial states)
+    std::size_t N = 0;
+    for (cArray const & a : r) N += a.size();
+    X.resize(N);
+    Y.resize(N);
     
     // convert block array to monolithic array
+    for (std::size_t ini = 0, Xoffset = 0; ini < Nini; ini++)
     for (std::size_t ill = 0; ill < Nang; ill++)
-        cArrayView(X, ill * Nchunk, Nchunk) = r[ill];
+    {
+        std::size_t chunk = r[ill].size() / Nini;
+        std::size_t roffset = chunk * ini;
+        
+        cArrayView(X, Xoffset, chunk) = cArrayView(r[ill], roffset, chunk);
+        
+        Xoffset += r[ill].size() / Nini;
+    }
     
     // solve
-    lu_->solve(X, Y, 1);
+    lu_->solve(X, Y, Nini);
     
     // broadcast solution from master to everyone
     par_->bcast(0, Y);
     
     // copy solution to result
+    for (std::size_t ini = 0, Yoffset = 0; ini < Nini; ini++)
     for (std::size_t ill = 0; ill < Nang; ill++)
-        z[ill] = cArrayView(Y, ill * Nchunk, Nchunk);
+    {
+        std::size_t chunk = z[ill].size() / Nini;
+        std::size_t zoffset = chunk * ini;
+        
+        cArrayView(z[ill], zoffset, chunk) = cArrayView(Y, Yoffset, chunk);
+        
+        Yoffset += z[ill].size() / Nini;
+    }
     
     // use segregated KPA preconditioner to solve uncoupled blocks
     KPACGPreconditioner::precondition(r, z);

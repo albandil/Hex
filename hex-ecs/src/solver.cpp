@@ -159,7 +159,7 @@ void Solver::solve ()
         std::cout.imbue(std::locale::classic());
         
         // we may have already computed all solutions for this energy... is it so?
-        std::vector<std::pair<int,int>> work;
+        std::vector<int> work[2];
         for (unsigned instate = 0; instate < inp_.instates.size(); instate++)
         for (unsigned Spin : inp_.Spin)
         {
@@ -216,11 +216,11 @@ void Solver::solve ()
             }
             
             // add work
-            work.push_back(std::make_pair(instate,Spin));
+            work[Spin].push_back(instate);
         }
         
         // skip this energy if nothing to compute
-        if (work.empty())
+        if (work[0].empty() and work[1].empty())
         {
             std::cout << "\tAll solutions for Etot[" << ie << "] = " << inp_.Etot[ie] << " loaded." << std::endl;
             continue;
@@ -231,26 +231,36 @@ void Solver::solve ()
             prec_->update(E_ = 0.5 * inp_.Etot[ie]);
         
         // for all initial states
-        for (auto workitem : work)
+        for (int Spin : inp_.Spin)
+        for (int instate : work[Spin])
+        if (not cmd_.multi_rhs or instate == work[Spin].front())
         {
-            // decode initial state
-            int instate = std::get<0>(workitem);
-            ang_.S() = std::get<1>(workitem);
-            ni_ = std::get<0>(inp_.instates[instate]);
-            li_ = std::get<1>(inp_.instates[instate]);
-            mi_ = std::get<2>(inp_.instates[instate]);
+            ang_.S() = Spin;
+            instates_ = cmd_.multi_rhs ? work[Spin] : iArray{instate};
             
             // create right hand side
             BlockArray<Complex> chi (ang_.states().size(), !cmd_.outofcore, "cg-b");
             if (not cmd_.cont)
             {
-                Timer t;
-                std::cout << "\tCreate right-hand side for initial state " << Hydrogen::stateName(ni_,li_,mi_) << " and total spin S = " << ang_.S() << " ... " << std::flush;
-                
-                // use the preconditioner setup routine
-                prec_->rhs(chi, ie, instate);
-                
-                std::cout << "done after " << t.nice_time() << std::endl;
+                for (int i : instates_)
+                {
+                    std::cout << "\tCreate right-hand side for initial state";
+                    std::cout << " " << Hydrogen::stateName
+                    (
+                        std::get<0>(inp_.instates[i]),
+                        std::get<1>(inp_.instates[i]),
+                        std::get<2>(inp_.instates[i])
+                    );
+                    std::cout << " and total spin S = " << Spin << " ... " << std::flush;
+                    
+                    // use the preconditioner setup routine
+                    Timer t;
+                    cBlockArray chiseg (chi.size());
+                    prec_->rhs(chiseg, ie, i);
+                    for (unsigned ill = 0; ill < chi.size(); ill++)
+                        chi[ill].append(chiseg[ill]);
+                    std::cout << "done after " << t.nice_time() << std::endl;
+                }
             }
             
             // compute and check norm of the right hand side vector
@@ -277,21 +287,40 @@ void Solver::solve ()
             BlockArray<Complex> psi (new_array(ang_.states().size(),"cg-x"));
             
             // load initial guess
-            if (not cmd_.cont and ie > 0 and cmd_.carry_initial_guess)
+            /*if (not cmd_.cont and ie > 0 and cmd_.carry_initial_guess)
             {
-                SolutionIO prev_sol_reader (ang_.L(), ang_.S(), ang_.Pi(), ni_, li_, mi_, inp_.Etot[ie-1], ang_.states());
-                prev_sol_reader.load(psi);
-            }
-            if (not cmd_.cont and cmd_.refine_solution)
+                for (unsigned i = 0; i < instates_.size(); i++)
+                {
+                    // read previous solution
+                    BlockArray<Complex> prevsol (psi.size());
+                    SolutionIO
+                    (
+                        ang_.L(), ang_.S(), ang_.Pi(),
+                        std::get<0>(inp_.instates[instates_[i]]),
+                        std::get<1>(inp_.instates[instates_[i]]),
+                        std::get<2>(inp_.instates[instates_[i]]),
+                        inp_.Etot[ie-1],
+                        ang_.states()
+                    ).load(prevsol);
+                    
+                    // overwrite the appropriate segments
+                    for (unsigned iblock = 0; iblock < psi.size(); iblock++)
+                    {
+                        // TODO
+                    }
+                }
+            }*/
+            /*if (not cmd_.cont and cmd_.refine_solution)
             {
                 SolutionIO prev_sol_reader (ang_.L(), ang_.S(), ang_.Pi(), ni_, li_, mi_, inp_.Etot[ie], ang_.states());
                 prev_sol_reader.load(psi);
-            }
+                TODO
+            }*/
             
             // launch the linear system solver
             Timer t;
             unsigned max_iter = (inp_.maxell + 1) * (std::size_t)Nspline_inner;
-            std::cout << "\tStart linear solver with tolerance " << cmd_.itertol << " for initial state " << Hydrogen::stateName(ni_,li_,mi_) << " and total spin S = " << ang_.S() << "." << std::endl;
+            std::cout << "\tStart linear solver with tolerance " << cmd_.itertol << std::endl;
             std::cout << "\t   i | time        | residual        | min  max  avg  block precond. iter." << std::endl;
             CG_.apply_preconditioner = apply_preconditioner;
             CG_.matrix_multiply      = matrix_multiply;
@@ -313,24 +342,46 @@ void Solver::solve ()
             computations_done++;
             
             // save solution to disk (if valid)
-            SolutionIO reader (ang_.L(), ang_.S(), ang_.Pi(), ni_, li_, mi_, 2 * E_, ang_.states(), channels_);
             if (std::isfinite(compute_norm(psi)))
+                
+            // for all angular blocks
+            for (unsigned ill = 0; ill < ang_.states().size(); ill++)
+            if (par_.isMyGroupWork(ill) and par_.IamGroupMaster())
             {
-                for (unsigned ill = 0; ill < ang_.states().size(); ill++)
+                // read solution from disk, if not available
+                if (not psi.inmemory())
+                    psi.hdfload(ill);
+                
+                // for all initial states that have been solved
+                for (unsigned i = 0; i < instates_.size(); i++)
                 {
-                    if (par_.isMyGroupWork(ill) and par_.IamGroupMaster())
-                    {
-                        if (not psi.inmemory())
-                            psi.hdfload(ill);
-                        
-                        // write the updated solution to disk
-                        if (not reader.save(psi, ill))
-                            HexException("Failed to save solution to disk - the data are lost!");
-                        
-                        if (not psi.inmemory())
-                            psi[ill].drop();
-                    }
+                    // create the solution writer
+                    SolutionIO writer
+                    (
+                        ang_.L(), ang_.S(), ang_.Pi(),
+                        std::get<0>(inp_.instates[instates_[i]]),
+                        std::get<1>(inp_.instates[instates_[i]]),
+                        std::get<2>(inp_.instates[instates_[i]]),
+                        2 * E_, ang_.states(), channels_
+                    );
+                    
+                    // extract part of the solution that corresponds to the i-th initial state
+                    cBlockArray psiseg (psi.size());
+                    psiseg[ill] = psi[ill].slice
+                    (
+                        psi[ill].size() *  i      / instates_.size(),
+                        psi[ill].size() * (i + 1) / instates_.size()
+                    );
+                    
+                    // write the solution to disk
+                    if (not writer.save(psiseg, ill))
+                        HexException("Failed to save solution to disk - the data are lost!");
+                    
                 }
+                
+                // releasae solution from memory if not needed
+                if (not psi.inmemory())
+                    psi[ill].drop();
             }
             
             // reset some one-solution command line flags
@@ -492,7 +543,7 @@ BlockArray<Complex> Solver::new_array_ (std::size_t N, std::string name) const
             size += (bstates_[i].first.size() + bstates_[i].second.size()) * Nspline_outer;
         
         // allocate memory
-        array[i].resize(size);
+        array[i].resize(instates_.size() * size);
         
         // take care of out-of-core mode
         if (not array.inmemory())
@@ -517,9 +568,30 @@ void Solver::process_solution_ (unsigned iteration, BlockArray<Complex> const & 
     {
         create_directory(dir);
         
-        // write the solution
-        SolutionIO writer (ang_.L(), ang_.S(), ang_.Pi(), ni_, li_, mi_, 2 * E_, ang_.states(), channels_, dir + "/psi");
-        writer.save(x);
+        // for all initial states that have been solved
+        for (unsigned i = 0; i < instates_.size(); i++)
+        {
+            // get segments corresponding to the i-th initial state
+            cBlockArray X (x.size());
+            for (unsigned ill = 0; ill < x.size(); ill++)
+            {
+                X[ill] = x[ill].slice
+                (
+                    X[ill].size() *  i      / instates_.size(),
+                    X[ill].size() * (i + 1) / instates_.size()
+                );
+            }
+            
+            // write the solution
+            SolutionIO
+            (
+                ang_.L(), ang_.S(), ang_.Pi(),
+                std::get<0>(inp_.instates[instates_[i]]),
+                std::get<1>(inp_.instates[instates_[i]]),
+                std::get<2>(inp_.instates[instates_[i]]),
+                2 * E_, ang_.states(), channels_, dir + "/psi"
+            ).save(X);
+        }
     }
     
     if (cmd_.runtime_postprocess)

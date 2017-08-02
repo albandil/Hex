@@ -122,6 +122,9 @@ void KPACGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z)
     int l1 = ang_->states()[iblock].first;
     int l2 = ang_->states()[iblock].second;
     
+    // get number of right-hand sides (initial states)
+    unsigned Nini = r.size() / block_rank_[iblock];
+    
     // get the right radial integrals (interior of the full domain, or full panel)
     RadialIntegrals const * rint;
     if (rad_panel_->bspline_x().hash() == rad_full_->bspline_x().hash() and
@@ -141,35 +144,42 @@ void KPACGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z)
         ithread = omp_get_thread_num();
 #endif
     
-    // encapsulated memory chunks
-    ColMatrixView<Complex> U (Nspline_inner_x, Nspline_inner_y, workspace_[ithread]);
-    RowMatrixView<Complex> R (Nspline_inner_x, Nspline_inner_y, r);
-    RowMatrixView<Complex> Z (Nspline_inner_x, Nspline_inner_y, z);
-    
-    // first Kronecker product
+    // for all initial states
+    for (unsigned ini = 0; ini < Nini; ini++)
     {
-        // U = (AV)B
-        RowMatrixView<Complex> A (Nspline_inner_x, Nspline_inner_x, Hl_[0][l1].invCl_invsqrtS.data());
-        ColMatrixView<Complex> B (Nspline_inner_y, Nspline_inner_y, Hl_[1][l2].invCl_invsqrtS.data());
+        // solution offset
+        std::size_t offset = ini * block_rank_[iblock];
         
-        blas::gemm(1., A, R, 0., Z); // N³ operations
-        blas::gemm(1., Z, B, 0., U); // N³ operations
-    }
-    
-    // Divide elements by the diagonal; N² operations
-    # pragma omp parallel for
-    for (std::size_t i = 0; i < Nspline_inner_x; i++) 
-    for (std::size_t j = 0; j < Nspline_inner_y; j++)
-        Z(i,j) = U(i,j) / (E_ - Hl_[0][l1].Dl[i] - Hl_[1][l2].Dl[j]);
-    
-    // second Kronecker product
-    {
-        // W = (AU)B
-        RowMatrixView<Complex> A (Nspline_inner_x, Nspline_inner_x, Hl_[0][l1].invsqrtS_Cl.data());
-        ColMatrixView<Complex> B (Nspline_inner_y, Nspline_inner_y, Hl_[1][l2].invsqrtS_Cl.data());
+        // encapsulated memory chunks
+        ColMatrixView<Complex> U (Nspline_inner_x, Nspline_inner_y, workspace_[ithread]);
+        RowMatrixView<Complex> R (Nspline_inner_x, Nspline_inner_y, cArrayView(r, offset, block_rank_[iblock]));
+        RowMatrixView<Complex> Z (Nspline_inner_x, Nspline_inner_y, cArrayView(z, offset, block_rank_[iblock]));
         
-        blas::gemm(1., A, Z, 0., U);    // N³ operations
-        blas::gemm(1., U, B, 0., Z);    // N³ operations
+        // first Kronecker product
+        {
+            // U = (AV)B
+            RowMatrixView<Complex> A (Nspline_inner_x, Nspline_inner_x, Hl_[0][l1].invCl_invsqrtS.data());
+            ColMatrixView<Complex> B (Nspline_inner_y, Nspline_inner_y, Hl_[1][l2].invCl_invsqrtS.data());
+            
+            blas::gemm(1., A, R, 0., Z); // N³ operations
+            blas::gemm(1., Z, B, 0., U); // N³ operations
+        }
+        
+        // Divide elements by the diagonal; N² operations
+        # pragma omp parallel for
+        for (std::size_t i = 0; i < Nspline_inner_x; i++) 
+        for (std::size_t j = 0; j < Nspline_inner_y; j++)
+            Z(i,j) = U(i,j) / (E_ - Hl_[0][l1].Dl[i] - Hl_[1][l2].Dl[j]);
+        
+        // second Kronecker product
+        {
+            // W = (AU)B
+            RowMatrixView<Complex> A (Nspline_inner_x, Nspline_inner_x, Hl_[0][l1].invsqrtS_Cl.data());
+            ColMatrixView<Complex> B (Nspline_inner_y, Nspline_inner_y, Hl_[1][l2].invsqrtS_Cl.data());
+            
+            blas::gemm(1., A, Z, 0., U);    // N³ operations
+            blas::gemm(1., U, B, 0., Z);    // N³ operations
+        }
     }
 }
 

@@ -127,8 +127,8 @@ class Solver
         /// Linear solver (conjugate gradients).
         ConjugateGradients <Complex, cBlockArray, cBlockArray&> CG_;
         
-        /// Quantum numbers of the state currently being solved.
-        int ni_, li_, mi_;
+        /// States currently being solved.
+        iArray instates_;
         Real E_;
         
         /// Asymptotic bound channels for every angular momentum state (l₁,l₂) and r₁- or r₂-asymptotics.
