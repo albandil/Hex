@@ -86,6 +86,9 @@ void DOMPreconditioner::update (Real E)
 
 void DOMPreconditioner::precondition (BlockArray<Complex> const & r, BlockArray<Complex> & z) const
 {
+    // number of initial states (right-hand sides)
+    Nini_ = r[0].size() / block_rank_[0];
+    
     // B-spline parameters
     int order = rad_inner().bspline().order();
     Real theta = rad_inner().bspline().ECStheta();
@@ -120,7 +123,8 @@ void DOMPreconditioner::precondition (BlockArray<Complex> const & r, BlockArray<
             cyknots1, ryknots, cyknots2,
             cxknots1, rxknots, cxknots2,
             cyknots1, ryknots, cyknots2,
-            ang_->states().size()
+            ang_->states().size(),
+            Nini_
         );
         
         // get the panel data structure
@@ -356,11 +360,11 @@ void DOMPreconditioner::solvePanel (int cycle, int cycles, std::vector<PanelSolu
             }
         }
     };
-    auto new_array = [Nxspline,Nyspline](std::size_t N, std::string name) -> cBlockArray
+    auto new_array = [Nxspline,Nyspline,this](std::size_t N, std::string name) -> cBlockArray
     {
         cBlockArray A (N);
         for (cArray & a : A)
-            a.resize(Nxspline * Nyspline);
+            a.resize(Nxspline * Nyspline * Nini_);
         return A;
     };
     auto process_solution = [](unsigned iteration, cBlockArray const & x) -> void
@@ -489,17 +493,26 @@ void DOMPreconditioner::correctSource
                 for (unsigned illp = 0; illp < chi.size(); illp++)
                 {
                     Complex Aijkl = couplingMatrixElement(ill, illp, i, j, k, l);
-                    Complex & rhs = chi[ill ][pi * p.yspline_inner.Nspline() + pj];
-                    Complex   own = p.z[illp][pk * p.yspline_inner.Nspline() + pl];
-                    Complex   nbr = n.z[illp][nk * n.yspline_inner.Nspline() + nl];
                     
-                    // update the field source with the neighbour field (use only incoming component)
-                    if (tgtInQ and srcInR and nP)
-                        rhs -= Aijkl * (nbr - own);
-                    
-                    // update the field source with the neighbour field (already just the incoming component)
-                    if (tgtInR and srcInQ and nR)
-                        rhs += Aijkl * nbr;
+                    // for all initial states (right-hand sides)
+                    for (int ini = 0; ini < Nini_; ini++)
+                    {
+                        std::size_t offset  = chi[ill ].size() * ini / Nini_;
+                        std::size_t poffset = p.z[illp].size() * ini / Nini_;
+                        std::size_t noffset = n.z[illp].size() * ini / Nini_;
+                        
+                        Complex & rhs = chi[ill ][pi * p.yspline_inner.Nspline() + pj + offset];
+                        Complex   own = p.z[illp][pk * p.yspline_inner.Nspline() + pl + poffset];
+                        Complex   nbr = n.z[illp][nk * n.yspline_inner.Nspline() + nl + noffset];
+                        
+                        // update the field source with the neighbour field (use only incoming component)
+                        if (tgtInQ and srcInR and nP)
+                            rhs -= Aijkl * (nbr - own);
+                        
+                        // update the field source with the neighbour field (already just the incoming component)
+                        if (tgtInR and srcInQ and nR)
+                            rhs += Aijkl * nbr;
+                    }
                 }
             }
         }
@@ -611,7 +624,7 @@ void DOMPreconditioner::splitResidual (cBlockArray const & r, std::vector<PanelS
         std::size_t Npxspline = p.xspline_inner.Nspline();
         std::size_t Npyspline = p.yspline_inner.Nspline();
         
-        p.r[ill].resize(Npxspline * Npyspline);
+        p.r[ill].resize(Npxspline * Npyspline * Nini_);
         p.r[ill].fill(0.);
         
         // for all elements of the residual
@@ -627,7 +640,11 @@ void DOMPreconditioner::splitResidual (cBlockArray const & r, std::vector<PanelS
                 continue;
             
             // copy the element to the panel residual
-            p.r[ill][pxspline * Npyspline + pyspline] = r[ill][ixspline * Nfyspline + iyspline];
+            for (int ini = 0; ini < Nini_; ini++)
+            {
+                p.r[ill][(ini * Npxspline + pxspline) * Npyspline + pyspline]
+                    = r[ill][(ini * Nfxspline + ixspline) * Nfyspline + iyspline];
+            }
         }
         
 #ifdef DOM_DEBUG
@@ -667,7 +684,9 @@ void DOMPreconditioner::collectSolution (cBlockArray & z, std::vector<PanelSolut
         {
             PanelSolution & p = panels[ixpanel * cmd_->dom_y_panels + iypanel];
             
+            std::size_t Nfxspline = rad_inner().bspline_x().Nspline();
             std::size_t Nfyspline = rad_inner().bspline_y().Nspline();
+            std::size_t Npxspline = p.xspline_inner.Nspline();
             std::size_t Npyspline = p.yspline_inner.Nspline();
             
             // for all elements of the panel solution
@@ -679,7 +698,11 @@ void DOMPreconditioner::collectSolution (cBlockArray & z, std::vector<PanelSolut
                 int iyspline = pyspline + p.yoffset;
                 
                 // update collected solution
-                z[ill][ixspline * Nfyspline + iyspline] = p.z[ill][pxspline * Npyspline + pyspline];
+                for (int ini = 0; ini < Nini_; ini++)
+                {
+                    z[ill][(ini * Nfxspline + ixspline) * Nfyspline + iyspline]
+                        = p.z[ill][(ini * Npxspline + pxspline) * Npyspline + pyspline];
+                }
             }
         }
         
@@ -719,7 +742,7 @@ DOMPreconditioner::PanelSolution::PanelSolution
     rArray cyspline1_inner, rArray ryspline_inner, rArray cyspline2_inner,
     rArray cxspline1_full,  rArray rxspline_full,  rArray cxspline2_full,
     rArray cyspline1_full,  rArray ryspline_full,  rArray cyspline2_full,
-    int Nang
+    int Nang, int Nini
 ) : xspline_inner (order, theta, cxspline1_inner, rxspline_inner, cxspline2_inner),
     yspline_inner (order, theta, cyspline1_inner, ryspline_inner, cyspline2_inner),
     xspline_full (order, theta, cxspline1_full, rxspline_full, cxspline2_full),
@@ -727,8 +750,8 @@ DOMPreconditioner::PanelSolution::PanelSolution
     r (Nang), z (Nang), ixpanel(ix), iypanel(iy)
 {
     // allocate memory for residual and solution
-    for (int i = 0; i < Nang; i++) r[i].resize(xspline_inner.Nspline() * yspline_inner.Nspline());
-    for (int i = 0; i < Nang; i++) z[i].resize(xspline_inner.Nspline() * yspline_inner.Nspline());
+    for (int i = 0; i < Nang; i++) r[i].resize(xspline_inner.Nspline() * yspline_inner.Nspline() * Nini);
+    for (int i = 0; i < Nang; i++) z[i].resize(xspline_inner.Nspline() * yspline_inner.Nspline() * Nini);
     
     // calculate panel-to-full real basis offset
     xoffset = xspline.knot(xspline_inner.R1()) - xspline_inner.iR1();

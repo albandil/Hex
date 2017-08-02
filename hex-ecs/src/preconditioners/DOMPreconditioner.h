@@ -145,7 +145,7 @@ class DOMPreconditioner : public NoPreconditioner
                     rArray cyspline1_inner, rArray ryspline_inner, rArray cyspline2_inner,
                     rArray cxspline1_full,  rArray rxspline_full,  rArray cxspline2_full,
                     rArray cyspline1_full,  rArray ryspline_full,  rArray cyspline2_full,
-                    int Nang
+                    int Nang, int Nini
                 );
                 
                 Bspline xspline_inner;  // inner x-axis B-spline basis
@@ -209,6 +209,9 @@ class DOMPreconditioner : public NoPreconditioner
         
         // gap of real knots between the panel seam and the complex absorption layer
         int gap_;
+        
+        // number of initial states (right-hand sides)
+        mutable int Nini_;
 };
 
 // --------------------------------------------------------------------------------- //
