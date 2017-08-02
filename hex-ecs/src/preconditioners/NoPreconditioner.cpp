@@ -340,7 +340,7 @@ void NoPreconditioner::setup ()
                 Complex Eb = loaded ? 2.0_r * Hl_[i][l].Dl[indices[nr]] : -1.0_r / ((nr + l + 1) * (nr + l + 1));
                 
                 // add all requested channels
-                if (not inp_->inner_only and (Eb.real() <= std::max(inp_->channel_max_E, inp_->max_Etot)))
+                if (Eb.real() <= std::max(inp_->channel_max_E, inp_->max_Etot))
                 {
                     if (loaded)
                     {
@@ -359,11 +359,19 @@ void NoPreconditioner::setup ()
                             Sp_[i][l].back() = -Sp_[i][l].back();
                         }
                     }
+                    else if (Eb.real() >= 0)
+                    {
+                        // This is a positive-energy pseudo-bound state, but as we are supposed to use only
+                        // analytic eigenstates, there is no way how to get it. So we will terminate here and
+                        // consider no more scattering channels.
+                        
+                        break;
+                    }
                     else
                     {
                         // Evaluate the analytic formula for the bound state. This is useful for inner-region-only calculation,
                         // where only the initial and final states need to be calculated, and for channel-reduced calculation
-                        // sufficiently below zero, where not much states exist. Otherwise this will blow the memory of the
+                        // sufficiently below zero, where not many states exist. Otherwise this will blow the memory of the
                         // computer.
                         
                         Sp_[i][l].push_back(RadialIntegrals::overlapP(rad_inner_->bspline(), rad_inner_->gaussleg(), inp_->Za, nr + l + 1, l));
@@ -379,7 +387,7 @@ void NoPreconditioner::setup ()
             }
             if (Xp_[i][l].size() >= 1)
             {
-                if (verbose_) std::cout << "\t\t- eigenstates used in asymptotic (outer) domain: " << l + 1 << " <= n <= " << l + Xp_[i][l].size() << std::endl;
+                if (verbose_) std::cout << "\t\t- asymptotical scattering channels: " << l + 1 << " <= n <= " << l + Xp_[i][l].size() << std::endl;
             }
             
             // unload the factorization file

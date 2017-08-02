@@ -274,7 +274,7 @@ void Solver::solve ()
             if (cmd_.cont /*or cmd_.refine_solution*/) CG_.recover(); else CG_.reset();
             
             // prepare solution vector
-            BlockArray<Complex> psi (std::move(new_array(ang_.states().size(),"cg-x")));
+            BlockArray<Complex> psi (new_array(ang_.states().size(),"cg-x"));
             
             // load initial guess
             if (not cmd_.cont and ie > 0 and cmd_.carry_initial_guess)

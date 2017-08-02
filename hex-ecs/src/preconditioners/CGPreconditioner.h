@@ -74,7 +74,10 @@ class CGPreconditioner : public NoPreconditioner
                 bspline_panel_x,
                 bspline_panel_y
             ),
-            n_(ang.states().size(), -1) {}
+            n_(ang.states().size(), -1)
+        {
+            // nothing to do
+        }
         
         // description of the preconditioner
         virtual std::string description () const;
@@ -90,7 +93,7 @@ class CGPreconditioner : public NoPreconditioner
         virtual void finish ();
         
         // solve diagonal block
-        int solve_block (int ill, const cArrayView r, cArrayView z) const;
+        virtual int solve_block (int ill, const cArrayView r, cArrayView z) const;
         
         // inner CG driver
         virtual void CG_init (int iblock) const;

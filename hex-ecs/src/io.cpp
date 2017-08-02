@@ -255,6 +255,8 @@ void CommandLine::parse (int argc, char* argv[])
                     "\n"
                     "Coupled preconditioner\n"
                     "\t--coupling-limit                 Maximal multipole to be considered by the coupled preconditioner.\n"
+                    "\t--couple-all                     Couple all angular blocks. (This is the default behaviour.)\n"
+                    "\t--couple-channels                Only couple blocks containing all open (and additional) channels, see --channel-max-E.\n"
                     "\n"
 #ifdef WITH_OPENCL
                     "GPU preconditioner\n"
@@ -506,13 +508,25 @@ void CommandLine::parse (int argc, char* argv[])
                 sub_prec_verbose = true;
                 return true;
             },
-#ifdef WITH_MUMPS
         "coupling-limit", "", 1, [&](std::vector<std::string> const & optargs) -> bool
             {
                 // maximal multipole to be considered by the coupled preconditioner
                 coupling_limit = std::atoi(optargs[0].c_str());
                 return true;
             },
+        "couple-all", "", 0, [&](std::vector<std::string> const & optargs) -> bool
+            {
+                // couple all angular blocks when using coupled preconditioner
+                couple_all = true;
+                return true;
+            },
+        "couple-channels", "", 0, [&](std::vector<std::string> const & optargs) -> bool
+            {
+                // couple only blocks containing open channels when using coupled preconditioner
+                couple_all = false;
+                return true;
+            },
+#ifdef WITH_MUMPS
         "mumps-out-of-core", "", 0, [&](std::vector<std::string> const & optargs) -> bool
             {
                 // MUMPS out of core

@@ -34,11 +34,11 @@
 
 // --------------------------------------------------------------------------------- //
 
-#include "NoPreconditioner.h"
+#include "KPAPreconditioner.h"
 
 // --------------------------------------------------------------------------------- //
 
-class CoupledPreconditioner : public NoPreconditioner
+class CoupledPreconditioner : public virtual KPACGPreconditioner
 {
     public:
         
@@ -59,7 +59,15 @@ class CoupledPreconditioner : public NoPreconditioner
             Bspline const & bspline_full,
             Bspline const & bspline_panel_x,
             Bspline const & bspline_panel_y
-        ) : NoPreconditioner
+        ) : CGPreconditioner
+            (
+                cmd, inp, par, ang,
+                bspline_inner,
+                bspline_full,
+                bspline_panel_x,
+                bspline_panel_y
+            ),
+            KPACGPreconditioner
             (
                 cmd, inp, par, ang,
                 bspline_inner,
@@ -67,15 +75,20 @@ class CoupledPreconditioner : public NoPreconditioner
                 bspline_panel_x,
                 bspline_panel_y
             )
-        {}
+        {
+            // nothing to do
+        }
         
         // preconditioner description
         virtual std::string description () const;
         
         // reuse parent definitions
-        using NoPreconditioner::setup;
-        using NoPreconditioner::rhs;
-        using NoPreconditioner::multiply;
+        using KPACGPreconditioner::setup;
+        using KPACGPreconditioner::rhs;
+        using KPACGPreconditioner::multiply;
+        
+        // override segregated preconditioner routine
+        virtual int solve_block (int ill, const cArrayView r, cArrayView z) const;
         
         // declare own definitions
         virtual void update (Real E);

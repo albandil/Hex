@@ -227,6 +227,7 @@ void CGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArray<C
     
     // preconditioner timing
     std::size_t us_total = us_axby_ + us_mmul_ + us_norm_ + us_prec_ + us_spro_;
+    if (us_total != 0)
     std::cout << " [prec: " << format("%2d", int(us_prec_ * 100. / us_total)) << "%"
               << ", mmul: " << format("%2d", int(us_mmul_ * 100. / us_total)) << "%"
               << ", axby: " << format("%2d", int(us_axby_ * 100. / us_total)) << "%"
