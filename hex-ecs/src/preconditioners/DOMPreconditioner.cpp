@@ -226,7 +226,7 @@ void DOMPreconditioner::solvePanel (int cycle, int cycles, std::vector<PanelSolu
     // Sometimes all we need to do is to mirror panel solutions that have been already found.
     // This is possible only when calculating with exchange enabled, when we have
     // access to all angular symmetries. Of course, both particles must be electrons.
-    /*if (inp_->exchange and inp_->Zp == -1 and cmd_->dom_x_panels == cmd_->dom_y_panels and ipanel > jpanel)
+    if (inp_->exchange and inp_->Zp == -1 and cmd_->dom_x_panels == cmd_->dom_y_panels and ipanel > jpanel)
     {
         PanelSolution * pMirror = &p[jpanel * cmd_->dom_y_panels + ipanel];
         
@@ -257,7 +257,7 @@ void DOMPreconditioner::solvePanel (int cycle, int cycles, std::vector<PanelSolu
         }
         
         return;
-    }*/
+    }
     
     // create the preconditioner object
     PreconditionerBase * prec = PreconditionerBase::Choose
