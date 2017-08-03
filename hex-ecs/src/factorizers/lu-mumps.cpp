@@ -86,7 +86,8 @@ void LUft_MUMPS::factorize (CsrMatrix<LU_int_t,Complex> const & matrix, LUftData
         A.resize(0); A.reserve(nz);
         
         // for all rows
-        for (LU_int_t row = 0, nz = 0; row < n_; row++)
+        nz = 0;
+        for (LU_int_t row = 0; row < n_; row++)
         {
             // for all columns with structurally non-zero entries
             for (LU_int_t idx = matrix.p()[row]; idx < matrix.p()[row + 1]; idx++)
