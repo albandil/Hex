@@ -160,7 +160,7 @@ void CoupledPreconditioner::update (Real E)
     ).tocsr();
     
     // set up factorization data
-    LUftData data;
+    LUftData data = defaultLUftData;
     data.drop_tolerance = cmd_->droptol;
 #ifdef WITH_SUPERLU_DIST
     if (cmd_->factorizer == "superlu_dist")
