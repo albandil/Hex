@@ -272,7 +272,7 @@ double cs_difference (std::vector<double> const & A, std::vector<double> const &
     for (std::size_t i = 0; i < A.size(); i++)
     if (std::min(A[i],B[i]) > cs_threshold * 0.5 * (sumA + sumB))
     {
-        std::cout << std::setw(15) << std::left << headers[i];
+        std::cout << std::setw(15) << std::left << (i < headers.size() ? headers[i] : "");
     }
     std::cout << std::endl;
 
