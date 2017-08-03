@@ -60,8 +60,8 @@ RadialIntegrals::RadialIntegrals
 )
   : bspline_x_(bspline_x),
     bspline_y_(bspline_y),
-    rxmin_(bspline_x.R1()),
-    rymin_(bspline_y.R1()),
+    rxmin_(bspline_x.Rmin() >= 0 ? bspline_x.Rmin() : 1.0_r),
+    rymin_(bspline_y.Rmin() >= 0 ? bspline_y.Rmin() : 1.0_r),
     rxmax_(bspline_x.R2()),
     rymax_(bspline_y.R2()),
     D_x_  (bspline_x.Nspline(), bspline_x.order() + 1),
