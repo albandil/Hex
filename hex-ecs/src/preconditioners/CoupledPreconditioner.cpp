@@ -51,8 +51,30 @@ void CoupledPreconditioner::update (Real E)
     
     KPACGPreconditioner::update(E);
     
-    // number of angular blocks
+    // shorthands
+    LU_int_t order = inp_->order;
     LU_int_t Nang = ang_->states().size();
+    
+    // B-spline bases
+    Bspline const & bspline_full  = rad_full_ ->bspline();
+    Bspline const & bspline_inner = rad_inner_->bspline();
+    Bspline const & bspline_x     = rad_panel_->bspline_x();
+    Bspline const & bspline_y     = rad_panel_->bspline_y();
+    
+    // global basis
+    int Nspline_full  = bspline_full.Nspline();
+    int Nspline_inner = bspline_inner.Nspline();
+    int Nspline_outer = Nspline_full - Nspline_inner;
+    
+    // panel x basis
+    int Nspline_x_full  = bspline_x.Nspline();
+    int Nspline_x_inner = bspline_x.hash() == bspline_full.hash() ? bspline_inner.Nspline() : bspline_x.Nspline();
+    int Nspline_x_outer = Nspline_x_full - Nspline_x_inner;
+    
+    // panel y basis
+    int Nspline_y_full  = bspline_y.Nspline();
+    int Nspline_y_inner = bspline_y.hash() == bspline_full.hash() ? bspline_inner.Nspline() : bspline_y.Nspline();
+    int Nspline_y_outer = Nspline_y_full - Nspline_y_inner;
     
     // concatenate matrix blocks as a COO matrix
     NumberArray<LU_int_t> I, J;
@@ -61,6 +83,28 @@ void CoupledPreconditioner::update (Real E)
     // calculate full matrix rank
     std::size_t N = 0;
     for (std::size_t n : block_rank_) N += n;
+    
+    // calculate approximate number of non-zero elements and pre-allocate memory
+    std::size_t NZ = 0;
+    for (LU_int_t ill  = 0; ill  < Nang; ill ++)
+    for (LU_int_t illp = 0; illp < Nang; illp++)
+    {
+        // number of asymptotic bound channels
+        int Nchan1 = Nchan_[ill].first;     // # r1 -> inf, l2 bound
+        int Nchan2 = Nchan_[ill].second;    // # r2 -> inf, l1 bound
+        int Nchan1p = Nchan_[illp].first;   // # r1 -> inf, l2p bound
+        int Nchan2p = Nchan_[illp].second;  // # r2 -> inf, l1p bound
+        
+        // update non-zero count (NOTE: Needs checking.)
+        NZ += Nspline_x_inner * Nspline_y_inner * (2*order + 1) * (2*order + 1);    // A-block
+        NZ += Nchan1 * Nchan1p * Nspline_x_outer * (2*order + 1);                   // B1-blocks
+        NZ += Nchan2 * Nchan2p * Nspline_y_outer * (2*order + 1);                   // B2-blocks
+        NZ += Nchan1 * (2*order + 1) * (2*order + 1) * Nspline_outer;               // Cu-blocks
+        NZ += Nchan2 * (2*order + 1) * (2*order + 1) * Nspline_outer;               // Cu-blocks
+    }
+    I.reserve(NZ);
+    J.reserve(NZ);
+    V.reserve(NZ);
     
     std::vector<std::pair<int,int>> segregated;
     std::cout << "\tAssemble full matrix of the system ... " << std::flush;
