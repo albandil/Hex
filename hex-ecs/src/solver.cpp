@@ -238,29 +238,53 @@ void Solver::solve ()
             ang_.S() = Spin;
             instates_ = cmd_.multi_rhs ? work[Spin] : iArray{instate};
             
+            // prepare solution vector
+            BlockArray<Complex> psi (new_array(ang_.states().size(),"cg-x"));
+            
             // create right hand side
             BlockArray<Complex> chi (ang_.states().size(), !cmd_.outofcore, "cg-b");
             if (not cmd_.cont)
             {
-                for (int i : instates_)
+                // right-hand side for a single initial state
+                cBlockArray chiseg (chi.size());
+                
+                // reset right-hand side
+                for (unsigned ill = 0; ill < ang_.states().size(); ill++)
+                {
+                    if (not psi.inmemory()) { psi.hdfload(ill); }
+                    
+                    chi[ill].resize(psi[ill].size());
+                    
+                    if (not psi.inmemory()) { psi[ill].drop(); }
+                    if (not chi.inmemory()) { chi.hdfsave(ill); chi[ill].drop(); }
+                }
+                
+                // calculate right-hand sides
+                for (unsigned i = 0; i < instates_.size(); i++)
                 {
                     std::cout << "\tCreate right-hand side for initial state";
                     std::cout << " " << Hydrogen::stateName
                     (
-                        std::get<0>(inp_.instates[i]),
-                        std::get<1>(inp_.instates[i]),
-                        std::get<2>(inp_.instates[i])
+                        std::get<0>(inp_.instates[instates_[i]]),
+                        std::get<1>(inp_.instates[instates_[i]]),
+                        std::get<2>(inp_.instates[instates_[i]])
                     );
                     std::cout << " and total spin S = " << Spin << " ... " << std::flush;
                     
                     // use the preconditioner setup routine
                     Timer t;
-                    cBlockArray chiseg (chi.size());
-                    prec_->rhs(chiseg, ie, i);
+                    prec_->rhs(chiseg, ie, instates_[i]);
                     for (unsigned ill = 0; ill < chi.size(); ill++)
                     {
-                        if (not chi.inmemory()) chi.hdfload(ill);
-                        chi[ill].append(chiseg[ill]);
+                        if (not chi.inmemory()) { chi.hdfload(ill); }
+                        
+                        cArrayView
+                        (
+                            chi[ill],
+                            chi[ill].size() * i / instates_.size(),
+                            chi[ill].size()     / instates_.size()
+                        ) = chiseg[ill];
+                        
                         if (not chi.inmemory()) { chi.hdfsave(ill); chi[ill].drop(); }
                     }
                     std::cout << "done after " << t.nice_time() << std::endl;
@@ -286,9 +310,6 @@ void Solver::solve ()
             
             // load / reset solver state
             if (cmd_.cont /*or cmd_.refine_solution*/) CG_.recover(); else CG_.reset();
-            
-            // prepare solution vector
-            BlockArray<Complex> psi (new_array(ang_.states().size(),"cg-x"));
             
             // load initial guess
             /*if (not cmd_.cont and ie > 0 and cmd_.carry_initial_guess)
