@@ -110,8 +110,7 @@ void CoupledPreconditioner::update (Real E)
     std::cout << "\tAssemble full matrix of the system ... " << std::flush;
     Timer timer;
     
-    if (par_->IamMaster())
-    for (LU_int_t ill  = 0, offset  = 0; ill  < Nang; offset  += block_rank_[ill ++])
+    for (LU_int_t ill  = 0, offset  = 0; ill  < Nang; offset  += block_rank_[ill ++]) if (ill % par_->groupsize() == par_->igroupproc())
     for (LU_int_t illp = 0, offsetp = 0; illp < Nang; offsetp += block_rank_[illp++])
     {
         int l1 = ang_->states()[ill].first;
@@ -173,7 +172,7 @@ void CoupledPreconditioner::update (Real E)
     {
         data.out_of_core = cmd_->mumps_outofcore;
         data.verbosity = cmd_->mumps_verbose;
-        data.centralized_matrix = true;
+        data.centralized_matrix = false;
     #ifdef WITH_MPI
         #ifdef _WIN32
         data.fortran_comm = MPI_Comm_c2f((MPI_Fint)(std::intptr_t) par_->groupcomm());
