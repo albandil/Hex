@@ -15,5 +15,6 @@ mpiexec \
         --shared-scratch \
         --input example.inp \
         --preconditioner coupled \
+        --lightweight-full \
         --lu mumps \
     | tee -a log
