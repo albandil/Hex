@@ -405,40 +405,32 @@ void CGPreconditioner::CG_axby_operation (Complex a, cArrayView x, Complex b, co
     
     assert(x.size() == y.size());
     
-    for (std::size_t i = 0; i < x.size(); i++)
-        x[i] = a * x[i] + b * y[i];
+    // number of elements each node should process (rounded up)
+    std::size_t N = (x.size() + par_->groupsize() - 1) / par_->groupsize();
     
-/*
- * FIXME : Why is this SOOOO SLOOOOOW ?
- * 
-
-    // calculate number of elements each node should process
-    std::size_t N = (x.size() + par_.groupsize() - 1) / par_.groupsize();
+    // beginning and end of the segment to be processed by this group member
+    std::size_t begin = par_->igroupproc() * N;
+    std::size_t end = std::min(x.size(), (par_->igroupproc() + 1) * N);
     
-    // calculate linear combination
-    for (std::size_t i = par_.igroupproc() * N; i < (par_.igroupproc() + 1) * N and i < x.size(); i++)
+    // calculate the linear combination
+    for (std::size_t i = begin; i < end; i++)
         x[i] = a * x[i] + b * y[i];
     
     // synchronize the segments
-    for (int inode = 0; inode < par_.groupsize(); inode++)
+    for (int inode = 0; inode < par_->groupsize(); inode++)
     {
-        // calculate 'begin' and 'end' of inode's data
-        std::size_t begin = inode * N;
-        std::size_t end = std::min(x.size(), (inode + 1) * N);
+        begin = inode * N;
+        end = std::min(x.size(), (inode + 1) * N);
         
-        // broadcast the data
-        par_.bcast_g
+        // broadcast the data to all members of the group
+        par_->bcast_g
         (
-            par_.igroup(),          // broadcast within this node's group
-            inode,                  // use inode's data
+            par_->igroup(),         // broadcast within this node's group
+            inode,                  // owners rank within the group
             &x[0] + begin,          // data pointer
             end - begin             // number of elements to synchronize
         );
     }
-
- *
- *
- */
 }
 
 void CGPreconditioner::CG_constrain (cArrayView r) const
