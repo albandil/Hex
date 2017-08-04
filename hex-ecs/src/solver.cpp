@@ -468,11 +468,11 @@ Complex Solver::scalar_product_ (BlockArray<Complex> const & x, BlockArray<Compl
         if (not y.inmemory()) const_cast<BlockArray<Complex>&>(y)[i].drop();
     }
     
-    // colect products from other nodes
+    // collect products from other nodes
     par_.syncsum(&prod, 1);
     
     // return global scalar product
-    return prod / Real(cmd_.groupsize);
+    return prod;
 }
 
 Real Solver::compute_norm_ (BlockArray<Complex> const & r) const
@@ -505,7 +505,7 @@ Real Solver::compute_norm_ (BlockArray<Complex> const & r) const
     par_.syncsum(&rnorm2, 1);
     
     // return global norm
-    return std::sqrt(rnorm2 / par_.groupsize());
+    return std::sqrt(rnorm2);
 }
 
 void Solver::axby_operation_ (Complex a, BlockArray<Complex> & x, Complex b, BlockArray<Complex> const & y) const
