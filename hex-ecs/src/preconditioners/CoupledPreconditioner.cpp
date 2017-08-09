@@ -237,6 +237,10 @@ void CoupledPreconditioner::precondition (BlockArray<Complex> const & r, BlockAr
     // number of initial states (right-hand sides) solved at once
     std::size_t Nini = r[0].size() / block_rank_[0];
     
+    // in parallel, only the master process and its fellows from the MPI group have the complete segment r[0]
+    // so to get correct number of right-hand sides we need to let the process broadcast the number;
+    par_->bcast(0, &Nini, 1);
+    
     // total solution size (all blocks, all initial states)
     std::size_t N = 0;
     for (cArray const & a : r) N += a.size();
