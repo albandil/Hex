@@ -55,7 +55,8 @@
 
 NoPreconditioner::NoPreconditioner ()
   : PreconditionerBase(),
-    E_(0), cmd_(nullptr), par_(nullptr), inp_(nullptr), ang_(nullptr),
+    E_(special::constant::Nan), dE_(0),
+    cmd_(nullptr), par_(nullptr), inp_(nullptr), ang_(nullptr),
     rad_inner_(nullptr), rad_full_(nullptr), rad_panel_(nullptr)
 {
     // nothing to do
@@ -72,12 +73,17 @@ NoPreconditioner::NoPreconditioner
     Bspline const & bspline_panel_x,
     Bspline const & bspline_panel_y
 ) : PreconditionerBase(),
-    E_(0), cmd_(&cmd), par_(&par), inp_(&inp), ang_(&ang),
+    E_(special::constant::Nan), dE_(0),
+    cmd_(&cmd), par_(&par), inp_(&inp), ang_(&ang),
     A_blocks_ (ang.states().size() * ang.states().size()),
     B1_blocks_(ang.states().size() * ang.states().size()),
+    B1_blocks_ovl_(ang.states().size() * ang.states().size()),
     B2_blocks_(ang.states().size() * ang.states().size()),
+    B2_blocks_ovl_(ang.states().size() * ang.states().size()),
     Cu_blocks_(ang.states().size() * ang.states().size()),
+    Cu_blocks_ovl_(ang.states().size() * ang.states().size()),
     Cl_blocks_(ang.states().size() * ang.states().size()),
+    Cl_blocks_ovl_(ang.states().size() * ang.states().size()),
     block_rank_(ang.states().size()),
     rad_inner_(new RadialIntegrals(bspline_inner,   bspline_inner,   ang.maxlambda() + 1)),
     rad_full_ (new RadialIntegrals(bspline_full,    bspline_full,    ang.maxlambda() + 1)),
@@ -504,7 +510,7 @@ BlockSymBandMatrix<Complex> NoPreconditioner::calc_A_block (int ill, int illp, b
     return A;
 }
 
-CooMatrix<LU_int_t, Complex> NoPreconditioner::calc_full_block(int ill, int illp) const
+CooMatrix<LU_int_t, Complex> NoPreconditioner::calc_full_block (int ill, int illp) const
 {
     // number of asymptotic channels
     int Nchan1 = Nchan_[ill].first;
@@ -589,6 +595,13 @@ CooMatrix<LU_int_t, Complex> NoPreconditioner::calc_full_block(int ill, int illp
 
 void NoPreconditioner::update (Real E)
 {
+    // update only when not running energy perturbation
+    if (std::isnan(E_) or cmd_->energy_perturbation)
+    {
+        dE_ = E - E_;
+        return;
+    }
+    
     // shorthands
     int order = inp_->order;
     int Nang = ang_->states().size();
@@ -715,19 +728,34 @@ void NoPreconditioner::update (Real E)
             block_rank_[illp]
         );
         
+        // and the same with overlap matrix only
+        Cu_blocks_ovl_[ill * Nang + illp] = CooMatrix<LU_int_t,Complex>
+        (
+            block_rank_[ill],
+            block_rank_[illp]
+        );
+        Cl_blocks_ovl_[ill * Nang + illp] = CooMatrix<LU_int_t,Complex>
+        (
+            block_rank_[ill],
+            block_rank_[illp]
+        );
+        
         // setup stretched inner-outer problem
         if (not inp_->inner_only)
         {
             // outer problem matrix : r2 -> inf, r1 bound
             B2_blocks_[ill * Nang + illp].resize(Nchan2 * Nchan2p);
+            B2_blocks_ovl_[ill * Nang + illp].resize(Nchan2 * Nchan2p);
             for (int m = 0; m < Nchan2; m++)
             for (int n = 0; n < Nchan2p; n++)
             {
                 SymBandMatrix<Complex> subblock (Nspline_y_outer, order + 1);
+                SymBandMatrix<Complex> subblock_ovl (Nspline_y_outer, order + 1);
                 
                 // channel-diagonal contribution
                 if (ill == illp and m == n)
                 {
+                    subblock_ovl += (E_ + 1.0_z / (2.0_z * (l1 + m + 1.0_r) * (l1 + m + 1.0_r))) * S_outer;
                     subblock += (E_ + 1.0_z / (2.0_z * (l1 + m + 1.0_r) * (l1 + m + 1.0_r))) * S_outer
                              - 0.5_z * D_outer
                              - 0.5_z * (l2 * (l2 + 1.0_r)) * Mm2_outer;
@@ -745,18 +773,32 @@ void NoPreconditioner::update (Real E)
                     B2_blocks_[ill * Nang + illp][m * Nchan2p + n].hdfsave();
                     B2_blocks_[ill * Nang + illp][m * Nchan2p + n].drop();
                 }
+                
+                if (cmd_->energy_perturbation)
+                {
+                    B2_blocks_ovl_[ill * Nang + illp][m * Nchan2p + n].hdflink(format("blk-B2o-%d-%d-%d-%d.ooc", ill, illp, m, n));
+                    B2_blocks_ovl_[ill * Nang + illp][m * Nchan2p + n] = std::move(subblock_ovl);
+                    if (cmd_->outofcore)
+                    {
+                        B2_blocks_ovl_[ill * Nang + illp][m * Nchan2p + n].hdfsave();
+                        B2_blocks_ovl_[ill * Nang + illp][m * Nchan2p + n].drop();
+                    }
+                }
             }
             
             // outer problem matrix : r1 -> inf, r2 bound
             B1_blocks_[ill * Nang + illp].resize(Nchan1 * Nchan1p);
+            B1_blocks_ovl_[ill * Nang + illp].resize(Nchan1 * Nchan1p);
             for (int m = 0; m < Nchan1; m++)
             for (int n = 0; n < Nchan1p; n++)
             {
                 SymBandMatrix<Complex> subblock (Nspline_y_outer, order + 1);
+                SymBandMatrix<Complex> subblock_ovl (Nspline_y_outer, order + 1);
                 
                 // channel-diagonal contribution
                 if (ill == illp and m == n)
                 {
+                    subblock_ovl += (E_ + 1.0_z / (2.0_z * (l2 + m + 1.0_r) * (l2 + m + 1.0_r))) * S_outer;
                     subblock += (E_ + 1.0_z / (2.0_z * (l2 + m + 1.0_r) * (l2 + m + 1.0_r))) * S_outer
                              - 0.5_z * D_outer
                              - 0.5_z * (l1 * (l1 + 1.0_r)) * Mm2_outer;
@@ -774,6 +816,17 @@ void NoPreconditioner::update (Real E)
                     B1_blocks_[ill * Nang + illp][m * Nchan1p + n].hdfsave();
                     B1_blocks_[ill * Nang + illp][m * Nchan1p + n].drop();
                 }
+                
+                if (cmd_->energy_perturbation)
+                {
+                    B1_blocks_ovl_[ill * Nang + illp][m * Nchan1p + n].hdflink(format("blk-B1o-%d-%d-%d-%d.ooc", ill, illp, m, n));
+                    B1_blocks_ovl_[ill * Nang + illp][m * Nchan1p + n] = std::move(subblock_ovl);
+                    if (cmd_->outofcore)
+                    {
+                        B1_blocks_ovl_[ill * Nang + illp][m * Nchan1p + n].hdfsave();
+                        B1_blocks_ovl_[ill * Nang + illp][m * Nchan1p + n].drop();
+                    }
+                }
             }
             
             // transition area r2 > r1, upper : psi_kl expressed in terms of F_nl for 'l' out of inner area
@@ -787,9 +840,11 @@ void NoPreconditioner::update (Real E)
                 std::size_t col = A_size + (Nchan1p + n) * Nspline_outer + (l - Nspline_inner);
                 
                 Complex elem = 0; // A_ij,kl Xp_nk
+                Complex elem_ovl = 0;
                 
                 if (ill == illp)
                 {
+                    elem_ovl += E_ * rad_full_->S_x()(i,k) * rad_full_->S_y()(j,l);
                     elem += E_ * rad_full_->S_x()(i,k) * rad_full_->S_y()(j,l)
                          - 0.5_r * rad_full_->D_x()(i,k) * rad_full_->S_y()(j,l)
                          - 0.5_r * rad_full_->S_x()(i,k) * rad_full_->D_y()(j,l)
@@ -809,6 +864,9 @@ void NoPreconditioner::update (Real E)
                 }
                 
                 Cu_blocks_[ill * Nang + illp].add(row, col, Xp_[0][l1p][n][k] * elem);
+                
+                if (cmd_->energy_perturbation)
+                    Cu_blocks_ovl_[ill * Nang + illp].add(row, col, Xp_[0][l1p][n][k] * elem_ovl);
             }
             
             // transition area r1 > r2, upper : psi_kl expressed in terms of F_nk for 'k' out of inner area
@@ -822,9 +880,11 @@ void NoPreconditioner::update (Real E)
                 std::size_t col = A_size + n * Nspline_outer + (k - Nspline_inner);
                 
                 Complex elem = 0; // A_ij,kl Xp_nl
+                Complex elem_ovl = 0;
                 
                 if (ill == illp)
                 {
+                    elem_ovl += E_ * rad_full_->S_x()(i,k) * rad_full_->S_y()(j,l);
                     elem += E_ * rad_full_->S_x()(i,k) * rad_full_->S_y()(j,l)
                          - 0.5_r * rad_full_->D_x()(i,k) * rad_full_->S_y()(j,l)
                          - 0.5_r * rad_full_->S_x()(i,k) * rad_full_->D_y()(j,l)
@@ -844,6 +904,9 @@ void NoPreconditioner::update (Real E)
                 }
                 
                 Cu_blocks_[ill * Nang + illp].add(row, col, Xp_[1][l2p][n][l] * elem);
+                
+                if (cmd_->energy_perturbation)
+                    Cu_blocks_ovl_[ill * Nang + illp].add(row, col, Xp_[1][l2p][n][l] * elem_ovl);
             }
             
             // transition area r2 > r1, lower : F_nl expressed in terms of psi_kl for 'l' out of outer area
@@ -857,9 +920,11 @@ void NoPreconditioner::update (Real E)
                 std::size_t col = k * Nspline_inner + l;
                 
                 Complex elem = 0; // B_mj,nl Sp_nk
+                Complex elem_ovl = 0;
                 
                 if (ill == illp and m == n)
                 {
+                    elem_ovl += (E_ + 0.5_r / ((n + l1 + 1) * (n + l1 + 1))) * rad_full_->S_y()(j,l);
                     elem += (E_ + 0.5_r / ((n + l1 + 1) * (n + l1 + 1))) * rad_full_->S_y()(j,l)
                          - 0.5_r * rad_full_->D_y()(j,l)
                          - 0.5_r * (l2 * (l2 + 1.0_r)) * rad_full_->Mm2_y()(j,l);
@@ -874,6 +939,9 @@ void NoPreconditioner::update (Real E)
                 }
                 
                 Cl_blocks_[ill * Nang + illp].add(row, col, Sp_[0][l1p][n][k] * elem);
+                
+                if (cmd_->energy_perturbation)
+                    Cl_blocks_ovl_[ill * Nang + illp].add(row, col, Sp_[0][l1p][n][k] * elem_ovl);
             }
             
             // transition area r1 > r2, lower : F_nk expressed in terms of psi_kl for 'k' out of outer area
@@ -887,9 +955,11 @@ void NoPreconditioner::update (Real E)
                 std::size_t col = k * Nspline_inner + l;
                 
                 Complex elem = 0; // B_mi,nk Sp_nl
+                Complex elem_ovl = 0;
                 
                 if (ill == illp and m == n)
                 {
+                    elem_ovl += (E_ + 0.5_r / ((n + l2 + 1) * (n + l2 + 1))) * rad_full_->S_x()(i,k);
                     elem += (E_ + 0.5_r / ((n + l2 + 1) * (n + l2 + 1))) * rad_full_->S_x()(i,k)
                          - 0.5_r * rad_full_->D_x()(i,k)
                          - 0.5_r * (l1 * (l1 + 1.0_r)) * rad_full_->Mm2_x()(i,k);
@@ -904,6 +974,9 @@ void NoPreconditioner::update (Real E)
                 }
                 
                 Cl_blocks_[ill * Nang + illp].add(row, col, Sp_[1][l2p][n][l] * elem);
+                
+                if (cmd_->energy_perturbation)
+                    Cl_blocks_ovl_[ill * Nang + illp].add(row, col, Sp_[1][l2p][n][l] * elem_ovl);
             }
         }
     }
@@ -1604,8 +1677,8 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
         par_->syncsum_g(q[ill].data(), q[ill].size());
         
         // constrain
-        if (const CGPreconditioner * cgprec = dynamic_cast<const CGPreconditioner*>(this))
-            cgprec->CG_constrain(q[ill]);
+//         if (const CGPreconditioner * cgprec = dynamic_cast<const CGPreconditioner*>(this))
+//             cgprec->CG_constrain(q[ill]);
         
         // release memory
         if (cmd_->outofcore)

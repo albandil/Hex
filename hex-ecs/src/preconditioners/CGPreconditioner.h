@@ -105,7 +105,7 @@ class CGPreconditioner : public NoPreconditioner
         virtual Real CG_compute_norm (const cArrayView a) const;
         virtual Complex CG_scalar_product (const cArrayView a, const cArrayView b) const;
         virtual void CG_axby_operation (Complex a, cArrayView x, Complex b, const cArrayView y) const;
-        virtual void CG_constrain (cArrayView r) const;
+        virtual void CG_constrain (int ill, const cArrayView x, cArrayView r) const;
     
     protected:
         

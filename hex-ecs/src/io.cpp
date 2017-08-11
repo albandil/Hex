@@ -238,6 +238,7 @@ void CommandLine::parse (int argc, char* argv[])
 #ifndef DISABLE_PARALLEL_PRECONDITION
                     "\t--parallel-precondition          Apply multiple block preconditioners in parallel.\n"
 #endif
+                    "\t--energy-perturbation            Do not update preconditioner for furher energies and instead run iterative refinement with old preconditioner.\n"
                     "\n"
                     "ILU preconditioner\n"
                     "\t--parallel-factorization         Factorize multiple blocks simultaneously.\n"
@@ -762,6 +763,12 @@ void CommandLine::parse (int argc, char* argv[])
             {
                 // solve for multiple initial states at once
                 multi_rhs = true;
+                return true;
+            },
+        "energy-perturbation", "", 0, [&](std::vector<std::string> const & optargs) -> bool
+            {
+                // energy perturbation (iterative refinement)
+                energy_perturbation = true;
                 return true;
             },
         

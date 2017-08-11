@@ -53,7 +53,7 @@ template <class TArrayView> void default_process_solution (unsigned iteration, c
 /**
  * @brief Constrain the residual vector.
  */
-template <class TArrayView> void default_constraint (TArrayView r)
+template <class TArrayView> void default_constraint (const TArrayView x, TArrayView r)
 {
     // no constraint by default
 }
@@ -193,7 +193,7 @@ class ConjugateGradients
         std::function<T (TArrayView, TArrayView)> scalar_product;
         std::function<void (T, const TArrayView, T, TArrayView)> axby;
         std::function<TArray (std::size_t,std::string)> new_array;
-        std::function<void (TArrayView)> constrain;
+        std::function<void (const TArrayView, TArrayView)> constrain;
         std::function<void (unsigned, const TArrayView)> process_solution;
         
         unsigned solve
@@ -229,7 +229,7 @@ class ConjugateGradients
                 matrix_multiply(x, r); // r = A x
                 axby(-1., r, 1., b); // r = b - r
             }
-            constrain(r);
+//             constrain(r);
             rnorm = compute_norm(r);
             recovered = false;
             
@@ -246,7 +246,7 @@ class ConjugateGradients
             {
                 axby(0., x, 0., b); // x = 0 b
                 axby(0., r, 1., b); // r = b
-                constrain(r);
+//                 constrain(r);
             }
             
             // some auxiliary arrays (search directions etc.)
@@ -308,7 +308,7 @@ class ConjugateGradients
                 axby(1., x, alpha, p); // x = x + α p
                 axby(1., r, -alpha, z); // r = r - α z
                 process_solution(k, x);
-                constrain(r);
+                constrain(x, r);
                 
                 // compute and check norm
                 rnorm = compute_norm(r);

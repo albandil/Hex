@@ -226,9 +226,8 @@ void Solver::solve ()
             continue;
         }
         
-        // update the preconditioner, if this is the first energy to compute or it changed from previous iteration
-        if (not (E_ == 0.5 * inp_.Etot[ie]))
-            prec_->update(E_ = 0.5 * inp_.Etot[ie]);
+        // update the preconditioner
+        prec_->update(E_ = 0.5 * inp_.Etot[ie]);
         
         // for all initial states
         for (int Spin : inp_.Spin)

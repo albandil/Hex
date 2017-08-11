@@ -100,9 +100,6 @@ class Solver
         // CG optional write current solution
         void process_solution_ (unsigned iteration, BlockArray<Complex> const & x) const;
         
-        // concatenate previous-panel full solution and new single-panel solution
-        void concatenate_panels_ (cArray & psi, cArray const & psip) const;
-        
     private:
         
         /// Command line parameters.

@@ -119,9 +119,9 @@ int CGPreconditioner::solve_block (int ill, const cArrayView r, cArrayView z) co
                               {
                                   return cArray(n);
                               };
-    CG.constrain            = [&](cArrayView r)
+    CG.constrain            = [&](const cArrayView x, cArrayView r)
                               {
-                                  this->CG_constrain(r);
+                                  this->CG_constrain(ill, x, r);
                               };
     int n = CG.solve(r, z, cmd_->prec_itertol, 0, max_iterations);
     
@@ -433,9 +433,68 @@ void CGPreconditioner::CG_axby_operation (Complex a, cArrayView x, Complex b, co
     }
 }
 
-void CGPreconditioner::CG_constrain (cArrayView r) const
+void CGPreconditioner::CG_constrain (int iblock, const cArrayView x, cArrayView r) const
 {
-    // leave the resudual as it is
+    // must update residual in case of energy perturbation
+    if (cmd_->energy_perturbation and dE_ != 0)
+    {
+        std::size_t Nspline_full_x  = rad_panel_->bspline_x().Nspline();
+        std::size_t Nspline_inner_x = rad_panel_->bspline_x().hash() == rad_full_->bspline().hash() ? rad_inner_->bspline().Nspline() : rad_panel_->bspline_x().Nspline();
+        std::size_t Nspline_outer_x = Nspline_full_x - Nspline_inner_x;
+        
+        std::size_t Nspline_full_y  = rad_panel_->bspline_y().Nspline();
+        std::size_t Nspline_inner_y = rad_panel_->bspline_y().hash() == rad_full_->bspline().hash() ? rad_inner_->bspline().Nspline() : rad_panel_->bspline_y().Nspline();
+        std::size_t Nspline_outer_y = Nspline_full_y - Nspline_inner_y;
+        
+        std::size_t Nini = x.size() / block_rank_[iblock];
+        std::size_t Nang = ang_->states().size();
+        std::size_t iang = iblock * Nang + iblock;
+        
+        for (std::size_t ini = 0; ini < Nini; ini++)
+        {
+            std::size_t offset = block_rank_[iblock] * ini;
+            
+            cArrayView x_inner (x, offset, Nspline_inner_x * Nspline_inner_y);
+            cArrayView r_inner (r, offset, Nspline_inner_x * Nspline_inner_y);
+            
+            kron_dot(1., r_inner, dE_, x_inner, rad_panel_->S_x(), rad_panel_->S_y(), Nspline_inner_x, Nspline_inner_y);
+            
+            if (not inp_->inner_only)
+            {
+                std::size_t Nchan1 = Nchan_[iblock].first;
+                std::size_t Nchan2 = Nchan_[iblock].second;
+                
+                # pragma omp parallel for if (!cmd_->parallel_precondition)
+                for (std::size_t m = 0; m < Nchan1; m++)
+                for (std::size_t n = 0; n < Nchan1; n++)
+                {
+                    if (cmd_->outofcore) const_cast<SymBandMatrix<Complex>&>(B1_blocks_ovl_[iang][m * Nchan1 + n]).hdfload();
+                    B1_blocks_ovl_[iang][m * Nchan1 + n].dot
+                    (
+                        1.0_r, cArrayView(x, offset + Nspline_inner_x * Nspline_inner_y + n * Nspline_outer_x, Nspline_outer_x),
+                        1.0_r, cArrayView(r, offset + Nspline_inner_x * Nspline_inner_y + m * Nspline_outer_x, Nspline_outer_x)
+                    );
+                    if (cmd_->outofcore) const_cast<SymBandMatrix<Complex>&>(B1_blocks_ovl_[iang][m * Nchan1 + n]).drop();
+                }
+                
+                # pragma omp parallel for if (!cmd_->parallel_precondition)
+                for (std::size_t m = 0; m < Nchan2; m++)
+                for (std::size_t n = 0; n < Nchan2; n++)
+                {
+                    if (cmd_->outofcore) const_cast<SymBandMatrix<Complex>&>(B2_blocks_ovl_[iang][m * Nchan2 + n]).hdfload();
+                    B2_blocks_ovl_[iang][m * Nchan2 + n].dot
+                    (
+                        1.0_r, cArrayView(x, offset + Nspline_inner_x * Nspline_inner_y + (Nchan1 + n) * Nspline_outer_y, Nspline_outer_y),
+                        1.0_r, cArrayView(r, offset + Nspline_inner_x * Nspline_inner_y + (Nchan1 + m) * Nspline_outer_y, Nspline_outer_y)
+                    );
+                    if (cmd_->outofcore) const_cast<SymBandMatrix<Complex>&>(B2_blocks_ovl_[iang][m * Nchan2 + n]).drop();
+                }
+                
+                Cu_blocks_ovl_[iang].dot(1.0_r, cArrayView(x, offset, block_rank_[iblock]), 1.0_r, cArrayView(r, offset, block_rank_[iblock]));
+                Cl_blocks_ovl_[iang].dot(1.0_r, cArrayView(x, offset, block_rank_[iblock]), 1.0_r, cArrayView(r, offset, block_rank_[iblock]));
+            }
+        }
+    }
 }
 
 // --------------------------------------------------------------------------------- //

@@ -101,8 +101,8 @@ class NoPreconditioner : public PreconditionerBase
         
     protected:
         
-        // energy
-        Real E_;
+        // energy and energy perturbation
+        Real E_, dE_;
         
         // command line switches
         CommandLine const * cmd_;
@@ -141,10 +141,10 @@ class NoPreconditioner : public PreconditionerBase
         //       condition is applied only on the closed channels.
         // The blocks marked with zero never contain non-zero elements.
         std::vector<BlockSymBandMatrix<Complex>> A_blocks_;
-        std::vector<std::vector<SymBandMatrix<Complex>>> B1_blocks_;
-        std::vector<std::vector<SymBandMatrix<Complex>>> B2_blocks_;
-        std::vector<CooMatrix<LU_int_t,Complex>> Cu_blocks_;
-        std::vector<CooMatrix<LU_int_t,Complex>> Cl_blocks_;
+        std::vector<std::vector<SymBandMatrix<Complex>>> B1_blocks_, B1_blocks_ovl_;
+        std::vector<std::vector<SymBandMatrix<Complex>>> B2_blocks_, B2_blocks_ovl_;
+        std::vector<CooMatrix<LU_int_t,Complex>> Cu_blocks_, Cu_blocks_ovl_;
+        std::vector<CooMatrix<LU_int_t,Complex>> Cl_blocks_, Cl_blocks_ovl_;
         std::vector<BlockSymBandMatrix<Complex>> E_blocks_;
         std::vector<CooMatrix<LU_int_t,Complex>> Fu_blocks_;
         std::vector<CooMatrix<LU_int_t,Complex>> Fl_blocks_;
