@@ -135,7 +135,7 @@ void ILUCGPreconditioner::setup ()
 void ILUCGPreconditioner::update (Real E)
 {
     // reset data on energy change
-    if (E != E_ and not cmd_->noluupdate)
+    if (std::isnan(E_) or (E != E_ and not cmd_->noluupdate))
     {
         // release outdated LU factorizations
         reset_lu();

@@ -457,7 +457,7 @@ void CGPreconditioner::CG_constrain (int iblock, const cArrayView x, cArrayView 
             cArrayView x_inner (x, offset, Nspline_inner_x * Nspline_inner_y);
             cArrayView r_inner (r, offset, Nspline_inner_x * Nspline_inner_y);
             
-            kron_dot(1., r_inner, dE_, x_inner, rad_panel_->S_x(), rad_panel_->S_y(), Nspline_inner_x, Nspline_inner_y);
+            kron_dot(1., r_inner, -dE_, x_inner, rad_panel_->S_x(), rad_panel_->S_y(), Nspline_inner_x, Nspline_inner_y);
             
             if (not inp_->inner_only)
             {
@@ -471,7 +471,7 @@ void CGPreconditioner::CG_constrain (int iblock, const cArrayView x, cArrayView 
                     if (cmd_->outofcore) const_cast<SymBandMatrix<Complex>&>(B1_blocks_ovl_[iang][m * Nchan1 + n]).hdfload();
                     B1_blocks_ovl_[iang][m * Nchan1 + n].dot
                     (
-                        1.0_r, cArrayView(x, offset + Nspline_inner_x * Nspline_inner_y + n * Nspline_outer_x, Nspline_outer_x),
+                        - dE_, cArrayView(x, offset + Nspline_inner_x * Nspline_inner_y + n * Nspline_outer_x, Nspline_outer_x),
                         1.0_r, cArrayView(r, offset + Nspline_inner_x * Nspline_inner_y + m * Nspline_outer_x, Nspline_outer_x)
                     );
                     if (cmd_->outofcore) const_cast<SymBandMatrix<Complex>&>(B1_blocks_ovl_[iang][m * Nchan1 + n]).drop();
@@ -484,14 +484,14 @@ void CGPreconditioner::CG_constrain (int iblock, const cArrayView x, cArrayView 
                     if (cmd_->outofcore) const_cast<SymBandMatrix<Complex>&>(B2_blocks_ovl_[iang][m * Nchan2 + n]).hdfload();
                     B2_blocks_ovl_[iang][m * Nchan2 + n].dot
                     (
-                        1.0_r, cArrayView(x, offset + Nspline_inner_x * Nspline_inner_y + (Nchan1 + n) * Nspline_outer_y, Nspline_outer_y),
+                        - dE_, cArrayView(x, offset + Nspline_inner_x * Nspline_inner_y + (Nchan1 + n) * Nspline_outer_y, Nspline_outer_y),
                         1.0_r, cArrayView(r, offset + Nspline_inner_x * Nspline_inner_y + (Nchan1 + m) * Nspline_outer_y, Nspline_outer_y)
                     );
                     if (cmd_->outofcore) const_cast<SymBandMatrix<Complex>&>(B2_blocks_ovl_[iang][m * Nchan2 + n]).drop();
                 }
                 
-                Cu_blocks_ovl_[iang].dot(1.0_r, cArrayView(x, offset, block_rank_[iblock]), 1.0_r, cArrayView(r, offset, block_rank_[iblock]));
-                Cl_blocks_ovl_[iang].dot(1.0_r, cArrayView(x, offset, block_rank_[iblock]), 1.0_r, cArrayView(r, offset, block_rank_[iblock]));
+                Cu_blocks_ovl_[iang].dot(-dE_, cArrayView(x, offset, block_rank_[iblock]), 1.0_r, cArrayView(r, offset, block_rank_[iblock]));
+                Cl_blocks_ovl_[iang].dot(-dE_, cArrayView(x, offset, block_rank_[iblock]), 1.0_r, cArrayView(r, offset, block_rank_[iblock]));
             }
         }
     }

@@ -769,6 +769,7 @@ void CommandLine::parse (int argc, char* argv[])
             {
                 // energy perturbation (iterative refinement)
                 energy_perturbation = true;
+                noluupdate = true;
                 return true;
             },
         

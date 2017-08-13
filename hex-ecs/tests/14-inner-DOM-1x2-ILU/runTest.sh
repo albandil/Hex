@@ -10,5 +10,6 @@ hex-ecs \
     --dom-xpanels 1 \
     --dom-ypanels 2 \
     --dom-preconditioner ILU \
-    --tolerance 0.1 \
+    --dom-sweeps 6 \
+    --tolerance 1e-6 \
     | tee -a log

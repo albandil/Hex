@@ -595,6 +595,12 @@ CooMatrix<LU_int_t, Complex> NoPreconditioner::calc_full_block (int ill, int ill
 
 void NoPreconditioner::update (Real E)
 {
+    // skip update if nothing changed
+    if (E == E_)
+    {
+        return;
+    }
+    
     // update only when not running energy perturbation
     if (not std::isnan(E_) and cmd_->energy_perturbation)
     {

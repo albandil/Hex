@@ -10,6 +10,7 @@ hex-ecs \
     --dom-xpanels 2 \
     --dom-ypanels 2 \
     --dom-preconditioner KPA \
+    --dom-sweeps 6 \
     --lightweight-full \
-    --tolerance 0.1 \
+    --tolerance 1e-3 \
     | tee -a log
