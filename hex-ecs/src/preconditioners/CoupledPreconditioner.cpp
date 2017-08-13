@@ -51,6 +51,10 @@ void CoupledPreconditioner::update (Real E)
     
     KPACGPreconditioner::update(E);
     
+    // do not update if running in energy-perturbation mode
+    if (lu_ != nullptr and lu_->valid() and cmd_->noluupdate)
+        return;
+    
     // shorthands
     LU_int_t order = inp_->order;
     LU_int_t Nang = ang_->states().size();
