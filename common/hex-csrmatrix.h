@@ -80,6 +80,8 @@ public:
         : m_(A.m_), n_(A.n_), p_(A.p_), i_(A.i_), x_(A.x_), name_() {}
     CsrMatrix (std::size_t m, std::size_t n, const ArrayView<IdxT> p, const ArrayView<IdxT> i, const ArrayView<DataT> x)
         : m_(m), n_(n), p_(p), i_(i), x_(x), name_() {}
+    CsrMatrix (std::size_t m, std::size_t n, NumberArray<IdxT> && p, NumberArray<IdxT> && i, NumberArray<DataT> && x)
+        : m_(m), n_(n), p_(std::move(p)), i_(std::move(i)), x_(std::move(x)), name_() {}
     
     /// Destructor
     ~CsrMatrix () {}
