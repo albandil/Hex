@@ -114,8 +114,9 @@ void CoupledPreconditioner::update (Real E)
     std::cout << "\tAssemble full matrix of the system ... " << std::flush;
     Timer timer;
     
-    for (LU_int_t ill  = 0, offset  = 0; ill  < Nang; offset  += block_rank_[ill ++]) if (ill % par_->groupsize() == par_->igroupproc())
+    for (LU_int_t ill  = 0, offset  = 0; ill  < Nang; offset  += block_rank_[ill ++])
     for (LU_int_t illp = 0, offsetp = 0; illp < Nang; offsetp += block_rank_[illp++])
+    if ((ill * Nang + illp) % par_->groupsize() == par_->igroupproc())
     {
         int l1 = ang_->states()[ill].first;
         int l2 = ang_->states()[ill].second;
