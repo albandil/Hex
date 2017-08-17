@@ -373,6 +373,5 @@ CsrMatrix<LU_int_t,Complex> CooMatrix<LU_int_t,Complex>::tocsr () const
         Ap[m + 1] = pos;
     }
     
-    return CsrMatrix<LU_int_t,Complex> (m_, n_, Ap, Ai, Ax);
+    return CsrMatrix<LU_int_t,Complex> (m_, n_, std::move(Ap), std::move(Ai), std::move(Ax));
 }
-

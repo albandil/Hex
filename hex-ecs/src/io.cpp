@@ -83,7 +83,7 @@ const std::string sample_input =
     "# a) Real knots of the basis that is common to atomic and projectile electron.\n"
     "  L  0.0  0.0   4\n"
     "  G  0.1 10.0  0.1  1.01\n"
-    "  L   11  100  90\n"
+    "  L   11  200  190\n"
     " -1\n"
     "# b) Real knots that are exclusive to the projectile, if any. (Start from zero.)\n"
     " -1\n"
@@ -1093,7 +1093,7 @@ void InputFile::read (std::ifstream & inf)
     
     // check that all energies are allowed by the asymptotic expansion
     max_Etot = -1;
-    if (not inner_only and not Etot.empty())
+    if (not Etot.empty())
     {
         max_Etot = *std::max_element(Etot.begin(), Etot.end());
         
