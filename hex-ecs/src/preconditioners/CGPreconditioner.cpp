@@ -59,8 +59,8 @@ int CGPreconditioner::solve_block (int ill, const cArrayView r, cArrayView z) co
     // prepare the block-preconditioner for run
     this->CG_init(ill);
     
-    // maximal number of nested iterations
-    int max_iterations = cmd_->max_sub_iter > 0 ? cmd_->max_sub_iter : std::size_t(Nspline_inner_x) * std::size_t(Nspline_inner_y);
+    // maximal number of nested iterations, never more than 10 thousand (also prevents the int to overflow)
+    int max_iterations = cmd_->max_sub_iter > 0 ? cmd_->max_sub_iter : std::min<std::size_t>(10000, std::size_t(Nspline_inner_x) * std::size_t(Nspline_inner_y));
     
     // adjust max iterations for ILU-preconditioned blocks
     if (HybCGPreconditioner const * hp = dynamic_cast<HybCGPreconditioner const*>(this))
