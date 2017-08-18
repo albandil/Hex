@@ -153,5 +153,16 @@ cArray HlData::readPseudoState (unsigned l, unsigned ichan) const
     if (not datafile.read("Cl", &data[0], n, indices[ichan] * n))
         HexException("Failed to read the pseudostate l = %d, ichan = %d from the dataset \"Cl\" in file %s.", l, ichan, filename.c_str());
     
+    // Adjust the overall sign of the eigenvector so that the result is compatible with the
+    // sign convention of GSL's function gsl_sf_hydrogenicR (used in previous versions of hex-ecs).
+    // That is, the radial function should increase from origin to positive values, then turn back
+    // and (potentially) dive through zero.
+    
+    if (data.front().real() < 0.0_r)
+    {
+        for (Complex & z : data)
+            z = -z;
+    }
+    
     return data;
 }
