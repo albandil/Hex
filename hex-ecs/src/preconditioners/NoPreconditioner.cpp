@@ -850,12 +850,8 @@ void NoPreconditioner::update (Real E)
             for (int m = 0; m < Nchan2; m++)
             for (int n = 0; n < Nchan2p; n++)
             for (int j = Nspline_inner; j < Nspline_full; j++) // *
-            for (int k = 0; k < Nspline_inner; k++)
             for (int l = j - order; l < Nspline_inner; l++)
             {
-                std::size_t row = A_size + (Nchan1 + m) * Nspline_outer + (j - Nspline_inner);
-                std::size_t col = k * Nspline_inner + l;
-                
                 Complex elem = 0; // B_mj,nl Sp_nk
                 
                 if (ill == illp and m == n)
@@ -873,7 +869,13 @@ void NoPreconditioner::update (Real E)
                     elem += inp_->Zp * ang_->f(ill,illp,lambda) * multipole * rad_full_->Mtr_mLm1_x(lambda)(j,l) * (Xp_[0][l1p][n] | Mtr_L_inner[lambda].dot(Xp_[0][l1][m]));
                 }
                 
-                Cl_blocks_[ill * Nang + illp].add(row, col, Sp_[0][l1p][n][k] * elem);
+                for (int k = 0; k < Nspline_inner; k++)
+                {
+                    std::size_t row = A_size + (Nchan1 + m) * Nspline_outer + (j - Nspline_inner);
+                    std::size_t col = k * Nspline_inner + l;
+                    
+                    Cl_blocks_[ill * Nang + illp].add(row, col, Sp_[0][l1p][n][k] * elem);
+                }
             }
             
             // transition area r1 > r2, lower : F_nk expressed in terms of psi_kl for 'k' out of outer area
@@ -881,11 +883,7 @@ void NoPreconditioner::update (Real E)
             for (int n = 0; n < Nchan1p; n++)
             for (int i = Nspline_inner; i < Nspline_full; i++) // *
             for (int k = i - order; k < Nspline_inner; k++)
-            for (int l = 0; l < Nspline_inner; l++)
             {
-                std::size_t row = A_size + m * Nspline_outer + (i - Nspline_inner);
-                std::size_t col = k * Nspline_inner + l;
-                
                 Complex elem = 0; // B_mi,nk Sp_nl
                 
                 if (ill == illp and m == n)
@@ -903,7 +901,13 @@ void NoPreconditioner::update (Real E)
                     elem += inp_->Zp * ang_->f(ill,illp,lambda) * multipole * rad_full_->Mtr_mLm1_x(lambda)(i,k) * (Xp_[1][l2p][n] | Mtr_L_inner[lambda].dot(Xp_[1][l2][m]));
                 }
                 
-                Cl_blocks_[ill * Nang + illp].add(row, col, Sp_[1][l2p][n][l] * elem);
+                for (int l = 0; l < Nspline_inner; l++)
+                {
+                    std::size_t row = A_size + m * Nspline_outer + (i - Nspline_inner);
+                    std::size_t col = k * Nspline_inner + l;
+                    
+                    Cl_blocks_[ill * Nang + illp].add(row, col, Sp_[1][l2p][n][l] * elem);
+                }
             }
         }
     }
