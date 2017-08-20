@@ -551,6 +551,15 @@ CooMatrix<LU_int_t, Complex> NoPreconditioner::calc_full_block(int ill, int illp
         coo_block += Cu_blocks_[iang];
         coo_block += Cl_blocks_[iang];
         
+        // reserve memory for B-blocks; otherwise the += operation below would perpetually
+        // reallocate the arrays, making the addition of new elements rather slow, especially
+        // for a large number of channels
+        std::size_t addsize = Nchan1 * Nchan1p * Nspline_outer_x * (2*inp_->order + 1)
+                            + Nchan2 * Nchan2p * Nspline_outer_y * (2*inp_->order + 1);
+        const_cast<NumberArray<LU_int_t>&>(coo_block.i()).reserve(coo_block.i().size() + addsize);
+        const_cast<NumberArray<LU_int_t>&>(coo_block.j()).reserve(coo_block.j().size() + addsize);
+        const_cast<NumberArray<Complex>& >(coo_block.v()).reserve(coo_block.v().size() + addsize);
+        
         // add the B-blocks
         for (int m = 0; m < Nchan1; m++)
         for (int n = 0; n < Nchan1p; n++)
