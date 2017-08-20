@@ -504,7 +504,7 @@ BlockSymBandMatrix<Complex> NoPreconditioner::calc_A_block (int ill, int illp, b
     return A;
 }
 
-CooMatrix<LU_int_t, Complex> NoPreconditioner::calc_full_block(int ill, int illp) const
+CooMatrix<LU_int_t, Complex> NoPreconditioner::calc_full_block (int ill, int illp) const
 {
     // number of asymptotic channels
     int Nchan1 = Nchan_[ill].first;
@@ -1416,19 +1416,19 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
                 if (ill < illp) selection = (tri & MatrixSelection::StrictUpper ? MatrixSelection::Both : MatrixSelection::None);
                 if (ill > illp) selection = (tri & MatrixSelection::StrictLower ? MatrixSelection::Both : MatrixSelection::None);
                 
+                // inner-region subset of the vectors
+                cArrayView p_inner (p[illp], offsetp, Nspline_x_inner * Nspline_y_inner);
+                cArrayView q_inner (q[ill],  offset,  Nspline_x_inner * Nspline_y_inner);
+                
                 // inner region part multiplication
                 if (cmd_->lightweight_full)
                 {
-                    // get block angular momemnta
-                    int l1 = ang_->states()[ill].first;
-                    int l2 = ang_->states()[ill].second;
-                    
                     // multiply 'p' by the diagonal block (except for the two-electron term, which is done later)
                     if (ill == illp)
                     {
-                        // inner-region subset of the vectors
-                        cArrayView p_inner (p[ill], offset, Nspline_x_inner * Nspline_y_inner);
-                        cArrayView q_inner (q[ill], offset, Nspline_x_inner * Nspline_y_inner);
+                        // get block angular momemnta
+                        int l1 = ang_->states()[ill].first;
+                        int l2 = ang_->states()[ill].second;
                         
                         // one-electron matrices
                         SymBandMatrix<Complex> const & Sx = rad_panel_->S_x();
@@ -1437,7 +1437,7 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
                         SymBandMatrix<Complex> Hy = 0.5_z * rad_panel_->D_y() + (0.5_z * (l2 * (l2 + 1.))) * rad_panel_->Mm2_y() + Complex(inp_->Za * inp_->Zp) * rad_panel_->Mm1_y();
                         
                         // multiply 'p' by the diagonal block (except for the two-electron term)
-                        kron_dot(0., q_inner, E_, p_inner, Sx, Sy, Nspline_x_inner, Nspline_y_inner);
+                        kron_dot(1., q_inner, E_, p_inner, Sx, Sy, Nspline_x_inner, Nspline_y_inner);
                         kron_dot(1., q_inner, -1, p_inner, Hx, Sy, Nspline_x_inner, Nspline_y_inner);
                         kron_dot(1., q_inner, -1, p_inner, Sx, Hy, Nspline_x_inner, Nspline_y_inner);
                     }
@@ -1449,13 +1449,7 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
                         const_cast<BlockSymBandMatrix<Complex> &>(A_blocks_[ill * Nang + illp]).hdfload();
                     
                     // full diagonal block multiplication
-                    A_blocks_[ill * Nang + illp].dot
-                    (
-                        1.0_z, cArrayView(p[illp], offsetp, Nspline_x_inner * Nspline_y_inner),
-                        1.0_z, cArrayView(q[ill],  offset,  Nspline_x_inner * Nspline_y_inner),
-                        true,
-                        selection
-                    );
+                    A_blocks_[ill * Nang + illp].dot(1.0_z, p_inner, 1.0_z, q_inner, true, selection);
                     
                     // release memory
                     if (cmd_->outofcore and cmd_->wholematrix)
