@@ -178,6 +178,7 @@ void CoupledPreconditioner::update (Real E)
         data.out_of_core = cmd_->mumps_outofcore;
         data.verbosity = cmd_->mumps_verbose;
         data.centralized_matrix = false;
+        data.memory_relaxation = cmd_->mumps_relax;
     #ifdef WITH_MPI
         #ifdef _WIN32
         data.fortran_comm = MPI_Comm_c2f((MPI_Fint)(std::intptr_t) par_->groupcomm());

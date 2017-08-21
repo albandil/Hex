@@ -184,6 +184,7 @@ void ILUCGPreconditioner::CG_init (int iblock) const
         {
             data_[iblock].out_of_core = cmd_->mumps_outofcore;
             data_[iblock].verbosity = cmd_->mumps_verbose;
+            data_[iblock].memory_relaxation = cmd_->mumps_relax;
     #ifdef WITH_MPI
         #ifdef _WIN32
             data_[iblock].fortran_comm = MPI_Comm_c2f((MPI_Fint)(std::intptr_t) par_->groupcomm());

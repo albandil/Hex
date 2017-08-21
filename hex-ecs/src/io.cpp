@@ -203,6 +203,7 @@ void CommandLine::parse (int argc, char* argv[])
 #ifdef WITH_MUMPS
                     "\t--mumps-out-of-core              Use out-of-core capability of MUMPS (this is independent on --out-of-core option).\n"
                     "\t--mumps-verbose <number>         Verbosity level of the MUMPS library. Zero ('0') means no output, higher numbers increase the verbosity.\n"
+                    "\t--mumps-memory-relaxation <number> How much percent more of the guessed LU factor storage to allocate.\n"
 #endif
                     "\n"
                     "Stage selection\n"
@@ -535,6 +536,12 @@ void CommandLine::parse (int argc, char* argv[])
             {
                 // maximal multipole to be considered by the coupled preconditioner
                 mumps_verbose = std::atoi(optargs[0].c_str());
+                return true;
+            },
+        "mumps-memory-relaxation", "", 1, [&](std::vector<std::string> const & optargs) -> bool
+            {
+                // MUMPS memory relaxation factor
+                mumps_relax = std::atof(optargs[0].c_str());
                 return true;
             },
 #endif

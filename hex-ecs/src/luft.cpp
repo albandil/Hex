@@ -6,7 +6,7 @@
 //                    / /   / /    \_\      / /  \ \                                 //
 //                                                                                   //
 //                                                                                   //
-//  Copyright (c) 2016, Jakub Benda, Charles University in Prague                    //
+//  Copyright (c) 2017, Jakub Benda, Charles University in Prague                    //
 //                                                                                   //
 // MIT License:                                                                      //
 //                                                                                   //
@@ -43,6 +43,7 @@ LUftData defaultLUftData =
     /* OOC scratch dir */           , "."
     /* superlu_dist_grid */         , nullptr
     /* centralized matrix */        , true
+    /* MUMPS memory relaxation */   , 20
 };
 
 // --------------------------------------------------------------------------------- //
