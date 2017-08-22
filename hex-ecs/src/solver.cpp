@@ -246,7 +246,7 @@ void Solver::solve ()
             if (not cmd_.cont)
             {
                 // right-hand side for a single initial state
-                cBlockArray chiseg (chi.size());
+                cBlockArray chiseg (chi.size(), !cmd_.outofcore, "cg-chi");
                 
                 // reset right-hand side
                 for (unsigned ill = 0; ill < ang_.states().size(); ill++)
@@ -274,9 +274,10 @@ void Solver::solve ()
                     // use the preconditioner setup routine
                     Timer t;
                     prec_->rhs(chiseg, ie, instates_[i]);
-                    for (unsigned ill = 0; ill < chi.size(); ill++)
+                    for (unsigned ill = 0; ill < chi.size(); ill++) if (par_.isMyGroupWork(ill))
                     {
                         if (not chi.inmemory()) { chi.hdfload(ill); }
+                        if (not chiseg.inmemory()) { chiseg.hdfload(ill); }
                         
                         cArrayView
                         (
@@ -286,6 +287,7 @@ void Solver::solve ()
                         ) = chiseg[ill];
                         
                         if (not chi.inmemory()) { chi.hdfsave(ill); chi[ill].drop(); }
+                        if (not chiseg.inmemory()) { chiseg[ill].drop(); }
                     }
                     std::cout << "done after " << t.nice_time() << std::endl;
                 }
