@@ -6,7 +6,7 @@
 //                    / /   / /    \_\      / /  \ \                                 //
 //                                                                                   //
 //                                                                                   //
-//  Copyright (c) 2016, Jakub Benda, Charles University in Prague                    //
+//  Copyright (c) 2017, Jakub Benda, Charles University in Prague                    //
 //                                                                                   //
 // MIT License:                                                                      //
 //                                                                                   //
@@ -132,8 +132,10 @@ void LUft_MUMPS::factorize (CsrMatrix<LU_int_t,Complex> const & matrix, LUftData
         settings.ICNTL(3) = (data.verbosity == 0 ? 0 : 6); // global info to STDOUT (default: 6)
         settings.ICNTL(4) = data.verbosity; // verbosity level (default: 2)
         settings.ICNTL(5) = 0; // COO format
+        settings.ICNTL(14) = data.memory_relaxation;
         settings.ICNTL(18) = data.centralized_matrix ? 0 : 3;
         settings.ICNTL(22) = data.out_of_core; // OOC factorization
+        settings.ICNTL(28) = 2; // parallel ordering
         std::strcpy(settings.ooc_tmpdir, data.ooc_dir);
         std::strcpy(settings.ooc_prefix, "ooc_");
         settings.n = n_;

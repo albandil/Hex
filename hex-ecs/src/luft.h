@@ -6,7 +6,7 @@
 //                    / /   / /    \_\      / /  \ \                                 //
 //                                                                                   //
 //                                                                                   //
-//  Copyright (c) 2016, Jakub Benda, Charles University in Prague                    //
+//  Copyright (c) 2017, Jakub Benda, Charles University in Prague                    //
 //                                                                                   //
 // MIT License:                                                                      //
 //                                                                                   //
@@ -53,6 +53,7 @@ typedef struct
     const char * ooc_dir;
     void * superlu_dist_grid;
     bool centralized_matrix;
+    double memory_relaxation;
 }
 LUftData;
 
