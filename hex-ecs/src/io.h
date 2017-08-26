@@ -405,6 +405,9 @@ class InputFile
             // maximal total energy
             Real max_Etot;
             
+            // maximal energy of a target bound state
+            Real max_Ebound;
+            
             // initial and final atomic states
             std::vector<std::tuple<int,int,int>> instates, outstates;
             

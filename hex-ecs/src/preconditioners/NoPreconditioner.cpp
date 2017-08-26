@@ -341,7 +341,13 @@ void NoPreconditioner::setup ()
                 Complex Eb = loaded ? 2.0_r * Hl_[i][l].Dl[indices[nr]] : -1.0_r / ((nr + l + 1) * (nr + l + 1));
                 
                 // add all requested channels
-                if (Eb.real() <= std::max(inp_->channel_max_E, inp_->max_Etot))
+                if
+                (
+                    // in inner-region-only calculation we need just all required bound channels
+                        (inp_->inner_only and Eb.real() < inp_->max_Ebound) or
+                    // in channel-reduced calculation we need also all states up to the total energy of the system (or higher, if requested)
+                        (not inp_->inner_only and Eb.real() <= mmax(inp_->channel_max_E, inp_->max_Etot, inp_->max_Ebound))
+                )
                 {
                     if (loaded)
                     {

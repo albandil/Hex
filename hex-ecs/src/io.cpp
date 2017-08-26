@@ -1031,6 +1031,23 @@ void InputFile::read (std::ifstream & inf)
     // - asymptotic channel max energy
     channel_max_E = ReadNext<Real>(inf).val;
     
+    // get maximal bound state energy
+    max_Ebound = -1;
+    for (ReadItem<int> const & n : nis)
+    {
+        if (n.val == 0)
+            max_Ebound = 0;
+        else if (n.val > 0)
+            max_Ebound = std::max(max_Ebound, -1./(n.val * n.val));
+    }
+    for (ReadItem<int> const & n : nfs)
+    {
+        if (n.val == 0)
+            max_Ebound = 0;
+        else if (n.val > 0)
+            max_Ebound = std::max(max_Ebound, -1./(n.val * n.val));
+    }
+    
     // print info
     std::cout << "\t[n l m]: ";
     for (auto state : outstates)
