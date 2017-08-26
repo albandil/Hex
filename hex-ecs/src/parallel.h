@@ -67,9 +67,20 @@ class Parallel
 #ifdef WITH_MPI
             if (active_)
             {
-    #ifndef _OPENMP
+    #if (!defined(_OPENMP) && !defined(WITH_MUMPS))
                 // initialize MPI
                 MPI_Init(argc, argv);
+    #elif defined (WITH_MUMPS)
+                // initialize MPI compatible with threaded PT-Scotch
+                int req_flag = MPI_THREAD_MULTIPLE, prov_flag;
+                MPI_Init_thread(argc, argv, req_flag, &prov_flag);
+                
+                // check thread support
+                if (prov_flag != MPI_THREAD_MULTIPLE)
+                {
+                    std::cout << "Warning: The MPI implementation doesn't support MPI_THREAD_MULTIPLE. ";
+                    std::cout << "If MUMPS is compiled with ptscotch, it may fail." << std::endl;
+                }
     #else
                 // initialize MPI compatible with OpenMP
                 int req_flag = MPI_THREAD_SERIALIZED, prov_flag;
