@@ -1348,11 +1348,6 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
     // shorthands
     unsigned order = inp_->order;
     unsigned Nang = ang_->states().size();
-    unsigned Nini = p[0].size() / block_rank_[0];
-    
-    // in parallel, only the master process and its fellows from the MPI group have the complete segment p[0]
-    // so to get correct number of right-hand sides we need to let the process broadcast the number;
-    par_->bcast(0, &Nini, 1);
     
     // B-spline bases
     Bspline const & bspline_full  = rad_full_ ->bspline();
@@ -1397,6 +1392,13 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
         if (par_->isMyGroupWork(ill) and cmd_->outofcore)
             q.hdfload(ill);
     }
+    
+    // get number of right-hand sides (initial states)
+    unsigned Nini = v[0].size() / block_rank_[0];
+    
+    // in parallel, only the master process and its fellows from the MPI group have the complete segment p[0]
+    // so to get correct number of right-hand sides we need to let the process broadcast the number;
+    par_->bcast(0, &Nini, 1);
     
     // for all initial states (right-hand sides)
     for (unsigned ini = 0; ini < Nini; ini++)
