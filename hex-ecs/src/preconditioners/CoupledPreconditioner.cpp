@@ -99,6 +99,17 @@ void CoupledPreconditioner::update (Real E)
         int Nchan1p = Nchan_[illp].first;   // # r1 -> inf, l2p bound
         int Nchan2p = Nchan_[illp].second;  // # r2 -> inf, l1p bound
         
+        // angular momenta
+        int l1 = ang_->states()[ill].first;
+        int l2 = ang_->states()[ill].second;
+        int l1p = ang_->states()[illp].first;
+        int l2p = ang_->states()[illp].second;
+        
+        // skip blocks coupled only by high multipoles
+        int minMultipole = std::min(std::abs(l1-l1p),std::abs(l2-l2p));
+        if (cmd_->coupling_limit >= 0 and minMultipole > cmd_->coupling_limit)
+            continue;
+        
         // update non-zero count (NOTE: Needs checking.)
         NZ += Nspline_x_inner * Nspline_y_inner * (2*order + 1) * (2*order + 1);    // A-block
         NZ += Nchan1 * Nchan1p * Nspline_x_outer * (2*order + 1);                   // B1-blocks
@@ -110,6 +121,7 @@ void CoupledPreconditioner::update (Real E)
     J.reserve(NZ);
     V.reserve(NZ);
     
+    int coupled = 0;
     std::vector<std::pair<int,int>> segregated;
     std::cout << "\tAssemble full matrix of the system ... " << std::flush;
     Timer timer;
@@ -118,8 +130,16 @@ void CoupledPreconditioner::update (Real E)
     for (LU_int_t illp = 0, offsetp = 0; illp < Nang; offsetp += block_rank_[illp++])
     if ((ill * Nang + illp) % par_->groupsize() == par_->igroupproc())
     {
+        // angular momenta
         int l1 = ang_->states()[ill].first;
         int l2 = ang_->states()[ill].second;
+        int l1p = ang_->states()[illp].first;
+        int l2p = ang_->states()[illp].second;
+        
+        // skip blocks coupled only by high multipoles
+        int minMultipole = std::min(std::abs(l1-l1p),std::abs(l2-l2p));
+        if (cmd_->coupling_limit >= 0 and minMultipole > cmd_->coupling_limit)
+            continue;
         
         // when this angular state is only weakly coupled, do not include it in the matrix
         if (not cmd_->couple_all and Xp_[0][l1].empty() and Xp_[1][l2].empty())
@@ -145,15 +165,24 @@ void CoupledPreconditioner::update (Real E)
             I.append(coo.i() + offset);
             J.append(coo.j() + offsetp);
             V.append(coo.v());
+            
+            // update included blocks count
+            coupled++;
         }
     }
     
-    std::cout << "done after " << timer.nice_time() << std::endl;
+    std::cout << "done after " << timer.nice_time() << " (" << coupled << " blocks, ";
+    std::cout.imbue(std::locale(std::locale::classic(), new MyNumPunct));
+    std::cout << I.size();
+    std::cout.imbue(std::locale::classic());
+    std::cout << " non-zeros)" << std::endl;
     std::cout << "\tUncoupled blocks:";
+    
     if (segregated.empty())
         std::cout << " none";
     else for (std::pair<int,int> const & p : segregated)
         std::cout << " (" << p.first << "," << p.second << ")";
+    
     std::cout << std::endl;
     
     // convert the blocks to CSR
