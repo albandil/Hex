@@ -455,8 +455,13 @@ cArray Amplitudes::readAtomPseudoState (int l, int ichan) const
 
 void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> & solution, int ie, int Spin)
 {
+    // final projectile energies
+    rArray Ef = inp_.Etot + 1.0_r/(T.nf*T.nf) + (T.mf-T.mi) * inp_.B;
+    
     // final projectile momenta
-    rArray kf = sqrt(inp_.Etot + 1.0_r/(T.nf*T.nf) + (T.mf-T.mi) * inp_.B);
+    rArray kf;
+    for (double ef : Ef)
+        kf.push_back(ef >= 0 ? std::sqrt(ef) : special::constant::Nan);
     
     // shorthands
     unsigned Nenergy = kf.size();               // energy count
