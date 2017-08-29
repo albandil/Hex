@@ -459,9 +459,7 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> &
     rArray Ef = inp_.Etot + 1.0_r/(T.nf*T.nf) + (T.mf-T.mi) * inp_.B;
     
     // final projectile momenta
-    rArray kf;
-    for (double ef : Ef)
-        kf.push_back(ef >= 0 ? std::sqrt(ef) : special::constant::Nan);
+    rArray kf; for (Real ef : Ef) kf.push_back(ef >= 0 ? std::sqrt(ef) : special::constant::Nan);
     
     // shorthands
     unsigned Nenergy = kf.size();               // energy count
@@ -623,7 +621,11 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> &
 void Amplitudes::computeTmat_ (Amplitudes::Transition T)
 {
     // final projectile momenta
-    rArray kf = sqrt(inp_.Etot + 1.0_r/(T.nf*T.nf) + (T.mf-T.mi) * inp_.B);
+    // final projectile energies
+    rArray Ef = inp_.Etot + 1.0_r/(T.nf*T.nf) + (T.mf-T.mi) * inp_.B;
+    
+    // final projectile momenta
+    rArray kf; for (Real ef : Ef) kf.push_back(ef >= 0 ? std::sqrt(ef) : special::constant::Nan);
     
     // allocate memory
     if (Tmat_Slp.find(T) == Tmat_Slp.end())
@@ -659,9 +661,13 @@ void Amplitudes::computeTmat_ (Amplitudes::Transition T)
 
 void Amplitudes::computeSigma_ (Amplitudes::Transition T)
 {
+    // initial and final projectile energies
+    rArray Ei = inp_.Etot + 1.0_r/(T.ni*T.ni);
+    rArray Ef = inp_.Etot + 1.0_r/(T.nf*T.nf) + (T.mf-T.mi) * inp_.B;
+    
     // final projectile momenta
-    rArray ki = sqrt(inp_.Etot + 1.0_r/(T.ni*T.ni));
-    rArray kf = sqrt(inp_.Etot + 1.0_r/(T.nf*T.nf) + (T.mf-T.mi) * inp_.B);
+    rArray ki; for (Real ei : Ei) ki.push_back(ei >= 0 ? std::sqrt(ei) : special::constant::Nan);
+    rArray kf; for (Real ef : Ef) kf.push_back(ef >= 0 ? std::sqrt(ef) : special::constant::Nan);
     
     // allocate memory
     if (sigma_S.find(T) == sigma_S.end())
