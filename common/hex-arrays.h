@@ -1165,11 +1165,7 @@ template <class T, class Alloc_> class NumberArray : public Array<T, Alloc_>
                 return false;
             
             // get data size
-            std::size_t size = hdf.size("array");
-            
-            // scale size if this is a complex array
-            if (typeid(T) == typeid(Complex))
-                size /= 2;
+            std::size_t size = hdf.size("array") / typeinfo<T>::ncmpt;
             
             // read packed elements
             if (elements.resize(size) > 0 and not hdf.read("array", &(elements[0]), elements.size()))
@@ -1329,7 +1325,7 @@ template <class T, class Alloc_> class NumberArray : public Array<T, Alloc_>
 // --------------------------------------------------------------------------------- //
 
 /**
- * @brief Helper class returning either reference of new object.
+ * @brief Helper class returning either reference or new object.
  * 
  * This class is a wrapper around an object or a reference to the object.
  * It serves as a useful return type of functions that either return
@@ -1340,23 +1336,41 @@ template <class T> class TmpNumberArray
 {
     public:
         
+        // delete default constructor
+        TmpNumberArray () = delete;
+        
+        // delete default copy constructor
+        TmpNumberArray (TmpNumberArray<T> const & array) = delete;
+        
+        // initialize as array reference
         TmpNumberArray (const ArrayView<T> view)
             : owner_(false), view_(view)
         {}
         
+        // initialize as allocated array
         TmpNumberArray (NumberArray<T> && array)
             : owner_(true), array_(array)
         {}
         
-        ArrayView<T> view () const
+        // move constructor
+        TmpNumberArray (TmpNumberArray<T> && array)
+            : owner_(array.owner_), view_(array.view_), array_(std::move(array.array_))
+        {}
+        
+        // access view of the underlying data
+        ArrayView<T> operator() () const
         {
             return owner_ ? array_ : view_;
         }
         
+        // access pointer to the underlying data
         T const * ptr () const
         {
             return owner_ ? array_.data() : view_.data();
         }
+        
+        // delete default copy operator
+        TmpNumberArray & operator= (TmpNumberArray const & other) = delete;
     
     private:
         
@@ -1401,6 +1415,29 @@ template <class T> class BlockArray
         std::size_t size () const
         {
             return arrays_.size();
+        }
+        
+        std::size_t size (std::size_t iblock) const
+        {
+            assert(iblock < arrays_.size());
+            
+            if (inmemory_)
+            {
+                return arrays_[iblock].size();
+            }
+            else
+            {
+                // returns length of the "array" dataset within the on-disk file
+                // - assumes no compression
+                HDFFile hdf (subname(iblock), HDFFile::readonly);
+                return hdf.size("array") / typeinfo<T>::ncmpt;
+            }
+        }
+        
+        void drop (std::size_t iblock)
+        {
+            assert(iblock < arrays_.size());
+            arrays_[iblock].drop();
         }
         
         NumberArray<T> * begin () { return arrays_.begin(); }

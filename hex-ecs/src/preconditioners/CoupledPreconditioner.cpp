@@ -270,46 +270,73 @@ void CoupledPreconditioner::precondition (BlockArray<Complex> const & r, BlockAr
     std::size_t Nang = r.size();
     
     // number of initial states (right-hand sides) solved at once
-    std::size_t Nini = r[0].size() / block_rank_[0];
-    
-    // in parallel, only the master process and its fellows from the MPI group have the complete segment r[0]
-    // so to get correct number of right-hand sides we need to let the process broadcast the number;
+    std::size_t Nini = 0;
+    if (par_->IamMaster())
+        Nini = r.size(0) / block_rank_[0];
     par_->bcast(0, &Nini, 1);
     
     // total solution size (all blocks, all initial states)
     std::size_t N = 0;
-    for (cArray const & a : r) N += a.size();
-    X.resize(N);
-    Y.resize(N);
+    for (std::size_t ill = 0; ill < Nang; ill++)
+    {
+        if (par_->isMyWork(ill))
+            N += r.size(ill);
+    }
+    par_->syncsum(&N, 1);
     
-    // convert block array to monolithic array
+    // allocate memory for source vector (host only)
+    if (par_->IamMaster())
+        X.resize(N);
+    
+    // allocate memory for destination vector (all processes, or host only in OOC mode)
+    if (not cmd_->outofcore or par_->IamMaster())
+        Y.resize(N);
+    
+    // convert block array to monolithic array (only host needs to do this)
+    if (par_->IamMaster())
     for (std::size_t ini = 0, Xoffset = 0; ini < Nini; ini++)
     for (std::size_t ill = 0; ill < Nang; ill++)
     {
-        std::size_t chunk = r[ill].size() / Nini;
+        // get position of a data chunk to copy
+        std::size_t chunk = r.size(ill) / Nini;
         std::size_t roffset = chunk * ini;
         
-        cArrayView(X, Xoffset, chunk) = cArrayView(r[ill], roffset, chunk);
+        // get view of the chunk (possibly read from disk in OOC mode)
+        TmpNumberArray<Complex> rseg = r.segment(ill, roffset, chunk);
         
-        Xoffset += r[ill].size() / Nini;
+        // copy the chunk
+        cArrayView(X, Xoffset, chunk) = rseg();
+        
+        // update combined array offset
+        Xoffset += chunk;
     }
     
     // solve
     lu_->solve(X, Y, Nini);
     
     // broadcast solution from master to everyone
-    par_->bcast(0, Y);
+    // - except for OOC mode; master will write solutions to disk in that case
+    if (not cmd_->outofcore)
+        par_->bcast(0, Y);
     
-    // copy solution to result
+    // split monolithic solution to final block array
+    // - everyone in group needs to do this unless OOC mode is on
+    if (not cmd_->outofcore or par_->IamMaster())
     for (std::size_t ini = 0, Yoffset = 0; ini < Nini; ini++)
     for (std::size_t ill = 0; ill < Nang; ill++)
     {
-        std::size_t chunk = z[ill].size() / Nini;
+        // get position of a data chunk to copy
+        std::size_t chunk = z.size(ill) / Nini;
         std::size_t zoffset = chunk * ini;
         
-        cArrayView(z[ill], zoffset, chunk) = cArrayView(Y, Yoffset, chunk);
+        // get view of the chunk
+        cArrayView zseg (Y, Yoffset, chunk);
         
-        Yoffset += z[ill].size() / Nini;
+        // copy the chunk (possibly write to disk in OOC mode)
+        z.setSegment(ill, zoffset, chunk, zseg);
+        
+        // update combined array offset
+        Yoffset += z.size(ill) / Nini;
     }
     
     // use segregated KPA preconditioner to solve uncoupled blocks
