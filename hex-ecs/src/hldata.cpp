@@ -51,7 +51,7 @@ bool HlData::hdfload (const char* file)
         return false;
     
     // read size
-    unsigned size;
+    std::size_t size;
     if (not hdf.read("n", &size, 1))
         return false;
     
