@@ -625,7 +625,7 @@ void Amplitudes::computeTmat_ (Amplitudes::Transition T)
     rArray Ef = inp_.Etot + 1.0_r/(T.nf*T.nf) + (T.mf-T.mi) * inp_.B;
     
     // final projectile momenta
-    rArray kf; for (Real ef : Ef) kf.push_back(ef >= 0 ? std::sqrt(ef) : special::constant::Nan);
+    rArray inv_kf; for (Real ef : Ef) inv_kf.push_back(ef > 0 ? 1./std::sqrt(ef) : 0.);
     
     // allocate memory
     if (Tmat_Slp.find(T) == Tmat_Slp.end())
@@ -652,9 +652,9 @@ void Amplitudes::computeTmat_ (Amplitudes::Transition T)
         Real sf = (inp_.Zp > 0 ? 1.0_r : special::constant::sqrt_half);
         
         // compute T-matrices
-        Tmat_Slp[T][ell].first = rad_S0 * 4.0_r * special::constant::pi / kf * std::pow(Complex(0.,1.), -ell)
+        Tmat_Slp[T][ell].first = rad_S0 * 4.0_r * special::constant::pi * inv_kf * std::pow(Complex(0.,1.), -ell)
                     * (Real)special::ClebschGordan(T.lf, T.mf, ell, T.mi - T.mf, inp_.L, T.mi) * sf;
-        Tmat_Slp[T][ell].second = rad_S1 * 4.0_r * special::constant::pi / kf * std::pow(Complex(0.,1.), -ell)
+        Tmat_Slp[T][ell].second = rad_S1 * 4.0_r * special::constant::pi * inv_kf * std::pow(Complex(0.,1.), -ell)
                     * (Real)special::ClebschGordan(T.lf, T.mf, ell, T.mi - T.mf, inp_.L, T.mi) * sf;
     }
 }
@@ -666,8 +666,8 @@ void Amplitudes::computeSigma_ (Amplitudes::Transition T)
     rArray Ef = inp_.Etot + 1.0_r/(T.nf*T.nf) + (T.mf-T.mi) * inp_.B;
     
     // final projectile momenta
-    rArray ki; for (Real ei : Ei) ki.push_back(ei >= 0 ? std::sqrt(ei) : special::constant::Nan);
-    rArray kf; for (Real ef : Ef) kf.push_back(ef >= 0 ? std::sqrt(ef) : special::constant::Nan);
+    rArray inv_ki; for (Real ei : Ei) inv_ki.push_back(ei > 0 ? 1./std::sqrt(ei) : 0.);
+    rArray     kf; for (Real ef : Ef)     kf.push_back(ef > 0 ?    std::sqrt(ef) : 0.);
     
     // allocate memory
     if (sigma_S.find(T) == sigma_S.end())
@@ -683,12 +683,12 @@ void Amplitudes::computeSigma_ (Amplitudes::Transition T)
         // compute singlet contribution
         rArray Re_f0_ell = -realpart(Tmat_S0) / special::constant::two_pi;
         rArray Im_f0_ell = -imagpart(Tmat_S0) / special::constant::two_pi;
-        sigma_S[T].first += 0.25 * kf / ki * (Re_f0_ell * Re_f0_ell + Im_f0_ell * Im_f0_ell);
+        sigma_S[T].first += 0.25 * kf * inv_ki * (Re_f0_ell * Re_f0_ell + Im_f0_ell * Im_f0_ell);
         
         // compute triplet contribution
         rArray Re_f1_ell = -realpart(Tmat_S1) / special::constant::two_pi;
         rArray Im_f1_ell = -imagpart(Tmat_S1) / special::constant::two_pi;
-        sigma_S[T].second += 0.75 * kf / ki * (Re_f1_ell * Re_f1_ell + Im_f1_ell * Im_f1_ell);
+        sigma_S[T].second += 0.75 * kf * inv_ki * (Re_f1_ell * Re_f1_ell + Im_f1_ell * Im_f1_ell);
     }
 }
 
