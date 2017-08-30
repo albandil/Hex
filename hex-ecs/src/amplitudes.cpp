@@ -455,14 +455,14 @@ cArray Amplitudes::readAtomPseudoState (int l, int ichan) const
 
 void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> & solution, int ie, int Spin)
 {
-    // final projectile energies
-    rArray Ef = inp_.Etot + 1.0_r/(T.nf*T.nf) + (T.mf-T.mi) * inp_.B;
+    // final projectile energy
+    Real Ef = inp_.Etot[ie] + 1.0_r/(T.nf*T.nf) + (T.mf-T.mi) * inp_.B;
     
-    // final projectile momenta
-    rArray kf; for (Real ef : Ef) kf.push_back(ef >= 0 ? std::sqrt(ef) : special::constant::Nan);
+    // final projectile momentum
+    Real kf = (Ef >= 0 ? std::sqrt(Ef) : special::constant::Nan);
     
     // shorthands
-    unsigned Nenergy = kf.size();               // energy count
+    unsigned Nenergy = inp_.Etot.size();               // energy count
     int order   = inp_.order;                   // B-spline order
     int Nspline_inner = bspline_inner_.Nspline(); // B-spline count (inner basis)
     int Nspline_full  = bspline_full_ .Nspline(); // B-spline count (combined basis)
@@ -480,7 +480,11 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> &
     }
     
     // skip impact energies with undefined outgoing momentum
-    if (not std::isfinite(kf[ie]) or kf[ie] == 0.)
+    if (not std::isfinite(kf) or kf == 0.)
+        return;
+    
+    // skip angular-forbidden transitions
+    if (T.li > inp_.maxell or T.lf > inp_.maxell)
         return;
     
     // read the appropriate projectile channel function for the final state (nf,lf,*)
@@ -500,7 +504,7 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> &
     // extractions and get rid of the oscillations. Otherwise we need to extrapolate also
     // the trend of the T-matrix.
     
-    Real wavelength = special::constant::two_pi / kf[ie];
+    Real wavelength = special::constant::two_pi / kf;
     Real Rb     = (cmd_.extract_rho       > 0) ? cmd_.extract_rho       : bspline_full_.R2();
     Real Ra     = (cmd_.extract_rho_begin > 0) ? cmd_.extract_rho_begin : Rb - wavelength; Ra = std::max(bspline_full_.R2() / 2, Ra);
     int samples = (cmd_.extract_samples   > 0) ? cmd_.extract_samples   : 10;
@@ -532,8 +536,8 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> &
         
         // evaluate j and dj at far radius for all angular momenta up to maxell
         // FIXME : Coulomb for charge (inp_->Za - 1)
-        cArray j_R0 = special::ric_jv(inp_.maxell, kf[ie] * eval_r);
-        cArray dj_R0 = special::dric_jv(inp_.maxell, kf[ie] * eval_r) * kf[ie];
+        cArray j_R0 = special::ric_jv(inp_.maxell, kf * eval_r);
+        cArray dj_R0 = special::dric_jv(inp_.maxell, kf * eval_r) * kf;
         
         // evaluate B-splines and their derivatives at evaluation radius
         cArray Bspline_R0 (Nspline_full), Dspline_R0 (Nspline_full);
