@@ -249,14 +249,17 @@ void Solver::solve ()
                 cBlockArray chiseg (chi.size(), !cmd_.outofcore, "cg-chi");
                 
                 // reset right-hand side
-                for (unsigned ill = 0; ill < ang_.states().size(); ill++)
+                for (unsigned ill = 0; ill < ang_.states().size(); ill++) if (par_.isMyGroupWork(ill))
                 {
-                    if (not psi.inmemory()) { psi.hdfload(ill); }
+                    chi[ill].resize(psi.size(ill));
                     
-                    chi[ill].resize(psi[ill].size());
-                    
-                    if (not psi.inmemory()) { psi[ill].drop(); }
-                    if (not chi.inmemory()) { chi.hdfsave(ill); chi[ill].drop(); }
+                    if (not chi.inmemory())
+                    {
+                        if (not cmd_.shared_scratch or par_.IamGroupMaster())
+                            chi.hdfsave(ill);
+                        
+                        chi.drop(ill);
+                    }
                 }
                 
                 // calculate right-hand sides
@@ -274,7 +277,8 @@ void Solver::solve ()
                     // use the preconditioner setup routine
                     Timer t;
                     prec_->rhs(chiseg, ie, instates_[i]);
-                    for (unsigned ill = 0; ill < chi.size(); ill++) if (par_.isMyGroupWork(ill))
+                    for (unsigned ill = 0; ill < ang_.states().size(); ill++)
+                    if (par_.isMyGroupWork(ill))
                     {
                         if (not chi.inmemory()) { chi.hdfload(ill); }
                         if (not chiseg.inmemory()) { chiseg.hdfload(ill); }
@@ -286,8 +290,8 @@ void Solver::solve ()
                             chi[ill].size()     / instates_.size()
                         ) = chiseg[ill];
                         
-                        if (not chi.inmemory()) { chi.hdfsave(ill); chi[ill].drop(); }
-                        if (not chiseg.inmemory()) { chiseg[ill].drop(); }
+                        if (not chi.inmemory()) { if (not cmd_.shared_scratch or par_.IamGroupMaster()) chi.hdfsave(ill); chi.drop(ill); }
+                        if (not chiseg.inmemory()) { chiseg.drop(ill); }
                     }
                     std::cout << "done after " << t.nice_time() << std::endl;
                 }

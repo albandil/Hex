@@ -284,13 +284,12 @@ void CoupledPreconditioner::precondition (BlockArray<Complex> const & r, BlockAr
     }
     par_->syncsum(&N, 1);
     
-    // allocate memory for source vector (host only)
-    if (par_->IamMaster())
-        X.resize(N);
-    
-    // allocate memory for destination vector (all processes, or host only in OOC mode)
+    // allocate memory for source and destination vector (host only in OOC mode)
     if (not cmd_->outofcore or par_->IamMaster())
+    {
+        X.resize(N);
         Y.resize(N);
+    }
     
     // convert block array to monolithic array (only host needs to do this)
     if (par_->IamMaster())

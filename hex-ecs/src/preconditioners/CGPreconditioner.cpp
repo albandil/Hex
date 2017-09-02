@@ -210,7 +210,9 @@ void CGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArray<C
             if (cmd_->outofcore)
             {
                 const_cast<BlockArray<Complex>&>(r)[ill].drop();
-                z.hdfsave(ill, true);
+                
+                if (not cmd_->shared_scratch or par_->IamGroupMaster())
+                    z.hdfsave(ill, true);
             }
         }
     }

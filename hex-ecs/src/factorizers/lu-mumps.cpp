@@ -173,7 +173,7 @@ void LUft_MUMPS::solve (const cArrayView b, cArrayView x, int eqs) const
     MUMPS_C(&settings);
     
     if (settings.INFOG(1) != 0)
-            HexException("MUMPS backsubstitution failed, error code: %d, detail %d", settings.INFOG(1), settings.INFOG(2));
+        HexException("MUMPS backsubstitution failed, error code: %d, detail %d", settings.INFOG(1), settings.INFOG(2));
 }
 
 
