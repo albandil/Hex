@@ -223,8 +223,9 @@ void CommandLine::parse (int argc, char* argv[])
                     "\t--out-of-core-continue     (-O)  Start solution from the existing OOC files.\n"
                     "\t--whole-matrix             (-W)  In the above three cases: Load whole matrix from scratch file when calculating dot product (speeds them up a little).\n"
                     "\t--shared-scratch           (-s)  Let every MPI process calculate only a subset of shared radial integrals (assume shared output directory).\n"
-//                     "\t--lightweight-radial-cache (-l)  Do not precalculate two-electron integrals and only apply them on the fly (slower, but saves RAM).\n"
-                    "\t--lightweight-full         (-L)  Avoid precalculating all large matrices and only apply them on the fly (only available for KPA preconditioner).\n"
+                    "\t--lightweight-radial-cache (-l)  Do not precalculate two-electron integrals and only apply them on the fly (slower, but saves RAM).\n"
+                    "\t--lightweight-full         (-L)  Avoid precalculating all large matrices and only apply them on the fly.\n"
+                    "\t--lightweight-simple             Similar as lightweight-full, but precalculate diagonal block before every start of a nested CG solver.\n"
                     "\n"
                     "Preconditioners (general)\n"
                     "\t--preconditioner <name>    (-p)  Preconditioner to use (default: ILU).\n"
@@ -457,6 +458,13 @@ void CommandLine::parse (int argc, char* argv[])
             {
                 // do not precompute large matrices but only apply them on the fly
                 lightweight_full = lightweight_radial_cache = true;
+                lightweight_simple = false;
+                return true;
+            },
+        "lightweight-simple", "", 0, [&](std::vector<std::string> const & optargs) -> bool
+            {
+                // only precompute diagonal matrices just before nested CG solution
+                lightweight_simple = lightweight_full = lightweight_radial_cache = true;
                 return true;
             },
         "write-intermediate-solutions", "", 0, [&](std::vector<std::string> const & optargs) -> bool

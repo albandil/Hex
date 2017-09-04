@@ -238,6 +238,11 @@ void CGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArray<C
 
 void CGPreconditioner::CG_init (int iblock) const
 {
+    if (cmd_->lightweight_simple)
+    {
+        const_cast<BlockSymBandMatrix<Complex> &>(A_blocks_[iblock * ang_->states().size() + iblock])
+            = calc_A_block(iblock, iblock, true);
+    }
 }
 
 void CGPreconditioner::CG_mmul (int iblock, const cArrayView p, cArrayView q) const
@@ -263,7 +268,7 @@ void CGPreconditioner::CG_mmul (int iblock, const cArrayView p, cArrayView q) co
         cArrayView p_inner (p, offset, Nspline_inner_x * Nspline_inner_y);
         cArrayView q_inner (q, offset, Nspline_inner_x * Nspline_inner_y);
         
-        if (cmd_->lightweight_full)
+        if (cmd_->lightweight_full and not cmd_->lightweight_simple)
         {
             // get block angular momemnta
             int l1 = ang_->states()[iblock].first;
@@ -299,7 +304,7 @@ void CGPreconditioner::CG_mmul (int iblock, const cArrayView p, cArrayView q) co
         }
         else
         {
-            if (cmd_->outofcore and cmd_->wholematrix) const_cast<BlockSymBandMatrix<Complex> &>(A_blocks_[iang]).hdfload();
+            if (not cmd_->lightweight_simple and cmd_->outofcore and cmd_->wholematrix) const_cast<BlockSymBandMatrix<Complex> &>(A_blocks_[iang]).hdfload();
             
             A_blocks_[iang].dot
             (
@@ -308,7 +313,7 @@ void CGPreconditioner::CG_mmul (int iblock, const cArrayView p, cArrayView q) co
                 !cmd_->parallel_precondition
             );
             
-            if (cmd_->outofcore and cmd_->wholematrix) const_cast<BlockSymBandMatrix<Complex> &>(A_blocks_[iang]).drop();
+            if (not cmd_->lightweight_simple and cmd_->outofcore and cmd_->wholematrix) const_cast<BlockSymBandMatrix<Complex> &>(A_blocks_[iang]).drop();
         }
         
         if (not inp_->inner_only)
@@ -355,6 +360,11 @@ void CGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z) co
 
 void CGPreconditioner::CG_exit (int iblock) const
 {
+    if (cmd_->lightweight_simple)
+    {
+        const_cast<BlockSymBandMatrix<Complex> &>(A_blocks_[iblock * ang_->states().size() + iblock])
+            .drop();
+    }
 }
 
 void CGPreconditioner::finish ()
