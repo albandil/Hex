@@ -1337,8 +1337,10 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
         // optionally transfer to disk
         if (not chi.inmemory())
         {
-            chi.hdfsave(ill);
-            chi[ill].drop();
+            if (not cmd_->shared_scratch and par_->IamGroupMaster())
+                chi.hdfsave(ill);
+            
+            chi.drop(ill);
         }
     }
 }
@@ -1610,7 +1612,7 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
     
     // release source vectors
     for (unsigned ill = 0; ill < Nang; ill++) if (cmd_->outofcore)
-        v[ill].drop();
+        v.drop(ill);
     
     // synchronize and release the result vectors
     for (unsigned ill = 0; ill < Nang; ill++) if (par_->isMyGroupWork(ill))
@@ -1625,10 +1627,10 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
         // release memory
         if (cmd_->outofcore)
         {
-            if (par_->IamGroupMaster())
+            if (not cmd_->shared_scratch or par_->IamGroupMaster())
                 q.hdfsave(ill);
             
-            q[ill].drop();
+            q.drop(ill);
         }
     }
 }

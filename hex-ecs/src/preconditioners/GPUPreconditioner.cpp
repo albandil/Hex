@@ -810,8 +810,9 @@ void GPUCGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArra
         if (cmd_->outofcore)
         {
             const_cast<BlockArray<Complex>&>(r)[ill].drop();
-            z.hdfsave(ill);
-            z[ill].drop();
+            if (not cmd_->shared_scratch or par_->IamGroupMaster())
+                z.hdfsave(ill);
+            z.drop(ill);
         }
         
         // release block preconditioner
