@@ -89,16 +89,19 @@ int main (int argc, char* argv[])
         // turn off GSL exceptions
         gsl_set_error_handler_off();
         
-#ifdef __linux__
-        // abort on non-numerical values
-        feenableexcept(FE_INVALID);
-#endif
-        
         // disable buffering of the standard output (-> immediate logging)
         std::setvbuf(stdout, nullptr, _IONBF, 0);
         
         // get input from command line
         CommandLine cmd (argc, argv);
+        
+#ifdef __linux__
+        if (cmd.fpe)
+        {
+            // abort on non-numerical values
+            feenableexcept(FE_INVALID);
+        }
+#endif
     
     //
     // Setup parallel environments

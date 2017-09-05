@@ -183,7 +183,7 @@ void CommandLine::parse (int argc, char* argv[])
                     "\n"
                     "Basic usage\n"
                     "\t--example                  (-e)  Create sample input file.\n"
-                    "\t--help                     (-h)  Display this help.                                                                                                     \n"
+                    "\t--help                     (-h)  Display this help.\n"
                     "\t--input <filename>         (-i)  Use custom input file (other than \"ecs.inp\").\n"
                     "\t--zip <parameters>         (-z)  Solution file to zip (i.e. evaluate in B-spline basis and produce VTK datafile).\n"
                     "\t                                 The '<parameters>' stands for '<filename> <Xmin> <Ymin> <Xmax> <Ymax> <Xn> <Yn>'.\n"
@@ -191,6 +191,9 @@ void CommandLine::parse (int argc, char* argv[])
                     "\t--write-intermediate-solutions   Write all intermediate solution (after every iteration of the PCOCG solver).\n"
                     "\t--carry-initial-guess            Whether to use previous-energy solution as an initial guess for the new energy.\n"
                     "\t--refine-solution                Load existing solutions and check that they are within tolerance, update if needed.\n"
+#ifdef __linux__
+                    "\t--fp-exceptions                  Abort when invalid number is encountered. This can result in unnecessary GSL failures.\n"
+#endif
                     "\n"
 #ifdef WITH_MPI
                     "MPI setup\n"
@@ -307,6 +310,14 @@ void CommandLine::parse (int argc, char* argv[])
                 zipdata.nY = std::stoi(optargs[6]);
                 return true;
             },
+#ifdef __linux__
+        "fp-exceptions", "", 0, [&](std::vector<std::string> const & optargs) -> bool
+            {
+                // enable SIGFPE
+                fpe = true;
+                return true;
+            },
+#endif
         "lu", "F", 1, [&](std::vector<std::string> const & optargs) -> bool
             {
                 // choose factorizer
