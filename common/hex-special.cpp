@@ -585,24 +585,35 @@ int special::coul_F (int l, double k, double r, double& F, double& Fp)
         return err;
     }
     
-    err = gsl_sf_coulomb_wave_FG_e (eta, k*r, l, 0, &f, &fp, &g, &gp, &ef, &eg);
+    err = gsl_sf_coulomb_wave_FG_e(eta, k*r, l, 0, &f, &fp, &g, &gp, &ef, &eg);
     
-    // if the results are reliable, use them
+    switch (err)
+    {
+        case GSL_ELOSS:
+            // "Loss of accuracy."
+            // - This sometimes happens for large angular momenta close to
+            //   the origin. We will use the uniform approximation instead.
+            fprintf(stderr, "[coul_F] GSL_ELOSS @ k = %g, r = %g, l = %d\n", k, r, l);
+            return coul_F_michel(l, k, r, F, Fp);
+
+        case GSL_ERUNAWAY:
+            // "Iterative method out of control."
+            // - This sometimes happens for very small 'k' and small 'k*r'.
+            //   We will use value at 'r = 0' instead.
+            fprintf(stderr, "[coul_F] GSL_ERUNAWAY @ k = %g, r = %g, l = %d\n", k, r, l);
+            return coul_F(l, k, 0, F, Fp);
+    }
+    
     if (std::isfinite(f.val) and std::isfinite(fp.val))
     {
         F = f.val;
         Fp = fp.val;
-        return GSL_SUCCESS;
     }
-    
-    // if the precision is insufficent, use uniform approximation
-    //  if (err == GSL_ELOSS)
+    else
     {
         err = coul_F_michel(l, k, r, F, Fp);
-        return err;
     }
     
-    // otherwise pass the error up
     return err;
 }
 
