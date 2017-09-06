@@ -921,7 +921,7 @@ void Amplitudes::computeSigmaIon_ (Amplitudes::Transition T)
         if (not Xi_Sl1l2[T][ill * Nenergy + ie].second.empty())
         {
             CB = Chebyshev<double,Complex>(Xi_Sl1l2[T][ill * Nenergy + ie].second, 0., kmax); tail = CB.tail(1e-10); 
-            sigma_S[T].second[ie] = integrator.integrate(0, special::constant::pi_quart, &n) / ki[ie];
+            sigma_S[T].second[ie] += integrator.integrate(0, special::constant::pi_quart, &n) / ki[ie];
         }
     }
 }
