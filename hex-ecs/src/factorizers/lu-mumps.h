@@ -6,7 +6,7 @@
 //                    / /   / /    \_\      / /  \ \                                 //
 //                                                                                   //
 //                                                                                   //
-//  Copyright (c) 2016, Jakub Benda, Charles University in Prague                    //
+//  Copyright (c) 2017, Jakub Benda, Charles University in Prague                    //
 //                                                                                   //
 // MIT License:                                                                      //
 //                                                                                   //
@@ -35,6 +35,9 @@
 // --------------------------------------------------------------------------------- //
 
 #include "hex-csrmatrix.h"
+
+// --------------------------------------------------------------------------------- //
+
 #include "luft.h"
 
 // --------------------------------------------------------------------------------- //
@@ -97,7 +100,7 @@ class LUft_MUMPS : public LUft
         LUft_MUMPS const & operator= (LUft_MUMPS const &) = delete;
         
         /// Factorize.
-        virtual void factorize (CsrMatrix<LU_int_t,Complex> const & matrix, LUftData data);
+        virtual void factorize (CsrMatrix<LU_int_t,Complex> const & matrix);
         
         /// Validity indicator.
         virtual bool valid () const
@@ -144,6 +147,14 @@ class LUft_MUMPS : public LUft
             I.drop();
             J.drop();
             A.drop();
+            
+            if (workspace_ != nullptr)
+            {
+                vMemAllocator<MUMPS_COMPLEX>::free(workspace_);
+                
+                workspace_ = nullptr;
+                workspace_size_ = 0;
+            }
         }
         
     private:
@@ -157,6 +168,10 @@ class LUft_MUMPS : public LUft
         // data arrays
         NumberArray<MUMPS_INT> I, J;
         NumberArray<Complex> A;
+        
+        // additional workspace
+        MUMPS_COMPLEX* workspace_;
+        std::size_t workspace_size_;
 };
 
 #endif // HEX_LU_MUMPS_H, WITH_MUMPS

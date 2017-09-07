@@ -6,7 +6,7 @@
 //                    / /   / /    \_\      / /  \ \                                 //
 //                                                                                   //
 //                                                                                   //
-//  Copyright (c) 2016, Jakub Benda, Charles University in Prague                    //
+//  Copyright (c) 2017, Jakub Benda, Charles University in Prague                    //
 //                                                                                   //
 // MIT License:                                                                      //
 //                                                                                   //
@@ -43,7 +43,8 @@
 
 LUft_SUPERLU_DIST::LUft_SUPERLU_DIST () : LUft(), size_(0)
 {
-    // nothing
+    pdata_["superlu_dist_grid"] = nullptr;
+    rdata_["drop_tolerance"] = 1e-8;
 }
 
 void LUft_SUPERLU_DIST::drop ()
@@ -65,7 +66,7 @@ LUft_SUPERLU_DIST::~LUft_SUPERLU_DIST ()
     drop();
 }
 
-void LUft_SUPERLU_DIST::factorize (CsrMatrix<LU_int_t,Complex> const & matrix, LUftData data)
+void LUft_SUPERLU_DIST::factorize (CsrMatrix<LU_int_t,Complex> const & matrix)
 {
     //
     // Create matrix of the system.
@@ -106,7 +107,7 @@ void LUft_SUPERLU_DIST::factorize (CsrMatrix<LU_int_t,Complex> const & matrix, L
     //
     
         // get process grid
-        grid_ = (gridinfo_t *)data.superlu_dist_grid;
+        grid_ = (gridinfo_t *)pdata_["superlu_dist_grid"];
         
         // calculation options
         superlu_dist_options_t options;
@@ -114,7 +115,7 @@ void LUft_SUPERLU_DIST::factorize (CsrMatrix<LU_int_t,Complex> const & matrix, L
         options.PrintStat    = NO;
         options.SymPattern   = YES;
         options.ILU_DropRule = /* DROP_BASIC */ 1;
-        options.ILU_DropTol  = data.drop_tolerance;
+        options.ILU_DropTol  = rdata["drop_tolerance"];
         
         // distributed scale and permutation data
         ScalePermstructInit(A.nrow, A.ncol, &ScalePermstruct_);

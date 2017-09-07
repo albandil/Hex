@@ -6,7 +6,7 @@
 //                    / /   / /    \_\      / /  \ \                                 //
 //                                                                                   //
 //                                                                                   //
-//  Copyright (c) 2016, Jakub Benda, Charles University in Prague                    //
+//  Copyright (c) 2017, Jakub Benda, Charles University in Prague                    //
 //                                                                                   //
 // MIT License:                                                                      //
 //                                                                                   //
@@ -155,7 +155,7 @@ LUft_LAPACK::~LUft_LAPACK ()
     
 }
 
-void LUft_LAPACK::factorize (CsrMatrix<LU_int_t,Complex> const & matrix, LUftData data)
+void LUft_LAPACK::factorize (CsrMatrix<LU_int_t,Complex> const & matrix)
 {
     // reorder the matrix to make the bandwidth as small as possible
     //R_ = cuthill_mckee(matrix.p(), matrix.i());

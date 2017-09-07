@@ -33,21 +33,6 @@
 
 // --------------------------------------------------------------------------------- //
 
-LUftData defaultLUftData =
-{
-    /* drop_tolerance */            1e-8
-    /* out_of_core */               , false
-    /* verbosity */                 , 0
-    /* Fortran MPI communicator */  , 0
-    /* groupsize */                 , 1
-    /* OOC scratch dir */           , "."
-    /* superlu_dist_grid */         , nullptr
-    /* centralized matrix */        , true
-    /* MUMPS memory relaxation */   , 20
-};
-
-// --------------------------------------------------------------------------------- //
-
 defineBaseClassRunTimeSelectionTable(LUft)
 
 // --------------------------------------------------------------------------------- //

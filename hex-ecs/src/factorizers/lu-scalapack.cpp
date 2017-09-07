@@ -6,7 +6,7 @@
 //                    / /   / /    \_\      / /  \ \                                 //
 //                                                                                   //
 //                                                                                   //
-//  Copyright (c) 2016, Jakub Benda, Charles University in Prague                    //
+//  Copyright (c) 2017, Jakub Benda, Charles University in Prague                    //
 //                                                                                   //
 // MIT License:                                                                      //
 //                                                                                   //
@@ -52,7 +52,7 @@ LUft_SCALAPACK::~LUft_SCALAPACK ()
     // nothing
 }
 
-void LUft_SCALAPACK::factorize (CsrMatrix<LU_int_t,Complex> const & matrix, LUftData data)
+void LUft_SCALAPACK::factorize (CsrMatrix<LU_int_t,Complex> const & matrix)
 {
     
 }

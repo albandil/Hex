@@ -65,6 +65,13 @@ void CoupledPreconditioner::update (Real E)
     Bspline const & bspline_x     = rad_panel_->bspline_x();
     Bspline const & bspline_y     = rad_panel_->bspline_y();
     
+    // look for existing LU decomposition
+    lu_.reset(LUft::Choose(cmd_->factorizer));
+    lu_->link(format("lu-coupled-E%+g-%d-%4x-%4x.bin", E, par_->iproc(), bspline_x.hash(), bspline_y.hash()));
+    lu_->silent_load();
+    if (lu_->valid())
+        return;
+    
     // global basis
     int Nspline_full  = bspline_full.Nspline();
     int Nspline_inner = bspline_inner.Nspline();
@@ -193,8 +200,7 @@ void CoupledPreconditioner::update (Real E)
     ).tocsr();
     
     // set up factorization data
-    LUftData data = defaultLUftData;
-    data.drop_tolerance = cmd_->droptol;
+    lu_->rdata("drop_tolerance") = cmd_->droptol;
 #ifdef WITH_SUPERLU_DIST
     if (cmd_->factorizer == "superlu_dist")
     {
@@ -204,26 +210,27 @@ void CoupledPreconditioner::update (Real E)
 #ifdef WITH_MUMPS
     if (cmd_->factorizer == "mumps")
     {
-        data.out_of_core = cmd_->mumps_outofcore;
-        data.verbosity = cmd_->mumps_verbose;
-        data.centralized_matrix = false;
-        data.memory_relaxation = cmd_->mumps_relax;
+        lu_->idata("out_of_core") = cmd_->mumps_outofcore;
+        lu_->idata("verbosity") = cmd_->mumps_verbose;
+        lu_->idata("centralized_matrix") = false;
+        lu_->idata("disk_workspace") = cmd_->mumps_virtual_memory;
+        lu_->rdata("memory_relaxation") = cmd_->mumps_relax;
     #ifdef WITH_MPI
         #ifdef _WIN32
-        data.fortran_comm = MPI_Comm_c2f((MPI_Fint)(std::intptr_t) par_->groupcomm());
+        lu_->idata("fortran_comm") = MPI_Comm_c2f((MPI_Fint)(std::intptr_t) par_->groupcomm());
         #else
-        data.fortran_comm = MPI_Comm_c2f((ompi_communicator_t*) par_->groupcomm());
+        lu_->idata("fortran_comm") = MPI_Comm_c2f((ompi_communicator_t*) par_->groupcomm());
         #endif
     #else
-        data.fortran_comm = 0;
+        lu_->idata("fortran_comm") = 0;
     #endif
     }
 #endif
     
     // factorize
     timer.reset();
-    lu_.reset(LUft::Choose(cmd_->factorizer));
-    lu_->factorize(csr, data);
+    lu_->factorize(csr);
+    lu_->save();
     
     // print statistics
     if (lu_->cond() != 0)

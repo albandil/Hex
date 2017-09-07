@@ -6,7 +6,7 @@
 //                    / /   / /    \_\      / /  \ \                                 //
 //                                                                                   //
 //                                                                                   //
-//  Copyright (c) 2016, Jakub Benda, Charles University in Prague                    //
+//  Copyright (c) 2017, Jakub Benda, Charles University in Prague                    //
 //                                                                                   //
 // MIT License:                                                                      //
 //                                                                                   //
@@ -70,7 +70,7 @@ class LUft_SUPERLU_DIST : public LUft
         LUft_SUPERLU_DIST const & operator= (LUft_SUPERLU_DIST const &) = delete;
         
         /// Factorize.
-        virtual void factorize (CsrMatrix<LU_int_t,Complex> const & matrix, LUftData data);
+        virtual void factorize (CsrMatrix<LU_int_t,Complex> const & matrix);
         
         /// Validity indicator.
         virtual bool valid () const { return size_ != 0; }

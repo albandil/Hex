@@ -97,9 +97,6 @@ class CoupledPreconditioner : public virtual KPACGPreconditioner
     
     protected:
     
-        // LU factorization data.
-        LUftData data_;
-        
         // LU factorization.
         std::shared_ptr<LUft> lu_;
         

@@ -207,6 +207,7 @@ void CommandLine::parse (int argc, char* argv[])
                     "\t--mumps-out-of-core              Use out-of-core capability of MUMPS (this is independent on --out-of-core option).\n"
                     "\t--mumps-verbose <number>         Verbosity level of the MUMPS library. Zero ('0') means no output, higher numbers increase the verbosity.\n"
                     "\t--mumps-memory-relaxation <number> How much percent more of the guessed LU factor storage to allocate.\n"
+                    "\t--mumps-virtual-memory           Use virtual memory (disk files) for LU factors.\n"
 #endif
                     "\n"
                     "Stage selection\n"
@@ -561,6 +562,12 @@ void CommandLine::parse (int argc, char* argv[])
             {
                 // MUMPS memory relaxation factor
                 mumps_relax = std::atof(optargs[0].c_str());
+                return true;
+            },
+        "mumps-virtual-memory", "", 0, [&](std::vector<std::string> const & optargs) -> bool
+            {
+                // MUMPS out of core
+                mumps_virtual_memory = true;
                 return true;
             },
 #endif

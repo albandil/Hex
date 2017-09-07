@@ -6,7 +6,7 @@
 //                    / /   / /    \_\      / /  \ \                                 //
 //                                                                                   //
 //                                                                                   //
-//  Copyright (c) 2016, Jakub Benda, Charles University in Prague                    //
+//  Copyright (c) 2017, Jakub Benda, Charles University in Prague                    //
 //                                                                                   //
 // MIT License:                                                                      //
 //                                                                                   //
@@ -94,6 +94,9 @@ LUft_Pardiso::LUft_Pardiso () : LUft()
     int solver = 0;     // sparse direct solver
     int error  = 0;     // success indicator
     
+    idata_["groupsize"] = 1;
+    rdata_["drop_tolerance"] = 1e-8;
+    
 #ifdef WITH_MKL
     pardisoinit(pt_, &mtype, iparm_);
 #else
@@ -127,7 +130,7 @@ LUft_Pardiso::~LUft_Pardiso ()
     drop();
 }
 
-void LUft_Pardiso::factorize (CsrMatrix<LU_int_t,Complex> const & matrix, LUftData data)
+void LUft_Pardiso::factorize (CsrMatrix<LU_int_t,Complex> const & matrix)
 {
     //
     // Cast matrix data to the data types expected by Pardiso (32-bit Int and 8-byte Real).
@@ -167,12 +170,12 @@ void LUft_Pardiso::factorize (CsrMatrix<LU_int_t,Complex> const & matrix, LUftDa
     #else
         IPARM(3) = 1;
     #endif
-        IPARM(52) = data.groupsize;
+        IPARM(52) = idata_["groupsize"];
 #endif
         
         perm_.resize(n);
         
-        DPARM(5) = data.drop_tolerance;     // ILU drop tolerance
+        DPARM(5) = rdata_["drop_tolerance"];     // ILU drop tolerance
         
         pardiso
         (

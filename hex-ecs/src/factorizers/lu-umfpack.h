@@ -6,7 +6,7 @@
 //                    / /   / /    \_\      / /  \ \                                 //
 //                                                                                   //
 //                                                                                   //
-//  Copyright (c) 2016, Jakub Benda, Charles University in Prague                    //
+//  Copyright (c) 2017, Jakub Benda, Charles University in Prague                    //
 //                                                                                   //
 // MIT License:                                                                      //
 //                                                                                   //
@@ -91,8 +91,7 @@ class LUft_UMFPACK : public LUft
         factorizerRunTimeSelectionDefinitions(LUft_UMFPACK, "umfpack")
         
         /// Default constructor.
-        LUft_UMFPACK ()
-            : LUft(), numeric_(nullptr), info_(UMFPACK_INFO) {}
+        LUft_UMFPACK ();
         
         /// Destructor.
         virtual ~LUft_UMFPACK () { drop(); }
@@ -101,7 +100,7 @@ class LUft_UMFPACK : public LUft
         LUft_UMFPACK const & operator= (LUft_UMFPACK const &) = delete;
         
         /// Factorize.
-        virtual void factorize (CsrMatrix<LU_int_t,Complex> const & matrix, LUftData data);
+        virtual void factorize (CsrMatrix<LU_int_t,Complex> const & matrix);
         
         /// Return factorization information.
         NumberArray<double> const & info () const { return info_; }

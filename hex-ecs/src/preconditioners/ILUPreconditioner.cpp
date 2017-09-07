@@ -6,7 +6,7 @@
 //                    / /   / /    \_\      / /  \ \                                 //
 //                                                                                   //
 //                                                                                   //
-//  Copyright (c) 2016, Jakub Benda, Charles University in Prague                    //
+//  Copyright (c) 2017, Jakub Benda, Charles University in Prague                    //
 //                                                                                   //
 // MIT License:                                                                      //
 //                                                                                   //
@@ -70,7 +70,6 @@ ILUCGPreconditioner::ILUCGPreconditioner
         bspline_x_inner, bspline_x_full,
         bspline_y_inner, bspline_y_full
     ),
-    data_(ang.states().size()),
     lu_(ang.states().size())
 {
 #ifdef _OPENMP
@@ -102,7 +101,7 @@ void ILUCGPreconditioner::reset_lu ()
             std::cout << "\tUsing factorizer \"" << lu_[iblock]->name() << "\" (use --lu <factorizer> to change this)" << std::endl;
         
         // associate existing disk files
-        lu_[iblock]->link(format("lu-%d.ooc", iblock));
+        lu_[iblock]->link(format("lu-E%+g-%d-%4x-%4x.bin", E_, iblock, rad_panel().bspline_x().hash(), rad_panel().bspline_y().hash()));
     }
     
 #ifdef WITH_SUPERLU_DIST
@@ -137,12 +136,15 @@ void ILUCGPreconditioner::update (Real E)
     // reset data on energy change
     if (E != E_ and not cmd_->noluupdate)
     {
+        CGPreconditioner::update(E);
+        
         // release outdated LU factorizations
         reset_lu();
     }
-    
-    // update parent
-    CGPreconditioner::update(E);
+    else
+    {
+        CGPreconditioner::update(E);
+    }
 }
 
 void ILUCGPreconditioner::CG_init (int iblock) const
@@ -170,35 +172,36 @@ void ILUCGPreconditioner::CG_init (int iblock) const
         CsrMatrix<LU_int_t,Complex> csr = calc_full_block(iblock, iblock).tocsr();
         
         // set up factorization data
-        data_[iblock].drop_tolerance = cmd_->droptol;
-        data_[iblock].groupsize = cmd_->groupsize;
-        data_[iblock].ooc_dir = cmd_->scratch.c_str();
+        lu_[iblock]->rdata("drop_tolerance") = cmd_->droptol;
+        lu_[iblock]->idata("groupsize") = cmd_->groupsize;
+        lu_[iblock]->pdata("ooc_dir") = (void*)cmd_->scratch.c_str();
 #ifdef WITH_SUPERLU_DIST
         if (cmd_->factorizer == "superlu_dist")
         {
-            data_[iblock].superlu_dist_grid = const_cast<gridinfo_t*>(&grid_);
+            lu_[iblock]->pdata("superlu_dist_grid") = const_cast<gridinfo_t*>(&grid_);
         }
 #endif
 #ifdef WITH_MUMPS
         if (cmd_->factorizer == "mumps")
         {
-            data_[iblock].out_of_core = cmd_->mumps_outofcore;
-            data_[iblock].verbosity = cmd_->mumps_verbose;
-            data_[iblock].memory_relaxation = cmd_->mumps_relax;
+            lu_[iblock]->idata("out_of_core") = cmd_->mumps_outofcore;
+            lu_[iblock]->idata("verbosity") = cmd_->mumps_verbose;
+            lu_[iblock]->idata("disk_workspace") = cmd_->mumps_virtual_memory;
+            lu_[iblock]->rdata("memory_relaxation") = cmd_->mumps_relax;
     #ifdef WITH_MPI
         #ifdef _WIN32
-            data_[iblock].fortran_comm = MPI_Comm_c2f((MPI_Fint)(std::intptr_t) par_->groupcomm());
+            lu_[iblock]->idata("fortran_comm") = MPI_Comm_c2f((MPI_Fint)(std::intptr_t) par_->groupcomm());
         #else
-            data_[iblock].fortran_comm = MPI_Comm_c2f((ompi_communicator_t*) par_->groupcomm());
+            lu_[iblock]->idata("fortran_comm") = MPI_Comm_c2f((ompi_communicator_t*) par_->groupcomm());
         #endif
     #else
-            data_[iblock].fortran_comm = 0;
+            lu_[iblock]->idata("fortran_comm") = 0;
     #endif
         }
 #endif
         
         // factorize the block and store it
-        lu_[iblock]->factorize(csr, data_[iblock]);
+        lu_[iblock]->factorize(csr);
         
         // print time and memory info for this block (one thread at a time)
         # pragma omp critical
@@ -227,9 +230,8 @@ void ILUCGPreconditioner::CG_init (int iblock) const
         }
         
         // save the diagonal block's factorization
-        lu_[iblock]->link(format("lu-%d.bin", iblock));
-        if (cmd_->outofcore)
-            lu_[iblock]->save();
+        lu_[iblock]->link(format("lu-E%+g-%d-%4x-%4x.bin", E_, iblock, rad_panel().bspline_x().hash(), rad_panel().bspline_y().hash()));
+        lu_[iblock]->save();
         
 #ifdef _OPENMP
         // release lock

@@ -6,7 +6,7 @@
 //                    / /   / /    \_\      / /  \ \                                 //
 //                                                                                   //
 //                                                                                   //
-//  Copyright (c) 2016, Jakub Benda, Charles University in Prague                    //
+//  Copyright (c) 2017, Jakub Benda, Charles University in Prague                    //
 //                                                                                   //
 // MIT License:                                                                      //
 //                                                                                   //
@@ -106,9 +106,6 @@ class ILUCGPreconditioner : public virtual CGPreconditioner
         virtual void CG_exit (int iblock) const;
         
     protected:
-        
-        // LU data
-        mutable std::vector<LUftData> data_;
         
         // LU decompositions of the diagonal blocks
         mutable std::vector<std::shared_ptr<LUft>> lu_;

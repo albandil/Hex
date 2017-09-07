@@ -6,7 +6,7 @@
 //                    / /   / /    \_\      / /  \ \                                 //
 //                                                                                   //
 //                                                                                   //
-//  Copyright (c) 2015, Jakub Benda, Charles University in Prague                    //
+//  Copyright (c) 2017, Jakub Benda, Charles University in Prague                    //
 //                                                                                   //
 // MIT License:                                                                      //
 //                                                                                   //
@@ -32,16 +32,30 @@
 #ifndef HEX_MEMORY
 #define HEX_MEMORY
 
+// --------------------------------------------------------------------------------- //
+
 #include <iostream>
+#include <climits>
 #include <cstdint>
 #include <cstddef>
 #include <cstdlib>
 
+// --------------------------------------------------------------------------------- //
+
 #include "hex-misc.h"
+
+// --------------------------------------------------------------------------------- //
 
 // number array alignment (256 bits ~ AVX2)
 #define SIMD_VECTOR_BITS 256u
 #define SIMD_VECTOR_BYTES (SIMD_VECTOR_BITS / 8u)
+
+// --------------------------------------------------------------------------------- //
+
+// page size
+#define PAGE_SIZE 4096
+
+// --------------------------------------------------------------------------------- //
 
 // number of components of vector that fits into SIMD vector type
 #define simd_single_vec_size (SIMD_VECTOR_BYTES / sizeof(float))
@@ -52,6 +66,8 @@
     #define simd_real_vec_size simd_double_vec_size
 #endif
 
+// --------------------------------------------------------------------------------- //
+
 // aligned pointers
 #if (defined(__GNUC__) && !defined(__clang__))
     #define assume_aligned(x,a) __builtin_assume_aligned((x),(a))
@@ -59,12 +75,27 @@
     #define assume_aligned(x,a) (x)
 #endif
 
+// --------------------------------------------------------------------------------- //
+
 // restricted pointers
 #ifdef __GNUC__
     #define restrict __restrict
 #else
     #define restrict
 #endif
+
+// --------------------------------------------------------------------------------- //
+
+// low-level file and memory functions
+#ifdef __linux__
+    #include <sys/mman.h>
+    #include <sys/stat.h>
+    
+    #include <fcntl.h>
+    #include <unistd.h>
+#endif
+
+// --------------------------------------------------------------------------------- //
 
 /**
  * @brief Basic memory allocator.
@@ -130,6 +161,8 @@ template <class T> class PlainAllocator
                 delete [] ptr;
         }
 };
+
+// --------------------------------------------------------------------------------- //
 
 /**
  * @brief Aligned memory allocator.
@@ -284,5 +317,117 @@ template <class T, std::size_t alignment_ = std::alignment_of<T>::value> class A
             std::cout << "   alignment    : " << align << " Bytes (default: " << alignof(max_align_t) << ")" << std::endl;
         }
 };
+
+// --------------------------------------------------------------------------------- //
+
+/**
+ * @brief Virtual memory allocator.
+ * 
+ * This class will create a memory mapped disk file each time an allocation is
+ * requested. Such file does not occupy the physical memory and can be used to
+ * offload large arrays. Still, if there is enough physical memory, it will be
+ * cached in memory and the access times should not dramatically suffer.
+ */
+template <class T, std::size_t pagesize_ = PAGE_SIZE> class vMemAllocator
+{
+    public:
+        
+        static const std::size_t pagesize = pagesize_;
+        
+        /**
+         * @brief Allocate virtual memory.
+         * 
+         * Create a temporary file with given prefix, in chosen location,
+         * and map it into virtual memory space. The first three words
+         * are reserved for internal usage (file descriptor, low word of
+         * file size, high word of file size) and pointer to the rest is
+         * returned to the used.
+         */
+        static T * alloc (std::size_t n, std::string tmpdir = ".", std::string prefix = "")
+        {
+#ifdef __linux__
+            // create a unique temporary file with the given prefix
+            std::string filename = tmpdir + "/" + prefix + "XXXXXX";
+            int fd = mkstemp64(const_cast<char*>(filename.c_str()));
+            
+            if (fd == -1)
+                HexException("Failed to create scratch file %s: %s", filename.c_str(), std::strerror(errno));
+            
+            // calculate number of pages the file will span, round up
+            size_t npages = (n * sizeof(T) + 3*sizeof(int) + pagesize_ - 1) / pagesize_;
+            std::size_t filesize = npages * pagesize_;
+            
+            std::cout << "allocate " << npages << " pages" << std::endl;
+            
+            // fill file with zeros
+            char page[pagesize];
+            std::memset(page, 0, pagesize);
+            for (std::size_t ipage = 0; ipage < npages; ipage++)
+            if (write(fd, page, pagesize) != pagesize)
+                HexException("Cannot allocate %ld-th page in file %s: %s", ipage + 1, filename.c_str(), std::strerror(errno));
+            
+            // map the file to memory
+            int* buffer = (int*)mmap64
+            (
+                nullptr,                // memory location where the mapping should start - auto
+                filesize,               // size of the mapping
+                PROT_READ | PROT_WRITE, // access permissions
+                MAP_SHARED,             // allow immediate write to disk
+                fd,                     // file desccriptor
+                0                       // file offset
+            );
+            
+            if (buffer == MAP_FAILED)
+                HexException("Failed to map scratch file %s to memory: %s", filename.c_str(), std::strerror(errno));
+            
+            buffer[0] = fd;
+            buffer[1] = filesize % INT_MAX;
+            buffer[2] = filesize / INT_MAX;
+            
+            return (T*)(buffer + 3);
+#else
+            return nullptr;
+#endif
+        }
+        
+        static void free (T * origin)
+        {
+#ifdef __linux__
+            if (origin != nullptr)
+            {
+                // shfit pointer to the beginning of the data array
+                int* buffer = ((int*)origin) - 3;
+                
+                // read allocation data
+                int fd = buffer[0];
+                int lo = buffer[1];
+                int hi = buffer[2];
+                
+                // calculate memory size
+                size_t filesize = hi;
+                filesize *= INT_MAX;
+                filesize += lo;
+                
+                // get scratch filename
+                char link[PATH_MAX], filename[PATH_MAX];
+                snprintf(link, PATH_MAX, "/proc/%d/fd/%d", getpid(), fd);
+                if (realpath(link, filename) == nullptr)
+                    HexException("Failed to retrieve filename from %s: %s", link, std::strerror(errno));
+                
+                // safely unmap the disk file
+                if (munmap(buffer, filesize) == -1)
+                    HexException("Failed to deallocate virtual memory: %s", std::strerror(errno));
+                
+                // close the file
+                close(fd);
+                
+                // remove the file
+                std::remove(filename);
+            }
+#endif
+        }
+};
+
+// --------------------------------------------------------------------------------- //
 
 #endif /* HEX_MEMORY */

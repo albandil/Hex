@@ -103,7 +103,7 @@ class CommandLine
               gpu_host_multiply(false), mumps_outofcore(false), mumps_verbose(0), mumps_relax(20), kpa_drop(-1), write_intermediate_solutions(false),
               fast_bessel(false), hyb_additional_levels(0), multigrid_depth(0), multigrid_coarse_prec(0), dom_x_panels(1), dom_y_panels(1),
               dom_preconditioner("ILU"), dom_sweeps(-1), scratch(std::getenv("SCRATCHDIR") ? std::getenv("SCRATCHDIR") : "."), analytic_eigenstates(false),
-              runtime_postprocess(false), sub_prec_verbose(false), multi_rhs(false), fpe(false)
+              runtime_postprocess(false), sub_prec_verbose(false), multi_rhs(false), fpe(false), mumps_virtual_memory(false)
         {
             // get command line options
             parse(argc, argv);
@@ -309,6 +309,9 @@ class CommandLine
         
         /// Raise SIGFPE on invalid numerical result.
         bool fpe;
+        
+        /// Use virtual memory for MUMPS factors.
+        bool mumps_virtual_memory;
 };
 
 /**

@@ -44,6 +44,21 @@
 LUft_MUMPS::LUft_MUMPS () : LUft()
 {
     settings.job = MUMPS_NOACTION;
+    
+    workspace_ = nullptr;
+    workspace_size_ = 0;
+    
+    static const char * ooc_dir  = ".";
+    
+    idata_["verbosity"]          = 0;
+    idata_["centralized_matrix"] = true;
+    idata_["out_of_core"]        = false;
+    idata_["fortran_comm"]       = 0;
+    idata_["disk_workspace"]     = false;
+    
+    rdata_["memory_relaxation"]  = 20.0;
+    
+    pdata_["ooc_dir"]            = (void*)ooc_dir;
 }
 
 LUft_MUMPS::~LUft_MUMPS ()
@@ -69,7 +84,7 @@ std::size_t LUft_MUMPS::size () const
     return sizeof(MUMPS_COMPLEX) * elems_size + sizeof(MUMPS_INT) * index_size;
 }
 
-void LUft_MUMPS::factorize (CsrMatrix<LU_int_t,Complex> const & matrix, LUftData data)
+void LUft_MUMPS::factorize (CsrMatrix<LU_int_t,Complex> const & matrix)
 {
     //
     // Create matrix of the system (i.e. the IJV triplets of the symmetric part).
@@ -118,7 +133,7 @@ void LUft_MUMPS::factorize (CsrMatrix<LU_int_t,Complex> const & matrix, LUftData
         settings.sym = 2;
         settings.par = 1;
 #ifdef WITH_MPI
-        settings.comm_fortran = data.fortran_comm;
+        settings.comm_fortran = idata_["fortran_comm"];
 #endif
         MUMPS_C(&settings);
         
@@ -127,16 +142,16 @@ void LUft_MUMPS::factorize (CsrMatrix<LU_int_t,Complex> const & matrix, LUftData
         
         // analyze
         settings.job = MUMPS_ANALYZE;
-        settings.ICNTL(1) = (data.verbosity == 0 ? 0 : 6); // errors to STDOUT (default: 6)
+        settings.ICNTL(1) = (idata_["verbosity"] == 0 ? 0 : 6); // errors to STDOUT (default: 6)
         settings.ICNTL(2) = 0; // diagnostics to /dev/null
-        settings.ICNTL(3) = (data.verbosity == 0 ? 0 : 6); // global info to STDOUT (default: 6)
-        settings.ICNTL(4) = data.verbosity; // verbosity level (default: 2)
+        settings.ICNTL(3) = (idata_["verbosity"] == 0 ? 0 : 6); // global info to STDOUT (default: 6)
+        settings.ICNTL(4) = idata_["verbosity"]; // verbosity level (default: 2)
         settings.ICNTL(5) = 0; // COO format
-        settings.ICNTL(14) = data.memory_relaxation;
-        settings.ICNTL(18) = data.centralized_matrix ? 0 : 3;
-        settings.ICNTL(22) = data.out_of_core; // OOC factorization
+        settings.ICNTL(14) = rdata_["memory_relaxation"];
+        settings.ICNTL(18) = rdata_["centralized_matrix"] ? 0 : 3;
+        settings.ICNTL(22) = idata_["out_of_core"]; // OOC factorization
         settings.ICNTL(28) = 2; // parallel ordering
-        std::strcpy(settings.ooc_tmpdir, data.ooc_dir);
+        std::strcpy(settings.ooc_tmpdir, (const char*)pdata_["ooc_dir"]);
         std::strcpy(settings.ooc_prefix, "ooc_");
         settings.n = n_;
         settings.nz  = settings.nz_loc  = nz;
@@ -147,6 +162,17 @@ void LUft_MUMPS::factorize (CsrMatrix<LU_int_t,Complex> const & matrix, LUftData
         
         if (settings.INFOG(1) != 0)
             HexException("MUMPS analysis failed, error code: %d, detail %d", settings.INFOG(1), settings.INFOG(2));
+        
+        if (idata_["disk_workspace"])
+        {
+            int param = (settings.ICNTL(22) ? settings.ICNTL(20) : settings.ICNTL(8));
+            
+            workspace_size_ = (param >= 0 ? param : (-param) * std::size_t{1000000});
+            workspace_ = vMemAllocator<MUMPS_COMPLEX>::alloc(workspace_size_, settings.ooc_tmpdir, settings.ooc_prefix);
+            
+            settings.lwk_user = param;
+            settings.wk_user = workspace_;
+        }
     
     //
     // Compute the factorization.

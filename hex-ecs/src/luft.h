@@ -43,26 +43,6 @@ template <class IdxT, class DataT> class CsrMatrix;
 
 // --------------------------------------------------------------------------------- //
 
-typedef struct
-{
-    Real drop_tolerance;
-    bool out_of_core;
-    int verbosity;
-    int fortran_comm;
-    int groupsize;
-    const char * ooc_dir;
-    void * superlu_dist_grid;
-    bool centralized_matrix;
-    double memory_relaxation;
-}
-LUftData;
-
-// --------------------------------------------------------------------------------- //
-
-extern LUftData defaultLUftData;
-
-// --------------------------------------------------------------------------------- //
-
 /**
  * @brief LU factorization object
  * 
@@ -93,7 +73,7 @@ class LUft
             virtual ~LUft () {}
             
             /// Factorize.
-            virtual void factorize (CsrMatrix<LU_int_t,Complex> const & matrix, LUftData data = defaultLUftData) = 0;
+            virtual void factorize (CsrMatrix<LU_int_t,Complex> const & matrix) = 0;
             
             /**
              * @brief Validity indicator.
@@ -187,11 +167,23 @@ class LUft
             virtual void load (std::string name, bool throw_on_io_failure = true) = 0;
             virtual void load () { this->load(filename_, true); }
             virtual void silent_load () { this->load(filename_, false); }
+            
+            /**
+             * @brief Set various parameters specific for the factorization method.
+             */
+            virtual void* & pdata (std::string name) { return pdata_[name]; }
+            virtual int   & idata (std::string name) { return idata_[name]; }
+            virtual Real  & rdata (std::string name) { return rdata_[name]; }
         
-    private:
+    protected:
         
         /// Name of the disk file.
         std::string filename_;
+        
+        /// Factorization setup.
+        std::map<std::string,int>   idata_;
+        std::map<std::string,Real>  rdata_;
+        std::map<std::string,void*> pdata_;
 };
 
 // --------------------------------------------------------------------------------- //

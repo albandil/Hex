@@ -6,7 +6,7 @@
 //                    / /   / /    \_\      / /  \ \                                 //
 //                                                                                   //
 //                                                                                   //
-//  Copyright (c) 2016, Jakub Benda, Charles University in Prague                    //
+//  Copyright (c) 2017, Jakub Benda, Charles University in Prague                    //
 //                                                                                   //
 // MIT License:                                                                      //
 //                                                                                   //
@@ -39,10 +39,10 @@
 
 LUft_SUPERLU::LUft_SUPERLU () : LUft(), size_(0)
 {
-    // nothing
+    rdata_["drop_tolerance"] = 1e-8;
 }
 
-void LUft_SUPERLU::factorize (CsrMatrix<LU_int_t,Complex> const & matrix, LUftData data)
+void LUft_SUPERLU::factorize (CsrMatrix<LU_int_t,Complex> const & matrix)
 {
     //
     // Create matrix of the system.
@@ -98,7 +98,7 @@ void LUft_SUPERLU::factorize (CsrMatrix<LU_int_t,Complex> const & matrix, LUftDa
         options.ColPerm = MMD_AT_PLUS_A;
         options.SymPattern = YES;
         options.ILU_DropRule = DROP_BASIC;
-        options.ILU_DropTol = data.drop_tolerance;
+        options.ILU_DropTol = rdata_["drop_tolerance"];
         
         // calculation diagnostic information
         SuperLUStat_t stat;

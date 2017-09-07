@@ -6,7 +6,7 @@
 //                    / /   / /    \_\      / /  \ \                                 //
 //                                                                                   //
 //                                                                                   //
-//  Copyright (c) 2016, Jakub Benda, Charles University in Prague                    //
+//  Copyright (c) 2017, Jakub Benda, Charles University in Prague                    //
 //                                                                                   //
 // MIT License:                                                                      //
 //                                                                                   //
@@ -37,6 +37,12 @@
 
 // --------------------------------------------------------------------------------- //
 
+LUft_UMFPACK::LUft_UMFPACK ()
+    : LUft(), numeric_(nullptr), info_(UMFPACK_INFO)
+{
+    rdata_["drop_tolerance"] = 1e-8;
+}
+
 std::size_t LUft_UMFPACK::size () const
 {
     if (numeric_ == nullptr)
@@ -66,7 +72,7 @@ Real LUft_UMFPACK::cond () const
     return info_[UMFPACK_RCOND];
 }
 
-void LUft_UMFPACK::factorize (CsrMatrix<LU_int_t,Complex> const & matrix, LUftData data)
+void LUft_UMFPACK::factorize (CsrMatrix<LU_int_t,Complex> const & matrix)
 {
     // Use standard UMFPACK sequence
     void *Symbolic, *Numeric;
@@ -78,7 +84,7 @@ void LUft_UMFPACK::factorize (CsrMatrix<LU_int_t,Complex> const & matrix, LUftDa
     
     // modify the drop tolerance
     Control[UMFPACK_STRATEGY] = UMFPACK_STRATEGY_SYMMETRIC;
-    Control[UMFPACK_DROPTOL] = data.drop_tolerance;
+    Control[UMFPACK_DROPTOL] = rdata_["drop_tolerance"];
     
     // diagnostic information
     double Info[UMFPACK_INFO];
