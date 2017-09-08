@@ -353,11 +353,12 @@ template <class T, std::size_t pagesize_ = PAGE_SIZE> class vMemAllocator
             if (fd == -1)
                 HexException("Failed to create scratch file %s: %s", filename.c_str(), std::strerror(errno));
             
-            // calculate number of pages the file will span, round up
-            size_t npages = (n * sizeof(T) + 3*sizeof(int) + pagesize_ - 1) / pagesize_;
-            std::size_t filesize = npages * pagesize_;
+            // header size
+            std::size_t header = std::max<std::size_t>(SIMD_VECTOR_BYTES, 4*sizeof(int));
             
-            std::cout << "allocate " << npages << " pages" << std::endl;
+            // calculate number of pages the file will span, reserve space for header, round up
+            std::size_t npages = (n * sizeof(T) + header + pagesize_ - 1) / pagesize_;
+            std::size_t filesize = npages * pagesize_;
             
             // fill file with zeros
             char page[pagesize];
@@ -384,7 +385,7 @@ template <class T, std::size_t pagesize_ = PAGE_SIZE> class vMemAllocator
             buffer[1] = filesize % INT_MAX;
             buffer[2] = filesize / INT_MAX;
             
-            return (T*)(buffer + 3);
+            return (T*)(buffer + header / sizeof(int));
 #else
             return nullptr;
 #endif
@@ -395,8 +396,11 @@ template <class T, std::size_t pagesize_ = PAGE_SIZE> class vMemAllocator
 #ifdef __linux__
             if (origin != nullptr)
             {
+                // header size
+                std::size_t header = std::max<std::size_t>(SIMD_VECTOR_BYTES, 4*sizeof(int));
+                
                 // shfit pointer to the beginning of the data array
-                int* buffer = ((int*)origin) - 3;
+                int* buffer = ((int*)origin) - header / sizeof(int);
                 
                 // read allocation data
                 int fd = buffer[0];
