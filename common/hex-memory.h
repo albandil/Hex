@@ -360,12 +360,10 @@ template <class T, std::size_t pagesize_ = PAGE_SIZE> class vMemAllocator
             std::size_t npages = (n * sizeof(T) + header + pagesize_ - 1) / pagesize_;
             std::size_t filesize = npages * pagesize_;
             
-            // fill file with zeros
-            char page[pagesize];
-            std::memset(page, 0, pagesize);
-            for (std::size_t ipage = 0; ipage < npages; ipage++)
-            if (write(fd, page, pagesize) != pagesize)
-                HexException("Cannot allocate %ld-th page in file %s: %s", ipage + 1, filename.c_str(), std::strerror(errno));
+            // preallocate scratchfile on disk
+            int status = posix_fallocate64(fd, 0, filesize);
+            if (status != 0)
+                HexException("Cannot pre-allocate file %s: %s", filename.c_str(), std::strerror(status));
             
             // map the file to memory
             int* buffer = (int*)mmap64
