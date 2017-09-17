@@ -160,6 +160,16 @@ template <class T> class PlainAllocator
             if (ptr != nullptr)
                 delete [] ptr;
         }
+        
+        T * allocate (std::size_t n, T const * hint)
+        {
+            return PlainAllocator<T>::alloc(n);
+        }
+        
+        void deallocate (T * ptr, std::size_t n)
+        {
+            PlainAllocator<T>::free(ptr);
+        }
 };
 
 // --------------------------------------------------------------------------------- //
@@ -316,6 +326,16 @@ template <class T, std::size_t alignment_ = std::alignment_of<T>::value> class A
             std::cout << "   padding      : " << d - sizeof(root_address) << " Bytes" << std::endl;
             std::cout << "   alignment    : " << align << " Bytes (default: " << alignof(max_align_t) << ")" << std::endl;
         }
+        
+        T * allocate (std::size_t n, T const * hint)
+        {
+            return AlignedAllocator<T,alignment>::alloc(n);
+        }
+        
+        void deallocate (T * ptr, std::size_t n)
+        {
+            AlignedAllocator<T,alignment>::free(ptr);
+        }
 };
 
 // --------------------------------------------------------------------------------- //
@@ -427,6 +447,16 @@ template <class T, std::size_t pagesize_ = PAGE_SIZE> class vMemAllocator
                 std::remove(filename);
             }
 #endif
+        }
+        
+        T * allocate (std::size_t n, T const * hint)
+        {
+            return vMemAllocator<T,pagesize>::alloc(n);
+        }
+        
+        void deallocate (T * ptr, std::size_t n)
+        {
+            vMemAllocator<T,pagesize>::free(ptr);
         }
 };
 
