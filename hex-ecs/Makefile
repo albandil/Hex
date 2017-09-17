@@ -81,6 +81,7 @@ SUITESPARSELIBS ?= -lumfpack -lamd -lsuitesparseconfig
 
 # Pardiso 5.0.0
 # - incompatible with Intel MKL Pardiso
+# - contains Metis -> incompatible with other Metises (e.g. linked to MUMPS)
 # PARDISOFLAGS = -DWITH_PARDISO
 # PARDISOLIBS = -lpardiso500-MPI-GNU472-X86-64
 
