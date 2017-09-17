@@ -307,14 +307,16 @@ bool LUft_SUPERLU::valid () const
 }
 
 void LUft_SUPERLU::save (std::string name) const
-{
-    HexException("SuperLU factorizer does not yet support --out-of-core option.");
+{ 
+    // TODO
 }
 
 void LUft_SUPERLU::load (std::string name, bool throw_on_io_failure)
 {
+    // TODO
+    
     if (throw_on_io_failure)
-        HexException("SuperLU factorizer does not yet support --out-of-core option.");
+        HexException("Failed to load SuperLU LU decomposition from disk.");
 }
 
 void LUft_SUPERLU::drop ()

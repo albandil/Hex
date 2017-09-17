@@ -240,13 +240,15 @@ std::size_t LUft_LAPACK::size () const
 
 void LUft_LAPACK::save (std::string name) const
 { 
-    HexException("LAPACK factorizer does not yet support --out-of-core option.");
+    // TODO
 }
 
 void LUft_LAPACK::load (std::string name, bool throw_on_io_failure)
 {
+    // TODO
+    
     if (throw_on_io_failure)
-        HexException("LAPACK factorizer does not yet support --out-of-core option.");
+        HexException("Failed to load LAPACK LU decomposition from disk.");
 }
 
 // --------------------------------------------------------------------------------- //

@@ -251,13 +251,15 @@ void LUft_SUPERLU_DIST::solve (const cArrayView b, cArrayView x, int eqs) const
 
 void LUft_SUPERLU_DIST::save (std::string name) const
 { 
-    HexException("SuperLU_dist factorizer does not yet support --out-of-core option.");
+    // TODO
 }
 
 void LUft_SUPERLU_DIST::load (std::string name, bool throw_on_io_failure)
 {
+    // TODO
+    
     if (throw_on_io_failure)
-        HexException("SuperLU_dist factorizer does not yet support --out-of-core option.");
+        HexException("Failed to load SuperLU-DIST LU decomposition from disk.");
 }
 
 
