@@ -44,7 +44,7 @@ LUft_SCALAPACK::LUft_SCALAPACK () : LUft()
 
 void LUft_SCALAPACK::drop ()
 {
-    
+    // TODO
 }
 
 LUft_SCALAPACK::~LUft_SCALAPACK ()
@@ -54,27 +54,31 @@ LUft_SCALAPACK::~LUft_SCALAPACK ()
 
 void LUft_SCALAPACK::factorize (CsrMatrix<LU_int_t,Complex> const & matrix)
 {
-    
+    // TODO
 }
 
 void LUft_SCALAPACK::solve (const cArrayView b, cArrayView x, int eqs) const
 {
-    
+    // TODO
 }
 
 void LUft_SCALAPACK::save (std::string name) const
 {
-    HexException("ScaLAPACK factorizer does not yet support --out-of-core option.");
+    // TODO
 }
 
 void LUft_SCALAPACK::load (std::string name, bool throw_on_io_failure)
 {
+    // TODO
+    
     if (throw_on_io_failure)
-        HexException("ScaLAPACK factorizer does not yet support --out-of-core option.");
+        HexException("Failed to load ScaLAPACK LU decomposition from disk.");
 }
 
 std::size_t LUft_SCALAPACK::size () const
 {
+    // TODO
+    
     return 0;
 }
 

@@ -249,13 +249,15 @@ std::size_t LUft_Pardiso::size () const
 
 void LUft_Pardiso::save (std::string name) const
 { 
-    HexException("Pardiso factorizer does not yet support --out-of-core option.");
+    // TODO
 }
 
 void LUft_Pardiso::load (std::string name, bool throw_on_io_failure)
 {
+    // TODO
+    
     if (throw_on_io_failure)
-        HexException("Pardiso factorizer does not yet support --out-of-core option.");
+        HexException("Failed to load Pardiso LU decomposition from disk.");
 }
 
 

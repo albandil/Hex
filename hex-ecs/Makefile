@@ -81,6 +81,7 @@ SUITESPARSELIBS ?= -lumfpack -lamd -lsuitesparseconfig
 
 # Pardiso 5.0.0
 # - incompatible with Intel MKL Pardiso
+# - contains Metis -> incompatible with other Metises (e.g. linked to MUMPS)
 # PARDISOFLAGS = -DWITH_PARDISO
 # PARDISOLIBS = -lpardiso500-MPI-GNU472-X86-64
 
@@ -140,8 +141,8 @@ BASECXX = $(shell basename $(CXX))
 COMMON_FILES   = hex-arrays hex-blas hex-hdffile hex-hydrogen \
                  hex-matrix hex-misc hex-special hex-version hex-vtkfile
 COMMON_SOURCES = $(patsubst %,../common/%.cpp,$(COMMON_FILES))
-COMMON_OBJECTS = $(patsubst %,obj/$(BASECXX)/common/%.o,$(COMMON_FILES))
-COMMON_DEPS    = $(patsubst %,obj/$(BASECXX)/common/%.dep,$(COMMON_FILES))
+COMMON_OBJECTS = $(patsubst %,obj/$(TARGET)-$(BASECXX)/common/%.o,$(COMMON_FILES))
+COMMON_DEPS    = $(patsubst %,obj/$(TARGET)-$(BASECXX)/common/%.dep,$(COMMON_FILES))
 
 # source files specific to hex-ecs
 HEX_ECS_FILES   = amplitudes ang gauss bspline hldata io luft main preconditioners radial slater solver \
@@ -152,15 +153,15 @@ HEX_ECS_FILES   = amplitudes ang gauss bspline hldata io luft main preconditione
                   preconditioners/GPUPreconditioner preconditioners/HybPreconditioner \
                   preconditioners/DOMPreconditioner preconditioners/CoupledPreconditioner
 HEX_ECS_SOURCES = $(patsubst %,src/%.cpp,$(HEX_ECS_FILES))
-HEX_ECS_OBJECTS = $(patsubst %,obj/$(BASECXX)/hex-ecs/%.o,$(HEX_ECS_FILES))
-HEX_ECS_DEPS    = $(patsubst %,obj/$(BASECXX)/hex-ecs/%.dep,$(HEX_ECS_FILES))
+HEX_ECS_OBJECTS = $(patsubst %,obj/$(TARGET)-$(BASECXX)/hex-ecs/%.o,$(HEX_ECS_FILES))
+HEX_ECS_DEPS    = $(patsubst %,obj/$(TARGET)-$(BASECXX)/hex-ecs/%.dep,$(HEX_ECS_FILES))
 
 # OpenCL kernels
 OCLSOURCES = src/preconditioners/GPUPreconditioner.cl
 OCLKERNELS = src/preconditioners/GPUPreconditioner.inc
 
 # build all targets
-all: pollversion bin/hex-ecs.$(BASECXX)
+all: pollversion bin/hex-ecs.$(TARGET).$(BASECXX)
 
 # dummy target to force update of git revision
 pollversion:
@@ -176,26 +177,26 @@ docclean:
 
 # remove build files
 clean:
-	rm -f bin/hex-ecs bin/hex-ecs.$(BASECXX) $(COMMON_OBJECTS) $(COMMON_DEPS) $(HEX_ECS_OBJECTS) $(HEX_ECS_DEPS)
+	rm -f bin/hex-ecs bin/hex-ecs.$(TARGET).$(BASECXX) $(COMMON_OBJECTS) $(COMMON_DEPS) $(HEX_ECS_OBJECTS) $(HEX_ECS_DEPS)
 
 # remove everything (build files, documentation and distribution files)
 allclean: clean docclean
 
 # main program target
-bin/hex-ecs.$(BASECXX): $(OCLKERNELS) $(COMMON_OBJECTS) $(HEX_ECS_OBJECTS)
+bin/hex-ecs.$(TARGET).$(BASECXX): $(OCLKERNELS) $(COMMON_OBJECTS) $(HEX_ECS_OBJECTS)
 	@mkdir -p $(@D)
 	$(CXX) $(HEX_ECS_OBJECTS) $(COMMON_OBJECTS) $(LFLAGS) -o $@
-	@ln -fs hex-ecs.$(BASECXX) bin/hex-ecs
+	@ln -fs hex-ecs.$(TARGET).$(BASECXX) bin/hex-ecs
 
 # CL -> INC rule (convert OpenCL sources to C byte array)
 %.inc: %.cl
 	xxd -i $< > $@
 
 # CPP -> O rule (compile source files)
-obj/$(BASECXX)/common/%.o: ../common/%.cpp
+obj/$(TARGET)-$(BASECXX)/common/%.o: ../common/%.cpp
 	@mkdir -p $(@D)
 	$(CXX) $(CXXFLAGS) -c $< -o $@ -MMD -MF $(patsubst %.o,%.dep,$@)
-obj/$(BASECXX)/hex-ecs/%.o: src/%.cpp
+obj/$(TARGET)-$(BASECXX)/hex-ecs/%.o: src/%.cpp
 	@mkdir -p $(@D)
 	$(CXX) $(CXXFLAGS) -c $< -o $@ -MMD -MF $(patsubst %.o,%.dep,$@)
 

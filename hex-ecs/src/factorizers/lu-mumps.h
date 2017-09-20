@@ -122,24 +122,10 @@ class LUft_MUMPS : public LUft
         virtual void solve (const cArrayView b, cArrayView x, int eqs) const;
         
         /// Save large data to disk.
-        virtual void save (std::string name) const
-        {
-            //I.hdfsave("I-" + name);
-            //J.hdfsave("J-" + name);
-            //A.hdfsave("A-" + name);
-        }
+        virtual void save (std::string name) const;
         
         /// Load large data from disk.
-        virtual void load (std::string name, bool throw_on_io_failure = true)
-        {
-            //if (not I.hdfload("I-" + name) or
-            //    not J.hdfload("J-" + name) or
-            //    not A.hdfload("A-" + name))
-            //{
-            //    if (throw_on_io_failure)
-            //        HexException("Failed to load MUMPS IJV matrices.");
-            //}
-        }
+        virtual void load (std::string name, bool throw_on_io_failure = true);
         
         /// Release memory.
         virtual void drop ()

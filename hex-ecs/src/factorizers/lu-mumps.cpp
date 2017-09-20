@@ -202,6 +202,19 @@ void LUft_MUMPS::solve (const cArrayView b, cArrayView x, int eqs) const
         HexException("MUMPS backsubstitution failed, error code: %d, detail %d", settings.INFOG(1), settings.INFOG(2));
 }
 
+void LUft_MUMPS::save (std::string name) const
+{ 
+    // TODO
+}
+
+void LUft_MUMPS::load (std::string name, bool throw_on_io_failure)
+{
+    // TODO
+    
+    if (throw_on_io_failure)
+        HexException("Failed to load MUMPS LU decomposition from disk.");
+}
+
 
 // --------------------------------------------------------------------------------- //
 
