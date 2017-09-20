@@ -59,8 +59,8 @@ std::istream & operator >> (std::istream & is, vec3d & v)
         // read white characters as well
         is >> std::noskipws >> c;
         
-        // throw away leading spaces and the opening bracket
-        if (vec.empty() and isspace(c))
+        // throw away leading spaces
+        if (vec.empty() and std::isspace(c))
             continue;
         
         // check that we start with the opening parenthesis
