@@ -29,12 +29,6 @@ Here is the list of the libraries with versions that were used:
                 http://www.sqlite.org/download.html
             Used for access to the database files.
 
- * GiNaC 1.6.4 (+ CLN 1.3.4)
-            Needed, obtainable from
-                http://www.ginac.de/
-            Used for symbolical computation of integrands.
-            Note: I needed to configure GiNaC with '--disable-rpath' option.
-            
 Some or all of the libraries may be present in precompiled form in the repositories
 of the Linux distribution used.
 
