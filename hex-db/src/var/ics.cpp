@@ -78,7 +78,7 @@ void db_ioncs (sqlite3_context* pdb, int n, sqlite3_value** val)
 {
     assert(n == 1);
     
-    // get blob data as text; reinterpret_cast is save as we are using
+    // get blob data as text; reinterpret_cast is safe as we are using
     // the low ASCII only
     std::string blob = reinterpret_cast<const char*>(sqlite3_value_text(*val));
     
@@ -93,7 +93,7 @@ void db_ioncs (sqlite3_context* pdb, int n, sqlite3_value** val)
         return;
     }
     
-    // construct Chebyshev approximation object from the data
+    // reconstruct Chebyshev approximation object from the stored data
     Chebyshev<double,Complex> CB(coeffs, 0, 1);
     
     // integrate

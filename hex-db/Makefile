@@ -59,7 +59,7 @@ COMMON_DEPS    = $(patsubst %,obj/$(BASECXX)/common/%.dep,$(COMMON_FILES))
 # Source files specific to hex-db.
 HEX_DB_FILES   = db ui quantities utils var/asy var/ccs var/colls var/dcs var/ics var/momtf \
                  var/scatamp var/scatamp-dir var/tcs var/tmat var/ionf var/ionamp var/tdcs \
-                 var/stokes var/spflip
+                 var/stokes var/spflip var/sdcsE
 HEX_DB_SOURCES = $(patsubst %,src/%.cpp,$(HEX_DB_FILES))
 HEX_DB_OBJECTS = $(patsubst %,obj/$(BASECXX)/hex-db/%.o,$(HEX_DB_FILES))
 HEX_DB_DEPS    = $(patsubst %,obj/$(BASECXX)/hex-db/%.dep,$(HEX_DB_FILES))
