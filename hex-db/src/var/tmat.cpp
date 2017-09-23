@@ -209,6 +209,10 @@ void hex_tmat_pw_transform
                     if (special::ClebschGordan(ell, mi - mf, lf, mf, L, mi) == 0)
                         continue;
                     
+                    // skip odd parity outcome in case of initial S-state
+                    if (li == 0 and (L + lf + ell) % 2 == 1)
+                        continue;
+                    
                     rArray energies_db, reT_db, imT_db;
                     
                     // prepare selection statement
