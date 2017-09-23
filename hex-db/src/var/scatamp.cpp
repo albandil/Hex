@@ -36,6 +36,7 @@
 
 // --------------------------------------------------------------------------------- //
 
+#include "hex-born.h"
 #include "hex-interpolate.h"
 #include "hex-chebyshev.h"
 #include "hex-special.h"
@@ -175,6 +176,12 @@ void hex_scattering_amplitude_
         cos_angles[i] = std::cos(angles[i]);
     }
     
+    // is the transition a dipole one?
+    bool dipole = (std::abs((*li) - (*lf)) == 1);
+    
+    // Born partial T-matrices
+    std::vector<cArrays> TB (*nEnergies);
+    
     // This function will be called by "hex_tmat_pw_transform" for every partial wave
     //    -  "ell" is the angular momentum of the partial wave
     //    -  "converged" indicates whether the partial wave expansion is converged (0 = not yet, 1 = yes, 2 = convergence failed)
@@ -188,6 +195,47 @@ void hex_scattering_amplitude_
         cArrays const & tmatrices
     )
     {
+        cArray tmatborn (*nEnergies, 0.);
+        
+#ifdef WITH_GINAC
+        // for dipole transitions do the no-exchange Born subtraction
+        if (dipole)
+        {
+            // for all requested energies
+            for (int ie = 0; ie < (*nEnergies); ie++)
+            {
+                // impact and scattered momentum
+                double ki = std::sqrt(energies[ie]);
+                double kf = std::sqrt(energies[ie] - 1./((*ni)*(*ni)) + 1./((*nf)*(*nf)));
+                
+                // no correction for forbidden channels
+                if (not std::isfinite(ki) or not std::isfinite(kf))
+                    continue;
+                
+                // for all missing total angular momenta
+                for (int L = (int)TB[ie].size(); L <= ell + (*lf); L++)
+                {
+                    // Born T-matrices for this energy
+                    cArrays Tdir, Texc;
+                    
+                    // calculate the T-matrices (only direct part, no exchange)
+                    pwba(*ni, *li, ki, *nf, *lf, kf, L, Tdir, Texc, true, false);
+                    
+                    // store only a subset of calculated T-matrices for the requested Mi-Mf transition
+                    TB[ie].push_back( Tdir[((*mi) + (*li))*(2*(*lf) + 1) + (*mf) + (*lf)] );
+                }
+                
+                // sum Born T-matrices for current partial wave
+                for (int L = std::abs((*lf) - ell); L <= (*lf) + ell; L++)
+                {
+                    // TODO: think about the sign
+                    tmatborn[ie] += -TB[ie][L][ell - std::abs((*lf) - L)];
+                }
+            }
+            
+        }
+#endif
+        
         // for all angles
         for (int i = 0; i < (*nAngles); i++)
         {
@@ -197,7 +245,10 @@ void hex_scattering_amplitude_
             // all energies
             for (int j = 0; j < (*nEnergies); j++) if (converged[*S][j] == 0)
             {
-                Complex contrib = -tmatrices[*S][j] * Y / special::constant::two_pi;
+                Complex fdata = -tmatrices[*S][j] * Y / special::constant::two_pi;
+                Complex fborn = -tmatborn[j]      * Y / special::constant::two_pi;
+                
+                Complex contrib = fdata - fborn;
                 
                 // update scattering amplitude
                 if (complete[*S][j])
@@ -216,9 +267,54 @@ void hex_scattering_amplitude_
     (
         *ni, *li, *mi, *nf, *lf, *mf,
         *nEnergies, energies,
+#ifdef WITH_GINAC
+        extra != nullptr and not dipole, // do not extrapolate when Born-subtracting
+#else
         extra != nullptr,
+#endif
         fun
     );
+    
+#ifdef WITH_GINAC
+    // finalize the Born subtraction
+    if (dipole)
+    {
+        // symbolical calculation of the Born amplitude (uses GiNaC library)
+        // - elements of the returned array correspond to individual terms of the result
+        std::map<std::tuple<int,int,int,int,int>,Complex> wb = Wb_symb_in(*nf,*lf,*mf,*ni,*li,*mi);
+        
+        // combined exponential decay factor of the initial and final orbitals
+        double nu = 1./(*ni) + 1./(*nf);
+        
+        // evaluate the symbolical result for all energies
+        for (int j = 0; j < (*nEnergies); j++)
+        {
+            // impact and scattered momentum
+            double ki = std::sqrt(energies[j]);
+            double kf = std::sqrt(energies[j] - 1./((*ni)*(*ni)) + 1./((*nf)*(*nf)));
+            
+            // no correction for forbidden channels
+            if (not std::isfinite(ki) or not std::isfinite(kf))
+                continue;
+            
+            // evaluate the symbolical result for all angles
+            for (int i = 0; i < (*nAngles); i++)
+            {
+                double sint = std::sin(angles[i]);
+                double cost = std::cos(angles[i]);
+                
+                geom::vec3d vki = { 0., 0., ki };
+                geom::vec3d vkf = { kf * sint, 0., kf * cost };
+                geom::vec3d vq = vkf - vki;
+                
+                // TODO: think about the sign
+                Complex fborn = eval_Wb(wb,nu,vq) / special::constant::two_pi;
+                
+                results[j * (*nAngles) + i] += fborn;
+            }
+        }
+    }
+#endif
 }
 
 // --------------------------------------------------------------------------------- //

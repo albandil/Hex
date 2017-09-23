@@ -6,7 +6,7 @@
 //                    / /   / /    \_\      / /  \ \                                 //
 //                                                                                   //
 //                                                                                   //
-//  Copyright (c) 2015, Jakub Benda, Charles University in Prague                    //
+//  Copyright (c) 2017, Jakub Benda, Charles University in Prague                    //
 //                                                                                   //
 // MIT License:                                                                      //
 //                                                                                   //
@@ -32,19 +32,35 @@
 #ifndef HEX_SYMBOLIC
 #define HEX_SYMBOLIC
 
+// --------------------------------------------------------------------------------- //
+
+#if defined(WITH_CLN) || defined(WITH_GINAC)
+
+// --------------------------------------------------------------------------------- //
+
 #include <iostream>
 #include <vector>
 
+// --------------------------------------------------------------------------------- //
+
 #include <cln/cln.h>
 
+// --------------------------------------------------------------------------------- //
+
 #include "hex-misc.h"
+
+// --------------------------------------------------------------------------------- //
 
 #define GF_NONE   0
 #define GF_SIN    1
 #define GF_COS    2
 
+// --------------------------------------------------------------------------------- //
+
 namespace symbolic
 {
+
+// --------------------------------------------------------------------------------- //
 
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *\
@@ -170,7 +186,7 @@ term operator + (term const & A, term const & B);
  * The goniometric functions can either be identical in both terms or the second term
  * has to contain none goniometric function. If this is violated, the function will throw.
  */
-term operator / (term const & A, term const & B) throw (exception);
+term operator / (term const & A, term const & B);
 
 /**
  * @brief Symbolic exponential.
@@ -632,6 +648,14 @@ poly integrate_low (poly const & P);
  */
 term integrate_full (poly const & P);
 
+// --------------------------------------------------------------------------------- //
+
 } // endof namespace symbolic
 
-#endif
+// --------------------------------------------------------------------------------- //
+
+#endif // WITH_CLN or WITH_GINAC
+
+// --------------------------------------------------------------------------------- //
+
+#endif // HEX_SYMBOLIC

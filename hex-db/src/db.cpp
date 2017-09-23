@@ -71,6 +71,9 @@ void hex_initialize_ (const char* dbname)
     // open database
     db.open(dbname);
     
+    // turn off GSL error handler
+    gsl_set_error_handler_off();
+    
     // disable journaling
     sqlitepp::statement st (db);
     st << "PRAGMA synchronous = OFF";
