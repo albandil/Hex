@@ -75,7 +75,7 @@ std::vector<std::pair<std::string,std::string>> TripleDifferentialCrossSection::
         {"mi", "Initial atomic magnetic quantum number."},
         {"S", "Total spin of atomic + projectile electron."},
         {"Ei", "Projectile impact energy (Rydberg)."},
-        {"dirs", "List of pairs of energy share and coordinate triplets in the, like this: '(ε₁,θ₁,φ₁) (ε₂,θ₂,φ₂)'."}
+        {"dirs", "List of pairs of energy share and coordinate triplets in the, like this: '(theta1,phi1,epsilon1) (theta2,phi2,epsilon2)'."}
     };
 }
 
@@ -201,8 +201,8 @@ bool TripleDifferentialCrossSection::run (std::map<std::string,std::string> cons
         // compute outgoing momenta so that
         //   1) (k₁)² + (k₂)² = Ef
         //   2) (k₂)² / (k₁)² = Eshare / (1 - Eshare)
-        double k1 = sqrt((Ei - 1/(ni*ni)) * Eshare);
-        double k2 = sqrt((Ei - 1/(ni*ni)) * (1 - Eshare));
+        double k1 = std::sqrt((Ei - 1./(ni*ni)) * Eshare);
+        double k2 = std::sqrt((Ei - 1./(ni*ni)) * (1 - Eshare));
         
         // evaluated amplitudes for all precomputed energies
         cArray ampls0(E_arr.size());
