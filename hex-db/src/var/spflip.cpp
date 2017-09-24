@@ -206,9 +206,7 @@ bool SpinFlipCrossSection::run (std::map<std::string,std::string> const & sdata)
         for (unsigned j = 0; j < scaled_energies.size(); j++)
         if (converged[0][j] == 0 and converged[1][j] == 0)
         {
-            double contrib = sqrabs(tmatrices[0][j])
-                           + sqrabs(tmatrices[1][j])
-                           + 2.0 * (tmatrices[0][j] * tmatrices[1][j]).real();
+            double contrib = 0.25 * sqrabs(tmatrices[1][j] - tmatrices[0][j]);
             
             // update scattering amplitude
             if (complete[0][j] and complete[1][j])
@@ -216,7 +214,6 @@ bool SpinFlipCrossSection::run (std::map<std::string,std::string> const & sdata)
             
             // update the extrapolated scattering amplitude
             spflip_ex[j] += contrib;
-            
         }
     };
     
