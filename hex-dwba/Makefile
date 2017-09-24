@@ -24,7 +24,7 @@ GSLLIBS ?= $(shell gsl-config --libs)
 # CLN                                                                          #
 # ---------------------------------------------------------------------------- #
 
-CLNFLAGS ?=
+CLNFLAGS ?= -DWITH_CLN
 CLNLIBS ?= -lcln
                                                                                #
 ################################################################################
@@ -43,12 +43,12 @@ CXXFLAGS = $(CXXRILIS)
 
 BASECXX = $(shell basename $(CXX))
 
-COMMON_FILES   = hex-arrays hex-hdffile hex-hydrogen hex-misc hex-special hex-symbolic hex-version
+COMMON_FILES   = hex-arrays hex-born hex-hdffile hex-hydrogen hex-misc hex-special hex-symbolic hex-version
 COMMON_SOURCES = $(patsubst %,../common/%.cpp,$(COMMON_FILES))
 COMMON_OBJECTS = $(patsubst %,obj/$(BASECXX)/common/%.o,$(COMMON_FILES))
 COMMON_DEPS    = $(patsubst %,obj/$(BASECXX)/common/%.dep,$(COMMON_FILES))
 
-HEX_DWBA_FILES   = dwba potential pwba ui wave_distort
+HEX_DWBA_FILES   = dwba potential ui wave_distort
 HEX_DWBA_SOURCES = $(patsubst %,src/%.cpp,$(HEX_DWBA_FILES))
 HEX_DWBA_OBJECTS = $(patsubst %,obj/$(BASECXX)/hex-dwba/%.o,$(HEX_DWBA_FILES))
 HEX_DWBA_DEPS    = $(patsubst %,obj/$(BASECXX)/hex-dwba/%.dep,$(HEX_DWBA_FILES))

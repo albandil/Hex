@@ -6,7 +6,7 @@
 //                    / /   / /    \_\      / /  \ \                                 //
 //                                                                                   //
 //                                                                                   //
-//  Copyright (c) 2015, Jakub Benda, Charles University in Prague                    //
+//  Copyright (c) 2017, Jakub Benda, Charles University in Prague                    //
 //                                                                                   //
 // MIT License:                                                                      //
 //                                                                                   //
@@ -29,6 +29,10 @@
 //                                                                                   //
 //  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
+#if defined(WITH_CLN) || defined(WITH_GINAC)
+
+// --------------------------------------------------------------------------------- //
+
 #include <algorithm>
 #include <cassert>
 #include <cmath>
@@ -37,12 +41,18 @@
 #include <set>
 #include <vector>
 
+// --------------------------------------------------------------------------------- //
+
 #include <cln/cln.h>
 #include <gsl/gsl_sf.h>
+
+// --------------------------------------------------------------------------------- //
 
 #include "hex-misc.h"
 #include "hex-special.h"
 #include "hex-symbolic.h"
+
+// --------------------------------------------------------------------------------- //
 
 symbolic::rational symbolic::onehalf = cln::cl_RA(1)/cln::cl_I(2);
 
@@ -92,7 +102,7 @@ symbolic::term symbolic::operator + (symbolic::term const & A, symbolic::term co
     return S;
 }
 
-symbolic::term symbolic::operator / (symbolic::term const & A, symbolic::term const & B) throw (exception)
+symbolic::term symbolic::operator / (symbolic::term const & A, symbolic::term const & B)
 {
     symbolic::term S = A;
     
@@ -864,3 +874,7 @@ void symbolic::collect (symbolic::poly const & P, symbolic::term const & p, symb
             R.push_back(q);
     }
 }
+
+// --------------------------------------------------------------------------------- //
+
+#endif // WITH_CLN or WITH_GINAC

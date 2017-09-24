@@ -26,6 +26,15 @@ SQLITELIBS ?= -lsqlite3
 
 GSLFLAGS ?= 
 GSLLIBS ?= -lgsl -lgslcblas
+
+# ---------------------------------------------------------------------------- #
+# CLN / GiNaC                                                                  #
+# - optional; used for Born subtraction                                        #
+# ---------------------------------------------------------------------------- #
+
+# GINACFLAGS ?= -DWITH_GINAC
+# GINACLIBS ?= -lginac -lcln
+
                                                                                #
 ################################################################################
 
@@ -35,8 +44,8 @@ LFLAGS += $(SQLITELIBS) $(GINACLIBS) $(GSLLIBS) -Wl,-rpath,'$$ORIGIN/../lib'
 
 GIT_COMMIT = $(shell git rev-parse HEAD | cut -c -8)
 
-CXXRILIS = $(CFLAGS) -DNDEBUG -DNO_LAPACK -DNO_HDF -DNO_MPI -O2 -DGIT_COMMIT=\"$(GIT_COMMIT)\"
-CXXDEBUG = $(CFLAGS) -DNO_HDF -DNO_LAPACK -DNO_MPI -g -O2 -DGIT_COMMIT=\"$(GIT_COMMIT)\"
+CXXRILIS = $(CFLAGS) -DNDEBUG -DNO_LAPACK -DNO_HDF -DNO_MPI -g -O2 -DGIT_COMMIT=\"$(GIT_COMMIT)\"
+CXXDEBUG = $(CFLAGS) -DNO_HDF -DNO_LAPACK -DNO_MPI -g -O0 -DGIT_COMMIT=\"$(GIT_COMMIT)\"
 
 # CXXFLAGS = $(CXXDEBUG)
 CXXFLAGS = $(CXXRILIS)
@@ -51,7 +60,7 @@ SQLITEPP_SOURCES = $(patsubst %,../libs/sqlitepp/%.cpp,$(SQLITEPP_FILES))
 SQLITEPP_OBJECTS = $(patsubst %,obj/$(BASECXX)/sqlitepp/%.o,$(SQLITEPP_FILES))
 
 # Common source files
-COMMON_FILES   = hex-arrays hex-misc hex-special hex-vec3d hex-version
+COMMON_FILES   = hex-arrays hex-born hex-hydrogen hex-misc hex-special hex-symbolic hex-vec3d hex-version
 COMMON_SOURCES = $(patsubst %,../common/%.cpp,$(COMMON_FILES))
 COMMON_OBJECTS = $(patsubst %,obj/$(BASECXX)/common/%.o,$(COMMON_FILES))
 COMMON_DEPS    = $(patsubst %,obj/$(BASECXX)/common/%.dep,$(COMMON_FILES))

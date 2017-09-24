@@ -6,7 +6,7 @@
 //                    / /   / /    \_\      / /  \ \                                 //
 //                                                                                   //
 //                                                                                   //
-//  Copyright (c) 2016, Jakub Benda, Charles University in Prague                    //
+//  Copyright (c) 2017, Jakub Benda, Charles University in Prague                    //
 //                                                                                   //
 // MIT License:                                                                      //
 //                                                                                   //
@@ -33,16 +33,26 @@
 #include <iostream>
 #include <sstream>
 
+// --------------------------------------------------------------------------------- //
+
 #include <gsl/gsl_sf.h>
 
+// --------------------------------------------------------------------------------- //
+
 #include "hex-arrays.h"
+#include "hex-born.h"
 #include "hex-special.h"
 #include "hex-version.h"
 
+// --------------------------------------------------------------------------------- //
+
 #include "dwba.h"
-#include "pwba.h"
+
+// --------------------------------------------------------------------------------- //
 
 using special::constant::pi;
+
+// --------------------------------------------------------------------------------- //
 
 std::string help_text =
     "Usage:\n"
@@ -54,6 +64,8 @@ std::string help_text =
     "\t--nodirect       skip computation of direct T-matrix\n"
     "\t--noexchange     skip computation of exchange T-matrix\n"
     "\t--subtract       generate SQL batch file for Born subtraction\n";
+
+// --------------------------------------------------------------------------------- //
 
 int main (int argc, char *argv[])
 {
