@@ -19,6 +19,7 @@
 					<Add option="-Wno-deprecated-declarations" />
 					<Add option="-Wno-unused-local-typedefs" />
 					<Add option="-DNDEBUG" />
+					<Add option="-DWITH_CLN" />
 					<Add option="-DNO_HDF" />
 					<Add option="-DNO_MPI" />
 					<Add option="-DNO_LAPACK" />
@@ -70,8 +71,6 @@
 		<Unit filename="src/dwba.h" />
 		<Unit filename="src/potential.cpp" />
 		<Unit filename="src/potential.h" />
-		<Unit filename="src/pwba.cpp" />
-		<Unit filename="src/pwba.h" />
 		<Unit filename="src/ui.cpp" />
 		<Unit filename="src/wave_distort.cpp" />
 		<Unit filename="src/wave_distort.h" />

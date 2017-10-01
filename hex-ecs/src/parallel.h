@@ -6,7 +6,7 @@
 //                    / /   / /    \_\      / /  \ \                                 //
 //                                                                                   //
 //                                                                                   //
-//  Copyright (c) 2016, Jakub Benda, Charles University in Prague                    //
+//  Copyright (c) 2017, Jakub Benda, Charles University in Prague                    //
 //                                                                                   //
 // MIT License:                                                                      //
 //                                                                                   //
@@ -513,7 +513,7 @@ class Parallel
         }
         
         /**
-         * @brief Wait for completition of all running tasks.
+         * @brief Wait for completion of all running tasks.
          * 
          * Inserts a MPI BARRIER.
          */
@@ -539,7 +539,7 @@ class Parallel
             if (active_)
                 return (void*)(std::intptr_t)groupcomm_;
 #endif
-            return MPI_Comm(0);
+            return (void*)MPI_Comm(0);
         }
         
     private:

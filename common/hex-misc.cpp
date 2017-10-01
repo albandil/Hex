@@ -219,6 +219,6 @@ void create_directory (std::string dir)
 #ifdef __linux__
     mkdir(dir.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
 #elif defined(_WIN32)
-    CreateDirectoryA(dir.c_str());
+    CreateDirectoryA(dir.c_str(), NULL);
 #endif
 }

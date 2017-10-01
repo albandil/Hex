@@ -39,7 +39,7 @@
 					<Add library="../Win64/lib/libumfpack-5.7.4.dll.a" />
 					<Add library="gfortran" />
 					<Add library="../Win64/lib/libopencl-2.1.dll.a" />
-					<Add library="../Win64/lib/libmumps-5.0.2.dll.a" />
+					<Add library="../Win64/lib/libmumps-5.1.1.dll.a" />
 				</Linker>
 			</Target>
 		</Build>
@@ -77,6 +77,8 @@
 		<Unit filename="../common/hex-symbandmatrix.h" />
 		<Unit filename="../common/hex-version.cpp" />
 		<Unit filename="../common/hex-version.h" />
+		<Unit filename="../common/hex-vtkfile.cpp" />
+		<Unit filename="../common/hex-vtkfile.h" />
 		<Unit filename="src/amplitudes.cpp" />
 		<Unit filename="src/amplitudes.h" />
 		<Unit filename="src/ang.cpp" />
@@ -113,6 +115,10 @@
 		<Unit filename="src/preconditioners.h" />
 		<Unit filename="src/preconditioners/CGPreconditioner.cpp" />
 		<Unit filename="src/preconditioners/CGPreconditioner.h" />
+		<Unit filename="src/preconditioners/CoupledPreconditioner.cpp" />
+		<Unit filename="src/preconditioners/CoupledPreconditioner.h" />
+		<Unit filename="src/preconditioners/DOMPreconditioner.cpp" />
+		<Unit filename="src/preconditioners/DOMPreconditioner.h" />
 		<Unit filename="src/preconditioners/GPUPreconditioner.cpp" />
 		<Unit filename="src/preconditioners/GPUPreconditioner.h" />
 		<Unit filename="src/preconditioners/HybPreconditioner.cpp" />

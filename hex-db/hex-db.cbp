@@ -275,6 +275,9 @@
 		<Unit filename="src/var/scatamp.cpp">
 			<Option target="lib" />
 		</Unit>
+		<Unit filename="src/var/sdcsE.cpp">
+			<Option target="lib" />
+		</Unit>
 		<Unit filename="src/var/spflip.cpp">
 			<Option target="lib" />
 		</Unit>
