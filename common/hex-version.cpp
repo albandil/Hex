@@ -6,7 +6,7 @@
 //                    / /   / /    \_\      / /  \ \                                 //
 //                                                                                   //
 //                                                                                   //
-//  Copyright (c) 2015, Jakub Benda, Charles University in Prague                    //
+//  Copyright (c) 2017, Jakub Benda, Charles University in Prague                    //
 //                                                                                   //
 // MIT License:                                                                      //
 //                                                                                   //
@@ -52,9 +52,9 @@ std::string logo (std::string esc)
         "%s             UK MFF (c) 2017             \n"
         "%s                                         \n"
 #ifdef _LONGINT
-        "%s       version: 2.02 %s ILP64\n"
+        "%s       version: 2.03 %s ILP64\n"
 #else
-        "%s         version: 2.02 %s\n"
+        "%s         version: 2.03 %s\n"
 #endif
         "%s                                         \n",
         esc.c_str(),esc.c_str(),esc.c_str(),esc.c_str(),
