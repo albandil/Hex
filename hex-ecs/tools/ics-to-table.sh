@@ -28,10 +28,10 @@ vtransitions=$(echo "$htransitions" | tr -s ' ' | sed 's/ /\n/g')
 Ntransitions=$(echo "$vtransitions" | wc -l)
 
 # get number of initial states
-Nistates=$(echo "$vtransitions" | cut -f1 -d- | sort | uniq | wc -l)
+Nistates=$(echo "$vtransitions" | sed 's/\(.*(.*)\)-\(.*(.*)\)/\1/g' | sort | uniq | wc -l)
 
 # get number of final states
-Nfstates=$(echo "$vtransitions" | cut -f2 -d- | sort | uniq | wc -l)
+Nfstates=$(echo "$vtransitions" | sed 's/\(.*(.*)\)-\(.*(.*)\)/\2/g' | sort | uniq | wc -l)
 
 # for all energies
 grep -v "#" $1 | while read line
@@ -44,7 +44,7 @@ do
     printf "#%14s" "f \\ i" > $filename
     for i in $(seq 1 $Nistates)
     do
-        istate=$(echo "$htransitions" | cut -f$(( ($i - 1) * $Nfstates + 1 )) -d' ' | cut -f1 -d-)
+        istate=$(echo "$htransitions" | cut -f$(( ($i - 1) * $Nfstates + 1 )) -d' ' | sed 's/\(.*(.*)\)-\(.*(.*)\)/\1/g')
         printf "%15s" "$istate"
     done >> $filename
     echo >> $filename
@@ -52,7 +52,7 @@ do
     # write cross sections
     for f in $(seq 1 $Nfstates)
     do
-        fstate=$(echo "$htransitions" | cut -f$f -d' ' | cut -f2 -d-)
+        fstate=$(echo "$htransitions" | cut -f$f -d' ' | sed 's/\(.*(.*)\)-\(.*(.*)\)/\2/g')
         printf "%15s" "$fstate"
         for i in $(seq 1 $Nistates)
         do
