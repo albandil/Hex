@@ -1537,17 +1537,25 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
             {
                 unsigned k = i + d;
                 
-                SymBandMatrix<Complex> R
-                (
-                    Nspline_y_inner,
-                    order + 1,
-                    rad_panel_->calc_R_tr_dia_block(lambda, i, k).data().slice(0, Nspline_y_inner * (order + 1))
-                );
+                std::shared_ptr<SymBandMatrix<Complex>> R;
                 
                 for (unsigned ill = 0; ill < Nang; ill++) if (par_->isMyGroupWork(ill))
                 for (unsigned illp = 0; illp < Nang; illp++) if (par_->igroupproc() == (int)illp % par_->groupsize())
                 if (Real f = ang_->f(ill, illp, lambda))
                 {
+                    if (R.get() == nullptr)
+                    {
+                        R.reset
+                        (
+                            new SymBandMatrix<Complex>
+                            (
+                                Nspline_y_inner,
+                                order + 1,
+                                rad_panel_->calc_R_tr_dia_block(lambda, i, k).data().slice(0, Nspline_y_inner * (order + 1))
+                            )
+                        );
+                    }
+                    
                     std::size_t chunk = p[ill].size() / Nini;
                     std::size_t chunkp = p[illp].size() / Nini;
                     std::size_t offset = chunk * ini;
@@ -1563,7 +1571,7 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
                     {
                         OMP_LOCK_LOCK(ill * Nspline_x_inner + i);
                         
-                        R.dot
+                        R->dot
                         (
                             inp_->Zp * f, cArrayView(p[illp], offsetp + i * Nspline_y_inner, Nspline_y_inner),
                             1.0_z,        cArrayView(q[ill],  offset  + i * Nspline_y_inner, Nspline_y_inner),
@@ -1581,7 +1589,7 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
                         {
                             OMP_LOCK_LOCK(ill * Nspline_x_inner + i);
                             
-                            R.dot
+                            R->dot
                             (
                                 inp_->Zp * f, cArrayView(p[illp], offsetp + k * Nspline_y_inner, Nspline_y_inner),
                                 1.0_z,        cArrayView(q[ill],  offset  + i * Nspline_y_inner, Nspline_y_inner)
@@ -1594,7 +1602,7 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
                         {
                             OMP_LOCK_LOCK(ill * Nspline_x_inner + k);
                             
-                            R.dot
+                            R->dot
                             (
                                 inp_->Zp * f, cArrayView(p[illp], offsetp + i * Nspline_y_inner, Nspline_y_inner),
                                 1.0_z,        cArrayView(q[ill],  offset  + k * Nspline_y_inner, Nspline_y_inner)
