@@ -12,7 +12,7 @@ fi
 # check that the file exists
 if [ ! -f "$1" ]
 then
-    echo "File \"$f\" does not exist."
+    echo "File \"$1\" does not exist."
     exit
 fi
 
