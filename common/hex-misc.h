@@ -62,6 +62,14 @@
 
 // --------------------------------------------------------------------------------- //
 
+#ifdef WITH_BOINC
+    #include <boinc_api.h>
+    #undef ERR_TRUNCATE
+    #undef ERR_IO
+#endif
+
+// --------------------------------------------------------------------------------- //
+
 #include "hex-numbers.h"
 
 // --------------------------------------------------------------------------------- //
@@ -125,6 +133,9 @@ template <class ...Params> [[noreturn]] void TerminateWithException (const char*
     print_stack_trace();
     
     // exit the program
+#ifdef WITH_BOINC
+    boinc_finish_message(EXIT_FAILURE, format(p...).c_str(), true);
+#endif
 #ifdef NDEBUG
     std::exit(EXIT_FAILURE);
 #else

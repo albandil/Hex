@@ -212,7 +212,10 @@ void CGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArray<C
                 const_cast<BlockArray<Complex>&>(r)[ill].drop();
                 
                 if (not cmd_->shared_scratch or par_->IamGroupMaster())
-                    z.hdfsave(ill, true);
+                {
+                    z.hdfsave(ill);
+                    z.drop(ill);
+                }
             }
         }
     }

@@ -69,12 +69,36 @@
 
 // --------------------------------------------------------------------------------- //
 
+#ifdef WITH_BOINC
+    #include <boinc_api.h>
+    #include <diagnostics.h>
+#endif
+
+// --------------------------------------------------------------------------------- //
+
 int main (int argc, char* argv[])
 {
     //
     // Program initialization
     //
     
+        // disable buffering of the standard output (-> immediate logging)
+        std::setvbuf(stdout, nullptr, _IONBF, 0);
+        
+#ifdef WITH_BOINC
+        // initialize Boinc
+        BOINC_OPTIONS options;
+        boinc_options_defaults(options);
+        options.multi_thread = true;
+        options.multi_process = false;
+        boinc_init_options(&options);
+        
+        // redirect output to "stdout.txt"
+        std::ofstream stdoutFile ("stdout.txt", std::ios::out | std::ios::app);
+        std::cout.rdbuf(stdoutFile.rdbuf());
+        std::cerr.rdbuf(stdoutFile.rdbuf());
+#endif
+        
         // display logo
         std::cout << logo(" ") << std::endl;
         std::cout << "=== Exterior complex scaling in B-splines ===" << std::endl << std::endl;
@@ -88,9 +112,6 @@ int main (int argc, char* argv[])
         
         // turn off GSL exceptions
         gsl_set_error_handler_off();
-        
-        // disable buffering of the standard output (-> immediate logging)
-        std::setvbuf(stdout, nullptr, _IONBF, 0);
         
         // get input from command line
         CommandLine cmd (argc, argv);
@@ -140,6 +161,8 @@ int main (int argc, char* argv[])
         }
         
 #ifdef _OPENMP
+        omp_set_num_threads(cmd.nthreads);
+        
         # pragma omp parallel
         # pragma omp master
         {
@@ -304,5 +327,9 @@ int main (int argc, char* argv[])
 
         std::cout << std::endl << "Done." << std::endl << std::endl;
         
+#ifdef WITH_BOINC
+        boinc_finish(EXIT_SUCCESS);
+#else
         return EXIT_SUCCESS;
+#endif
 }

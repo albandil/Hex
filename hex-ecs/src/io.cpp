@@ -189,8 +189,11 @@ void CommandLine::parse (int argc, char* argv[])
                     "\t                                 The '<parameters>' stands for '<filename> <Xmin> <Ymin> <Xmax> <Ymax> <Xn> <Yn>'.\n"
                     "\t--write-grid               (-g)  Write grid layout to a VTK file.\n"
                     "\t--write-intermediate-solutions   Write all intermediate solution (after every iteration of the PCOCG solver).\n"
+                    "\t--checkpoints                    Write all run-time intermediate data needed to continue interrupted calculation.\n"
+                    "\t--continue                       Continue interrupted calculation from the last available checkpoint.\n"
                     "\t--carry-initial-guess            Whether to use previous-energy solution as an initial guess for the new energy.\n"
                     "\t--refine-solution                Load existing solutions and check that they are within tolerance, update if needed.\n"
+                    "\t--nthreads                       Number of OpenMP threads (otherwise honour OMP_NUM_THREADS).\n"
 #ifdef __linux__
                     "\t--fp-exceptions                  Abort when invalid number is encountered. This can result in unnecessary GSL failures.\n"
 #endif
@@ -224,7 +227,7 @@ void CommandLine::parse (int argc, char* argv[])
                     "\t--own-radial-cache         (-w)  Keep two-electron radial integrals not referenced by preconditioner only on disk (slows down only the initialization).\n"
                     "\t--no-radial-cache          (-r)  Keep all two-electron radial integrals only on disk (slows down also the solution process).\n"
                     "\t--out-of-core              (-o)  Use hard disk drive to store most of intermediate data and thus to save RAM (considerably slower).\n"
-                    "\t--out-of-core-continue     (-O)  Start solution from the existing OOC files.\n"
+                    "\t--out-of-core-continue     (-O)  Start out-of-core solution from the existing OOC files.\n"
                     "\t--whole-matrix             (-W)  In the above three cases: Load whole matrix from scratch file when calculating dot product (speeds them up a little).\n"
                     "\t--shared-scratch           (-s)  Let every MPI process calculate only a subset of shared radial integrals (assume shared output directory).\n"
                     "\t--lightweight-radial-cache (-l)  Do not precalculate two-electron integrals and only apply them on the fly (slower, but saves RAM).\n"
@@ -311,6 +314,12 @@ void CommandLine::parse (int argc, char* argv[])
                 zipdata.nY = std::stoi(optargs[6]);
                 return true;
             },
+        "nthreads", "F", 1, [&](std::vector<std::string> const & optargs) -> bool
+            {
+                // choose factorizer
+                nthreads = std::atoi(optargs[0].c_str());
+                return true;
+            },
 #ifdef __linux__
         "fp-exceptions", "", 0, [&](std::vector<std::string> const & optargs) -> bool
             {
@@ -385,6 +394,12 @@ void CommandLine::parse (int argc, char* argv[])
                 outofcore = true;
                 return true;
             },
+        "continue", "", 0, [&](std::vector<std::string> const & optargs) -> bool
+            {
+                // continue checkpointed calculation (if possible)
+                cont = true;
+                return true;
+            },
         "out-of-core-continue", "O", 0, [&](std::vector<std::string> const & optargs) -> bool
             {
                 // continue OOC calculation
@@ -438,6 +453,11 @@ void CommandLine::parse (int argc, char* argv[])
                 }
                 
                 preconditioner = optargs[0];
+                return true;
+            },
+        "checkpoints", "", 0, [&](std::vector<std::string> const & optargs) -> bool
+            {
+                checkpoints = true;
                 return true;
             },
         "list-preconditioners", "P", 0, [&](std::vector<std::string> const & optargs) -> bool

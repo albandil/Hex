@@ -32,13 +32,19 @@
 #ifndef HEX_PARALLEL
 #define HEX_PARALLEL
 
+// --------------------------------------------------------------------------------- //
+
 #ifdef WITH_MPI
-#include <mpi.h>
+    #include <mpi.h>
 #else
-#define MPI_Comm std::intptr_t
+    #define MPI_Comm std::intptr_t
 #endif
 
+// --------------------------------------------------------------------------------- //
+
 #include "hex-arrays.h"
+
+// --------------------------------------------------------------------------------- //
 
 /**
  * @brief MPI info.
@@ -568,5 +574,7 @@ class Parallel
         // local communicator size
         int groupsize_;
 };
+
+// --------------------------------------------------------------------------------- //
 
 #endif

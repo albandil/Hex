@@ -29,6 +29,11 @@
 //                                                                                   //
 //  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
+#include <cmath>
+#include <csignal>
+
+// --------------------------------------------------------------------------------- //
+
 #include "hex-hydrogen.h"
 #include "hex-misc.h"
 
@@ -36,6 +41,17 @@
 
 #include "amplitudes.h"
 #include "solver.h"
+
+// --------------------------------------------------------------------------------- //
+
+volatile bool writeCheckpointAndDie = false;
+
+void siginthook (int signl)
+{
+    std::cout << "\n\tTerminate request received - please wait for the next iteration." << std::endl;
+    std::cout << "\t                                    " << std::flush;
+    writeCheckpointAndDie = true;
+}
 
 // --------------------------------------------------------------------------------- //
 
@@ -111,6 +127,9 @@ void Solver::solve ()
     auto axby_operation       = [&](Complex a, BlockArray<Complex> & x, Complex b, BlockArray<Complex> const & y) { this->axby_operation_(a,x,b,y); };
     auto new_array            = [&](std::size_t N, std::string name) { return this->new_array_(N,name); };
     auto process_solution     = [&](unsigned iteration, BlockArray<Complex> const & x) { return this->process_solution_(iteration,x); };
+    auto checkpoint_array     = [&](BlockArray<Complex> const & x) { return this->checkpoint_array_(x); };
+    auto recover_array        = [&](BlockArray<Complex> & x) { return this->recover_array_(x); };
+    auto constrain            = [&](BlockArray<Complex> & r) { return this->constrain_(r); };
     
     E_ = special::constant::Nan;
     int iterations_done = 0, computations_done = 0;
@@ -241,9 +260,9 @@ void Solver::solve ()
             // prepare solution vector
             BlockArray<Complex> psi (new_array(ang_.states().size(),"cg-x"));
             
-            // create right hand side
+            // create right hand side (unless we are continuing an OOC calculation, where it can be just read)
             BlockArray<Complex> chi (ang_.states().size(), !cmd_.outofcore, "cg-b");
-            if (not cmd_.cont)
+            if (not cmd_.outofcore or not cmd_.cont)
             {
                 // right-hand side for a single initial state
                 cBlockArray chiseg (chi.size(), !cmd_.outofcore, "cg-chi");
@@ -298,18 +317,19 @@ void Solver::solve ()
             }
             
             // compute and check norm of the right hand side vector
-            Real chi_norm = compute_norm(chi);
-            if (chi_norm == 0.)
+            bnorm_ = compute_norm(chi);
+            progress_ = 0;
+            if (bnorm_ == 0.)
             {
                 // this should not happen, hopefully we already checked
                 std::cout << "\t! Right-hand-side is zero, check L, Pi and nL." << std::endl;
                 computations_done++;
                 continue;
             }
-            if (not std::isfinite(chi_norm))
+            if (not std::isfinite(bnorm_))
             {
                 // this is a numerical problem, probably in evaluation of special functions (P, j)
-                std::cout << "\t! Right hand side has invalid norm (" << chi_norm << ")." << std::endl;
+                std::cout << "\t! Right hand side has invalid norm (" << bnorm_ << ")." << std::endl;
                 computations_done++;
                 continue;
             }
@@ -348,8 +368,9 @@ void Solver::solve ()
                 TODO
             }*/
             
-            // launch the linear system solver
+            // set up the linear system solver
             Timer t;
+            progress_ = 0;
             unsigned max_iter = (inp_.maxell + 1) * (std::size_t)Nspline_inner;
             std::cout << "\tStart linear solver with tolerance " << cmd_.itertol << std::endl;
             std::cout << "\t   i | time        | residual        | min  max  avg  block precond. iter." << std::endl;
@@ -361,7 +382,18 @@ void Solver::solve ()
             CG_.axby                 = axby_operation;
             CG_.new_array            = new_array;
             CG_.process_solution     = process_solution;
+            CG_.checkpoint_array     = checkpoint_array;
+            CG_.recover_array        = recover_array;
+            CG_.constrain            = constrain;
+            
+            // register SIGINT hook
+            std::signal(SIGINT, siginthook);
+            
+            // execute the solver
             unsigned iterations = CG_.solve(chi, psi, cmd_.itertol, 0, max_iter);
+            
+            // unregister SIGINT hook
+            std::signal(SIGINT, SIG_DFL);
             
             if (iterations >= max_iter)
                 std::cout << "\tConvergence too slow... The saved solution will be probably non-converged." << std::endl;
@@ -433,8 +465,34 @@ void Solver::solve ()
 
 void Solver::apply_preconditioner_ (BlockArray<Complex> const & r, BlockArray<Complex> & z) const
 {
-    // save state of the solver for possible restart
-    CG_.dump();
+    // this is the place to do the checkpointing...
+#ifdef WITH_BOINC
+    if (boinc_time_to_checkpoint())
+    {
+        // extended (checkpoint) dump
+        boinc_begin_critical_section();
+        CG_.dump();
+        boinc_end_critical_section();
+        
+        // notify the scheduler
+        boinc_checkpoint_completed();
+    }
+    else
+#endif
+    if (writeCheckpointAndDie)
+    {
+        // extended (checkpoint) dump
+        CG_.dump();
+        
+        // exit, user wants to go home already
+        std::cout << "\n\tCheckpoint written, terminating on user request." << std::endl << std::endl;
+        std::exit(0);
+    }
+    else if (cmd_.outofcore or cmd_.checkpoints)
+    {
+        // simple dump (no extra checkpoint)
+        CG_.dump();
+    }
     
     // MPI-distributed preconditioning
     prec_->precondition(r, z);
@@ -586,6 +644,11 @@ BlockArray<Complex> Solver::new_array_ (std::size_t N, std::string name) const
             // release memory
             array[i].drop();
         }
+        else if (cmd_.cont)
+        {
+            // read checkpoint from disk
+            array.hdfload(i);
+        }
     }
     
     return array;
@@ -636,6 +699,44 @@ void Solver::process_solution_ (unsigned iteration, BlockArray<Complex> const & 
         ampl.writeSQL_files(dir);
         ampl.writeICS_files(dir);
     }
+}
+
+void Solver::checkpoint_array_ (BlockArray<Complex> const & psi) const
+{
+#ifdef WITH_BOINC
+    if (boinc_time_to_checkpoint())
+#else
+    if (cmd_.checkpoints or writeCheckpointAndDie)
+#endif
+    {
+        for (unsigned i = 0; i < psi.size(); i++)
+            psi.hdfsave(i);
+    }
+}
+
+void Solver::recover_array_ (BlockArray<Complex>& psi) const
+{
+    if (cmd_.cont)
+    {
+        for (unsigned i = 0; i < psi.size(); i++)
+        {
+            if (psi.hdfload(i))
+                std::remove(psi[i].hdfname().c_str());
+        }
+    }
+}
+
+void Solver::constrain_ (BlockArray<Complex> & r) const
+{
+#ifdef WITH_BOINC
+    // we will use this place to estimate progress
+    // - assume geometric convergence
+    // - never return lower progress than before
+    Real residual = compute_norm_(r) / bnorm_;
+    Real new_progress = std::log(residual) / std::log(cmd_.itertol);
+    progress_ = std::max(progress_, new_progress);
+    boinc_fraction_done(progress_);
+#endif
 }
 
 void Solver::finish ()

@@ -229,7 +229,7 @@ template <class T, class Alloc = PlainAllocator<T>> class clArray : public clArr
         // data assignment
         //
         
-        clArray & operator = (const ArrayView<T> v)
+        clArray & operator= (const ArrayView<T> v)
         {
             // realloc memory if needed
             resize(v.size());
@@ -237,6 +237,15 @@ template <class T, class Alloc = PlainAllocator<T>> class clArray : public clArr
             // copy data
             for (std::size_t j = 0; j < size(); j++)
                 (*this)[j] = v[j];
+            
+            return *this;
+        }
+        
+        clArray & operator= (clArray<T> && v)
+        {
+            std::swap(clArrayView<T>::cl_handle_, v.clArrayView<T>::cl_handle_);
+            std::swap(  ArrayView<T>::N_,         v.  ArrayView<T>::N_);
+            std::swap(  ArrayView<T>::array_,     v.  ArrayView<T>::array_);
             
             return *this;
         }

@@ -1507,13 +1507,11 @@ template <class T> class BlockArray
             return arrays_[iblock].hdfload(subname(iblock));
         }
         
-        bool hdfsave (std::size_t iblock, bool drop = false)
+        bool hdfsave (std::size_t iblock) const
         {
             assert(iblock < arrays_.size());
             if (not arrays_[iblock].hdfsave(subname(iblock)))
                 return false;
-            if (drop)
-                arrays_[iblock].drop();
             return true;
         }
         

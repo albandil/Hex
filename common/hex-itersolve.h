@@ -51,6 +51,26 @@ template <class TArrayView> void default_process_solution (unsigned iteration, c
 }
 
 /**
+ * @brief Save array for possible recovery read.
+ * 
+ * This function is called when the current state of the solution is being checkpointed.
+ */
+template <class TArrayView> void default_checkpoint_array (const TArrayView r)
+{
+    // no dumping by default
+}
+
+/**
+ * @brief Read array from checkpoint.
+ * 
+ * This function is called when the solver is being recovered. The data are read from a checkpoint.
+ */
+template <class TArrayView> void default_recover_array (TArrayView r)
+{
+    // no recovery by default
+}
+
+/**
  * @brief Constrain the residual vector.
  */
 template <class TArrayView> void default_constraint (TArrayView r)
@@ -178,6 +198,8 @@ class ConjugateGradients
               new_array(default_new_array<TArray>),
               constrain(default_constraint<TArrayView>),
               process_solution(default_process_solution<TArrayView>),
+              checkpoint_array(default_checkpoint_array<TArrayView>),
+              recover_array(default_recover_array<TArrayView>),
               k(1), recovered(false)
         {
             // nothing
@@ -195,7 +217,13 @@ class ConjugateGradients
         std::function<TArray (std::size_t,std::string)> new_array;
         std::function<void (TArrayView)> constrain;
         std::function<void (unsigned, const TArrayView)> process_solution;
+        std::function<void (const TArrayView)> checkpoint_array;
+        std::function<void (TArrayView)> recover_array;
         
+        // internal Krylov and residual vectors
+        TArray r, p, z;
+        
+        // main solution routine
         unsigned solve
         (
             const TArrayView b,
@@ -223,7 +251,7 @@ class ConjugateGradients
             std::size_t N = b.size();
             
             // residual; initialized to starting residual using the initial guess
-            TArray r (new_array(N, "cg-r"));
+            r = std::move(new_array(N, "cg-r"));
             if (not recovered)
             {
                 matrix_multiply(x, r); // r = A x
@@ -250,8 +278,8 @@ class ConjugateGradients
             }
             
             // some auxiliary arrays (search directions etc.)
-            TArray p (new_array(N, "cg-p"));
-            TArray z (new_array(N, "cg-z"));
+            p = std::move(new_array(N, "cg-p"));
+            z = std::move(new_array(N, "cg-z"));
             
             // Iterate
             
@@ -338,8 +366,6 @@ class ConjugateGradients
             return k;
         }
         
-        TArray r, p, z;
-        
         void dump () const
         {
             std::ofstream out ("cg.dat");
@@ -347,6 +373,10 @@ class ConjugateGradients
             out << rho_old.real() << std::endl;
             out << rho_old.imag() << std::endl;
             out << time_offset << std::endl;
+            
+            checkpoint_array(const_cast<const TArrayView>(r));
+            checkpoint_array(const_cast<const TArrayView>(p));
+            checkpoint_array(const_cast<const TArrayView>(z));
         }
         
         void recover ()
@@ -360,6 +390,10 @@ class ConjugateGradients
                 in >> x; rho_old.imag(x);
                 in >> time_offset;
                 recovered = true;
+                
+                recover_array(r);
+                recover_array(p);
+                recover_array(z);
             }
             else
             {

@@ -103,6 +103,15 @@ class Solver
         // concatenate previous-panel full solution and new single-panel solution
         void concatenate_panels_ (cArray & psi, cArray const & psip) const;
         
+        // save array to disk
+        void checkpoint_array_ (BlockArray<Complex> const & psi) const;
+        
+        // read array from disk
+        void recover_array_ (BlockArray<Complex> & psi) const;
+        
+        // constrain the residual
+        void constrain_ (BlockArray<Complex> & r) const;
+        
     private:
         
         /// Command line parameters.
@@ -130,6 +139,8 @@ class Solver
         /// States currently being solved.
         iArray instates_;
         Real E_;
+        mutable Real progress_;
+        mutable Real bnorm_;
         
         /// Asymptotic bound channels for every angular momentum state (l₁,l₂) and r₁- or r₂-asymptotics.
         std::vector<std::pair<iArray,iArray>> bstates_;
