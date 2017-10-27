@@ -244,7 +244,11 @@ void Amplitudes::writeSQL_files (std::string directory)
     
     // compose output filename
     std::ostringstream ossfile;
+#ifdef WITH_BOINC
+    ossfile << "tmat.sql";
+#else
     ossfile << "tmat-L" << inp_.L << "-Pi" << inp_.Pi << ".sql";
+#endif
     
     // Create SQL batch file
     std::ofstream fsql (directory + "/" + ossfile.str().c_str());
