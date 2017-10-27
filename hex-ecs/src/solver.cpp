@@ -406,8 +406,6 @@ void Solver::solve ()
             
             // save solution to disk (if valid)
             if (std::isfinite(compute_norm(psi)))
-                
-            // for all angular blocks
             for (unsigned ill = 0; ill < ang_.states().size(); ill++)
             if (par_.isMyGroupWork(ill) and par_.IamGroupMaster())
             {
@@ -734,7 +732,7 @@ void Solver::constrain_ (BlockArray<Complex> & r) const
     // - never return lower progress than before
     Real residual = compute_norm_(r) / bnorm_;
     Real new_progress = std::log(residual) / std::log(cmd_.itertol);
-    progress_ = std::max(progress_, new_progress);
+    progress_ = std::min(std::max(progress_, new_progress), 1.0);
     boinc_fraction_done(progress_);
 #endif
 }
