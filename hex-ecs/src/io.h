@@ -114,6 +114,8 @@ class CommandLine
         {
 #ifdef _OPENMP
             // initialize the number of threads to OMP_NUM_THREADS
+            #pragma omp parallel
+            #pragma omp master
             nthreads = omp_get_num_threads();
 #endif
             
