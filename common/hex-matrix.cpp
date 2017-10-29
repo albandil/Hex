@@ -52,9 +52,11 @@
 #ifdef SINGLE
 extern "C" void cgetrf_ (int*, int*, Complex*, int*, int*, int*);
 extern "C" void cgetri_ (int*, Complex*, int*, int*, Complex*, int*, int*);
+extern "C" void cgetrs_ (char*, int*, int*, Complex*, int*, int*, Complex*, int*, int*);
 extern "C" void cgeev_ (char*, char*, int*, Complex*, int*, Complex*, Complex*, int*, Complex*, int*, Complex*, int*, Real*, int*);
 #else
 extern "C" void zgetrf_ (int*, int*, Complex*, int*, int*, int*);
+extern "C" void zgetrs_ (char*, int*, int*, Complex*, int*, int*, Complex*, int*, int*);
 extern "C" void zgetri_ (int*, Complex*, int*, int*, Complex*, int*, int*);
 extern "C" void zgeev_ (char*, char*, int*, Complex*, int*, Complex*, Complex*, int*, Complex*, int*, Complex*, int*, Real*, int*);
 #endif

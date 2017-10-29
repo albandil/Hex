@@ -12,7 +12,7 @@
 CXX = g++
 
 # build mode ("debug" or "release")
-TARGET = release
+TARGET = debug
 
 # global compiler flags
 CFLAGS = -fopenmp -Wall -mtune=native -march=native -fcx-limited-range
@@ -91,14 +91,14 @@ endif
 BASECXX = $(shell basename $(CXX))
 
 # common source files
-COMMON_FILES   = hex-arrays hex-hdffile hex-hydrogen \
-                 hex-misc hex-special hex-version
+COMMON_FILES   = hex-arrays hex-blas hex-hdffile hex-hydrogen \
+                 hex-matrix hex-misc hex-special hex-version hex-vtkfile
 COMMON_SOURCES = $(patsubst %,../common/%.cpp,$(COMMON_FILES))
 COMMON_OBJECTS = $(patsubst %,obj/$(BASECXX)/common/%.o,$(COMMON_FILES))
 COMMON_DEPS    = $(patsubst %,obj/$(BASECXX)/common/%.dep,$(COMMON_FILES))
 
 # source files specific to hex-ctmc
-HEX_CTMC_FILES   = main
+HEX_CTMC_FILES   = bspline gauss io luft main preconditioners radial slater
 HEX_CTMC_SOURCES = $(patsubst %,src/%.cpp,$(HEX_CTMC_FILES))
 HEX_CTMC_OBJECTS = $(patsubst %,obj/$(BASECXX)/hex-ctmc/%.o,$(HEX_CTMC_FILES))
 HEX_CTMC_DEPS    = $(patsubst %,obj/$(BASECXX)/hex-ctmc/%.dep,$(HEX_CTMC_FILES))
