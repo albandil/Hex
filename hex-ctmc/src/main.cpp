@@ -43,6 +43,7 @@
 // --------------------------------------------------------------------------------- //
 
 #include "hex-arrays.h"
+#include "hex-hydrogen.h"
 #include "hex-symbandmatrix.h"
 #include "hex-version.h"
 
@@ -53,8 +54,8 @@
 
 // --------------------------------------------------------------------------------- //
 
-extern "C" void zgetrf_ (int*, int*, Complex*, int*, int*, int*);
-extern "C" void zgetrs_ (char*, int*, int*, Complex*, int*, int*, Complex*, int*, int*);
+extern "C" void zgbtrf_ (int*, int*, int*, int*, Complex*, int*, int*, int*);
+extern "C" void zgbtrs_ (char*, int*, int*, int*, int*, Complex*, int*, int*, Complex*, int*, int*);
 
 // --------------------------------------------------------------------------------- //
 
@@ -115,11 +116,14 @@ int main (int argc, char * argv[])
         RadialIntegrals rad (bspline, bspline, 1);
         rad.setupOneElectronIntegrals();
         
+        std::cout << "Calculating one-electron eigenstates" << std::endl << std::endl;
+        
         //- Eigenstates and eigenenergies
         cArray omega (Nspline), D (Nspline);
         
         ColMatrix<Complex> CR (Nspline, Nspline), invCR (Nspline, Nspline), invsqrtS (Nspline, Nspline);
         
+        std::cout << "S(0,0) = " << rad.S()(0,0) << std::endl;
         ColMatrix<Complex> S = rad.S().torow().T();
         ColMatrix<Complex> H = (0.5_z * rad.D() - rad.Mm1()).torow().T();
         
@@ -168,9 +172,17 @@ int main (int argc, char * argv[])
         std::iota(indices.begin(), indices.end(), 0);
         std::sort(indices.begin(), indices.end(), [&](int i, int j) -> bool { return omega[i].real() < omega[j].real(); });
         
-        D = omega;
-        std::sort(D.begin(), D.end(), Complex_realpart_less);
-        std::cout << std::endl << "Eigen-energies: " << D << std::endl;
+        std::cout << "\t\t- eigen-energies: " << std::endl;
+        for (int nr = 0; nr < Nspline; nr++)
+        {
+            Real E_exact = -1./(2*(nr+1)*(nr+1));
+            Real rel_err = std::abs(E_exact - omega[indices[nr]].real()) / std::abs(E_exact);
+            
+            if (rel_err >= 0.01)
+                break;
+            
+            std::cout << format("\t\t  E(%3s) = %7.6f Ry (err %4.3f %%)", Hydrogen::stateName(nr+1,0).c_str(), 2*omega[indices[nr]].real(), 100*rel_err) << std::endl;
+        }
     
     //
     // 2. Initial atomic state.
@@ -179,7 +191,7 @@ int main (int argc, char * argv[])
         int ni = 1;
         
         //- Dimension of atomic electron space to consider (1 <= N <= Nspline)
-        int N = Nspline;
+        int N = 1;
         
         //- Atomic state
         cArray psia (N);
@@ -199,15 +211,23 @@ int main (int argc, char * argv[])
     // 4. Time loop.
     //
     
-        Real dt = 1e-5;
+        Real dt = 1e-6;
         
         //- Potential matrix
         SymBandMatrix<Complex> v (Nspline, order + 1);
         RowMatrix<Complex> V (N,N);
-        ColMatrix<Complex> R (N,N);
+        ColMatrix<Complex> R (Nspline,N);
         
-        //- Auxiliary workspace
-        cArray wrk (N);
+        //- Auxiliary workspaces
+        cArray wrkb1 (Nspline), wrkb2 (Nspline), wrke (N);
+        SymBandMatrix<Complex> M (Nspline, 2 * order + 1);
+        cArray w (Nspline * (4 * order + 1));
+        iArray piv (Nspline);
+        
+        //- Other helper variables
+        int ld = 4 * order + 1, info = 0;
+        char norm = 'N';
+        int one = 1;
         
         std::cout << std::endl << "Starting time loop" << std::endl;
         
@@ -219,7 +239,7 @@ int main (int argc, char * argv[])
         
         std::ofstream out ("out.txt");
         
-        for (int it = 1; x2 < bspline.R2() and it < 1000000; it++)
+        for (int it = 1; x2 < bspline.R2() and it < 10; it++)
         {
             Real t = dt * it;
             
@@ -232,47 +252,91 @@ int main (int argc, char * argv[])
                 {
                     v(ispline,jspline) = 0;
                     
+                    Complex const * const pMi0  = Mi0  + (ispline * (2 * order + 1) + jspline + order - ispline) * (order + 1);
+                    Complex const * const pMim1 = Mim1 + (ispline * (2 * order + 1) + jspline + order - ispline) * (order + 1);
+                    
                     for (int iknot = jspline; iknot <= ispline + order and iknot < bspline.Nreknot() - 1; iknot++)
                     {
                         if (r2 <= bspline.t(iknot).real())
                         {
-                            // r2 < r1
-                            v(ispline,jspline) += 0;
+                            // r1 > r2
+                            v(ispline,jspline) += pMim1[iknot-ispline] / bspline.t(iknot + 1).real();
                         }
                         else if (bspline.t(iknot + 1).real() <= r2)
                         {
                             // r2 > r1
-                            v(ispline,jspline) += 0;
+                            v(ispline,jspline) += pMi0[iknot-ispline] / r2;
                         }
                         else
                         {
                             // r2 ~ r1
-                            v(ispline,jspline) += 0;
+                            // FIXME: This is just an approximation.
+                            v(ispline,jspline) += pMim1[iknot-ispline] / bspline.t(iknot + 1).real();
                         }
                     }
                 }
+                std::cout << "|v| ~ " << v.data().norm() << std::endl;
+                std::cout << "v00 = " << v(0,0) << std::endl;
+                std::cout << " -> = " << rad.S()(0,0) / r2 << std::endl;
                 
-                //- transform the potential to eigenstate basis
-                #pragma omp parallel for
-                for (int i = 0; i < N; i++)
-                    v.dot(1., P.col(i), 0., R.col(i));
-                #pragma omp parallel for collapse(2)
-                for (int i = 0; i < N; i++)
-                for (int j = 0; j < N; j++)
-                    V(i,j) = (P.col(i) | R.col(i));
-            
             // 4b. Update the atomic quantum state.
-
+                
                 //- free hamiltonian action, O(Nspline)
                 #pragma omp parallel for
                 for (int i = 0; i < N; i++)
                     psia[i] *= std::exp(-1.0_i * omega[indices[i]] * t);
                 
-                //- forward Euler scheme: apply potential matrix, O(2 * Nspline^2)
-                blas::gemv(1., V, psia, 1., wrk);
+                //- convert atomic state to the B-spline space
+                #pragma omp parallel for
+                for (int j = 0; j < Nspline; j++)
+                {
+                    wrkb1[j] = 0;
+                    for (int i = 0; i < N; i++)
+                        wrkb1[j] += P.col(indices[i])[j] * psia[i];
+                }
+                
+                M.data().fill(0.);
+/*
+                //- Crank-Nicholson I. (forward Euler half-step)
+                #pragma omp parallel for
+                for (int i = 0; i < Nspline; i++)
+                for (int j = i; j <= i + order and j < Nspline; j++)
+                    M(i,j) = rad.S()(i,j) - 0.5_i * dt * v(i,j);
+                M.dot(1., wrkb1, 0., wrkb2);
+                
+                //- Crank-Nicholson II. (backward Euler half-step)
+                #pragma omp parallel for
+                for (int i = 0; i < Nspline; i++)
+                for (int j = i; j <= i + order and j < Nspline; j++)
+                    M(i,j) = rad.S()(i,j) + 0.5_i * dt * v(i,j);
+                M.toPaddedRows(w);
+                zgbtrf_(&Nspline,&Nspline,&order,&order,w.data(),&ld,piv.data(),&info);
+                zgbtrs_(&norm,&Nspline,&order,&order,&one,w.data(),&ld,piv.data(),wrkb2.data(),&Nspline,&info);
+*/
+/*
+                // backward Euler
+                #pragma omp parallel for
+                for (int i = 0; i < Nspline; i++)
+                for (int j = i; j <= i + order and j < Nspline; j++)
+                    M(i,j) = rad.S()(i,j) - 1.0_i * dt * v(i,j);
+                M.toPaddedRows(w);
+                zgbtrf_(&Nspline,&Nspline,&order,&order,w.data(),&ld,piv.data(),&info);
+                zgbtrs_(&norm,&Nspline,&order,&order,&one,w.data(),&ld,piv.data(),wrkb1.data(),&Nspline,&info);
+*/
+                //- forward Euler
+                #pragma omp parallel for
+                for (int i = 0; i < Nspline; i++)
+                for (int j = i; j <= i + order and j < Nspline; j++)
+                    M(i,j) = rad.S()(i,j) - 1.0_i * dt * v(i,j);
+                M.dot(1., wrkb1, 0., wrkb2);
+                
+                //- apply overlap matrix
+                rad.S().dot(1., wrkb2, 0., wrkb1);
+                
+                //- project back to eigenstate space
                 #pragma omp parallel for
                 for (int i = 0; i < N; i++)
-                    psia[i] -= 1.0_i * dt * wrk[i];
+                    psia[i] = (P.col(indices[i]) | wrkb1);
                 
                 //- free hamiltonian action, O(Nspline)
                 #pragma omp parallel for
