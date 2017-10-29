@@ -105,6 +105,14 @@ class CarthesianBoundWaveFunction
  * @brief Compose name of the hydrogen state.
  * 
  * Return the spectroscopic notation for given quantum numbers.
+ * Example are: 1s, 2s, 2p.
+ */
+std::string stateName (int n, int l);
+
+/**
+ * @brief Compose name of the hydrogen state.
+ * 
+ * Return the spectroscopic notation for given quantum numbers.
  * Example are: 1s(0), 2s(0), 2p(0), 2p(1), 2p(-1).
  */
 std::string stateName (int n, int l, int m);

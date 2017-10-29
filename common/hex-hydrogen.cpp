@@ -121,19 +121,30 @@ Complex CarthesianBoundWaveFunction::operator() (double x, double y, double z) c
     return result * std::exp(-r / N_);
 }
 
-std::string stateName (int n, int l, int m)
+std::string stateName (int n, int l)
 {
-    static const char ang[] = { 's', 'p', 'd', 'f', 'g', 'h', 'i', 'k', 'l', 'm', 'n', 'o' };
-    
-    assert(l < (int)sizeof(ang));
+    static const std::string ang = "spdfghiklmno";
     
     std::ostringstream oss;
-    if (n != 0)
-        oss << n << ang[l] << "(" << m << ")";
-    else
+    
+    if (n == 0)
         oss << "ion";
+    else if (l < (int)ang.size())
+        oss << n << ang[l];
+    else
+        oss << n << '[' << l << ']';
     
     return oss.str();
+}
+
+std::string stateName (int n, int l, int m)
+{
+    std::string name = stateName(n,l);
+    
+    if (n != 0)
+        name += "(" + std::to_string(m) + ")";
+    
+    return name;
 }
 
 std::string stateRName (int n, int l, int two_j, int two_m)
