@@ -512,70 +512,86 @@ public:
      * @f[
      *      \left(
      *           \matrix {
-     *               \ast & \ast &      &      &      \cr
      *               \ast & \ast & \ast &      &      \cr
      *               \ast & \ast & \ast & \ast &      \cr
      *               \ast & \ast & \ast & \ast & \ast \cr
      *                    & \ast & \ast & \ast & \ast \cr
      *                    &      & \ast & \ast & \ast \cr
-     *                    &      &      & \ast & \ast \cr
      *           }
      *      \right)
      *      \longrightarrow
      *      \matrix {
-     *           0    & 0    & 0 \cr
      *                & 0    & 0 \cr
      *                &      & 0 \cr
-     *                &      & . \cr
      *                &      & . \cr
      *                &      & . \cr
      *                &      & . \cr
      *      }
      *      \left(
      *           \matrix {
-     *               \ast & \ast &      &      &      \cr
      *               \ast & \ast & \ast &      &      \cr
      *               \ast & \ast & \ast & \ast &      \cr
      *               \ast & \ast & \ast & \ast & \ast \cr
      *                    & \ast & \ast & \ast & \ast \cr
      *                    &      & \ast & \ast & \ast \cr
-     *                    &      &      & \ast & \ast \cr
      *           }
      *      \right)
      *      \matrix {
      *           .    &      &      \cr
      *           .    &      &      \cr
      *           .    &      &      \cr
-     *           .    &      &      \cr
      *           0    &      &      \cr
      *           0    & 0    &      \cr
-     *           0    & 0    & 0    \cr
      *      }
      *      \longrightarrow
      *      \matrix {
-     *          0    & 0    & 0    & \ast & \ast \cr
      *          0    & 0    & \ast & \ast & \ast \cr
      *          0    & \ast & \ast & \ast & \ast \cr
      *          \ast & \ast & \ast & \ast & \ast \cr
      *          \ast & \ast & \ast & \ast & 0    \cr
      *          \ast & \ast & \ast & 0    & 0    \cr
-     *          \ast & \ast & 0    & 0    & 0    \cr
      *      }
      * @f]
      * Then concatenate rows and return as a single array.
+     * This is useful for example when passing the data to LAPACK
+     * xGBTRF function. However, that function requires double amount
+     * of super-diagonal storage space, so one needs to use an appropriately
+     * larger SymBandMatrix for this, and then pass a corresponding
+     * leading dimension, which will be inflated also below the main
+     * diagonal.
      */
-    NumberArray<DataT> toPaddedRows () const;
-    
-    /**
-     * @brief Zero-pad columns.
-     * 
-     * Pad rows with zeros as in @ref toPaddedRows, then concatenate
-     * columns and return as a single array.
-     */
-    NumberArray<DataT> toPaddedCols () const;
+    void toPaddedRows (ArrayView<DataT> out) const
+    {
+        if (out.size() < (2*d_ - 1) * n_)
+            HexException("Too small array supplied to SymBandMatrix::toPaddedRows (%d < %d x %d).", out.size(), 2*d_ + 1, n_);
+        
+        // clear corners
+        for (std::size_t a = 0; a < d_ - 1; a++)
+        for (std::size_t b = 0; b < d_ - 1 - a; b++)
+            out[a * (2*d_ - 1) + b] = out[(n_ - a - 1) * (2*d_ - 1) + (2*d_ - b - 2)] = 0;
+        
+        // assign non-zero elements
+        for (std::size_t i = 0; i < n_; i++)
+        {
+            // position of diagonal element in output array
+            std::size_t x = d_ - 1 + i * (2*d_ - 1);
+            
+            // diagonal element
+            out[x] = elems_[i * d_];
+            
+            // assign sub-diagonal elements
+            for (std::size_t j = (i >= d_ - 1 ? i - d_ + 1 : 0); j < i; j++)
+                out[x + j - i] = elems_[j * d_ + i - j];
+            
+            // assign super-diagonal elements
+            for (std::size_t j = i + 1; j < n_ and j < i + d_; j++)
+                out[x + j - i] = elems_[i * d_ + j - i];
+        }
+    }
     
     /// Convert matrix part to CooMatrix.
-    template <class IdxT> CooMatrix<IdxT,DataT> tocoo (MatrixSelection::Selection triangle = MatrixSelection::Both) const
+    template <class IdxT>
+    CooMatrix<IdxT,DataT> tocoo (MatrixSelection::Selection triangle = MatrixSelection::Both) const
     {
         NumberArray<IdxT> I, J;
         NumberArray<DataT> V;
