@@ -104,11 +104,11 @@ int main (int argc, char * argv[])
         int order = 4;
         rArray rknots = concatenate
         (
-            linspace( 0.0,   0.0, order),
-            linspace( 0.1,  10.0, 100),
-            linspace(10.5, 500.0, 980)
+            linspace( 0.0,    0.0, order),
+            linspace( 0.05,  10.0,  200),
+            linspace(10.25, 500.0, 1960)
         );
-        rArray cknots = linspace(500., 550., 101);
+        rArray cknots = linspace(500., 550., 201);
         
         //- ECS basis
         Real theta = 0.63;
@@ -202,8 +202,8 @@ int main (int argc, char * argv[])
     
         Real Ei = 4; // impact energy [Ry]
         
-        Real x2 = -bspline.R2();
-        Real v2 = std::sqrt(Ei);
+        Real x2 = -10*bspline.R2();
+        Real u2 = std::sqrt(Ei);
         Real r2 = std::abs(x2);
     
     //
@@ -214,7 +214,7 @@ int main (int argc, char * argv[])
         
         //- Dimension of atomic electron space to consider (1 <= N <= Nspline)
         //  Crop to energetically allowed states.
-        int N = 30;
+        /*int N = 100;
         for (int nr = 0; nr < Nspline and nr < N; nr++)
         {
             if (omega[indices[nr]].real() > 0.5*Ei - 0.5/(ni*ni))
@@ -222,7 +222,8 @@ int main (int argc, char * argv[])
                 N = nr;
                 break;
             }
-        }
+        }*/
+        int N = 200;
         
         std::cout << std::endl;
         std::cout << "Hydrogen eigenstates considered: " << N << std::endl;
@@ -235,18 +236,18 @@ int main (int argc, char * argv[])
     // 4. Time loop.
     //
     
-        Real dt = 0.5e-3;
-        std::size_t nt = 2.01 * bspline.R2() / dt;
+        Real dt = 0.001;
+        std::size_t nt = 2.01 * r2 / dt;
         
         //- potential matrix
-        SymBandMatrix<Complex> v (Nspline, order + 1);
-        RowMatrix<Complex> V (N,N), W (N,N);
+        SymBandMatrix<Complex> v1 (Nspline, order + 1), v2 (Nspline, order + 1), w1 (Nspline, order + 1), w2 (Nspline, order + 1);
+        RowMatrix<Complex> V (N,N), V1 (N,N), V2 (N,N), W1 (N,N), W2 (N,N), MM (N,N);
         ColMatrix<Complex> R (Nspline,N);
         
         //- auxiliary workspaces
         cArray wrkb1 (Nspline), wrkb2 (Nspline), wrke (N);
         SymBandMatrix<Complex> M (Nspline, 2 * order + 1);
-        cArray w (Nspline * (4 * order + 1));
+        //cArray W (Nspline * (4 * order + 1));
         iArray piv (Nspline);
         
         //- other helper variables
@@ -262,20 +263,27 @@ int main (int argc, char * argv[])
         Complex const * const Mi0  = rad.Mitr_L_x(0).data();
         Complex const * const Mim1 = rad.Mitr_mLm1_x(0).data();
         
-        std::ofstream out ("out.txt");
-        
-        for (std::size_t it = 1; x2 < bspline.R2() and it < nt; it++)
+        for (std::size_t it = 1; x2 < 10*bspline.R2() and it < nt; it++)
         {
             Real t = dt * it;
+            
+            std::cout << std::endl;
+            std::cout << "Time = " << t << std::endl;
             
             // 4a. Calculate potential matrix based on the projectile position.
             
                 //- evaluate potential matrix in B-spline basis
-                #pragma omp parallel for
+                # pragma omp parallel for
                 for (int ispline = 0; ispline < Nspline; ispline++)
                 for (int jspline = ispline; jspline < Nspline and jspline <= ispline + order; jspline++)
                 {
-                    v(ispline,jspline) = 0;
+                    v1(ispline,jspline) = v2(ispline,jspline) = 0;
+                    
+                    if (bspline.t(std::min(ispline,jspline) + order + 1).real() <= r2)
+                    {
+                        v1(ispline,jspline) = rad.S()(ispline,jspline);
+                        continue;
+                    }
                     
                     Complex const * const pMi0  = Mi0  + (ispline * (2 * order + 1) + jspline + order - ispline) * (order + 1);
                     Complex const * const pMim1 = Mim1 + (ispline * (2 * order + 1) + jspline + order - ispline) * (order + 1);
@@ -285,22 +293,92 @@ int main (int argc, char * argv[])
                         if (r2 <= bspline.t(iknot).real())
                         {
                             // r1 > r2
-                            v(ispline,jspline) += pMim1[iknot-ispline] / bspline.t(iknot + 1).real();
+                            v2(ispline,jspline) += pMim1[iknot-ispline] / bspline.t(iknot + 1).real();
                         }
                         else if (bspline.t(iknot + 1).real() <= r2)
                         {
                             // r2 > r1
-                            v(ispline,jspline) += pMi0[iknot-ispline] / r2;
+                            v2(ispline,jspline) += pMi0[iknot-ispline] / r2;
                         }
                         else
                         {
                             // r2 ~ r1
                             // FIXME: This is just an approximation.
-                            v(ispline,jspline) += pMim1[iknot-ispline] / bspline.t(iknot + 1).real();
+                            v2(ispline,jspline) += pMim1[iknot-ispline] / bspline.t(iknot + 1).real();
                         }
                     }
                 }
                 
+                unsigned n1 = 0, n2 = 0;
+                
+                //- low-rank updates of the eigenstate potential matrix
+                for (int ispline = 0; ispline < Nspline; ispline++)
+                for (int jspline = ispline; jspline < Nspline and jspline <= ispline + order; jspline++)
+                {
+                    if (w1(ispline,jspline) != v1(ispline,jspline))
+                    {
+                        n1++;
+                        
+                        // amount of change of the B-spline potential matrix element
+                        Complex delta = w1(ispline,jspline) - v1(ispline,jspline);
+                        
+                        // use only half of the change for diagonal elements (will be applied twice)
+                        if (ispline == jspline)
+                            delta *= 0.5;
+                        
+                        // update all elements of the eigenstate potential matrix
+                        # pragma omp parallel for collapse(2)
+                        for (int i = 0; i < N; i++)
+                        for (int j = 0; j < N; j++)
+                        {
+                            cArrayView Pi = P.col(indices[i]);
+                            cArrayView Pj = P.col(indices[j]);
+                            
+                            V1(i,j) += delta * Pi[ispline] * Pj[jspline];
+                            V1(i,j) += delta * Pi[jspline] * Pj[ispline];
+                        }
+                        
+                        // remember that this element has been updated
+                        w1(ispline,jspline) = v1(ispline,jspline);
+                    }
+                    
+                    if (w2(ispline,jspline) != v2(ispline,jspline))
+                    {
+                        n2++;
+                        
+                        // amount of change of the B-spline potential matrix element
+                        Complex delta = w2(ispline,jspline) - v2(ispline,jspline);
+                        
+                        // use only half of the change for diagonal elements (will be applied twice)
+                        if (ispline == jspline)
+                            delta *= 0.5;
+                        
+                        // update all elements of the eigenstate potential matrix
+                        # pragma omp parallel for collapse(2)
+                        for (int i = 0; i < N; i++)
+                        for (int j = 0; j < N; j++)
+                        {
+                            cArrayView Pi = P.col(indices[i]);
+                            cArrayView Pj = P.col(indices[j]);
+                            
+                            V2(i,j) += delta * Pi[ispline] * Pj[jspline];
+                            V2(i,j) += delta * Pi[jspline] * Pj[ispline];
+                        }
+                        
+                        // remember that this element has been updated
+                        w2(ispline,jspline) = v2(ispline,jspline);
+                    }
+                }
+                
+                std::cout << "Low-rank updates: " << n1 << " / " << n2 << std::endl;
+                
+                //- sum eigenstate potential matrix parts
+                # pragma omp parallel for collapse(2)
+                for (int i = 0; i < N; i++)
+                for (int j = 0; j < N; j++)
+                    V(i,j) = V1(i,j)/r2 + V2(i,j);
+                
+/*
                 //- convert to eigenstate basis
                 for (int j = 0; j < N; j++)
                 {
@@ -309,6 +387,7 @@ int main (int argc, char * argv[])
                     for (int i = 0; i < N; i++)
                         V(i,j) = (P.col(indices[i]) | wrkb1);
                 }
+*/
 /*
                 std::cout << std::endl;
                 std::cout << "Re V" << std::endl;
@@ -333,29 +412,20 @@ int main (int argc, char * argv[])
                 //- free hamiltonian action, O(Nspline)
                 #pragma omp parallel for
                 for (int i = 0; i < N; i++)
-                    psia[i] *= std::exp(-1.0_i * omega[indices[i]] * t);
+                    psia[i] = std::exp(-1.0_i * omega[indices[i]] * dt) * psia[i];
 #if 0
                 //- backward Euler
-                #pragma omp parallel for
+                # pragma omp parallel for
                 for (int i = 0; i < N; i++)
                 for (int j = 0; j < N; j++)
-                    W(i,j) = (i == j ? 1.0 : 0.0) + 1.0_i * dt * V(i,j);
-                zgetrf_(&N,&N,W.data().data(),&N,piv.data(),&info);
-                zgetrs_(&norm,&N,&one,W.data().data(),&N,piv.data(),psia.data(),&N,&info);
+                    MM(i,j) = (i == j ? 1.0 : 0.0) + 1.0_i * dt * V(i,j);
+                zgetrf_(&N,&N,MM.data().data(),&N,piv.data(),&info);
+                zgetrs_(&norm,&N,&one,MM.data().data(),&N,piv.data(),psia.data(),&N,&info);
 #else
                 //- forward Euler
                 wrke = psia;
                 blas::gemv(-1.0_i * dt, V, wrke, 1.0, psia);
 #endif
-                //- free hamiltonian action, O(Nspline)
-                #pragma omp parallel for
-                for (int i = 0; i < N; i++)
-                    psia[i] *= std::exp(+1.0_i * omega[indices[i]] * t);
-                
-                //- renormalize, O(Nspline)
-                std::cout << std::endl;
-                std::cout << "Time = " << t << std::endl;
-                //std::cout << "Potential matrix: " << V1.data() << ", " << V2.data() << std::endl;
                 std::cout << "Atomic state populations for first " << std::min(N,7) << " states: " << sqrabs(psia.slice(0,std::min(N,7))) << std::endl;
                 std::cout << "Cross sections: ";
                 for (unsigned nr = 0; nr < std::min(N,10); nr++)
@@ -363,20 +433,20 @@ int main (int argc, char * argv[])
                     int nf = nr + 1;
                     
                     if (ni == nf)
-                        std::cout << sqrabs(psia[nr]) << "(" << sqrabs(psia[nr] - 1.) << "," << sqrabs(psia[nr] + 1.) << ") ";
+                        std::cout << sqrabs(psia[nr]) << "("
+                                  << sqrabs(psia[nr] * std::exp(1.0_i * t * omega[indices[nr]]) - 1.) << " "
+                                  << sqrabs(psia[nr] * std::exp(1.0_i * t * omega[indices[nr]]) + 1.) << ") ";
                     else
                         std::cout << std::sqrt(1 - (1./(ni*ni) - 1./(nf*nf)) / Ei) * sqrabs(psia[nr]) << " ";
                 }
                 std::cout << std::endl;
                 std::cout << "Atomic state norm: " << psia.norm() << std::endl;
-                std::cout << "Projectile kinematics: v2 = " << v2 << ", x2 = " << x2 << std::endl;
+                std::cout << "Projectile kinematics: u2 = " << u2 << ", x2 = " << x2 << std::endl;
                 
-                out << t << '\t' << x2 << '\t' << psia.norm();
-                for (int i = 0; i < std::min(N,5); i++)
-                    out << '\t' << sqrabs(psia[i]);
-                out << std::endl;
-                
-                //psia /= psia.norm();
+                //- free hamiltonian action, O(Nspline)
+//                 # pragma omp parallel for
+//                 for (int i = 0; i < N; i++)
+//                     psia[i] *= std::exp(+1.0_i * omega[indices[i]] * t);
                 
             // 4c. Calculate total mean charge below projectile radius.
 /*
@@ -397,8 +467,8 @@ int main (int argc, char * argv[])
                 Real a2 = 0; // -x2/(r2*r2*r2) * Qr;
                 
                 //- forward Euler scheme
-                v2 += a2 * dt;
-                x2 += v2 * dt;
+                u2 += a2 * dt;
+                x2 += u2 * dt;
                 
                 //- also calculate projectile distance from the origin
                 r2 = std::abs(x2);
