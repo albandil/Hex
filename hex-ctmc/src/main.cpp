@@ -54,6 +54,9 @@
 
 // --------------------------------------------------------------------------------- //
 
+extern "C" void zgetrf_ (int*, int*, Complex*, int*, int*, int*);
+extern "C" void zgetrs_ (char*, int*, int*, Complex*, int*, int*, Complex*, int*, int*);
+
 extern "C" void zgbtrf_ (int*, int*, int*, int*, Complex*, int*, int*, int*);
 extern "C" void zgbtrs_ (char*, int*, int*, int*, int*, Complex*, int*, int*, Complex*, int*, int*);
 
@@ -67,7 +70,7 @@ int main (int argc, char * argv[])
     
         // display logo
         std::cout << logo(" ") << std::endl;
-        std::cout << "=== Semi-classical trajectory Monte Carlo ===" << std::endl << std::endl;
+        std::cout << "=== Classical trajectory projectile fly-by ===" << std::endl << std::endl;
         
         // echo command line
         std::cout << "Command line used" << std::endl;
@@ -101,11 +104,11 @@ int main (int argc, char * argv[])
         int order = 4;
         rArray rknots = concatenate
         (
-            linspace( 0.0,  0.0, order),
-            linspace( 0.1, 10.0, 100),
-            linspace(10.5, 100.0, 180)
+            linspace( 0.0,   0.0, order),
+            linspace( 0.1,  10.0, 100),
+            linspace(10.5, 500.0, 980)
         );
-        rArray cknots = linspace(100., 150., 101);
+        rArray cknots = linspace(500., 550., 101);
         
         //- ECS basis
         Real theta = 0.63;
@@ -122,8 +125,6 @@ int main (int argc, char * argv[])
         cArray omega (Nspline), D (Nspline);
         
         ColMatrix<Complex> CR (Nspline, Nspline), invCR (Nspline, Nspline), invsqrtS (Nspline, Nspline);
-        
-        std::cout << "S(0,0) = " << rad.S()(0,0) << std::endl;
         ColMatrix<Complex> S = rad.S().torow().T();
         ColMatrix<Complex> H = (0.5_z * rad.D() - rad.Mm1()).torow().T();
         
@@ -160,6 +161,10 @@ int main (int argc, char * argv[])
         blas::gemm(1., invsqrtS, CR, 0., invsqrtS_Cl);
         ColMatrix<Complex> const & P = invsqrtS_Cl;
         
+        ColMatrix<Complex> invCl_invsqrtS (Nspline, Nspline);
+        blas::gemm(1., invCR, invsqrtS, 0., invCl_invsqrtS);
+        RowMatrix<Complex> Pm1 (invCl_invsqrtS);
+        
         // Now Hl = ClR * D * ClR⁻¹
         std::cout << "\t\t- time: " << timer.nice_time() << std::endl;
         for (std::size_t i = 0; i < std::size_t(Nspline) * std::size_t(Nspline); i++)
@@ -183,22 +188,16 @@ int main (int argc, char * argv[])
             
             std::cout << format("\t\t  E(%3s) = %7.6f Ry (err %4.3f %%)", Hydrogen::stateName(nr+1,0).c_str(), 2*omega[indices[nr]].real(), 100*rel_err) << std::endl;
         }
-    
-    //
-    // 2. Initial atomic state.
-    //
-    
-        int ni = 1;
         
-        //- Dimension of atomic electron space to consider (1 <= N <= Nspline)
-        int N = 1;
-        
-        //- Atomic state
-        cArray psia (N);
-        psia[ni - 1] = 1; // pure initial state
+        std::ofstream e ("E.dat");
+        for (int nr = 0; nr < Nspline; nr++)
+        {
+            e << nr + 1 << " " << 2*omega[indices[nr]].real() << " " << 2*omega[indices[nr]].imag() << std::endl;
+        }
+        e.close();
     
     //
-    // 3. Initial projectile state.
+    // 2. Initial projectile state.
     //
     
         Real Ei = 4; // impact energy [Ry]
@@ -208,23 +207,49 @@ int main (int argc, char * argv[])
         Real r2 = std::abs(x2);
     
     //
+    // 3. Initial atomic state.
+    //
+    
+        int ni = 6;
+        
+        //- Dimension of atomic electron space to consider (1 <= N <= Nspline)
+        //  Crop to energetically allowed states.
+        int N = 30;
+        for (int nr = 0; nr < Nspline and nr < N; nr++)
+        {
+            if (omega[indices[nr]].real() > 0.5*Ei - 0.5/(ni*ni))
+            {
+                N = nr;
+                break;
+            }
+        }
+        
+        std::cout << std::endl;
+        std::cout << "Hydrogen eigenstates considered: " << N << std::endl;
+        
+        //- Atomic state
+        cArray psia (N);
+        psia[ni - 1] = 1; // pure initial state
+    
+    //
     // 4. Time loop.
     //
     
-        Real dt = 1e-6;
+        Real dt = 0.5e-3;
+        std::size_t nt = 2.01 * bspline.R2() / dt;
         
-        //- Potential matrix
+        //- potential matrix
         SymBandMatrix<Complex> v (Nspline, order + 1);
-        RowMatrix<Complex> V (N,N);
+        RowMatrix<Complex> V (N,N), W (N,N);
         ColMatrix<Complex> R (Nspline,N);
         
-        //- Auxiliary workspaces
+        //- auxiliary workspaces
         cArray wrkb1 (Nspline), wrkb2 (Nspline), wrke (N);
         SymBandMatrix<Complex> M (Nspline, 2 * order + 1);
         cArray w (Nspline * (4 * order + 1));
         iArray piv (Nspline);
         
-        //- Other helper variables
+        //- other helper variables
         int ld = 4 * order + 1, info = 0;
         char norm = 'N';
         int one = 1;
@@ -239,7 +264,7 @@ int main (int argc, char * argv[])
         
         std::ofstream out ("out.txt");
         
-        for (int it = 1; x2 < bspline.R2() and it < 10; it++)
+        for (std::size_t it = 1; x2 < bspline.R2() and it < nt; it++)
         {
             Real t = dt * it;
             
@@ -275,69 +300,53 @@ int main (int argc, char * argv[])
                         }
                     }
                 }
-                std::cout << "|v| ~ " << v.data().norm() << std::endl;
-                std::cout << "v00 = " << v(0,0) << std::endl;
-                std::cout << " -> = " << rad.S()(0,0) / r2 << std::endl;
                 
+                //- convert to eigenstate basis
+                for (int j = 0; j < N; j++)
+                {
+                    v.dot(1., P.col(indices[j]), 0., wrkb1);
+                    # pragma omp parallel for
+                    for (int i = 0; i < N; i++)
+                        V(i,j) = (P.col(indices[i]) | wrkb1);
+                }
+/*
+                std::cout << std::endl;
+                std::cout << "Re V" << std::endl;
+                for (int j = 0; j < N; j++)
+                {
+                    for (int i = 0; i < N; i++)
+                        std::cout << format("%+4.3f  ", V(i,j).real()) << "  ";
+                    std::cout << std::endl;
+                }
+                std::cout << std::endl;
+                std::cout << "Im V" << std::endl;
+                for (int j = 0; j < N; j++)
+                {
+                    for (int i = 0; i < N; i++)
+                        std::cout << format("%+4.3f  ", V(i,j).imag()) << "  ";
+                    std::cout << std::endl;
+                }
+                std::cout << std::endl;
+*/
             // 4b. Update the atomic quantum state.
                 
                 //- free hamiltonian action, O(Nspline)
                 #pragma omp parallel for
                 for (int i = 0; i < N; i++)
                     psia[i] *= std::exp(-1.0_i * omega[indices[i]] * t);
-                
-                //- convert atomic state to the B-spline space
-                #pragma omp parallel for
-                for (int j = 0; j < Nspline; j++)
-                {
-                    wrkb1[j] = 0;
-                    for (int i = 0; i < N; i++)
-                        wrkb1[j] += P.col(indices[i])[j] * psia[i];
-                }
-                
-                M.data().fill(0.);
-/*
-                //- Crank-Nicholson I. (forward Euler half-step)
-                #pragma omp parallel for
-                for (int i = 0; i < Nspline; i++)
-                for (int j = i; j <= i + order and j < Nspline; j++)
-                    M(i,j) = rad.S()(i,j) - 0.5_i * dt * v(i,j);
-                M.dot(1., wrkb1, 0., wrkb2);
-                
-                //- Crank-Nicholson II. (backward Euler half-step)
-                #pragma omp parallel for
-                for (int i = 0; i < Nspline; i++)
-                for (int j = i; j <= i + order and j < Nspline; j++)
-                    M(i,j) = rad.S()(i,j) + 0.5_i * dt * v(i,j);
-                M.toPaddedRows(w);
-                zgbtrf_(&Nspline,&Nspline,&order,&order,w.data(),&ld,piv.data(),&info);
-                zgbtrs_(&norm,&Nspline,&order,&order,&one,w.data(),&ld,piv.data(),wrkb2.data(),&Nspline,&info);
-*/
-/*
-                // backward Euler
-                #pragma omp parallel for
-                for (int i = 0; i < Nspline; i++)
-                for (int j = i; j <= i + order and j < Nspline; j++)
-                    M(i,j) = rad.S()(i,j) - 1.0_i * dt * v(i,j);
-                M.toPaddedRows(w);
-                zgbtrf_(&Nspline,&Nspline,&order,&order,w.data(),&ld,piv.data(),&info);
-                zgbtrs_(&norm,&Nspline,&order,&order,&one,w.data(),&ld,piv.data(),wrkb1.data(),&Nspline,&info);
-*/
-                //- forward Euler
-                #pragma omp parallel for
-                for (int i = 0; i < Nspline; i++)
-                for (int j = i; j <= i + order and j < Nspline; j++)
-                    M(i,j) = rad.S()(i,j) - 1.0_i * dt * v(i,j);
-                M.dot(1., wrkb1, 0., wrkb2);
-                
-                //- apply overlap matrix
-                rad.S().dot(1., wrkb2, 0., wrkb1);
-                
-                //- project back to eigenstate space
+#if 0
+                //- backward Euler
                 #pragma omp parallel for
                 for (int i = 0; i < N; i++)
-                    psia[i] = (P.col(indices[i]) | wrkb1);
-                
+                for (int j = 0; j < N; j++)
+                    W(i,j) = (i == j ? 1.0 : 0.0) + 1.0_i * dt * V(i,j);
+                zgetrf_(&N,&N,W.data().data(),&N,piv.data(),&info);
+                zgetrs_(&norm,&N,&one,W.data().data(),&N,piv.data(),psia.data(),&N,&info);
+#else
+                //- forward Euler
+                wrke = psia;
+                blas::gemv(-1.0_i * dt, V, wrke, 1.0, psia);
+#endif
                 //- free hamiltonian action, O(Nspline)
                 #pragma omp parallel for
                 for (int i = 0; i < N; i++)
@@ -347,7 +356,18 @@ int main (int argc, char * argv[])
                 std::cout << std::endl;
                 std::cout << "Time = " << t << std::endl;
                 //std::cout << "Potential matrix: " << V1.data() << ", " << V2.data() << std::endl;
-                std::cout << "Atomic state populations for first " << std::min(N,5) << " states: " << sqrabs(psia.slice(0,std::min(N,5))) << std::endl;
+                std::cout << "Atomic state populations for first " << std::min(N,7) << " states: " << sqrabs(psia.slice(0,std::min(N,7))) << std::endl;
+                std::cout << "Cross sections: ";
+                for (unsigned nr = 0; nr < std::min(N,10); nr++)
+                {
+                    int nf = nr + 1;
+                    
+                    if (ni == nf)
+                        std::cout << sqrabs(psia[nr]) << "(" << sqrabs(psia[nr] - 1.) << "," << sqrabs(psia[nr] + 1.) << ") ";
+                    else
+                        std::cout << std::sqrt(1 - (1./(ni*ni) - 1./(nf*nf)) / Ei) * sqrabs(psia[nr]) << " ";
+                }
+                std::cout << std::endl;
                 std::cout << "Atomic state norm: " << psia.norm() << std::endl;
                 std::cout << "Projectile kinematics: v2 = " << v2 << ", x2 = " << x2 << std::endl;
                 
@@ -356,21 +376,21 @@ int main (int argc, char * argv[])
                     out << '\t' << sqrabs(psia[i]);
                 out << std::endl;
                 
-                psia /= psia.norm();
+                //psia /= psia.norm();
                 
             // 4c. Calculate total mean charge below projectile radius.
-                
+/*
                 //- evaluate the mean atomic electron charge
-//                 Real Qc = 0;
-//                 #pragma omp parallel for reduction(+:Qc)
-//                 for (int n  = 0; n  < N; n ++)
-//                 for (int np = 0; np < N; np++)
-//                     Qc += (V1(n,np) * psia[n] * psia[np] * std::exp(1.0_i * (omega[indices[n]] - omega[indices[np]]) * t)).real();
+                Real Qc = 0;
+                #pragma omp parallel for reduction(+:Qc)
+                for (int n  = 0; n  < N; n ++)
+                for (int np = 0; np < N; np++)
+                    Qc += (V1(n,np) * psia[n] * psia[np] * std::exp(1.0_i * (omega[indices[n]] - omega[indices[np]]) * t)).real();
                 
                 //- get total real charge
-//                 Real Qr = 1. - Qc;
-//                 std::cout << "Effective charge felt by projectile: " << Qr << std::endl;
-            
+                Real Qr = 1. - Qc;
+                std::cout << "Effective charge felt by projectile: " << Qr << std::endl;
+*/
             // 4d. Update the projectile classical state.
             
                 //- projectile acceletation
