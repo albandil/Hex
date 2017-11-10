@@ -41,12 +41,12 @@
 				"using the first order of the distorted or plane " +
 				"wave Born approximation."
 			);
-			setMod (
+			/*setMod (
 				document.getElementById("mod-pwba2"), cur,
 				"Intermediate-energy code. This one computes the " +
 				"scattering T-matrices using the second order of the plane " +
 				"wave Born approximation."
-			);
+			);*/
 			setMod (
 				document.getElementById("mod-db"), cur,
 				"The database interface module. Data from the computational " +
@@ -98,8 +98,8 @@
 					<a href = "hex-ecs.html">Hex-ecs</a>
 				</td><td id = "mod-dwba" onmouseover = "jsColours(this)">
 					<a href = "hex-dwba.html">Hex-dwba</a>
-				</td><td id = "mod-pwba2" onmouseover = "jsColours(this)">
-					<a href = "hex-pwba2.html">Hex-pwba2</a>
+				<!--</td><td id = "mod-pwba2" onmouseover = "jsColours(this)">
+				<a href = "hex-pwba2.html">Hex-pwba2</a>-->
 				</td><td id = "mod-db" onmouseover = "jsColours(this)">
 					<a href = "hex-db.html">Hex-db</a>
 				</td><td id = "mod-data" onmouseover = "jsColours(this)">
@@ -118,7 +118,7 @@
 	</center></div>
 	
 	<img src = "logo.png" style = "float:right;width:175px;margin-left:20px;margin-right:20px;"/>
-	
+
 	<div class = "text" style = "">
 		The current source code of the programs can be freely downloaded at
 		the Hex project page at <a href = "http://sourceforge.net/projects/hecs/">SourceForge</a>
@@ -129,6 +129,17 @@
 		The package is maintained by the Institute of Theoretical Physics at the
 		Charles University in Prague, Czech Republic, in the collaboration with
 		the Astronomical Institute of the Czech Academy of Sciences.
+	</div>
+
+	<br/>
+
+	<a href="https://ilmandel.cc/boinc/Hex"><img src = "pb_boinc.gif" style = "float:left;width:115px;margin-left:10px;margin-right:10px;margin-top:10px;margin-bottom:10px;"/></a>
+
+	<div class = "text" style = "">
+		You can help with extension of the database using your own computer!
+		Apart from supercomputers, Hex runs also on the Boinc network. See the
+		<a href="https://ilmandel.cc/boinc/Hex">Hex@home</a> project page for details.
+		(Only IPv6 access is supported currently.)
 	</div>
 
 	<br/>
