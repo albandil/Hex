@@ -14,11 +14,10 @@ CXX ?= g++
 # build mode ("debug" or "release")
 TARGET ?= release
 
+# floating point precision ("single" or "double")
+FP ?= double
+
 # global compiler flags
-#
-#    Single precision: -DSINGLE
-#    Double precision: -fcx-limited-range (optional)
-#
 CFLAGS ?= -fopenmp -Wall -mtune=native -march=native -fcx-limited-range -Wno-unknown-pragmas
 LFLAGS ?= -fopenmp -lstdc++
 
@@ -134,6 +133,15 @@ else
 $(error "Unknown target $(TARGET)")
 endif
 
+# SINGLE and DOUBLE variants
+ifeq ($(FP),single)
+CXXFLAGS += -DSINGLE
+else ifeq ($(FP),double)
+CXXFLAGS += -fcx-limited-range
+else
+$(error "Unknown precision $(FP)")
+endif
+
 # compiler name
 BASECXX = $(shell basename $(CXX))
 
@@ -141,8 +149,8 @@ BASECXX = $(shell basename $(CXX))
 COMMON_FILES   = hex-arrays hex-blas hex-hdffile hex-hydrogen \
                  hex-matrix hex-misc hex-special hex-version hex-vtkfile
 COMMON_SOURCES = $(patsubst %,../common/%.cpp,$(COMMON_FILES))
-COMMON_OBJECTS = $(patsubst %,obj/$(TARGET)-$(BASECXX)/common/%.o,$(COMMON_FILES))
-COMMON_DEPS    = $(patsubst %,obj/$(TARGET)-$(BASECXX)/common/%.dep,$(COMMON_FILES))
+COMMON_OBJECTS = $(patsubst %,obj/$(FP).$(TARGET).$(BASECXX)/common/%.o,$(COMMON_FILES))
+COMMON_DEPS    = $(patsubst %,obj/$(FP).$(TARGET).$(BASECXX)/common/%.dep,$(COMMON_FILES))
 
 # source files specific to hex-ecs
 HEX_ECS_FILES   = amplitudes ang gauss bspline hldata io luft main preconditioners radial slater solver \
@@ -153,15 +161,15 @@ HEX_ECS_FILES   = amplitudes ang gauss bspline hldata io luft main preconditione
                   preconditioners/GPUPreconditioner preconditioners/HybPreconditioner \
                   preconditioners/DOMPreconditioner preconditioners/CoupledPreconditioner
 HEX_ECS_SOURCES = $(patsubst %,src/%.cpp,$(HEX_ECS_FILES))
-HEX_ECS_OBJECTS = $(patsubst %,obj/$(TARGET)-$(BASECXX)/hex-ecs/%.o,$(HEX_ECS_FILES))
-HEX_ECS_DEPS    = $(patsubst %,obj/$(TARGET)-$(BASECXX)/hex-ecs/%.dep,$(HEX_ECS_FILES))
+HEX_ECS_OBJECTS = $(patsubst %,obj/$(FP).$(TARGET).$(BASECXX)/hex-ecs/%.o,$(HEX_ECS_FILES))
+HEX_ECS_DEPS    = $(patsubst %,obj/$(FP).$(TARGET).$(BASECXX)/hex-ecs/%.dep,$(HEX_ECS_FILES))
 
 # OpenCL kernels
 OCLSOURCES = src/preconditioners/GPUPreconditioner.cl
 OCLKERNELS = src/preconditioners/GPUPreconditioner.inc
 
 # build all targets
-all: pollversion bin/hex-ecs.$(TARGET).$(BASECXX)
+all: pollversion bin/hex-ecs.$(FP).$(TARGET).$(BASECXX)
 
 # dummy target to force update of git revision
 pollversion:
@@ -177,26 +185,26 @@ docclean:
 
 # remove build files
 clean:
-	rm -f bin/hex-ecs bin/hex-ecs.$(TARGET).$(BASECXX) $(COMMON_OBJECTS) $(COMMON_DEPS) $(HEX_ECS_OBJECTS) $(HEX_ECS_DEPS)
+	rm -f bin/hex-ecs bin/hex-ecs.$(FP).$(TARGET).$(BASECXX) $(COMMON_OBJECTS) $(COMMON_DEPS) $(HEX_ECS_OBJECTS) $(HEX_ECS_DEPS)
 
 # remove everything (build files, documentation and distribution files)
 allclean: clean docclean
 
 # main program target
-bin/hex-ecs.$(TARGET).$(BASECXX): $(OCLKERNELS) $(COMMON_OBJECTS) $(HEX_ECS_OBJECTS)
+bin/hex-ecs.$(FP).$(TARGET).$(BASECXX): $(OCLKERNELS) $(COMMON_OBJECTS) $(HEX_ECS_OBJECTS)
 	@mkdir -p $(@D)
 	$(CXX) $(HEX_ECS_OBJECTS) $(COMMON_OBJECTS) $(LFLAGS) -o $@
-	@ln -fs hex-ecs.$(TARGET).$(BASECXX) bin/hex-ecs
+	@ln -fs hex-ecs.$(FP).$(TARGET).$(BASECXX) bin/hex-ecs
 
 # CL -> INC rule (convert OpenCL sources to C byte array)
 %.inc: %.cl
 	xxd -i $< > $@
 
 # CPP -> O rule (compile source files)
-obj/$(TARGET)-$(BASECXX)/common/%.o: ../common/%.cpp
+obj/$(FP).$(TARGET).$(BASECXX)/common/%.o: ../common/%.cpp
 	@mkdir -p $(@D)
 	$(CXX) $(CXXFLAGS) -c $< -o $@ -MMD -MF $(patsubst %.o,%.dep,$@)
-obj/$(TARGET)-$(BASECXX)/hex-ecs/%.o: src/%.cpp
+obj/$(FP).$(TARGET).$(BASECXX)/hex-ecs/%.o: src/%.cpp
 	@mkdir -p $(@D)
 	$(CXX) $(CXXFLAGS) -c $< -o $@ -MMD -MF $(patsubst %.o,%.dep,$@)
 

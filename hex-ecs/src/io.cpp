@@ -1084,14 +1084,14 @@ void InputFile::read (std::ifstream & inf)
         if (n.val == 0)
             max_Ebound = 0;
         else if (n.val > 0)
-            max_Ebound = std::max(max_Ebound, -1./(n.val * n.val));
+            max_Ebound = std::max(max_Ebound, -1.0_r/(n.val * n.val));
     }
     for (ReadItem<int> const & n : nfs)
     {
         if (n.val == 0)
             max_Ebound = 0;
         else if (n.val > 0)
-            max_Ebound = std::max(max_Ebound, -1./(n.val * n.val));
+            max_Ebound = std::max(max_Ebound, -1.0_r/(n.val * n.val));
     }
     
     // print info
