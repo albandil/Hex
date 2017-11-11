@@ -593,14 +593,18 @@ int special::coul_F (int l, double k, double r, double& F, double& Fp)
             // "Loss of accuracy."
             // - This sometimes happens for large angular momenta close to
             //   the origin. We will use the uniform approximation instead.
+#ifndef WITH_BOINC
             fprintf(stderr, "[coul_F] GSL_ELOSS @ k = %g, r = %g, l = %d\n", k, r, l);
+#endif
             return coul_F_michel(l, k, r, F, Fp);
 
         case GSL_ERUNAWAY:
             // "Iterative method out of control."
             // - This sometimes happens for very small 'k' and small 'k*r'.
             //   We will use value at 'r = 0' instead.
+#ifndef WITH_BOINC
             fprintf(stderr, "[coul_F] GSL_ERUNAWAY @ k = %g, r = %g, l = %d\n", k, r, l);
+#endif
             return coul_F(l, k, 0, F, Fp);
     }
     
