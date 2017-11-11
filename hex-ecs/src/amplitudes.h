@@ -6,7 +6,7 @@
 //                    / /   / /    \_\      / /  \ \                                 //
 //                                                                                   //
 //                                                                                   //
-//  Copyright (c) 2016, Jakub Benda, Charles University in Prague                    //
+//  Copyright (c) 2017, Jakub Benda, Charles University in Prague                    //
 //                                                                                   //
 // MIT License:                                                                      //
 //                                                                                   //
@@ -38,7 +38,7 @@
 #include "hex-chebyshev.h"
 
 #include "bspline.h"
-#include "io.h"
+#include "inout.h"
 #include "parallel.h"
 #include "radial.h"
 

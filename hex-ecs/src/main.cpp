@@ -6,7 +6,7 @@
 //                    / /   / /    \_\      / /  \ \                                 //
 //                                                                                   //
 //                                                                                   //
-//  Copyright (c) 2016, Jakub Benda, Charles University in Prague                    //
+//  Copyright (c) 2017, Jakub Benda, Charles University in Prague                    //
 //                                                                                   //
 // MIT License:                                                                      //
 //                                                                                   //
@@ -63,7 +63,7 @@
 #include "amplitudes.h"
 #include "ang.h"
 #include "bspline.h"
-#include "io.h"
+#include "inout.h"
 #include "parallel.h"
 #include "solver.h"
 

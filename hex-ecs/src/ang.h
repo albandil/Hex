@@ -6,7 +6,7 @@
 //                    / /   / /    \_\      / /  \ \                                 //
 //                                                                                   //
 //                                                                                   //
-//  Copyright (c) 2016, Jakub Benda, Charles University in Prague                    //
+//  Copyright (c) 2017, Jakub Benda, Charles University in Prague                    //
 //                                                                                   //
 // MIT License:                                                                      //
 //                                                                                   //
@@ -34,7 +34,7 @@
 
 #include "hex-arrays.h"
 
-#include "io.h"
+#include "inout.h"
 
 /**
  * @brief Angular basis.

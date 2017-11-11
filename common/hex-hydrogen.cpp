@@ -6,7 +6,7 @@
 //                    / /   / /    \_\      / /  \ \                                 //
 //                                                                                   //
 //                                                                                   //
-//  Copyright (c) 2016, Jakub Benda, Charles University in Prague                    //
+//  Copyright (c) 2017, Jakub Benda, Charles University in Prague                    //
 //                                                                                   //
 // MIT License:                                                                      //
 //                                                                                   //
@@ -174,37 +174,37 @@ double getBoundFar (int n, int l, double eps, int max_steps)
     double last_zero_ubound = lastZeroBound(n, l) * 0.5 * n;
     
     // hunt for low value
-    double far = std::max(last_zero_ubound, 1.);
+    double far_r = std::max(last_zero_ubound, 1.);
     double far_val, der;
     do
     {
         // move further
-        far *= 2;
+        far_r *= 2;
         
         // evaluate function in 'far'
-        far_val = fabs(P(n,l,far));
+        far_val = fabs(P(n,l,far_r));
         
         // compute forward h-diference in 'far'
-        der = far_val - fabs(P(n,l,far+1e-5));
+        der = far_val - std::fabs(P(n,l,far_r+1e-5));
     }
     while (der > 0 or far_val > eps);
     
     // bisect for exact value
     int steps = 0;
-    double near = last_zero_ubound;
-    double near_val = fabs(P(n,l,near));
+    double near_r = last_zero_ubound;
+    double near_val = std::fabs(P(n,l,near_r));
     while (steps < max_steps)
     {
-        double middle = 0.5 * (near + far);
-        double middle_val = fabs(P(n,l,middle));
+        double middle = 0.5 * (near_r + far_r);
+        double middle_val = std::fabs(P(n,l,middle));
         if (middle_val > eps)
         {
-            near = middle;
+            near_r = middle;
             near_val = middle_val;
         }
         else
         {
-            far = middle;
+            far_r = middle;
             far_val = middle_val;
         }
         steps++;
@@ -213,12 +213,12 @@ double getBoundFar (int n, int l, double eps, int max_steps)
     }
     
     // return bisection
-    return 0.5 * (near + far);
+    return 0.5 * (near_r + far_r);
 }
 
 double Norm (int n, int l)
 {
-    return sqrt(gsl_sf_pow_int(2./n,3) * gsl_sf_fact(n-l-1) / (2*n*gsl_sf_fact(n+l))) * gsl_sf_pow_int(2./n,l);
+    return std::sqrt(gsl_sf_pow_int(2./n,3) * gsl_sf_fact(n-l-1) / (2*n*gsl_sf_fact(n+l))) * gsl_sf_pow_int(2./n,l);
 }
 
 double getSturmFar (int n, int l, double lambda, double eps, int max_steps)
@@ -227,37 +227,37 @@ double getSturmFar (int n, int l, double lambda, double eps, int max_steps)
     double last_zero_ubound = lastZeroBound(n,l) * 0.5;
     
     // hunt for low value
-    double far = std::max(last_zero_ubound, 1.);
+    double far_r = std::max(last_zero_ubound, 1.);
     double far_val, der;
     do
     {
         // move further
-        far *= 2;
+        far_r *= 2;
         
         // evaluate function in 'far'
-        far_val = fabs(S(n,l,far,lambda));
+        far_val = std::fabs(S(n,l,far_r,lambda));
         
         // compute forward h-diference in 'far'
-        der = fabs(S(n,l,far+0.001,lambda)) - far_val;
+        der = std::fabs(S(n,l,far_r+0.001,lambda)) - far_val;
     }
     while (der > 0 or far_val > eps);
     
     // bisect for exact value
     int steps = 0;
-    double near = last_zero_ubound;
-    double near_val = fabs(S(n,l,near,lambda));
+    double near_r = last_zero_ubound;
+    double near_val = std::fabs(S(n,l,near_r,lambda));
     while (steps < max_steps)
     {
-        double middle = 0.5 * (near + far);
-        double middle_val = fabs(S(n,l,middle,lambda));
+        double middle = 0.5 * (near_r + far_r);
+        double middle_val = std::fabs(S(n,l,middle,lambda));
         if (middle_val > eps)
         {
-            near = middle;
+            near_r = middle;
             near_val = middle_val;
         }
         else
         {
-            far = middle;
+            far_r = middle;
             far_val = middle_val;
         }
         steps++;
@@ -266,7 +266,7 @@ double getSturmFar (int n, int l, double lambda, double eps, int max_steps)
     }
     
     // return bisection
-    return 0.5 * (near + far);
+    return 0.5 * (near_r + far_r);
 }
 
 double P (unsigned n, unsigned l, double r, double Z)

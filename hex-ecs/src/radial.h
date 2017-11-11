@@ -48,7 +48,7 @@
 
 #include "bspline.h"
 #include "gauss.h"
-#include "io.h"
+#include "inout.h"
 #include "parallel.h"
 
 // --------------------------------------------------------------------------------- //

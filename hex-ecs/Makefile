@@ -145,7 +145,7 @@ COMMON_OBJECTS = $(patsubst %,obj/$(TARGET)-$(BASECXX)/common/%.o,$(COMMON_FILES
 COMMON_DEPS    = $(patsubst %,obj/$(TARGET)-$(BASECXX)/common/%.dep,$(COMMON_FILES))
 
 # source files specific to hex-ecs
-HEX_ECS_FILES   = amplitudes ang gauss bspline hldata io luft main preconditioners radial slater solver \
+HEX_ECS_FILES   = amplitudes ang gauss bspline hldata inout luft main preconditioners radial slater solver \
                   factorizers/lu-umfpack factorizers/lu-mumps factorizers/lu-superlu factorizers/lu-lapack \
                   factorizers/lu-superlu-dist factorizers/lu-pardiso factorizers/lu-scalapack \
                   preconditioners/NoPreconditioner preconditioners/CGPreconditioner \
