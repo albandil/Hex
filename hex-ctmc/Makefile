@@ -9,28 +9,26 @@
 # ---------------------------------------------------------------------------- #
 
 # C++ compiler (g++, clang, ...)
-CXX = g++
+CXX ?= g++
 
 # build mode ("debug" or "release")
-TARGET = debug
+TARGET ?= debug
+
+# floating point precision ("single" or "double")
+FP ?= double
 
 # global compiler flags
-CFLAGS = -fopenmp -Wall -mtune=native -march=native -fcx-limited-range
+CFLAGS = -fopenmp -Wall -mtune=native -march=native
 LFLAGS = -fopenmp -lstdc++
 
 # ---------------------------------------------------------------------------- #
 # BLAS & LAPACK                                                                #
-#                                                                              #
-# The macro DISABLE_PARALLEL_PRECONDITION will inhibit nested parallelism      #
-# e.g. when using threaded OpenBLAS. This may (and may not) deliver            #
-# performance benefits in exchange of giving up possibility to precondition    #
-# several blocks concurrently.                                                 #
 # ---------------------------------------------------------------------------- #
 
 BLASLAPACKFLAGS = 
 BLASLAPACKLIBS = -lblas -llapack
 
-# BLASLAPACKFLAGS = -DDISABLE_PARALLEL_PRECONDITION
+# BLASLAPACKFLAGS =
 # BLASLAPACKLIBS = -lopenblas
 
 # ---------------------------------------------------------------------------- #
@@ -65,7 +63,7 @@ GSLLIBS = $(shell gsl-config --libs)
 
 
 # compiler flags
-CFLAGS += -fPIC -std=c++11 -pedantic-errors -DGIT_COMMIT=\"$(GIT_COMMIT)\" \
+CFLAGS += -fPIC -std=c++11 -pedantic-errors -DHEX_GIT_COMMIT=\"$(GIT_COMMIT)\" \
           -Isrc -I../common \
           $(SUITESPARSEFLAGS) $(SUPERLUFLAGS) $(SUPERLUDISTFLAGS) $(OPENMPIFLAGS) \
           $(OPENCLFLAGS) $(GSLFLAGS) $(BLASLAPACKFLAGS) $(PNGPPFLAGS) 
@@ -87,6 +85,15 @@ else
 $(error "Unknown target $(TARGET)")
 endif
 
+# SINGLE and DOUBLE variants
+ifeq ($(FP),single)
+CXXFLAGS += -DSINGLE
+else ifeq ($(FP),double)
+CXXFLAGS += -fcx-limited-range
+else
+$(error "Unknown precision $(FP)")
+endif
+
 # compiler name
 BASECXX = $(shell basename $(CXX))
 
@@ -94,21 +101,21 @@ BASECXX = $(shell basename $(CXX))
 COMMON_FILES   = hex-arrays hex-blas hex-hdffile hex-hydrogen \
                  hex-matrix hex-misc hex-special hex-version hex-vtkfile
 COMMON_SOURCES = $(patsubst %,../common/%.cpp,$(COMMON_FILES))
-COMMON_OBJECTS = $(patsubst %,obj/$(BASECXX)/common/%.o,$(COMMON_FILES))
-COMMON_DEPS    = $(patsubst %,obj/$(BASECXX)/common/%.dep,$(COMMON_FILES))
+COMMON_OBJECTS = $(patsubst %,obj/$(FP).$(TARGET).$(BASECXX)/common/%.o,$(COMMON_FILES))
+COMMON_DEPS    = $(patsubst %,obj/$(FP).$(TARGET).$(BASECXX)/common/%.dep,$(COMMON_FILES))
 
 # source files specific to hex-ctmc
 HEX_CTMC_FILES   = bspline gauss io luft main preconditioners radial slater
 HEX_CTMC_SOURCES = $(patsubst %,src/%.cpp,$(HEX_CTMC_FILES))
-HEX_CTMC_OBJECTS = $(patsubst %,obj/$(BASECXX)/hex-ctmc/%.o,$(HEX_CTMC_FILES))
-HEX_CTMC_DEPS    = $(patsubst %,obj/$(BASECXX)/hex-ctmc/%.dep,$(HEX_CTMC_FILES))
+HEX_CTMC_OBJECTS = $(patsubst %,obj/$(FP).$(TARGET).$(BASECXX)/hex-ctmc/%.o,$(HEX_CTMC_FILES))
+HEX_CTMC_DEPS    = $(patsubst %,obj/$(FP).$(TARGET).$(BASECXX)/hex-ctmc/%.dep,$(HEX_CTMC_FILES))
 
 # OpenCL kernels
 OCLSOURCES = 
 OCLKERNELS = 
 
 # build all targets
-all: pollversion bin/hex-ctmc.$(BASECXX)
+all: pollversion bin/hex-ctmc.$(FP).$(TARGET).$(BASECXX)
 
 # dummy target to force update of git revision
 pollversion:
@@ -124,26 +131,26 @@ docclean:
 
 # remove build files
 clean:
-	rm -f bin/hex-ctmc bin/hex-ctmc.$(BASECXX) $(COMMON_OBJECTS) $(COMMON_DEPS) $(HEX_CTMC_OBJECTS) $(HEX_CTMC_DEPS)
+	rm -f bin/hex-ctmc bin/hex-ctmc.$(FP).$(TARGET).$(BASECXX) $(COMMON_OBJECTS) $(COMMON_DEPS) $(HEX_CTMC_OBJECTS) $(HEX_CTMC_DEPS)
 
 # remove everything (build files, documentation and distribution files)
 allclean: clean docclean
 
 # main program target
-bin/hex-ctmc.$(BASECXX): $(OCLKERNELS) $(COMMON_OBJECTS) $(HEX_CTMC_OBJECTS)
+bin/hex-ctmc.$(FP).$(TARGET).$(BASECXX): $(OCLKERNELS) $(COMMON_OBJECTS) $(HEX_CTMC_OBJECTS)
 	@mkdir -p $(@D)
 	$(CXX) $(HEX_CTMC_OBJECTS) $(COMMON_OBJECTS) $(LFLAGS) -o $@
-	@ln -fs hex-ctmc.$(BASECXX) bin/hex-ctmc
+	@ln -fs hex-ctmc.$(FP).$(TARGET).$(BASECXX) bin/hex-ctmc
 
 # CL -> INC rule (convert OpenCL sources to C byte array)
 %.inc: %.cl
 	xxd -i $< > $@
 
 # CPP -> O rule (compile source files)
-obj/$(BASECXX)/common/%.o: ../common/%.cpp
+obj/$(FP).$(TARGET).$(BASECXX)/common/%.o: ../common/%.cpp
 	@mkdir -p $(@D)
 	$(CXX) $(CXXFLAGS) -c $< -o $@ -MMD -MF $(patsubst %.o,%.dep,$@)
-obj/$(BASECXX)/hex-ctmc/%.o: src/%.cpp
+obj/$(FP).$(TARGET).$(BASECXX)/hex-ctmc/%.o: src/%.cpp
 	@mkdir -p $(@D)
 	$(CXX) $(CXXFLAGS) -c $< -o $@ -MMD -MF $(patsubst %.o,%.dep,$@)
 

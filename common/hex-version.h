@@ -6,7 +6,7 @@
 //                    / /   / /    \_\      / /  \ \                                 //
 //                                                                                   //
 //                                                                                   //
-//  Copyright (c) 2015, Jakub Benda, Charles University in Prague                    //
+//  Copyright (c) 2017, Jakub Benda, Charles University in Prague                    //
 //                                                                                   //
 // MIT License:                                                                      //
 //                                                                                   //
@@ -32,7 +32,11 @@
 #ifndef HEX_VERSION
 #define HEX_VERSION
 
+// --------------------------------------------------------------------------------- //
+
 #include <string>
+
+// --------------------------------------------------------------------------------- //
 
 /**
  * @brief SHA identificator of the commit.
@@ -43,7 +47,9 @@
  *     g++ version.cpp -DGIT_COMMIT=\"6a4gfd4\" -o version.o
  * @endcode
  */
-extern char const * commit_hash;
+extern char const * hex_commit_hash;
+
+// --------------------------------------------------------------------------------- //
 
 /**
  * @brief Application text logo.
@@ -52,5 +58,7 @@ extern char const * commit_hash;
  * The argument string will be prepended before every line of the logo.
  */
 std::string logo (std::string escape = " ");
+
+// --------------------------------------------------------------------------------- //
 
 #endif

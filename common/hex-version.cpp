@@ -31,34 +31,51 @@
 
 #include <string>
 
+// --------------------------------------------------------------------------------- //
+
 #include "hex-misc.h"
 
-#ifndef GIT_COMMIT
-#define GIT_COMMIT ""
+// --------------------------------------------------------------------------------- //
+
+#ifndef HEX_VERSION
+#define HEX_VERSION "2.3"
 #endif
 
-char const * commit_hash = GIT_COMMIT;
+#ifndef HEX_GIT_COMMIT
+#define HEX_GIT_COMMIT "unknown"
+#endif
+
+#ifdef SINGLE
+#define HEX_FP "FP32"
+#else
+#define HEX_FP "FP64"
+#endif
+
+#ifdef _LONGINT
+#define HEX_IP "ILP64"
+#else
+#define HEX_IP "LP64"
+#endif
+
+// --------------------------------------------------------------------------------- //
+
+char const * hex_version = HEX_VERSION;
+char const * hex_commit_hash = HEX_GIT_COMMIT;
+char const * hex_fp = HEX_FP;
+char const * hex_ip = HEX_IP;
+
+// --------------------------------------------------------------------------------- //
 
 std::string logo (std::string esc)
 {
-    return format
-    (
-        "%s                                         \n"
-        "%s       / /   / /    __    \\ \\  / /     \n"
-        "%s      / /__ / /   / _ \\    \\ \\/ /     \n"
-        "%s     /  ___  /   | |/_/    / /\\ \\      \n"
-        "%s    / /   / /    \\_\\      / /  \\ \\   \n"
-        "%s                                         \n"
-        "%s             UK MFF (c) 2017             \n"
-        "%s                                         \n"
-#ifdef _LONGINT
-        "%s       version: 2.03 %s ILP64\n"
-#else
-        "%s         version: 2.03 %s\n"
-#endif
-        "%s                                         \n",
-        esc.c_str(),esc.c_str(),esc.c_str(),esc.c_str(),
-        esc.c_str(),esc.c_str(),esc.c_str(),esc.c_str(),
-        esc.c_str(),commit_hash,esc.c_str()
-    );
+    return esc + "                                         \n" +
+           esc + "       / /   / /    __    \\ \\  / /     \n" +
+           esc + "      / /__ / /   / _ \\    \\ \\/ /     \n" +
+           esc + "     /  ___  /   | |/_/    / /\\ \\      \n" +
+           esc + "    / /   / /    \\_\\      / /  \\ \\   \n" +
+           esc + "                                         \n" +
+           esc + "             UK MFF (c) 2017             \n" +
+           esc + "                                         \n" +
+           esc + "    version: 2.3-" HEX_GIT_COMMIT "." HEX_FP  "."  HEX_IP "\n" +
+           esc + "                                         \n";
 }

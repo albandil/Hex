@@ -65,7 +65,7 @@ OPENMPILIBS  = $(shell mpic++ --showme:link)
 
 
 # compiler flags
-CFLAGS += -fPIC -std=c++11 -pedantic-errors -DGIT_COMMIT=\"$(GIT_COMMIT)\" \
+CFLAGS += -fPIC -std=c++11 -pedantic-errors -DHEX_GIT_COMMIT=\"$(GIT_COMMIT)\" \
           -Isrc -I../common \
           $(SUITESPARSEFLAGS) $(SUPERLUFLAGS) $(SUPERLUDISTFLAGS) $(OPENMPIFLAGS) \
           $(OPENCLFLAGS) $(GSLFLAGS) $(BLASLAPACKFLAGS) $(PNGPPFLAGS) 
