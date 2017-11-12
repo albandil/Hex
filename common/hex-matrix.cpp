@@ -54,11 +54,13 @@ extern "C" void cgetrf_ (int*, int*, Complex*, int*, int*, int*);
 extern "C" void cgetri_ (int*, Complex*, int*, int*, Complex*, int*, int*);
 extern "C" void cgetrs_ (char*, int*, int*, Complex*, int*, int*, Complex*, int*, int*);
 extern "C" void cgeev_ (char*, char*, int*, Complex*, int*, Complex*, Complex*, int*, Complex*, int*, Complex*, int*, Real*, int*);
+extern "C" void cggev_ (char*, char*, int*, Complex*, int*, Complex*, int*, Complex*, Complex*, Complex*, int*, Complex*, int*, Complex*, int*, Real*, int*);
 #else
 extern "C" void zgetrf_ (int*, int*, Complex*, int*, int*, int*);
 extern "C" void zgetrs_ (char*, int*, int*, Complex*, int*, int*, Complex*, int*, int*);
 extern "C" void zgetri_ (int*, Complex*, int*, int*, Complex*, int*, int*);
 extern "C" void zgeev_ (char*, char*, int*, Complex*, int*, Complex*, Complex*, int*, Complex*, int*, Complex*, int*, Real*, int*);
+extern "C" void zggev_ (char*, char*, int*, Complex*, int*, Complex*, int*, Complex*, Complex*, Complex*, int*, Complex*, int*, Complex*, int*, Real*, int*);
 #endif
 
 // -------------------------------------------------------------------------------------
@@ -134,6 +136,124 @@ void ColMatrix<Complex>::invert (ColMatrix<Complex> & inv) const
     
 #else
     HexException("Cannot invert dense matrix without LAPACK support.");
+#endif
+}
+
+template<>
+void ColMatrix<Complex>::diagonalize_g
+(
+    ColMatrix<Complex> const & S,
+    NumberArray<Complex> & W,
+    ColMatrix<Complex> * VL,
+    ColMatrix<Complex> * VR
+) const
+{
+#ifndef NO_LAPACK
+    if (rows() != cols())
+        HexException("Only square matrices can be diagonalized.");
+    
+    Complex* B = const_cast<Complex*>(S.data().data());
+    
+    int N = rows();
+    cArray WORK(1);
+    rArray RWORK(8*N);
+    int LWORK = -1, INFO;
+    char JOBL = 'N', JOBR = 'N';
+    Complex *pVL = nullptr, *pVR = nullptr;
+    
+    cArray U (N);
+    W.resize(N);
+    
+    if (VL != nullptr)
+    {
+        // compute left eigenvectors
+        JOBL = 'V';
+        
+        // resize output data
+        if (VL->rows() != N or VL->cols() != N)
+            *VL = std::move(ColMatrix<Complex>(N,N));
+        pVL = VL->begin();
+    }
+    
+    if (VR != nullptr)
+    {
+        // compute right eigenvectors
+        JOBR = 'V';
+        
+        // resize output data
+        if (VR->rows() != N or VR->cols() != N)
+            *VR = std::move(ColMatrix<Complex>(N,N));
+        pVR = VR->begin();
+    }
+    
+    // copy matrix data (it will be overwritten)
+    cArray A = data();
+    
+    // get work size
+#ifdef SINGLE
+    cggev_
+#else
+    zggev_
+#endif
+    (
+        &JOBL,      // compute left eigenvectors
+        &JOBR,      // compute right eigenvectors
+        &N,         // order of the matrix
+        &A[0],      // matrix A elements
+        &N,         // leading dimension of the matrix A
+        &B[0],      // matrix S elements
+        &N,         // leading dimension of the matrix S
+        &W[0],      // eigenvalue numerators
+        &U[0],      // eigenvalue denominators
+        pVL,        // left eigenvectors elements
+        &N,         // leading dimension of the matrix VL
+        pVR,        // right eigenvectors elements
+        &N,         // leading dimension of the matrix VR
+        &WORK[0],   // work array
+        &LWORK,     // length of the work array
+        &RWORK[0],  // work array
+        &INFO       // diagnostic information
+    );
+    
+    // resize work array
+    LWORK = WORK[0].real();
+    WORK.resize(LWORK);
+    
+    // run the diagonalization
+#ifdef SINGLE
+    cggev_
+#else
+    zggev_
+#endif
+    (
+        &JOBL,      // compute left eigenvectors
+        &JOBR,      // compute right eigenvectors
+        &N,         // order of the matrix
+        &A[0],      // matrix A elements
+        &N,         // leading dimension of the matrix A
+        &B[0],      // matrix S elements
+        &N,         // leading dimension of the matrix S
+        &W[0],      // eigenvalue numerators
+        &U[0],      // eigenvalue denominators
+        pVL,        // left eigenvectors elements
+        &N,         // leading dimension of the matrix VL
+        pVR,        // right eigenvectors elements
+        &N,         // leading dimension of the matrix VR
+        &WORK[0],   // work array
+        &LWORK,     // length of the work array
+        &RWORK[0],  // work array
+        &INFO       // diagnostic information
+    );
+    
+    if (INFO != 0)
+    {
+        std::cerr << "Diagonalization error: " << INFO << std::endl;
+    }
+    
+    W /= U;
+    
+#else
+    HexException("Cannot diagonalize dense matrix without LAPACK support.");
 #endif
 }
 

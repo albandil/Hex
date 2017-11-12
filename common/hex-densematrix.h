@@ -368,6 +368,15 @@ template <class Type, class Base> class ColMatrix : public Base
             ColMatrix<Type> * eigvecR = nullptr
         ) const;
         
+        /// Generalized diagonalization (non-orthonormal overlap matrix).
+        void diagonalize_g
+        (
+            ColMatrix<Type> const & S,
+            NumberArray<Type> & eigval,
+            ColMatrix<Type> * eigvecL = nullptr,
+            ColMatrix<Type> * eigvecR = nullptr
+        ) const;
+        
         /// Storage layout.
         virtual char layout () const { return DenseMatrix<Type>::ColumnMajorLayout; }
         
