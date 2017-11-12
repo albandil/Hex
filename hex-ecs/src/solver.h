@@ -44,7 +44,7 @@
 
 #include "ang.h"
 #include "bspline.h"
-#include "io.h"
+#include "inout.h"
 #include "parallel.h"
 #include "preconditioners.h"
 

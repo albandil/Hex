@@ -6,7 +6,7 @@
 //                    / /   / /    \_\      / /  \ \                                 //
 //                                                                                   //
 //                                                                                   //
-//  Copyright (c) 2016, Jakub Benda, Charles University in Prague                    //
+//  Copyright (c) 2017, Jakub Benda, Charles University in Prague                    //
 //                                                                                   //
 // MIT License:                                                                      //
 //                                                                                   //
@@ -286,16 +286,16 @@ public:
      * is zero. (I.e. the free state will be evaluated at the zeros of the asymptotic
      * form.)
      */
-    inline double far (double eps = 1e-10, int max_steps = 1000) const
+    double farr (double eps = 1e-10, int max_steps = 1000) const
     {
         return Hydrogen::getBoundFar(n_,l_,eps,max_steps);
     };
     
     /// Get principal quantum number.
-    inline int n () const { return n_; }
+    int n () const { return n_; }
     
     /// Get orbital quantum number.
-    inline int l () const { return l_; }
+    int l () const { return l_; }
     
     /// Evaluate the function.
     double operator() (double r) const;
@@ -304,7 +304,7 @@ public:
     double getTurningPoint () const;
     
     /// Comparison
-    inline bool operator== (HydrogenFunction const & psi) const
+    bool operator== (HydrogenFunction const & psi) const
     {
         return n_ == psi.n_ and l_ == psi.l_;
     }
