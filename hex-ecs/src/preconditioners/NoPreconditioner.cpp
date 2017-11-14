@@ -198,16 +198,16 @@ void NoPreconditioner::setup ()
         
         // Now S = CR * (D * CR⁻¹)
         if (verbose_) std::cout << "\t\t- time: " << timer.nice_time() << std::endl;
-        for (std::size_t i = 0; i < Nspline * Nspline; i++)
-            invCR.data()[i] *= D[i % Nspline];
+        for (std::size_t j = 0; j < Nspline * Nspline; j++)
+            invCR.data()[j] *= D[j % Nspline];
         
         // S = S - CR * invCR
         blas::gemm(-1., CR, invCR, 1., S);
         if (verbose_) std::cout << "\t\t- residual: " << S.data().norm() << std::endl;
         
         // compute √S⁻¹
-        for (std::size_t i = 0; i < Nspline * Nspline; i++)
-            invCR.data()[i] /= std::pow(D.data()[i % Nspline], 1.5);
+        for (std::size_t j = 0; j < Nspline * Nspline; j++)
+            invCR.data()[j] /= std::pow(D.data()[j % Nspline], 1.5);
         blas::gemm(1., CR, invCR, 0., invsqrtS);
         
         if (verbose_) std::cout << std::endl;
@@ -252,8 +252,8 @@ void NoPreconditioner::setup ()
             
             // Now Hl = ClR * D * ClR⁻¹
             if (verbose_) std::cout << "\t\t- time: " << timer.nice_time() << std::endl;
-            for (std::size_t i = 0; i < Nspline * Nspline; i++)
-                invCR.data()[i] *= D[i % Nspline];
+            for (std::size_t j = 0; j < Nspline * Nspline; j++)
+                invCR.data()[j] *= D[j % Nspline];
             
             // Hl <- Hl - CR * invCR
             blas::gemm(-1., CR, invCR, 1., tHl);
