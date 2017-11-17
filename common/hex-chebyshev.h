@@ -6,7 +6,7 @@
 //                    / /   / /    \_\      / /  \ \                                 //
 //                                                                                   //
 //                                                                                   //
-//  Copyright (c) 2015, Jakub Benda, Charles University in Prague                    //
+//  Copyright (c) 2017, Jakub Benda, Charles University in Prague                    //
 //                                                                                   //
 // MIT License:                                                                      //
 //                                                                                   //
@@ -119,7 +119,7 @@ public:
         
         for (int k = 1; k < N; k++)
         {
-            double Tk_x = cos(k * acos(xp));
+            double Tk_x = std::cos(k * std::acos(xp));
             ret += C[k] * Tk_x;
         }
         return ret;
@@ -340,7 +340,7 @@ public:
      */
     inline static double node (int k, int N)
     {
-        return cos(special::constant::pi * (k + 0.5) / N);
+        return std::cos(special::constant::pi * (k + 0.5) / N);
     }
     
 private:
@@ -390,6 +390,7 @@ void Chebyshev<double,double>::generate (Functor const & f, int n, double a, dou
     
     // evaluate nodes and function
     double pi_over_N = special::constant::pi / N;
+    # pragma omp parallel for firstprivate(pi_over_N)
     for (int k = 0; k < N; k++)
     {
         double xk = std::cos(pi_over_N * (k + 0.5));
@@ -406,9 +407,6 @@ void Chebyshev<double,double>::generate (Functor const & f, int n, double a, dou
 
 /**
  * @brief Chebyshev approximation of a given complex function.
- * 
- * Uses the function "fftw_plan_dft_1d" for complex data. Slower than the
- * real "generate".
  */
 template<> template <class Functor>
 void Chebyshev<double,Complex>::generate (Functor const & f, int n, double a, double b)
@@ -423,6 +421,7 @@ void Chebyshev<double,Complex>::generate (Functor const & f, int n, double a, do
     
     // evaluate nodes and function
     double pi_over_N = special::constant::pi / N;
+    # pragma omp parallel for firstprivate(pi_over_N)
     for (int k = 0; k < N; k++)
     {
         double xk = std::cos(pi_over_N * (k + 0.5));

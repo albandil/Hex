@@ -856,14 +856,12 @@ void Amplitudes::computeXi_ (Amplitudes::Transition T, BlockArray<Complex> & sol
     
     if (verbose_) std::cout << ": ";
     
-    // for all angular states ???: (triangle ℓ₂ ≤ ℓ₁)
-//     # pragma omp parallel for schedule (dynamic, 1)
+    // for all angular states
     for (unsigned ill = 0; ill < ang_.size(); ill++)
     {
         int l1 = ang_[ill].first;
         int l2 = ang_[ill].second;
         
-//         # pragma omp critical
         if (verbose_) std::cout << "(" << l1 << "," << l2 << ") " << std::flush;
         
         // load solution block
