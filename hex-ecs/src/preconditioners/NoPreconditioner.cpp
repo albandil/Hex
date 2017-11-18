@@ -945,12 +945,15 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
     std::size_t Nspline_outer = Nspline_full - Nspline_inner;
     
     // impact momentum
-    rArray ki = { std::sqrt(inp_->Etot[ie] + 1.0_r/(ni*ni)) };
+    Real ki = std::sqrt(inp_->Etot[ie] + 1.0_r/(ni*ni));
     
     // get the initial bound pseudo-state B-spline expansion
     cArray Xp = cmd_->analytic_eigenstates ?
         luS_->solve(RadialIntegrals::overlapP(rad_inner_->bspline(), rad_inner_->gaussleg(), inp_->Za, ni, li), 1) :
         Hl_[0][li].readPseudoState(li, ni - li - 1);
+    
+    // calculate Ricatti-Bessel B-spline expansions
+    cArray XJ = luS_->solve(RadialIntegrals::overlapj(rad_inner_->bspline(), rad_inner_->gaussleg(), ang_->maxell(), rArray{ ki }, cmd_->fast_bessel), ang_->maxell() + 1);
     
     // (anti)symmetrization
     Real Sign = ((ang_->S() + ang_->Pi()) % 2 == 0) ? 1. : -1.;
@@ -985,6 +988,9 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
         // for all allowed angular momenta (by momentum composition) of the projectile
         for (int l = std::abs(li - ang_->L()); l <= li + ang_->L(); l++)
         {
+            // Ricatti-Bessel function B-spline overlaps for this angular momentum (only for the inner region)
+            cArrayView Xj (XJ, l * Nspline_inner, Nspline_inner);
+            
             // skip wrong parity
             if ((ang_->L() + li + l) % 2 != ang_->Pi())
                 continue;
@@ -992,7 +998,7 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
             // compute energy- and angular momentum-dependent prefactor
             Complex prefactor = std::pow(1.0_i,l)
                               * std::sqrt(4.0_r * special::constant::pi * (2 * l + 1))
-                              * (Real)special::ClebschGordan(li,mi, l,0, inp_->L,mi) / ki[0];
+                              * (Real)special::ClebschGordan(li,mi, l,0, inp_->L,mi) / ki;
             
             // skip non-contributing terms
             if (prefactor == 0.0_r)
@@ -1038,7 +1044,7 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
             rArray ji_x (xs.size());
             # pragma omp parallel for
             for (unsigned ix = 0; ix < xs.size(); ix++)
-                ji_x[ix] = special::ric_j(l, ki[0] * xs[ix].real()); // FIXME : Coulomb for charge (inp_->Za - 1)
+                ji_x[ix] = special::ric_j(l, ki * xs[ix].real()); // FIXME : Coulomb for charge (inp_->Za - 1)
             
             // precompute integral moments
             cArrays M_L_P (rad_full_->maxlambda() + 1), M_mLm1_P (rad_full_->maxlambda() + 1);
@@ -1242,20 +1248,22 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
                                     rad_full_->gaussleg().scaled_nodes_and_weights(points, xs[ixknot * points + ix], rad_full_->bspline().t(iyknot + 1), &ys[0], &yws[0]);
                                     rad_full_->bspline().B(iyspline, iyknot, points, &ys[0], &B_y[0]);
                                     
+                                    Real rx = xs[ixknot * points + ix].real();
+                                    Complex Bx = B_x[(ixspline * (order + 1) + ixknot - ixspline) * points + ix];
+                                    Real Pix = Pi_x[ixknot * points + ix];
+                                    Real jix = ji_x[ixknot * points + ix];
+                                    Complex wx = xws[ixknot * points + ix];
+                                    
                                     for (int iy = 0; iy < points; iy++)
                                     {
-                                        // radii
-                                        Real rx = xs[ixknot * points + ix].real(), ry = ys[iy].real(), rmin = std::min(rx,ry), rmax = std::max(rx,ry);
-                                        
-                                        // evaluated functions
-                                        Complex Bx = B_x[(ixspline * (order + 1) + ixknot - ixspline) * points + ix];
+                                        Real ry = ys[iy].real();
                                         Complex By = B_y[iy];
-                                        Real Pix = Pi_x[ixknot * points + ix];
-                                        Real Piy = rad_inner_->bspline().eval(Xp, ry).real();
-                                        Real jix = ji_x[ixknot * points + ix];
-                                        Real jiy = special::ric_j(l, ki[0] * ry); // FIXME : Coulomb
-                                        Complex wx = xws[ixknot * points + ix];
                                         Complex wy = yws[iy];
+                                        
+                                        Real Piy = rad_inner_->bspline().eval(Xp, ry).real();
+                                        Real jiy = rad_inner_->bspline().R2() == rad_full_->bspline_y().R2()
+                                                 ? rad_inner_->bspline().eval(Xj, ry).real() // if only inner region - just evaluate the precomputed B-spline expansion
+                                                 : special::ric_j(l, ki * ry); // if also outer region - evaluate the wave now
                                         
                                         // damp factor
                                         Real dampfactor = 1;//damp(rx, ry, distance);
@@ -1265,6 +1273,7 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
                                         if (ry > rx and li == l2 and l == l1 and inp_->exchange) contrib_exchange += Bx * By * (1.0_r/ry - 1.0_r/rx) * jix * Piy * dampfactor * wx * wy;
                                         
                                         // higher multipoles contribution
+                                        Real rmin = std::min(rx,ry), rmax = std::max(rx,ry);
                                         Real multipole = 1 / rmax, rmin_over_rmax = rmin / rmax;
                                         for (int lambda = 1; lambda <= rad_full_->maxlambda(); lambda++)
                                         {
@@ -1282,20 +1291,22 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
                                     rad_full_->gaussleg_x().scaled_nodes_and_weights(points, rad_full_->bspline().t(iyknot), xs[ixknot * points + ix], &ys[0], &yws[0]);
                                     rad_full_->bspline().B(iyspline, iyknot, points, &ys[0], &B_y[0]);
                                     
+                                    Real rx = xs[ixknot * points + ix].real();
+                                    Complex Bx = B_x[(ixspline * (order + 1) + ixknot - ixspline) * points + ix];
+                                    Real Pix = Pi_x[ixknot * points + ix];
+                                    Real jix = ji_x[ixknot * points + ix];
+                                    Complex wx = xws[ixknot * points + ix];
+                                    
                                     for (int iy = 0; iy < points; iy++)
                                     {
-                                        // radii
-                                        Real rx = xs[ixknot * points + ix].real(), ry = ys[iy].real(), rmin = std::min(rx,ry), rmax = std::max(rx,ry);
-                                        
-                                        // evaluated functions
-                                        Complex Bx = B_x[(ixspline * (order + 1) + ixknot - ixspline) * points + ix];
+                                        Real ry = ys[iy].real();
                                         Complex By = B_y[iy];
-                                        Real Pix = Pi_x[ixknot * points + ix];
-                                        Real Piy = rad_inner_->bspline().eval(Xp, ry).real();
-                                        Real jix = ji_x[ixknot * points + ix];
-                                        Real jiy = special::ric_j(l, ki[0] * ry); // FIXME : Coulomb
-                                        Complex wx = xws[ixknot * points + ix];
                                         Complex wy = yws[iy];
+                                        
+                                        Real Piy = rad_inner_->bspline().eval(Xp, ry).real();
+                                        Real jiy = rad_inner_->bspline().R2() == rad_full_->bspline_y().R2()
+                                                 ? rad_inner_->bspline().eval(Xj, ry).real() // if only inner region - just evaluate the precomputed B-spline expansion
+                                                 : special::ric_j(l, ki * ry); // if also outer region - evaluate the wave now
                                         
                                         // damp factor
                                         Real dampfactor = 1;//damp(rx, ry, distance);
@@ -1305,6 +1316,7 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
                                         if (ry > rx and li == l2 and l == l1 and inp_->exchange) contrib_exchange += Bx * By * (1.0_r/ry - 1.0_r/rx) * jix * Piy * dampfactor * wx * wy;
                                         
                                         // higher multipoles contribution
+                                        Real rmin = std::min(rx,ry), rmax = std::max(rx,ry);
                                         Real multipole = 1 / rmax, rmin_over_rmax = rmin / rmax;
                                         for (int lambda = 1; lambda <= rad_full_->maxlambda(); lambda++)
                                         {

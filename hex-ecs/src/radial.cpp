@@ -301,11 +301,7 @@ Complex RadialIntegrals::computeOverlapMatrixElement
     return res;
 }
 
-SymBandMatrix<Complex> RadialIntegrals::computeOverlapMatrix
-(
-    Bspline const & bspline,
-    std::function<Complex(Complex)> weight
-) const
+/*SymBandMatrix<Complex> RadialIntegrals::computeOverlapMatrix (Bspline const & bspline, CCFunction func) const
 {
     GaussLegendre g;
     g.precompute_nodes_and_weights(EXPANSION_QUADRATURE_POINTS);
@@ -317,7 +313,7 @@ SymBandMatrix<Complex> RadialIntegrals::computeOverlapMatrix
             return computeOverlapMatrixElement(bspline, g, i, j, weight);
         }
     );
-}
+}*/
 
 CsrMatrix<LU_int_t, Complex> RadialIntegrals::computeOverlapMatrix
 (
@@ -887,14 +883,11 @@ cArray RadialIntegrals::overlap
 (
     Bspline const & bspline1, GaussLegendre const & g1,
     Bspline const & bspline2, GaussLegendre const & g2,
-    C2CFunction funct
+    C2CFunction funct, int points
 ) const
 {
     // resulting overlap
     cArray res (bspline1.Nspline() * bspline2.Nspline());
-    
-    // quadrature points per interval
-    int points = EXPANSION_QUADRATURE_POINTS;
     
     // evaluate quadrature nodes and weights
     cArray xs ((bspline1.Nknot() - 1) * points), wxs ((bspline1.Nknot() - 1) * points);
@@ -1018,7 +1011,7 @@ cArray RadialIntegrals::overlapP (Bspline const & bspline, GaussLegendre const &
     return res;
 }
 
-cArray RadialIntegrals::overlapj (Bspline const & bspline, GaussLegendre const & g, int maxell, const rArrayView vk, bool fast_bessel) const
+cArray RadialIntegrals::overlapj (Bspline const & bspline, GaussLegendre const & g, int maxell, const rArrayView vk, bool fast_bessel)
 {
     // shorthands
     int Nenergy = vk.size();
@@ -1059,31 +1052,11 @@ cArray RadialIntegrals::overlapj (Bspline const & bspline, GaussLegendre const &
             // evaluate the Riccati-Bessel function for this knot and energy and for all angular momenta
             for (int ipoint = 0; ipoint < points; ipoint++)
             {
-                // compute the damping factor
-                Real damp = 1;
-                if (bspline.t(iknot).imag() != 0 or bspline.t(iknot + 1).imag() != 0)
-                {
-                    // total damping in complex region
-                    damp = 0;
-                }
-                else
-                {
-                    // smooth damping in vicinity of the complex rotation point
-                    damp = std::tanh(0.125 * (bspline.R2() - 5 - xs[ipoint].real()));
-                }
-                
-                // if the factor is numerical zero, do not evaluate the function at all, just fill zeros
-                if (damp == 0.0_r)
-                {
-                    evalj.fill(0.0_z);
-                    continue;
-                }
-                
                 // which Bessel function evaluator to use?
                 std::function<int(int,double,double*)> jv = (fast_bessel ? gsl_sf_bessel_jl_array : gsl_sf_bessel_jl_steed_array);
                 
                 // evaluate all Riccati-Bessel functions in point
-                cArrayView(evalj, ipoint * (maxell + 1), maxell + 1) = damp * special::ric_jv(maxell, vk[ie] * xs[ipoint], jv);
+                cArrayView(evalj, ipoint * (maxell + 1), maxell + 1) = special::ric_jv(maxell, vk[ie] * xs[ipoint].real(), jv);
                 
                 // clear all possible NaN entries (these may occur for far radii, where should be zero)
                 for (int l = 0; l <= maxell; l++) if (not Complex_finite(evalj[ipoint * (maxell + 1) + l]))

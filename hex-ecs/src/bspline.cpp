@@ -123,35 +123,72 @@ void Bspline::B (int i, int iknot, int M, Complex const * const restrict x, Comp
     unsigned ithread = 0;
 #endif
     
-    // value of the parent B-splines of the requested B-spline
-    Complex * const restrict b = reinterpret_cast<Complex*>(work_[ithread].data());
-    
-    // initialize zero-order B-splines
-    for (int n = 0; n <= order_; n++)
-    for (int m = 0; m < M; m++)
-        b[n * M + m] = (i + n == iknot ? 1. : 0.);
-    
-    // calculate higher orders
-    for (int ord = 1; ord <= order_; ord++)
+    // calculate higher orders using real or complex path
+    if (t_[i].imag() == 0 and t_[i + M + 1].imag() == 0)
     {
-        // update splines
-        for (int n = 0; n <= order_ - ord; n++)
+        // value of the parent B-splines of the requested B-spline
+        Real * const restrict b = reinterpret_cast<Real*>(work_[ithread].data());
+        
+        // initialize zero-order B-splines
+        for (int n = 0; n <= order_; n++)
+        for (int m = 0; m < M; m++)
+            b[n * M + m] = (i + n == iknot ? 1. : 0.);
+        
+        // evaluating real B-spline
+        for (int ord = 1; ord <= order_; ord++)
         {
-            Complex invden1 = (t_[i+ord+n]   == t_[i+n]   ? 0.0_r : 1.0_r / (t_[i+ord+n]   - t_[i+n]));
-            Complex invden2 = (t_[i+ord+n+1] == t_[i+n+1] ? 0.0_r : 1.0_r / (t_[i+ord+n+1] - t_[i+n+1]));
-            
-            Complex * const restrict pb  = b +  n      * M;
-            Complex * const restrict pbn = b + (n + 1) * M;
-            
-            // for all evaluation points
-            for (int m = 0; m < M; m++)
-                pb[m] = pb[m] * (x[m] - t_[i+n]) * invden1 + pbn[m] * (t_[i+ord+n+1] - x[m]) * invden2;
+            // update splines
+            for (int n = 0; n <= order_ - ord; n++)
+            {
+                Real invden1 = (t_[i+ord+n].real()   == t_[i+n].real()   ? 0.0_r : 1.0_r / (t_[i+ord+n].real()   - t_[i+n].real()));
+                Real invden2 = (t_[i+ord+n+1].real() == t_[i+n+1].real() ? 0.0_r : 1.0_r / (t_[i+ord+n+1].real() - t_[i+n+1].real()));
+                
+                Real * const restrict pb  = b +  n      * M;
+                Real * const restrict pbn = b + (n + 1) * M;
+                
+                // for all evaluation points
+                # pragma omp simd
+                for (int m = 0; m < M; m++)
+                    pb[m] = pb[m] * (x[m].real() - t_[i+n].real()) * invden1 + pbn[m] * (t_[i+ord+n+1].real() - x[m].real()) * invden2;
+            }
         }
+        
+        // return the collected value of the requested B-spline
+        for (int m = 0; m < M; m++)
+            y[m] = b[m];
     }
-    
-    // return the collected value of the requested B-spline
-    for (int m = 0; m < M; m++)
-        y[m] = b[m];
+    else
+    {
+        // value of the parent B-splines of the requested B-spline
+        Complex * const restrict b = reinterpret_cast<Complex*>(work_[ithread].data());
+        
+        // initialize zero-order B-splines
+        for (int n = 0; n <= order_; n++)
+        for (int m = 0; m < M; m++)
+            b[n * M + m] = (i + n == iknot ? 1. : 0.);
+
+        // general complex variant
+        for (int ord = 1; ord <= order_; ord++)
+        {
+            // update splines
+            for (int n = 0; n <= order_ - ord; n++)
+            {
+                Complex invden1 = (t_[i+ord+n]   == t_[i+n]   ? 0.0_r : 1.0_r / (t_[i+ord+n]   - t_[i+n]));
+                Complex invden2 = (t_[i+ord+n+1] == t_[i+n+1] ? 0.0_r : 1.0_r / (t_[i+ord+n+1] - t_[i+n+1]));
+                
+                Complex * const restrict pb  = b +  n      * M;
+                Complex * const restrict pbn = b + (n + 1) * M;
+                
+                // for all evaluation points
+                for (int m = 0; m < M; m++)
+                    pb[m] = pb[m] * (x[m] - t_[i+n]) * invden1 + pbn[m] * (t_[i+ord+n+1] - x[m]) * invden2;
+            }
+        }
+        
+        // return the collected value of the requested B-spline
+        for (int m = 0; m < M; m++)
+            y[m] = b[m];
+    }
 }
 
 void Bspline::dB (int i, int iknot, int n, Complex const * const restrict x, Complex * const restrict y) const

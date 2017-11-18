@@ -387,7 +387,8 @@ class RadialIntegrals
             GaussLegendre const & gx,
             Bspline const & bspliney,
             GaussLegendre const & gy,
-            C2CFunction funct
+            C2CFunction funct,
+            int points = EXPANSION_QUADRATURE_POINTS
         ) const;
         
         /** 
@@ -416,14 +417,14 @@ class RadialIntegrals
          * @param vk Array containing linear momenta.
          * @return Array of shape [vk.size() × (maxell + 1) × Nspline] in column-major format.
          */
-        cArray overlapj
+        static cArray overlapj
         (
             Bspline const & bspline,
             GaussLegendre const & g,
             int maxell,
             const rArrayView vk,
             bool fast_bessel = false
-        ) const;
+        );
         
         // Return reference to the B-spline object.
         Bspline const & bspline () const { return bspline_x_; }
