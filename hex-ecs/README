@@ -10,19 +10,19 @@
 Dependencies
 ------------
 
-The program is written in C++11 and can be successfully compiled by the
+The program is written in C++14 and can be successfully compiled by the
 following compilers:
 
- * GCC 5.2.0 (also MinGW-w64 based on this GCC)
- * LLVM/clang 3.7.1
- * Intel C++ Compiler 16.0.0
+ * GCC 7.2.0 (also MinGW-w64 based on this GCC)
+ * LLVM/clang 4.0.1 (with additional -lm link flag)
+ * Intel C++ Compiler 18.0.1
  
 There are several external libraries that are being used for some partial tasks.
 Some of them can be avoided if a correct compiler flag is added to CFLAGS in the
 Makefile and the library link is removed from LIBRARY variable in Makefile.
 Here is the list of the libraries with versions that were used:
 
- * OpenMPI 1.8.3 or Microsoft MPI v6
+ * OpenMPI 2.1.0 or Microsoft MPI v8
             Optional. Used for distributed parallellization (hex-ecs --mpi).
 
  * UMFPACK 5.7.1
@@ -30,7 +30,7 @@ Here is the list of the libraries with versions that were used:
                 http://www.cise.ufl.edu/research/sparse/SuiteSparse/
             Used for solution of sparse linear systems.
 
- * OpenBLAS 0.2.15 (or other BLAS + LAPACK distribution)
+ * OpenBLAS 0.2.20 (or other BLAS + LAPACK distribution)
             OpenBLAS is one of the best open-source implementations of BLAS/LAPACK.
             Obtainable from
                 http://www.openblas.net/
@@ -38,7 +38,7 @@ Here is the list of the libraries with versions that were used:
             OpenBLAS. This can be compiled by setting USE_THREAD=1 and USE_OPENMP=1
             in Makefile.rule in OpenBLAS source.
 
- * GSL 1.16
+ * GSL 2.3
             Needed, obtainable from
                 http://www.gnu.org/software/gsl/
             Used for special functions, Fourier transform and some other routines.
