@@ -111,7 +111,7 @@ GSLLIBS ?= $(shell gsl-config --libs)
 
 
 # compiler flags
-CFLAGS += -fPIC -std=c++11 -pedantic-errors -DHEX_GIT_COMMIT=\"$(GIT_COMMIT)\" \
+CFLAGS += -fPIC -std=c++14 -pedantic-errors -DHEX_GIT_COMMIT=\"$(GIT_COMMIT)\" \
           -Isrc -I../common \
           $(SUITESPARSEFLAGS) $(SUPERLUFLAGS) $(SUPERLUDISTFLAGS) $(MUMPSFLAGS) $(PARDISOFLAGS) \
           $(OPENMPIFLAGS) $(OPENCLFLAGS) $(GSLFLAGS) $(BLASLAPACKFLAGS) $(PNGPPFLAGS)

@@ -30,6 +30,7 @@
 //  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
 #include <iostream>
+#include <x86intrin.h>
 
 // --------------------------------------------------------------------------------- //
 
@@ -45,6 +46,7 @@
 
 // --------------------------------------------------------------------------------- //
 
+#include "hex-memory.h"
 #include "hex-misc.h"
 
 // --------------------------------------------------------------------------------- //
@@ -222,3 +224,73 @@ void create_directory (std::string dir)
     CreateDirectoryA(dir.c_str(), NULL);
 #endif
 }
+
+#if defined(__AVX2__) && defined(__FMA__)
+void cmul2xd
+(
+    std::complex<double>       * const restrict C,
+    std::complex<double> const * const restrict A,
+    std::complex<double> const * const restrict B
+)
+{
+    // Multiplies two 2-component complex vectors (i.e. each containing 4 double-precision real values).
+    //
+    // [ a1 ]   [ b1 ]   [ a1 ] * [ b1 ] - [ a2 ] * [ b2 ]
+    // [ a2 ]   [ b2 ]   [ a2 ] * [ b1 ] + [ a1 ] * [ b2 ]
+    // [ -- ] * [ -- ] = [ -- ]   [ -- ]   [ -- ]   [ -- ]
+    // [ a3 ]   [ b3 ]   [ a3 ] * [ b3 ] - [ a4 ] * [ b4 ]
+    // [ a4 ]   [ b4 ]   [ a4 ] * [ b3 ] + [ a3 ] * [ b4 ]
+    
+    __m256d A1234 = _mm256_loadu_pd(reinterpret_cast<const double*>(A));
+    __m256d A2143 = _mm256_permute_pd(A1234, 0b01010101);
+    
+    __m256d B1234 = _mm256_loadu_pd(reinterpret_cast<const double*>(B));
+    __m256d B1133 = _mm256_unpacklo_pd(B1234, B1234);
+    __m256d B2244 = _mm256_unpackhi_pd(B1234, B1234);
+    
+    __m256d C1234 = _mm256_loadu_pd(reinterpret_cast<const double*>(C));
+    
+    C1234 = _mm256_fmaddsub_pd(A2143, B2244, C1234);
+    C1234 = _mm256_fmaddsub_pd(A1234, B1133, C1234);
+    
+    _mm256_storeu_pd(reinterpret_cast<double*>(C), C1234);
+}
+#endif
+
+#ifdef __AVX512F__
+void cmul4xd
+(
+    std::complex<double>       * const restrict C,
+    std::complex<double> const * const restrict A,
+    std::complex<double> const * const restrict B
+)
+{
+    // Multiplies two 4-component complex vectors (i.e. each containing 8 double-precision real values).
+    //
+    // [ a1 ]   [ b1 ]   [ a1 ] * [ b1 ] - [ a2 ] * [ b2 ]
+    // [ a2 ]   [ b2 ]   [ a2 ] * [ b1 ] + [ a1 ] * [ b2 ]
+    // [ -- ]   [ -- ]   [ -- ]   [ -- ]   [ -- ]   [ -- ]
+    // [ a3 ]   [ b3 ]   [ a3 ] * [ b3 ] - [ a4 ] * [ b4 ]
+    // [ a4 ]   [ b4 ]   [ a4 ] * [ b3 ] + [ a3 ] * [ b4 ]
+    // [ -- ] * [ -- ] = [ -- ]   [ -- ]   [ -- ]   [ -- ]
+    // [ a5 ]   [ b5 ]   [ a5 ] * [ b5 ] - [ a6 ] * [ b6 ]
+    // [ a6 ]   [ b6 ]   [ a6 ] * [ b5 ] + [ a5 ] * [ b6 ]
+    // [ -- ]   [ -- ]   [ -- ]   [ -- ]   [ -- ]   [ -- ]
+    // [ a7 ]   [ b7 ]   [ a7 ] * [ b7 ] - [ a8 ] * [ b8 ]
+    // [ a8 ]   [ b8 ]   [ a8 ] * [ b7 ] + [ a7 ] * [ b8 ]
+    
+    __m512d A12345678 = _mm512_loadu_pd(reinterpret_cast<const double*>(A));
+    __m512d A21436587 = _mm512_permute_pd(A12345678, 0b01010101);
+    
+    __m512d B12345678 = _mm512_loadu_pd(reinterpret_cast<const double*>(B));
+    __m512d B11335577 = _mm512_unpacklo_pd(B12345678, B12345678);
+    __m512d B22446688 = _mm512_unpackhi_pd(B12345678, B12345678);
+    
+    __m512d C12345678 = _mm512_loadu_pd(reinterpret_cast<const double*>(C));
+    
+    C12345678 = _mm512_fmaddsub_pd(A21436587, B22446688, C12345678);
+    C12345678 = _mm512_fmaddsub_pd(A12345678, B11335577, C12345678);
+    
+    _mm512_storeu_pd(reinterpret_cast<double*>(C), C12345678);
+}
+#endif

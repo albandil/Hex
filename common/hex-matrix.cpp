@@ -409,16 +409,94 @@ void SymBandMatrix<Complex>::sym_band_dot (int n, int d, const cArrayView M, Com
         
                 if (tri & MatrixSelection::StrictUpper)
                 {
-                    for (int l = 1; l < d and k + l < n; l++)
-                        pB[k] += pM[k * d + l] * alpha * pA[k + l];
+/*#if !defined(SINGLE) && defined(__AVX512F__)
+                    if (d == 5 and k + 4 < n)
+                    {
+                        // AVX 512 - manual optimization for order = 4
+                        //
+                        //   pB[k] += alpha * (pA[k + 1] * pM[k * d + 1]);
+                        //   pB[k] += alpha * (pA[k + 2] * pM[k * d + 2]);
+                        //   pB[k] += alpha * (pA[k + 3] * pM[k * d + 3]);
+                        //   pB[k] += alpha * (pA[k + 4] * pM[k * d + 4]);
+                        
+                        Complex X[4] = { 0., 0., 0., 0. };
+                        
+                        cmul4xd(X, pA + k + 1, pM + k * d + 1); // AVX 512
+                        
+                        pB[k] += alpha * (X[0] + X[1] + X[2] + X[3]);
+                    }
+                    else
+#elif !defined(SINGLE) && defined(__AVX2__) && defined(__FMA__)
+                    if (d == 5 and k + 4 < n)
+                    {
+                        // AVX 256 - manual optimization for order = 4
+                        //
+                        //   pB[k] += alpha * pA[k + 1] * pM[k * d + 1];
+                        //   pB[k] += alpha * pA[k + 2] * pM[k * d + 2];
+                        //
+                        //   pB[k] += alpha * pA[k + 3] * pM[k * d + 3];
+                        //   pB[k] += alpha * pA[k + 4] * pM[k * d + 4];
+                        
+                        Complex X[2] = { 0., 0. };
+                        
+                        cmul2xd(X, pA + k + 1, pM + k * d + 1); // AVX2
+                        cmul2xd(X, pA + k + 3, pM + k * d + 3); // AVX2
+                        
+                        pB[k] += alpha * (X[0] + X[1]);
+                    }
+                    else
+#endif*/
+                    {
+                        for (int l = 1; l < d and k + l < n; l++)
+                            pB[k] += pM[k * d + l] * alpha * pA[k + l];
+                    }
                 }
         
             // Mirror pass (~ strict lower triangle)
                 
                 if (tri & MatrixSelection::StrictLower)
                 {
-                    for (int l = 1; l < d and k + l < n; l++)
-                        pB[k + l] += pM[k * d + l] * alpha * pA[k];
+/*#if !defined(SINGLE) && defined(__AVX512F__)
+                    if (d == 5 and k + 4 < n)
+                    {
+                        // AVX 512 - manual optimization for order = 4
+                        //
+                        //   pB[k + 1] += (alpha * pA[k]) * pM[k * d + 1];
+                        //   pB[k + 2] += (alpha * pA[k]) * pM[k * d + 2];
+                        //   pB[k + 3] += (alpha * pA[k]) * pM[k * d + 3];
+                        //   pB[k + 4] += (alpha * pA[k]) * pM[k * d + 4];
+                        
+                        Complex X[4];
+                        
+                        X[0] = X[1] = X[2] = X[3] = alpha * pA[k];
+                        
+                        cmul4xd(pB + k + 1, X, pM + k * d + 1); // AVX 512
+                    }
+                    else
+#elif !defined(SINGLE) && defined(__AVX2__) && defined(__FMA__)
+                    if (d == 5 and k + 4 < n)
+                    {
+                        // AVX 256 - manual optimization for order = 4
+                        //
+                        //   pB[k + 1] += (alpha * pA[k]) * pM[k * d + 1];
+                        //   pB[k + 2] += (alpha * pA[k]) * pM[k * d + 2];
+                        //
+                        //   pB[k + 3] += (alpha * pA[k]) * pM[k * d + 3];
+                        //   pB[k + 4] += (alpha * pA[k]) * pM[k * d + 4];
+                        
+                        Complex X[2];
+                        
+                        X[0] = X[1] = alpha * pA[k];
+                        
+                        cmul2xd(pB + k + 1, X, pM + k * d + 1); // AVX2
+                        cmul2xd(pB + k + 3, X, pM + k * d + 3); // AVX2
+                    }
+                    else
+#endif*/
+                    {
+                        for (int l = 1; l < d and k + l < n; l++)
+                            pB[k + l] += pM[k * d + l] * alpha * pA[k];
+                    }
                 }
         }
         

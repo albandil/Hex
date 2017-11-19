@@ -779,4 +779,26 @@ std::string current_time ();
 
 // --------------------------------------------------------------------------------- //
 
+//
+// SIMD complex number multiplication
+//
+
+// AVX2 (2x double complex)
+void cmul2xd
+(
+    std::complex<double>       * const C,
+    std::complex<double> const * const A,
+    std::complex<double> const * const B
+);
+
+// AVX512 (4x double complex)
+void cmul4xd
+(
+    std::complex<double>       * const C,
+    std::complex<double> const * const A,
+    std::complex<double> const * const B
+);
+
+// --------------------------------------------------------------------------------- //
+
 #endif
