@@ -1541,86 +1541,107 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
             
             int maxlambda = rad_panel_->maxlambda();
             
-            # pragma omp parallel for collapse (3) schedule (dynamic,1)
+            cArray R;
+            cArray Rpd (Nspline_y_inner), Rpu (Nspline_y_inner), Rpl (Nspline_y_inner);
+            
+            # pragma omp parallel for collapse (3) schedule (dynamic, 1) firstprivate (R, Rpd, Rpu, Rpl)
             for (int lambda = 0; lambda <= maxlambda; lambda++)
             for (std::size_t i = 0; i < Nspline_x_inner; i++)
             for (int d = 0; d <= inp_->order; d++)
             if (i + d < Nspline_x_inner)
             {
                 unsigned k = i + d;
+                bool RReady = false;
                 
-                std::shared_ptr<SymBandMatrix<Complex>> R;
-                
-                for (unsigned ill = 0; ill < Nang; ill++) if (par_->isMyGroupWork(ill))
                 for (unsigned illp = 0; illp < Nang; illp++) if (par_->igroupproc() == (int)illp % par_->groupsize())
-                if (Real f = ang_->f(ill, illp, lambda))
                 {
-                    if (R.get() == nullptr)
+                    bool RpReady = false;
+                    
+                    for (unsigned ill = 0; ill < Nang; ill++) if (par_->isMyGroupWork(ill))
+                    if (Real f = ang_->f(ill, illp, lambda))
                     {
-                        R.reset
-                        (
-                            new SymBandMatrix<Complex>
+                        // skip unwanted angular blocks
+                        if (ill == illp and not (tri & MatrixSelection::BlockDiagonal))    continue;
+                        if (ill <  illp and not (tri & MatrixSelection::BlockStrictUpper)) continue;
+                        if (ill >  illp and not (tri & MatrixSelection::BlockStrictLower)) continue;
+                        
+                        std::size_t chunk = p[ill].size() / Nini;
+                        std::size_t chunkp = p[illp].size() / Nini;
+                        std::size_t offset = chunk * ini;
+                        std::size_t offsetp = chunkp * ini;
+                        
+                        // calculate sub-block R_ik^lambda
+                        if (not RReady)
+                        {
+                            R = rad_panel_->calc_R_tr_dia_block(lambda, i, k).data().slice(0, Nspline_y_inner * (order + 1));
+                            RReady = true;
+                        }
+                        
+                        // calculate scalar products of R_ik^lambda with appropriate sub-segments of p[illp]
+                        if (not RpReady)
+                        {
+                            // precompute Z * R_ijil * p_jl
+                            if (d == 0) SymBandMatrix<Complex>::sym_band_dot
                             (
-                                Nspline_y_inner,
-                                order + 1,
-                                rad_panel_->calc_R_tr_dia_block(lambda, i, k).data().slice(0, Nspline_y_inner * (order + 1))
-                            )
-                        );
-                    }
-                    
-                    std::size_t chunk = p[ill].size() / Nini;
-                    std::size_t chunkp = p[illp].size() / Nini;
-                    std::size_t offset = chunk * ini;
-                    std::size_t offsetp = chunkp * ini;
-                    
-                    // skip unwanted angular blocks
-                    if (ill == illp and not (tri & MatrixSelection::BlockDiagonal))    continue;
-                    if (ill <  illp and not (tri & MatrixSelection::BlockStrictUpper)) continue;
-                    if (ill >  illp and not (tri & MatrixSelection::BlockStrictLower)) continue;
-                    
-                    // diagonal blocks
-                    if (d == 0)
-                    {
-                        OMP_LOCK_LOCK(ill * Nspline_x_inner + i);
+                                Nspline_y_inner, order + 1, R,
+                                inp_->Zp, cArrayView(p[illp], offsetp + i * Nspline_y_inner, Nspline_y_inner),
+                                0.0_z,    Rpd,
+                                ill == illp ? tri : (ill < illp ? (tri & MatrixSelection::StrictUpper ? MatrixSelection::Both : MatrixSelection::None) :
+                                                                  (tri & MatrixSelection::StrictLower ? MatrixSelection::Both : MatrixSelection::None))
+                            );
+                            
+                            // precompute Z * R_ijkl * p_jl
+                            if (d != 0) SymBandMatrix<Complex>::sym_band_dot
+                            (
+                                Nspline_y_inner, order + 1, R,
+                                inp_->Zp, cArrayView(p[illp], offsetp + k * Nspline_y_inner, Nspline_y_inner),
+                                0.0_z,    Rpu
+                            );
+                            
+                            // precompute Z * R_kjil * p_jl
+                            if (d != 0) SymBandMatrix<Complex>::sym_band_dot
+                            (
+                                Nspline_y_inner, order + 1, R,
+                                inp_->Zp, cArrayView(p[illp], offsetp + i * Nspline_y_inner, Nspline_y_inner),
+                                0.0_z,    Rpl
+                            );
+                            
+                            RpReady = true;
+                        }
                         
-                        R->dot
-                        (
-                            inp_->Zp * f, cArrayView(p[illp], offsetp + i * Nspline_y_inner, Nspline_y_inner),
-                            1.0_z,        cArrayView(q[ill],  offset  + i * Nspline_y_inner, Nspline_y_inner),
-                            ill == illp ? tri : (ill < illp ? (tri & MatrixSelection::StrictUpper ? MatrixSelection::Both : MatrixSelection::None) :
-                                                              (tri & MatrixSelection::StrictLower ? MatrixSelection::Both : MatrixSelection::None))
-                        );
-                        
-                        OMP_UNLOCK_LOCK(ill * Nspline_x_inner + i);
-                    }
-                    
-                    // off-diagonal blocks
-                    else
-                    {
-                        if (tri & MatrixSelection::StrictUpper)
+                        // diagonal blocks
+                        if (d == 0)
                         {
                             OMP_LOCK_LOCK(ill * Nspline_x_inner + i);
                             
-                            R->dot
-                            (
-                                inp_->Zp * f, cArrayView(p[illp], offsetp + k * Nspline_y_inner, Nspline_y_inner),
-                                1.0_z,        cArrayView(q[ill],  offset  + i * Nspline_y_inner, Nspline_y_inner)
-                            );
+                            for (std::size_t r = 0; r < Nspline_y_inner; r++)
+                                q[ill][offset + i * Nspline_y_inner + r] += f * Rpd[r];
                             
                             OMP_UNLOCK_LOCK(ill * Nspline_x_inner + i);
                         }
                         
-                        if (tri & MatrixSelection::StrictLower)
+                        // off-diagonal blocks
+                        else
                         {
-                            OMP_LOCK_LOCK(ill * Nspline_x_inner + k);
+                            if (tri & MatrixSelection::StrictUpper)
+                            {
+                                OMP_LOCK_LOCK(ill * Nspline_x_inner + i);
+                                
+                                for (std::size_t r = 0; r < Nspline_y_inner; r++)
+                                    q[ill][offset + i * Nspline_y_inner + r] += f * Rpu[r];
+                                
+                                OMP_UNLOCK_LOCK(ill * Nspline_x_inner + i);
+                            }
                             
-                            R->dot
-                            (
-                                inp_->Zp * f, cArrayView(p[illp], offsetp + i * Nspline_y_inner, Nspline_y_inner),
-                                1.0_z,        cArrayView(q[ill],  offset  + k * Nspline_y_inner, Nspline_y_inner)
-                            );
-                            
-                            OMP_UNLOCK_LOCK(ill * Nspline_x_inner + k);
+                            if (tri & MatrixSelection::StrictLower)
+                            {
+                                OMP_LOCK_LOCK(ill * Nspline_x_inner + k);
+                                
+                                for (std::size_t r = 0; r < Nspline_y_inner; r++)
+                                    q[ill][offset + k * Nspline_y_inner + r] += f * Rpl[r];
+                                
+                                OMP_UNLOCK_LOCK(ill * Nspline_x_inner + k);
+                            }
                         }
                     }
                 }
