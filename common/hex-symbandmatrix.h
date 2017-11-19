@@ -6,7 +6,7 @@
 //                    / /   / /    \_\      / /  \ \                                 //
 //                                                                                   //
 //                                                                                   //
-//  Copyright (c) 2015, Jakub Benda, Charles University in Prague                    //
+//  Copyright (c) 2017, Jakub Benda, Charles University in Prague                    //
 //                                                                                   //
 // MIT License:                                                                      //
 //                                                                                   //
@@ -38,7 +38,6 @@
 #include "hex-coomatrix.h"
 #include "hex-densematrix.h"
 #include "hex-hdffile.h"
-#include "hex-openmp.h"
 
 // --------------------------------------------------------------------------------- //
 
@@ -906,9 +905,13 @@ template <class DataT> class BlockSymBandMatrix
         /**
          * @brief Multiply (block) vector by the matrix.
          * 
+         * @param a Multiplication factor.
          * @param v Vector to multiply. It should be of equal size to the size of the matrix.
          *          The result will be again of the same size.
+         * @param b Scaling factor.
+         * @param w Result vector.
          * @param parallelize Multiply by several blocks at once (OpenMP used).
+         * @param tri Which part of matrix to use (upper/lower/diagonal and combinations).
          */
         void dot (DataT a, const ArrayView<DataT> v, DataT b, ArrayView<DataT> w, bool parallelize = false, MatrixSelection::Selection tri = MatrixSelection::Both) const
         {
@@ -923,9 +926,6 @@ template <class DataT> class BlockSymBandMatrix
             // scale destination vector
             w *= b;
             
-            // create synchronization locks
-            OMP_CREATE_LOCKS(blockcount_);
-            
             // parallel section start
             # pragma omp parallel if (parallelize)
             {
@@ -938,107 +938,57 @@ template <class DataT> class BlockSymBandMatrix
                 if (not inmemory_)
                     hdf = new HDFFile (diskfile_, HDFFile::readonly);
                 
-                // for all block diagonals
-                for (std::size_t d = 0; d < blockhalfbw_; d++)
+                // parallel processing of blocks in this diagonal
+                # pragma omp for schedule (dynamic,1)
+                for (std::size_t i = 0; i < blockcount_; i++)
+                for (std::size_t j = 0; j < blockcount_; j++)
                 {
-                    // parallel processing of blocks in this diagonal
-                    # pragma omp for schedule (dynamic,1)
-                    for (std::size_t i = 0; i < blockcount_; i++)
-                    if (i + d < blockcount_)
+                    // skip unwanted blocks
+                    if (i < j and not (tri & MatrixSelection::StrictUpper)) continue;
+                    if (i > j and not (tri & MatrixSelection::StrictLower)) continue;
+                    
+                    // diagonal, skip if too far from main diagonal
+                    std::size_t d = std::max(i,j) - std::min(i,j);
+                    if (d >= blockhalfbw_) continue;
+                    
+                    // block volume and offset
+                    std::size_t vol = size_ * halfbw_;
+                    std::size_t offset = (std::min(i,j) * blockhalfbw_ + d) * vol;
+                    
+                    // data view of this block
+                    ArrayView<DataT> view;
+                    
+                    // select matrix block data
+                    if (inmemory_)
                     {
-                        // block volume and offset
-                        std::size_t vol = size_ * halfbw_;
-                        std::size_t offset = (i * blockhalfbw_ + d) * vol;
-                        
-                        // data view of this block
-                        ArrayView<DataT> view;
-                        
-                        // select matrix block data
-                        if (inmemory_)
-                        {
-                            // use data in memory
-                            view.reset(vol, data_.begin() + offset);
-                        }
-                        else
-                        {
-                            // read data from the disk
-                            diskdata.resize(vol);
-                            if (not hdf->read("data", &diskdata[0], vol, offset))
-                                HexException("Failed to read HDF file \"%s\".\nHDF error stack:\n%s", diskfile_.c_str(), hdf->error().c_str());
-                            
-                            // reset view to the new data
-                            view.reset(vol, diskdata.data());
-                        }
-                        
-                        // multiply by diagonal block
-                        if (d == 0)
-                        {
-                            SymBandMatrix<DataT>::sym_band_dot
-                            (
-                                size_, halfbw_, view,
-                                1., ArrayView<DataT>(v, i * size_, size_),
-                                0., product,
-                                MatrixSelection::Both
-                            );
-                            
-                            OMP_LOCK_LOCK(i);
-                            {
-                                # pragma omp simd
-                                for (std::size_t pos = 0; pos < size_; pos++)
-                                    w[i * size_ + pos] += a * product[pos];
-                            }
-                            OMP_UNLOCK_LOCK(i);
-                        }
-                        
-                        // multiply by the other diagonals (both symmetries)
-                        else
-                        {
-                            if (tri & MatrixSelection::StrictUpper)
-                            {
-                                SymBandMatrix<DataT>::sym_band_dot
-                                (
-                                    size_, halfbw_, view,
-                                    1., ArrayView<DataT>(v, (i + d) * size_, size_),
-                                    0., product
-                                );
-                                
-                                OMP_LOCK_LOCK(i);
-                                {
-                                    # pragma omp simd
-                                    for (std::size_t pos = 0; pos < size_; pos++)
-                                        w[i * size_ + pos] += a * product[pos];
-                                }
-                                OMP_UNLOCK_LOCK(i);
-                            }
-                            
-                            if (tri & MatrixSelection::StrictLower)
-                            {
-                                SymBandMatrix<DataT>::sym_band_dot
-                                (
-                                    size_, halfbw_, view,
-                                    1., ArrayView<DataT>(v, i * size_, size_),
-                                    0., product
-                                );
-                                
-                                OMP_LOCK_LOCK(i + d);
-                                {
-                                    # pragma omp simd
-                                    for (std::size_t pos = 0; pos < size_; pos++)
-                                        w[(i + d) * size_ + pos] += a * product[pos];
-                                }
-                                OMP_UNLOCK_LOCK(i + d);
-                            }
-                        }
+                        // use data in memory
+                        view.reset(vol, data_.begin() + offset);
                     }
+                    else
+                    {
+                        // read data from the disk
+                        diskdata.resize(vol);
+                        if (not hdf->read("data", &diskdata[0], vol, offset))
+                            HexException("Failed to read HDF file \"%s\".\nHDF error stack:\n%s", diskfile_.c_str(), hdf->error().c_str());
+                        
+                        // reset view to the new data
+                        view.reset(vol, diskdata.data());
+                    }
+                    
+                    // multiply-add
+                    SymBandMatrix<DataT>::sym_band_dot
+                    (
+                        size_, halfbw_, view,
+                        a,  ArrayView<DataT>(v, j * size_, size_),
+                        1., ArrayView<DataT>(w, i * size_, size_),
+                        i == j ? tri : MatrixSelection::Both
+                    );
                 }
                 
                 // release disk file
                 if (not inmemory_)
                     delete hdf;
             }
-            
-            // delete synchronization locks
-            OMP_DELETE_LOCKS();
         }
         
         //
@@ -1047,8 +997,6 @@ template <class DataT> class BlockSymBandMatrix
         
         /**
          * @brief Convert to COO format.
-         * 
-         * @param loadblocks Use blocks from scratch file instead of those in memory (if any).
          */
         template <class IdxT> CooMatrix<IdxT,DataT> tocoo () const
         {
