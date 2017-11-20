@@ -124,7 +124,7 @@ void Bspline::B (int i, int iknot, int M, Complex const * const restrict x, Comp
 #endif
     
     // calculate higher orders using real or complex path
-    if (t_[i].imag() == 0 and t_[i + M + 1].imag() == 0)
+    if (t_[i].imag() == 0 and t_[i + order_ + 1].imag() == 0)
     {
         // value of the parent B-splines of the requested B-spline
         Real * const restrict b = reinterpret_cast<Real*>(work_[ithread].data());
