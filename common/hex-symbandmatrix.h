@@ -1048,16 +1048,22 @@ template <class DataT> class BlockSymBandMatrix
                 // copy all elements to whole-matrix arrays
                 for (std::size_t k = 0; k < coo.v().size(); k++)
                 {
-                    I.push_back( coo.i()[k] +  i      * size_ );
-                    J.push_back( coo.j()[k] + (i + d) * size_ );
-                    V.push_back( coo.v()[k]                   );
+                    if (coo.v()[k] != DataT(0))
+                    {
+                        I.push_back( coo.i()[k] +  i      * size_ );
+                        J.push_back( coo.j()[k] + (i + d) * size_ );
+                        V.push_back( coo.v()[k]                   );
+                    }
                 }
                 if (d != 0)
                 for (std::size_t k = 0; k < coo.v().size(); k++)
                 {
-                    I.push_back( coo.i()[k] + (i + d) * size_ );
-                    J.push_back( coo.j()[k] +  i      * size_ );
-                    V.push_back( coo.v()[k]                   );
+                    if (coo.v()[k] != DataT(0))
+                    {
+                        I.push_back( coo.i()[k] + (i + d) * size_ );
+                        J.push_back( coo.j()[k] +  i      * size_ );
+                        V.push_back( coo.v()[k]                   );
+                    }
                 }
             }
             

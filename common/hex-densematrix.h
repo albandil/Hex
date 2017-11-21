@@ -913,7 +913,6 @@ NumberArray<Type> operator * (ArrayView<Complex> v, RowMatrixView<Complex> const
 template <class Type>
 void transpose (ArrayView<Type> A, std::size_t ldA0, std::size_t ldA)
 {
-    // the matrix size must be divisible by the leading dimension
     assert(A.size() == ldA * ldA0);
     
     // backup the original matrix
@@ -923,6 +922,60 @@ void transpose (ArrayView<Type> A, std::size_t ldA0, std::size_t ldA)
     for (std::size_t i = 0; i < ldA0; i++)
     for (std::size_t j = 0; j < ldA; j++)
         A[i * ldA + j] = A0[j * ldA0 + i];
+}
+
+/**
+ * @brief General rank-2 dense tensor transposition.
+ * 
+ * Transposes a tensor with given dimensions, effectively cyclically
+ * permuting indices. Assuming that the element @f$ A_{ij} @f$
+ * is stored in @code A[i * N2 + j] @endcode, then the
+ * output array will be permuted so that the same element will be
+ * located in @code B[j * N1 + i] @endcode.
+ * 
+ * @param A Dense tensor elements array to transpose of length @c N1 x @c N2.
+ * @param B Output array of the same size.
+ * @param N1 First dimension size.
+ * @param N2 Second dimension size.
+ */
+template <class Type>
+void transpose (const ArrayView<Type> A, ArrayView<Type> B, std::size_t N1, std::size_t N2)
+{
+    assert(A.size() == N1 * N2);
+    assert(B.size() == N1 * N2);
+    
+    // fill transposed elements
+    for (std::size_t i = 0; i < N1; i++)
+    for (std::size_t j = 0; j < N2; j++)
+        B[j * N1 + i] = A[i * N2 + j];
+}
+
+/**
+ * @brief General rank-3 dense tensor transposition.
+ * 
+ * Transposes a tensor with given dimensions, effectively cyclically
+ * permuting indices. Assuming that the element @f$ A_{ijk} @f$
+ * is stored in @code A[(i * N2 + j) * N3 + k] @endcode, then the
+ * output array will be permuted so that the same element will be
+ * located in @code B[(k * N1 + i) * N2 + j] @endcode.
+ * 
+ * @param A Dense tensor elements array to transpose of length @c N1 x @c N2 x @c N3.
+ * @param B Output array of the same size.
+ * @param N1 First dimension size.
+ * @param N2 Second dimension size.
+ * @param N3 Third dimension size.
+ */
+template <class Type>
+void transpose (const ArrayView<Type> A, ArrayView<Type> B, std::size_t N1, std::size_t N2, std::size_t N3)
+{
+    assert(A.size() == N1 * N2 * N3);
+    assert(B.size() == N1 * N2 * N3);
+    
+    // fill transposed elements
+    for (std::size_t i = 0; i < N1; i++)
+    for (std::size_t j = 0; j < N2; j++)
+    for (std::size_t k = 0; k < N3; k++)
+        B[(k * N1 + i) * N2 + j] = A[(i * N2 + j) * N3 + k];
 }
 
 #endif // HEX_DENSEMATRIX_H

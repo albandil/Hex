@@ -523,12 +523,16 @@ public:
     }
     
     /**
+     * @brief Upper triangular solve.
+     * 
      * Solves upper triangular system of equations using backsubstitution.
      * The matrix needs not be triangular, but elements under the diagonal
      * won't be used or changed.
+     * 
      * @param b Right-hand side.
+     * @param omega Over-relaxation factor.
      */
-    NumberArray<DataT> upperSolve (ArrayView<DataT> const & b) const
+    NumberArray<DataT> upperSolve (ArrayView<DataT> const & b, DataT omega = 1) const
     {
         // check size
         IdxT N = b.size();
@@ -559,7 +563,7 @@ public:
                 
                 // diagonal element will be useful in a moment, store it
                 if (col == row)
-                    a = x_[idx];
+                    a = x_[idx] / omega;
                 
                 // backsubstitute
                 else if (col > row)
@@ -577,12 +581,16 @@ public:
     }
     
     /**
+     * @brief Lower triangular solve.
+     * 
      * Solves lower triangular system of equations using backsubstitution.
      * The matrix needs not be triangular, but elements above the diagonal
      * won't be used or changed.
+     * 
      * @param b Right-hand side.
+     * @param omega Over-relaxation factor.
      */
-    NumberArray<DataT> lowerSolve (ArrayView<DataT> const & b) const
+    NumberArray<DataT> lowerSolve (ArrayView<DataT> const & b, DataT omega = 1) const
     {
         // check size
         IdxT N = b.size();
@@ -612,7 +620,7 @@ public:
                 
                 // diagonal element will be useful in a moment, store it
                 if (col == row)
-                    a = x_[idx];
+                    a = x_[idx] / omega;
                 
                 // backsubstitute
                 else if (col < row)

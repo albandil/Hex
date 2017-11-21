@@ -394,6 +394,201 @@ cArray Bspline::zip
     return f;
 }
 
+cArray Bspline::zip
+(
+    Bspline const & bx,
+    Bspline const & by,
+    Bspline const & bz,
+    const cArrayView coeff,
+    const rArrayView xgrid,
+    const rArrayView ygrid,
+    const rArrayView zgrid,
+    Complex (Bspline::* evalXBSpline) (int,int,int,Complex) const,
+    Complex (Bspline::* evalYBSpline) (int,int,int,Complex) const,
+    Complex (Bspline::* evalZBSpline) (int,int,int,Complex) const
+)
+{
+    // evaluated function
+    cArray f (xgrid.size() * ygrid.size() * zgrid.size());
+    
+    // rotate the grids
+    cArray x (xgrid.size()), y (ygrid.size()), z (zgrid.size());
+    for (std::size_t i = 0; i < xgrid.size(); i++)
+        x[i] = bx.rotate(xgrid[i]);
+    for (std::size_t i = 0; i < ygrid.size(); i++)
+        y[i] = by.rotate(ygrid[i]);
+    for (std::size_t i = 0; i < zgrid.size(); i++)
+        z[i] = bz.rotate(zgrid[i]);
+    
+    // evaluate B-splines (from "bx") on x-grid
+    cArrays evBx (bx.Nspline_);
+    cArray::const_iterator xleft = x.begin(), xright;
+    for (int ispline = 0; ispline < bx.Nspline_; ispline++)
+    {
+        // get first x-coordinate within this spline's support
+        while (xleft < x.end() and xleft->real() < bx.t_[ispline].real())
+            xleft++;
+        
+        // get (one beyond the) last x-coordinate within this spline's support
+        xright = xleft;
+        while (xright < x.end() and xright->real() < bx.t_[ispline + bx.order_ + 1].real())
+            xright++;
+        
+        // setup evaluation vector
+        evBx[ispline].resize(xright - xleft);
+        
+        // evaluation interval
+        int iknot = ispline;
+        
+        // evaluate at x[]
+        for (cArray::const_iterator ix = xleft; ix != xright; ix++)
+        {
+            // increment knot to match current evaluation point
+            while ( ix->real() > bx.t_[iknot + 1].real() )
+                if (++iknot >= bx.Nknot_)
+                    HexException("Some evaluation points are outside of grid.");
+            
+            // evaluate this spline at the current evaluation point
+            evBx[ispline][ix - xleft] = (bx.*evalXBSpline)(ispline, iknot, bx.order_, *ix);
+        }
+    }
+    
+    // evaluate B-splines (from "by") on y-grid
+    cArrays evBy (by.Nspline_);
+    cArray::const_iterator yleft = y.begin(), yright;
+    for (int ispline = 0; ispline < by.Nspline_; ispline++)
+    {
+        // get first y-coordinate within this spline's support
+        while (yleft < y.end() and yleft->real() < by.t_[ispline].real())
+            yleft++;
+        
+        // get (one beyond the) last y-coordinate within this spline's support
+        yright = yleft;
+        while (yright < y.end() and yright->real() < by.t_[ispline + by.order_ + 1].real())
+            yright++;
+        
+        // setup evaluation vector
+        evBy[ispline].resize(yright - yleft);
+        
+        // evaluation interval
+        int iknot = ispline;
+        
+        // evaluate at y[]
+        for (cArray::const_iterator iy = yleft; iy != yright; iy++)
+        {
+            // increment knot to match current evaluation point
+            while ( iy->real() > by.t_[iknot + 1].real() )
+                if (++iknot >= by.Nknot_)
+                    HexException("Some evaluation points are outside of grid.");
+            
+            // evaluate this spline at the current evaluation point
+            evBy[ispline][iy - yleft] = (by.*evalYBSpline)(ispline, iknot, by.order_, *iy);
+        }
+    }
+    
+    // evaluate B-splines (from "bz") on z-grid
+    cArrays evBz (bz.Nspline_);
+    cArray::const_iterator zleft = z.begin(), zright;
+    for (int ispline = 0; ispline < bz.Nspline_; ispline++)
+    {
+        // get first z-coordinate within this spline's support
+        while (zleft < z.end() and zleft->real() < bz.t_[ispline].real())
+            zleft++;
+        
+        // get (one beyond the) last y-coordinate within this spline's support
+        zright = zleft;
+        while (zright < z.end() and zright->real() < bz.t_[ispline + bz.order_ + 1].real())
+            zright++;
+        
+        // setup evaluation vector
+        evBz[ispline].resize(zright - zleft);
+        
+        // evaluation interval
+        int iknot = ispline;
+        
+        // evaluate at y[]
+        for (cArray::const_iterator iz = zleft; iz != zright; iz++)
+        {
+            // increment knot to match current evaluation point
+            while ( iz->real() > bz.t_[iknot + 1].real() )
+                if (++iknot >= bz.Nknot_)
+                    HexException("Some evaluation points are outside of grid.");
+            
+            // evaluate this spline at the current evaluation point
+            evBz[ispline][iz - zleft] = (bz.*evalZBSpline)(ispline, iknot, bz.order_, *iz);
+        }
+    }
+    
+    // zip triplet expansion
+    xleft = x.begin();
+    for (int ixspline = 0; ixspline < bx.Nspline_; ixspline++)
+    {
+        // get first x-coordinate within this spline's support
+        while (xleft < x.end() and xleft->real() < bx.t_[ixspline].real())
+            xleft++;
+        
+        // get (one beyond the) last x-coordinate within this spline's support
+        xright = xleft;
+        while (xright < x.end() and xright->real() < bx.t_[ixspline + bx.order_ + 1].real())
+            xright++;
+        
+        // get relevant evaluations
+        cArray const & Bx_row = evBx[ixspline];
+        
+        // for all y-splines
+        yleft = y.begin();
+        for (int iyspline = 0; iyspline < by.Nspline_; iyspline++)
+        {
+            // get first y-coordinate within this spline's support
+            while (yleft < y.end() and yleft->real() < by.t_[iyspline].real())
+                yleft++;
+            
+            // get (one beyond the) last y-coordinate within this spline's support
+            yright = yleft;
+            while (yright < y.end() and yright->real() < by.t_[iyspline + by.order_ + 1].real())
+                yright++;
+            
+            // get relevant evaluations
+            cArray const & By_row = evBy[iyspline];
+            
+            // for all z-splines
+            zleft = z.begin();
+            for (int izspline = 0; izspline < bz.Nspline_; izspline++)
+            {
+                // get first z-coordinate within this spline's support
+                while (zleft < z.end() and zleft->real() < bz.t_[izspline].real())
+                    zleft++;
+                
+                // get (one beyond the) last z-coordinate within this spline's support
+                zright = zleft;
+                while (zright < z.end() and zright->real() < bz.t_[izspline + bz.order_ + 1].real())
+                    zright++;
+                
+                // get relevant evaluations
+                cArray const & Bz_row = evBz[izspline];
+            
+                // get coefficient of the expansion
+                Complex C = coeff[(ixspline * by.Nspline_ + iyspline) * by.Nspline_ + izspline];
+                
+                // loop over relevant points
+                for (cArray::const_iterator ix = xleft; ix != xright; ix++)
+                for (cArray::const_iterator iy = yleft; iy != yright; iy++)
+                for (cArray::const_iterator iz = zleft; iz != zright; iz++)
+                {
+                    // get position indices within various arrays
+                    std::size_t idx = ix - x.begin(), evx = ix - xleft;
+                    std::size_t idy = iy - y.begin(), evy = iy - yleft;
+                    std::size_t idz = iz - z.begin(), evz = iz - zleft;
+                    
+                    // update the evaluation
+                    f[(idz * y.size() + idy) * x.size() + idx] += C * Bx_row[evx] * By_row[evy] * Bz_row[evz];
+                }
+            }
+        }
+    }
+    
+    return f;
+}
 
 cArray Bspline::zip (const cArrayView coeff, const rArrayView xgrid, const rArrayView ygrid) const
 {
