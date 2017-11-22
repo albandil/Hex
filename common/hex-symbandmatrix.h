@@ -345,7 +345,18 @@ public:
      * 
      * @param b Right hand side of the triangular system.
      */
-    NumberArray<DataT> lowerSolve (const ArrayView<DataT> b) const;
+    NumberArray<DataT> lowerSolve (const ArrayView<DataT> b) const
+    {
+        assert(b.size() == n_);
+        
+        NumberArray<DataT> x = b;
+        
+        for (std::size_t irow = 0; irow < n_; irow++)
+        for (std::size_t icol = 0; icol < irow; icol++)
+            x[irow] -= (*this)(irow,icol) * x[icol];
+        
+        return x;
+    }
     
     /**
      * @brief Back-substitution (upper).
@@ -355,7 +366,18 @@ public:
      * 
      * @param b Right hand side of the triangular system.
      */
-    NumberArray<DataT> upperSolve (const ArrayView<DataT> b) const;
+    NumberArray<DataT> upperSolve (const ArrayView<DataT> b) const
+    {
+        assert(b.size() == n_);
+        
+        NumberArray<DataT> x = b;
+        
+        for (std::size_t irow = 0; irow < n_; irow++)
+        for (std::size_t icol = 0; icol < irow; icol++)
+            x[n_ - 1 - irow] -= (*this)(n_ - 1 - irow, n_ - 1 - icol) * x[n_ - 1 - icol];
+        
+        return x;
+    }
     
     //
     // HDF interface
