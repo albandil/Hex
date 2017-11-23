@@ -134,12 +134,15 @@ public:
     
     /// Get row pointers.
     NumberArray<IdxT> const & p () const { return p_; }
+    NumberArray<IdxT> & p () { return p_; }
     
     /// Get column indices.
     NumberArray<IdxT> const & i () const { return i_; }
+    NumberArray<IdxT> & i () { return i_; }
     
     /// Get data array.
     NumberArray<DataT> const & x () const { return x_; }
+    NumberArray<DataT> & x () { return x_; }
     
     /// Return absolute value of the (in absolute value) largest element.
     double norm () const
