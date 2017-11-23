@@ -35,6 +35,7 @@
 // --------------------------------------------------------------------------------- //
 
 #include "hex-arrays.h"
+#include "hex-csrmatrix.h"
 #include "hex-rts.h"
 
 // --------------------------------------------------------------------------------- //
@@ -131,6 +132,16 @@ class LUft
                 
                 // return the result
                 return x;
+            }
+            
+            /**
+             * @brief Get the factorization as a sparse matrix.
+             * 
+             * Converts backend-specific LU format to CSR format.
+             */
+            virtual CsrMatrix<LU_int_t,Complex> get () const
+            {
+                HexException("The \"get\" method is not implemented in chosen factorizer.");
             }
             
             /**

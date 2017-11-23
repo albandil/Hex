@@ -211,6 +211,52 @@ void LUft_UMFPACK::solve (const cArrayView b, cArrayView x, int eqs) const
 #endif
 }
 
+CsrMatrix<LU_int_t,Complex> LUft_UMFPACK::get () const
+{
+    LU_int_t lnz, unz, m, n, nz_udiag;
+    LU_int_t status = UMFPACK_GET_LUNZ_F
+    (
+        &lnz,       // number of non-zero elements in L-factor
+        &unz,       // number of non-zero elements in U-factor
+        &m,         // row count
+        &n,         // column count
+        &nz_udiag,  // ?
+        numeric_    // factorization object
+    );
+    
+    // allocate memory for the data arrays
+    NumberArray<LU_int_t> Lp (n + 1), Lj (lnz);
+    NumberArray<LU_int_t> Up (n + 1), Ui (unz);
+    cArray Lx (lnz), Ux (unz);
+    
+    // retrieve elements of the LU
+    status = UMFPACK_GET_NUMERIC
+    (
+        Lp.data(), Lj.data(), reinterpret_cast<Real*>(Lx.data()), nullptr,
+        Up.data(), Ui.data(), reinterpret_cast<Real*>(Ux.data()), nullptr,
+        nullptr, nullptr,
+        nullptr, nullptr,
+        nullptr, nullptr,
+        numeric_
+    );
+    
+    // check output
+    if (status != UMFPACK_OK)
+    {
+        std::cerr << "\n[CsrMatrix::LUft::get] Exit status " << status << std::endl;
+        UMFPACK_REPORT_STATUS_F(0, status);
+    }
+    
+    // construct L and U matrices
+    CsrMatrix<LU_int_t,Complex> L (n, n, Lp, Lj, Lx);
+    CsrMatrix<LU_int_t,Complex> U (n, n, Up, Ui, Ux);
+    
+    // TODO scale diagonal
+    
+    // combine the matrices
+    return (L.tocoo() + U.tocoo().transpose()).tocsr();
+}
+
 void LUft_UMFPACK::save (std::string name) const
 {
     p_.hdfsave("csr-p-" + name);

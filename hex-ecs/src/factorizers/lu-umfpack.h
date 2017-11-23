@@ -56,6 +56,7 @@
     #define UMFPACK_FREE_NUMERIC_F      umfpack_zl_free_numeric
     #define UMFPACK_SOLVE_F             umfpack_zl_solve
     #define UMFPACK_GET_LUNZ_F          umfpack_zl_get_lunz
+    #define UMFPACK_GET_NUMERIC         umfpack_zl_get_numeric
     #define UMFPACK_REPORT_STATUS_F     umfpack_zl_report_status
     #define UMFPACK_COL_TO_TRIPLET_F    umfpack_zl_col_to_triplet
     #define UMFPACK_TRIPLET_TO_COL_F    umfpack_zl_triplet_to_col
@@ -69,6 +70,7 @@
     #define UMFPACK_FREE_NUMERIC_F      umfpack_zi_free_numeric
     #define UMFPACK_SOLVE_F             umfpack_zi_solve
     #define UMFPACK_GET_LUNZ_F          umfpack_zi_get_lunz
+    #define UMFPACK_GET_NUMERIC         umfpack_zi_get_numeric
     #define UMFPACK_REPORT_STATUS_F     umfpack_zi_report_status
     #define UMFPACK_COL_TO_TRIPLET_F    umfpack_zi_col_to_triplet
     #define UMFPACK_TRIPLET_TO_COL_F    umfpack_zi_triplet_to_col
@@ -125,6 +127,9 @@ class LUft_UMFPACK : public LUft
         
         /// Release memory.
         virtual void drop ();
+        
+        /// Convert LU to CSR.
+        virtual CsrMatrix<LU_int_t,Complex> get () const;
         
     private:
         
