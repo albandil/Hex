@@ -200,7 +200,7 @@ class ConjugateGradients
               process_solution(default_process_solution<TArrayView>),
               checkpoint_array(default_checkpoint_array<TArrayView>),
               recover_array(default_recover_array<TArrayView>),
-              k(1), recovered(false)
+              k(1), recovered(false), stationary(false)
         {
             // nothing
         }
@@ -304,7 +304,7 @@ class ConjugateGradients
                 rho_new = scalar_product(r, z);
                 
                 // setup search direction p
-                if (k == 1)
+                if (k == 1 or stationary)
                 {
                     axby(0., p, 1., z); // p = z
                 }
@@ -324,7 +324,7 @@ class ConjugateGradients
                 matrix_multiply(p, z);
                 
                 // compute projection ratio α
-                alpha = rho_new / scalar_product(p, z);
+                alpha = stationary ? 1. : rho_new / scalar_product(p, z);
                 if (not std::isfinite(std::abs(alpha)))
                 {
                     std::cout << "\t    Warning: Iterative method breakdown: (p|z) -> 0." << std::endl;
@@ -416,6 +416,7 @@ class ConjugateGradients
         unsigned k;
         unsigned time_offset;
         bool recovered;
+        bool stationary;
         double residual;
         bool ok;
 };
