@@ -227,13 +227,13 @@ CsrMatrix<LU_int_t,Complex> LUft_UMFPACK::get () const
     // allocate memory for the data arrays
     NumberArray<LU_int_t> Lp (n + 1), Lj (lnz);
     NumberArray<LU_int_t> Up (n + 1), Ui (unz);
-    cArray Lx (lnz), Ux (unz);
+    NumberArray<std::complex<double>> Lx (lnz), Ux (unz);
     
     // retrieve elements of the LU
     status = UMFPACK_GET_NUMERIC
     (
-        Lp.data(), Lj.data(), reinterpret_cast<Real*>(Lx.data()), nullptr,
-        Up.data(), Ui.data(), reinterpret_cast<Real*>(Ux.data()), nullptr,
+        Lp.data(), Lj.data(), reinterpret_cast<double*>(Lx.data()), nullptr,
+        Up.data(), Ui.data(), reinterpret_cast<double*>(Ux.data()), nullptr,
         nullptr, nullptr,
         nullptr, nullptr,
         nullptr, nullptr,
@@ -248,8 +248,16 @@ CsrMatrix<LU_int_t,Complex> LUft_UMFPACK::get () const
     }
     
     // construct L and U matrices
+#ifdef SINGLE
+    cArray lx (Lx.begin(), Lx.end());
+    cArray ux (Ux.begin(), Ux.end());
+    
+    CsrMatrix<LU_int_t,Complex> L (n, n, Lp, Lj, lx);
+    CsrMatrix<LU_int_t,Complex> U (n, n, Up, Ui, ux);
+#else
     CsrMatrix<LU_int_t,Complex> L (n, n, Lp, Lj, Lx);
     CsrMatrix<LU_int_t,Complex> U (n, n, Up, Ui, Ux);
+#endif
     
     // TODO scale diagonal
     
