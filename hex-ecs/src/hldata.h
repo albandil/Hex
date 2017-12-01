@@ -69,14 +69,14 @@ class HlData
         /// Release memory.
         void drop ();
         
-        /// One-electron hamiltonian eigenvalues.
-        cArray Dl;
-        
-        /// One-electron hamiltonian eigenvectors.
+        /// One-electron hamiltonian generalized eigenvectors.
+        /// Normalized so that Cl' S Cl = 1, where S is the B-spline basis
+        /// overlap matrix.
         ColMatrix<Complex> Cl;
         
-        /// Other combinations, used by @ref KPAPreconditioner only.
-        RowMatrix<Complex> invCl_invsqrtS, invsqrtS_Cl;
+        /// One-electron hamiltonian generalized eigenvalues.
+        /// Defined by Cl' Hl Cl = Dl, where Hl is the one-electron hamiltonian.
+        cArray Dl;
         
         /// Filename.
         std::string filename;

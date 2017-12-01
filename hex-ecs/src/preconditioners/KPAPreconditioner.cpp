@@ -158,8 +158,8 @@ void KPACGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z)
         // first Kronecker product
         {
             // U = (AV)B
-            RowMatrixView<Complex> A (Nspline_inner_x, Nspline_inner_x, Hl_[0][l1].invCl_invsqrtS.data());
-            ColMatrixView<Complex> B (Nspline_inner_y, Nspline_inner_y, Hl_[1][l2].invCl_invsqrtS.data());
+            RowMatrixView<Complex> A (Nspline_inner_x, Nspline_inner_x, Hl_[0][l1].Cl.data()); // Cl₁'
+            ColMatrixView<Complex> B (Nspline_inner_y, Nspline_inner_y, Hl_[1][l2].Cl.data()); // Cl₂
             
             blas::gemm(1., A, R, 0., Z); // N³ operations
             blas::gemm(1., Z, B, 0., U); // N³ operations
@@ -174,8 +174,8 @@ void KPACGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z)
         // second Kronecker product
         {
             // W = (AU)B
-            RowMatrixView<Complex> A (Nspline_inner_x, Nspline_inner_x, Hl_[0][l1].invsqrtS_Cl.data());
-            ColMatrixView<Complex> B (Nspline_inner_y, Nspline_inner_y, Hl_[1][l2].invsqrtS_Cl.data());
+            ColMatrixView<Complex> A (Nspline_inner_x, Nspline_inner_x, Hl_[0][l1].Cl.data()); // Cl₁
+            RowMatrixView<Complex> B (Nspline_inner_y, Nspline_inner_y, Hl_[1][l2].Cl.data()); // Cl₂'
             
             blas::gemm(1., A, Z, 0., U);    // N³ operations
             blas::gemm(1., U, B, 0., Z);    // N³ operations

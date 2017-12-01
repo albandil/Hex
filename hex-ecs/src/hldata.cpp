@@ -61,23 +61,9 @@ bool HlData::hdfload (const char* file)
         Cl.drop();
         Cl = std::move(ColMatrix<Complex>(size,size));
     }
-    if (invCl_invsqrtS.rows() != (int)size or invCl_invsqrtS.cols() != (int)size)
-    {
-        invCl_invsqrtS.drop();
-        invCl_invsqrtS = std::move(RowMatrix<Complex>(size,size));
-    }
-    if (invsqrtS_Cl.rows() != (int)size or invsqrtS_Cl.cols() != (int)size)
-    {
-        invsqrtS_Cl.drop();
-        invsqrtS_Cl = std::move(RowMatrix<Complex>(size,size));
-    }
     
-    // read matrices
+    // read eigenvectors
     if (not hdf.read("Cl", Cl.data().data(), size * size))
-        return false;
-    if (not hdf.read("invCl_invsqrtS", invCl_invsqrtS.data().data(), size * size))
-        return false;
-    if (not hdf.read("invsqrtS_Cl", invsqrtS_Cl.data().data(), size * size))
         return false;
     
     // read eigenvalues
@@ -103,12 +89,8 @@ bool HlData::hdfsave (const char* file) const
     if (not hdf.write("n", &size, 1))
         return false;
     
-    // write matrices
+    // write eigenstates
     if (not hdf.write("Cl", Cl.data().data(), size * size))
-        return false;
-    if (not hdf.write("invCl_invsqrtS", invCl_invsqrtS.data().data(), size * size))
-        return false;
-    if (not hdf.write("invsqrtS_Cl", invsqrtS_Cl.data().data(), size * size))
         return false;
     
     // write eigenvalues
@@ -120,8 +102,6 @@ bool HlData::hdfsave (const char* file) const
 
 void HlData::drop ()
 {
-    invCl_invsqrtS.drop();
-    invsqrtS_Cl.drop();
     Dl.clear();
 }
 

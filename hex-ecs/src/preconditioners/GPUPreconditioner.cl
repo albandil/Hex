@@ -507,7 +507,7 @@ kernel void mmul_2el_coupled
  * @param n Column count of B.
  * @param k Column count of A.
  * @param A Input m-by-k matrix in row-major storage.
- * @param B Input k-by-n matrix in column-major(!) storage (i.e., transposed).
+ * @param B Input k-by-n matrix in column-major storage (i.e., transposed).
  * @param C Output m-by-n matrix in row-major storage.
  */
 kernel void mul_ABt
@@ -550,6 +550,74 @@ kernel void mul_ABt
         // load elements of the source blocks into the local memory, pad by zeros
         barrier(CLK_LOCAL_MEM_FENCE);
         Aloc[icol_loc][irow_loc] = (Arow < m && Acol < k ? A[Arow * k + Acol] : (Complex)(0.,0.));
+        Bloc[irow_loc][icol_loc] = (Brow < k && Bcol < n ? B[Brow + k * Bcol] : (Complex)(0.,0.));
+        barrier(CLK_LOCAL_MEM_FENCE);
+        
+        // each group's thread will calculate one of the scalar products
+        for (private int K = 0; K < BLOCK_SIZE; K++)
+            if (iblock * BLOCK_SIZE + K < k)
+                res += cmul(Aloc[K][irow_loc],Bloc[K][icol_loc]);
+    }
+    
+    // store result to device memory
+    if (irow_glob < m && icol_glob < n)
+        C[irow_glob * n + icol_glob] = res;
+}
+
+/**
+ * @brief Matrix-matrix multiplication.
+ * 
+ * General matrix-matrix multiplication.
+ * \f[
+ *     C_{ij} = \sum_{k} A_{ik} B_{kj}
+ * \f]
+ * @param m Row count of A.
+ * @param n Column count of B.
+ * @param k Column count of A.
+ * @param A Input m-by-k matrix in column-major storage (i.e., transposed).
+ * @param B Input k-by-n matrix in column-major storage (i.e., transposed).
+ * @param C Output m-by-n matrix in row-major storage.
+ */
+kernel void mul_AtBt
+(
+    private int m, private int n, private int k,
+    global Complex const * const restrict A,
+    global Complex const * const restrict B,
+    global Complex       * const restrict C
+)
+{
+    // destination block indices
+    private int irow_block = get_group_id(0);
+    private int icol_block = get_group_id(1);
+    
+    // global destination index
+    private int irow_glob = get_global_id(0);
+    private int icol_glob = get_global_id(1);
+    
+    // group worker threads; indices within the destination block
+    private int irow_loc = get_local_id(0);
+    private int icol_loc = get_local_id(1);
+    
+    // work arrays
+    local Complex Aloc[BLOCK_SIZE][BLOCK_SIZE];
+    local Complex Bloc[BLOCK_SIZE][BLOCK_SIZE];
+    
+    // aggregated scalar product of the destination element C[idy,idx]
+    private Complex res = 0;
+    
+    // calculate number of blocks
+    private int Nblock = ((k + BLOCK_SIZE - 1) / BLOCK_SIZE);
+    
+    // for all source blocks
+    for (private int iblock = 0; iblock < Nblock; iblock++)
+    {
+        // get indices of the current elements in the matrices
+        private int Arow = irow_glob, Acol = iblock * BLOCK_SIZE + icol_loc;
+        private int Bcol = icol_glob, Brow = iblock * BLOCK_SIZE + irow_loc;
+        
+        // load elements of the source blocks into the local memory, pad by zeros
+        barrier(CLK_LOCAL_MEM_FENCE);
+        Aloc[icol_loc][irow_loc] = (Arow < m && Acol < k ? A[Arow + k * Acol] : (Complex)(0.,0.));
         Bloc[irow_loc][icol_loc] = (Brow < k && Bcol < n ? B[Brow + k * Bcol] : (Complex)(0.,0.));
         barrier(CLK_LOCAL_MEM_FENCE);
         

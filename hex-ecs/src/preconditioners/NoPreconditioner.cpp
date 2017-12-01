@@ -183,34 +183,13 @@ void NoPreconditioner::setup ()
         
         if (verbose_) std::cout << "Setting up the hydrogen eigenstates for electron #" << i + 1 << " ..." << std::endl << std::endl;
         
-        cArray D (Nspline);
+        cArray D (Nspline), tmp (Nspline);
         ColMatrix<Complex> CR (Nspline, Nspline);
-        ColMatrix<Complex> invCR (Nspline, Nspline);
-        ColMatrix<Complex> invsqrtS (Nspline, Nspline);
         
-        if (verbose_) std::cout << "\t- basis overlap matrix diagonalization" << std::endl;
-        Timer timer;
-        
-        SymBandMatrix<Complex> const & S_sym = (i == 0 ? rint->S_x() : rint->S_y());
-        ColMatrix<Complex> S = std::move(S_sym.torow().T());
-        S.diagonalize(D, nullptr, &CR);
-        CR.invert(invCR);
-        
-        // Now S = CR * (D * CR⁻¹)
-        if (verbose_) std::cout << "\t\t- time: " << timer.nice_time() << std::endl;
-        for (std::size_t j = 0; j < Nspline * Nspline; j++)
-            invCR.data()[j] *= D[j % Nspline];
-        
-        // S = S - CR * invCR
-        blas::gemm(-1., CR, invCR, 1., S);
-        if (verbose_) std::cout << "\t\t- residual: " << S.data().norm() << std::endl;
-        
-        // compute √S⁻¹
-        for (std::size_t j = 0; j < Nspline * Nspline; j++)
-            invCR.data()[j] /= std::pow(D.data()[j % Nspline], 1.5);
-        blas::gemm(1., CR, invCR, 0., invsqrtS);
-        
-        if (verbose_) std::cout << std::endl;
+        SymBandMatrix<Complex> const & bS = (i == 0 ? rint->S_x() : rint->S_y());
+        CsrMatrix<LU_int_t,Complex> csrS = bS.tocoo<LU_int_t>().tocsr();
+        std::shared_ptr<LUft> luS (LUft::Choose("lapack"));
+        luS->factorize(csrS);
         
         // for all one-electron angular momenta
         bool written = false;
@@ -226,42 +205,62 @@ void NoPreconditioner::setup ()
             
             written = true;
             if (verbose_) std::cout << "\t- one-electron Hamiltonian matrix diagonalization (Z = " << Z << ", l = " << l << ")" << std::endl;
-            timer.reset();
             
-            // compose the symmetrical one-electron hamiltonian
-            ColMatrix<Complex> tHl;
+            Timer timer;
+            
+            // diagonalize the symmetrical one-electron hamiltonian
+            SymBandMatrix<Complex> bHl;
+            ColMatrix<Complex> dHl;
             if (i == 0)
-                tHl = (Complex(0.5) * rint->D_x() + Complex(inp_->Za * Z) * rint->Mm1_x() + Complex(0.5*l*(l+1)) * rint->Mm2_x()).torow().T();
+            {
+                bHl = 0.5_z * rint->D_x() + Complex(inp_->Za * Z) * rint->Mm1_x() + Complex(0.5*l*(l+1)) * rint->Mm2_x();
+                dHl = bHl.torow().T();
+                dHl.diagonalize_g(bS.torow().T(), D, nullptr, &CR);
+                for (unsigned i = 0; i < Nspline; i++)
+                    CR.col(i) /= std::sqrt(CR.col(i) | rint->S_x() | CR.col(i));
+            }
             else
-                tHl = (Complex(0.5) * rint->D_y() + Complex(inp_->Za * Z) * rint->Mm1_y() + Complex(0.5*l*(l+1)) * rint->Mm2_y()).torow().T();
-            
-            // symmetrically transform by inverse square root of the overlap matrix, tHl <- invsqrtS * tHl * invsqrtS
-            blas::gemm(1., invsqrtS, tHl, 0., S);
-            blas::gemm(1., S, invsqrtS, 0., tHl);
-            
-            // diagonalize the transformed matrix
-            tHl.diagonalize(D, nullptr, &CR);
-            CR.invert(invCR);
-            
-            // store the KPA preconditioner data
-            Hl_[i][l].Dl = D;
-            Hl_[i][l].invsqrtS_Cl = std::move(RowMatrix<Complex>(Nspline, Nspline));
-            Hl_[i][l].invCl_invsqrtS = std::move(RowMatrix<Complex>(Nspline, Nspline));
-            blas::gemm(1., invsqrtS, CR, 0., Hl_[i][l].invsqrtS_Cl);
-            blas::gemm(1., invCR, invsqrtS, 0., Hl_[i][l].invCl_invsqrtS);
-            
-            // Now Hl = ClR * D * ClR⁻¹
-            if (verbose_) std::cout << "\t\t- time: " << timer.nice_time() << std::endl;
-            for (std::size_t j = 0; j < Nspline * Nspline; j++)
-                invCR.data()[j] *= D[j % Nspline];
-            
-            // Hl <- Hl - CR * invCR
-            blas::gemm(-1., CR, invCR, 1., tHl);
-            if (verbose_) std::cout << "\t\t- residual: " << tHl.data().norm() << std::endl;
+            {
+                bHl = 0.5_z * rint->D_y() + Complex(inp_->Za * Z) * rint->Mm1_y() + Complex(0.5*l*(l+1)) * rint->Mm2_y();
+                dHl = bHl.torow().T();
+                dHl.diagonalize_g(bS.torow().T(), D, nullptr, &CR);
+                for (unsigned i = 0; i < Nspline; i++)
+                    CR.col(i) /= std::sqrt(CR.col(i) | rint->S_y() | CR.col(i));
+            }
             
             // copy the eigenvectors as columns
-            // - already normalized by xGEEV to "Euclidean norm equal to 1 and largest component real"
-            Hl_[i][l].Cl = std::move(ColMatrix<Complex>(Hl_[i][l].invsqrtS_Cl));
+            Hl_[i][l].Cl = CR;
+            Hl_[i][l].Dl = D;
+            
+            if (verbose_) std::cout << "\t\t- time: " << timer.nice_time() << std::endl;
+            
+            // check CR' . S . CR = 1
+            Real orthoErr = 0;
+            for (unsigned j = 0; j < Nspline; j++)
+            {
+                bS.dot(1.0, CR.col(j), 0.0, tmp);
+                for (unsigned i = 0; i < Nspline; i++)
+                {
+                    Complex prod = (CR.col(i) | tmp);
+                    orthoErr += sqrabs(i == j ? prod - 1.0_z : prod);
+                }
+            }
+            
+            std::cout << "\t\t- orthogonality error: " << std::sqrt(orthoErr) / Nspline << std::endl;
+            
+            // check CR' . S⁻¹ . H . CR = D
+            Real simError = 0;
+            for (unsigned j = 0; j < Nspline; j++)
+            {
+                bHl.dot(1.0, CR.col(j), 0.0, tmp);
+                for (unsigned i = 0; i < Nspline; i++)
+                {
+                    Complex prod = (CR.col(i) | tmp);
+                    simError += sqrabs(i == j ? prod - D[j] : prod);
+                }
+            }
+            
+            std::cout << "\t\t- similarity error: " << std::sqrt(simError) / Nspline << std::endl;
             
             // write to disk and abandon for now
             Hl_[i][l].hdfsave();
@@ -1535,7 +1534,7 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
         }
         
         // lightweight-full off-diagonal contribution
-	if (cmd_->lightweight_full)
+        if (cmd_->lightweight_full)
         {
             int maxlambda = rad_panel_->maxlambda();
             
@@ -1587,8 +1586,11 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
                             RpReady = true;
                         }
                         
+                        // add the scalar product of R and p to q (multiplied by f)
                         for (std::size_t r = 0; r < Nspline_y_inner; r++)
+                        {
                             q[ill][offset + i * Nspline_y_inner + r] += f * Rp[r];
+                        }
                     }
                 }
             }

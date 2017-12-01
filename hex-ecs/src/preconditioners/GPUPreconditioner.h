@@ -161,10 +161,9 @@ class GPUCGPreconditioner : public virtual KPACGPreconditioner
         cl_mem_flags largeDataFlags_;
         
         // computational kernels
-        cl_kernel mabt_;
+        cl_kernel mabt_, matbt_;
         cl_kernel mml1_;
         cl_kernel mml2_dcpl_, mml2_cpld_;
-        cl_kernel mml2_dcpl_offset_, mml2_cpld_offset_;
         cl_kernel axby_;
         cl_kernel norm_;
         cl_kernel spro_;
