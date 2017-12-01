@@ -165,10 +165,13 @@ void NoPreconditioner::setup ()
     if (dynamic_cast<KPACGPreconditioner*>(this) or not cmd_->analytic_eigenstates)
     for (int i = 0; i < 2; i++)
     {
-        // shorthands
+        // shorthands and some auxiliary objects
         RadialIntegrals const * rint = full_domain ? rad_inner_ : rad_panel_;
+        SymBandMatrix<Complex> const & bS = (i == 0 ? rint->S_x() : rint->S_y());
         Bspline const & bspline = (i == 0 ? rint->bspline_x() : rint->bspline_y());
         std::size_t Nspline = bspline.Nspline();
+        cArray D (Nspline), tmp (Nspline);
+        ColMatrix<Complex> CR (Nspline, Nspline);
         
         // particle charge (first is electron, second is either electron or positron)
         Real Z = (i == 0 ? -1.0 : inp_->Zp);
@@ -182,14 +185,6 @@ void NoPreconditioner::setup ()
             continue;
         
         if (verbose_) std::cout << "Setting up the hydrogen eigenstates for electron #" << i + 1 << " ..." << std::endl << std::endl;
-        
-        cArray D (Nspline), tmp (Nspline);
-        ColMatrix<Complex> CR (Nspline, Nspline);
-        
-        SymBandMatrix<Complex> const & bS = (i == 0 ? rint->S_x() : rint->S_y());
-        CsrMatrix<LU_int_t,Complex> csrS = bS.tocoo<LU_int_t>().tocsr();
-        std::shared_ptr<LUft> luS (LUft::Choose("lapack"));
-        luS->factorize(csrS);
         
         // for all one-electron angular momenta
         bool written = false;
