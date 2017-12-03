@@ -6,6 +6,7 @@
 #include "hex-vtkfile.h"
 
 #include "bspline.h"
+#include "ft.h"
 #include "luft.h"
 #include "parallel.h"
 #include "radial.h"
@@ -16,6 +17,7 @@
 // #define CG_DILU
 // #define CG_ILUP
 // #define CG_BLOCK_JACOBI
+#define CG_CIRCULANT
 // #define CG_KPA
 
 int main (int argc, char* argv[])
@@ -84,6 +86,27 @@ int main (int argc, char* argv[])
             
             for (int i = 0; i < N; i++)
                 blocklu[i]->solve(R.col(i), Z.col(i), 1);
+        
+        #elif defined ( CG_CIRCULANT )
+            
+            // circulant matrix approximation
+            z = r;
+            
+            cArray s (N), st (N), d (N), dt (N), w (N*N);
+            
+            for (int i = 0; i <= order; i++)  d[i] = d[(N - i) % N] = bD(0,i);
+            for (int i = 0; i <= order; i++)  s[i] = s[(N - i) % N] = bS(0,i);
+            
+            DFT(+1, d, dt, 1, N);
+            DFT(+1, s, st, 1, N);
+            
+            DFT(+1, z, w, N, N);  transpose(w, z, N, N);
+            DFT(+1, z, w, N, N);  transpose(w, z, N, N);
+            
+            z /= (dt ^ st) + (st ^ dt);
+            
+            DFT(-1, z, w, N, N);  transpose(w, z, N, N);
+            DFT(-1, z, w, N, N);  transpose(w, z, N, N);
         
         #elif defined ( CG_KPA )
         

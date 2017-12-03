@@ -1619,13 +1619,13 @@ template <class T> T operator | (const ArrayView<T> a, const ArrayView<T> b)
  * a_1 b_1, a_1 b_2, \dots, a_1, b_n, a_2 b_1, \dots, a_m b_n
  * @f]
  */
-template <class T1, class T2> auto outer_product
+template <class T> NumberArray<T> operator ^
 (
-    const ArrayView<T1> a,
-    const ArrayView<T2> b
-) -> NumberArray<decltype(T1(0) * T2(0))>
+    const ArrayView<T> a,
+    const ArrayView<T> b
+)
 {
-    NumberArray<decltype(T1(0) * T2(0))> c (a.size() * b.size());
+    NumberArray<T> c (a.size() * b.size());
     
     auto ic = c.begin();
     
