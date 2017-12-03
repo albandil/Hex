@@ -17,8 +17,8 @@
 // #define CG_DILU
 // #define CG_ILUP
 // #define CG_BLOCK_JACOBI
-#define CG_CIRCULANT
-// #define CG_KPA
+// #define CG_CIRCULANT
+#define CG_KPA
 
 int main (int argc, char* argv[])
 {
@@ -117,12 +117,10 @@ int main (int argc, char* argv[])
             
             RowMatrixView<Complex> Z (N, N, z);
             RowMatrixView<Complex> W (N, N, w);
-            RowMatrixView<Complex> A (N, N, KPAA.data());
-            RowMatrixView<Complex> B (N, N, KPAB.data());
             
             for (int turn = 1; turn <= 2; turn++)
             {
-                blas::gemm(1., Z, A, 0., W);
+                blas::gemm(1., Z, V, 0., W);
                 transpose(w, z, N, N);
             }
             
@@ -132,7 +130,7 @@ int main (int argc, char* argv[])
             
             for (int turn = 1; turn <= 2; turn++)
             {
-                blas::gemm(1., Z, B, 0., W);
+                blas::gemm(1., Z, Vt, 0., W);
                 transpose(w, z, N, N);
             }
         

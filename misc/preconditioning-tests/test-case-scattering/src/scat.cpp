@@ -6,6 +6,7 @@
 #include "hex-vtkfile.h"
 
 #include "bspline.h"
+#include "ft.h"
 #include "luft.h"
 #include "parallel.h"
 #include "radial.h"
@@ -16,16 +17,17 @@
 // #define CG_DILU
 // #define CG_ILUP
 // #define CG_BLOCK_JACOBI
-// #define CG_KPA
+// #define CG_CIRCULANT
+#define CG_KPA
 
 int main (int argc, char* argv[])
 {
     Complex Etot = -0.1;
     
-    /*rArray rknots = concatenate(rArray{0,0,0}, linspace(0., 60., 61));
-    rArray cknots = linspace(60., 100., 41);*/
-    rArray rknots = concatenate(rArray{0,0,0}, linspace(0., 10., 21));
-    rArray cknots = linspace(10., 20., 21);
+    rArray rknots = concatenate(rArray{0,0,0}, linspace(0., 60., 61));
+    rArray cknots = linspace(60., 100., 41);
+    /*rArray rknots = concatenate(rArray{0,0,0}, linspace(0., 10., 21));
+    rArray cknots = linspace(10., 20., 21);*/
     
     #include "createCmdParallel.h"
     #include "createBspline.h"
@@ -91,6 +93,27 @@ int main (int argc, char* argv[])
             for (int i = 0; i < N; i++)
                 blocklu[i]->solve(R.col(i), Z.col(i), 1);
         
+        #elif defined ( CG_CIRCULANT )
+            
+            // circulant matrix approximation
+            z = r;
+            
+            cArray s (N), st (N), d (N), dt (N), w (N*N);
+            
+            for (int i = 0; i <= order; i++)  d[i] = d[(N - i) % N] = bD(20,20+i);
+            for (int i = 0; i <= order; i++)  s[i] = s[(N - i) % N] = bS(20,20+i);
+            
+            DFT(+1, d, dt, 1, N);
+            DFT(+1, s, st, 1, N);
+            
+            DFT(+1, z, w, N, N);  transpose(w, z, N, N);
+            DFT(+1, z, w, N, N);  transpose(w, z, N, N);
+            
+            z /= (dt ^ st) + (st ^ dt);
+            
+            DFT(-1, z, w, N, N);  transpose(w, z, N, N);
+            DFT(-1, z, w, N, N);  transpose(w, z, N, N);
+        
         #elif defined ( CG_KPA )
         
             // Kronecker product approximation
@@ -100,12 +123,10 @@ int main (int argc, char* argv[])
             
             RowMatrixView<Complex> Z (N, N, z);
             RowMatrixView<Complex> W (N, N, w);
-            RowMatrixView<Complex> A (N, N, KPAA.data());
-            RowMatrixView<Complex> B (N, N, KPAB.data());
             
             for (int turn = 1; turn <= 2; turn++)
             {
-                blas::gemm(1., Z, A, 0., W);
+                blas::gemm(1., Z, V, 0., W);
                 transpose(w, z, N, N);
             }
             
@@ -115,7 +136,7 @@ int main (int argc, char* argv[])
             
             for (int turn = 1; turn <= 2; turn++)
             {
-                blas::gemm(1., Z, B, 0., W);
+                blas::gemm(1., Z, Vt, 0., W);
                 transpose(w, z, N, N);
             }
         
