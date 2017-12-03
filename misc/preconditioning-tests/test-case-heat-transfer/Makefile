@@ -3,9 +3,9 @@ HEX_PATH ?= /home/jacob/Dokumenty/prog/Hex
 INCLUDES ?= -I$(HEX_PATH)/common \
             -I$(HEX_PATH)/libs \
             -I$(HEX_PATH)/hex-ecs/src \
-            -I/opt/suitesparse-4.5.5/include
+            -I/opt/suitesparse-4.5.6/include
 
-LIBS ?= -L/opt/suitesparse-4.5.5/lib -lumfpack -Wl,-rpath,/opt/suitesparse-4.5.5/lib \
+LIBS ?= -L/opt/suitesparse-4.5.6/lib -lumfpack -Wl,-rpath,/opt/suitesparse-4.5.6/lib \
         -L/opt/openblas-0.2.20/lib -lopenblas_openmp -Wl,-rpath,/opt/openblas-0.2.20/lib \
         -lgsl -lgslcblas -lpng
 

@@ -14,17 +14,18 @@
 // #define CG_SSOR
 // #define CG_ILUT
 // #define CG_DILU
-#define CG_ILUP
+// #define CG_ILUP
+// #define CG_BLOCK_JACOBI
 // #define CG_KPA
 
 int main (int argc, char* argv[])
 {
     Complex Etot = -0.1;
     
-    rArray rknots = concatenate(rArray{0,0,0}, linspace(0., 60., 61));
-    rArray cknots = linspace(60., 100., 41);
-    /*rArray rknots = concatenate(rArray{0,0,0}, linspace(0., 10., 21));
-    rArray cknots = linspace(10., 20., 21);*/
+    /*rArray rknots = concatenate(rArray{0,0,0}, linspace(0., 60., 61));
+    rArray cknots = linspace(60., 100., 41);*/
+    rArray rknots = concatenate(rArray{0,0,0}, linspace(0., 10., 21));
+    rArray cknots = linspace(10., 20., 21);
     
     #include "createCmdParallel.h"
     #include "createBspline.h"
@@ -44,6 +45,7 @@ int main (int argc, char* argv[])
     #include "createILUT.h"
     #include "createDILU.h"
     #include "createILUP.h"
+    #include "createBlockLU.h"
     
     #include "setupCG.h"
     {
@@ -79,6 +81,15 @@ int main (int argc, char* argv[])
             z = ilupL.lowerSolve(r);
             z = z / ilupd;
             z = ilupU.upperSolve(z);
+        
+        #elif defined ( CG_BLOCK_JACOBI )
+            
+            // block-Jacobi preconditioner
+            ColMatrixView<Complex> Z (N, N, z);
+            ColMatrixView<Complex> R (N, N, r);
+            
+            for (int i = 0; i < N; i++)
+                blocklu[i]->solve(R.col(i), Z.col(i), 1);
         
         #elif defined ( CG_KPA )
         

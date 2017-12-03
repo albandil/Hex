@@ -14,7 +14,8 @@
 // #define CG_SSOR
 // #define CG_ILUT
 // #define CG_DILU
-#define CG_ILUP
+// #define CG_ILUP
+// #define CG_BLOCK_JACOBI
 // #define CG_KPA
 
 int main (int argc, char* argv[])
@@ -31,13 +32,14 @@ int main (int argc, char* argv[])
     
     bool stationary = false;
     
-    Real droptol = 5e-3;
+    Real droptol = 1e-3;
     int level = 1;
     bool modified = false;
     
     #include "createILUT.h"
     #include "createDILU.h"
     #include "createILUP.h"
+    #include "createBlockLU.h"
     
     #include "setupCG.h"
     {
@@ -73,6 +75,15 @@ int main (int argc, char* argv[])
             z = ilupL.lowerSolve(r);
             z = z / ilupd;
             z = ilupU.upperSolve(z);
+        
+        #elif defined ( CG_BLOCK_JACOBI )
+        
+            // block-Jacobi preconditioner
+            ColMatrixView<Complex> Z (N, N, z);
+            ColMatrixView<Complex> R (N, N, r);
+            
+            for (int i = 0; i < N; i++)
+                blocklu[i]->solve(R.col(i), Z.col(i), 1);
         
         #elif defined ( CG_KPA )
         

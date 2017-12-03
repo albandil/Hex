@@ -14,8 +14,8 @@
 // #define CG_SSOR
 // #define CG_ILUT
 // #define CG_DILU
-#define CG_ILUP
-// #define CG_KPA
+// #define CG_ILUP
+#define CG_KPA
 
 int main (int argc, char* argv[])
 {
