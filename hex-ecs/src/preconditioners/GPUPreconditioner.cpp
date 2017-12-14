@@ -6,7 +6,7 @@
 //                    / /   / /    \_\      / /  \ \                                 //
 //                                                                                   //
 //                                                                                   //
-//  Copyright (c) 2016, Jakub Benda, Charles University in Prague                    //
+//  Copyright (c) 2017, Jakub Benda, Charles University in Prague                    //
 //                                                                                   //
 // MIT License:                                                                      //
 //                                                                                   //
@@ -210,6 +210,9 @@ void GPUCGPreconditioner::setup ()
     greq += (rad_panel_->maxlambda() + 1) * (rad_panel_->S_x().size() + rad_panel_->S_x().size());
     // - partial integral moments
     greq += 2 * rad_panel_->Mitr_L_x(-1).size() + rad_panel_->Mitr_L_x(-1).size();
+    // - diagonal block
+    if (cmd_->lightweight_simple or not cmd_->lightweight_full)
+        greq += std::size_t(order + 1) * (order + 1) * Nspline_inner_x * Nspline_inner_y;
     // - solution vector
     if (cmd_->gpu_multiply and not cmd_->gpu_host_multiply)
         greq = std::max(greq, (std::size_t)nsrcseg_ * ndstseg_ * Nspline_inner_x * Nspline_inner_y);
@@ -315,6 +318,7 @@ void GPUCGPreconditioner::setup ()
         largeDataFlags_ = CL_MEM_READ_WRITE | CL_MEM_USE_HOST_PTR;
     
     // set program entry points
+    mmls_       = clCreateKernel(program_, "mmul_simple",     nullptr);
     mml1_       = clCreateKernel(program_, "mmul_1el",        nullptr);
     mml2_dcpl_  = clCreateKernel(program_, "mmul_2el_decoupled", nullptr);
     mml2_cpld_  = clCreateKernel(program_, "mmul_2el_coupled", nullptr);
@@ -407,7 +411,7 @@ void GPUCGPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Co
         fgpu.connect(context_, smallDataFlags_);
         
         // one-electron contribution
-        for (unsigned ill = 0; ill < ang_->states().size(); ill++) // TODO : MPI
+        for (unsigned ill = 0; ill < ang_->states().size(); ill++) if (par_->isMyWork(ill))
         {
             // decode angular momenta
             cl_int l1 = ang_->states()[ill].first;
@@ -532,6 +536,9 @@ void GPUCGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArra
     // for all diagonal blocks
     for (int ill = 0; ill < (int)ang_->states().size(); ill++) if (par_->isMyWork(ill))
     {
+        // initialize block preconditioner
+        this->CG_init(ill);
+        
         // get angular momenta
         cl_int l1 = ang_->states()[ill].first;
         cl_int l2 = ang_->states()[ill].second;
@@ -543,12 +550,22 @@ void GPUCGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArra
             z.hdfload(ill);
         }
         
+        // upload full matrix block to GPU's memory
+        clArrayView<Complex> Aview;
+        if (cmd_->lightweight_simple or not cmd_->lightweight_full)
+        {
+            BlockSymBandMatrix<Complex> const & A = A_blocks_[ill * ang_->states().size() + ill];
+            
+            if (cmd_->outofcore)
+                const_cast<BlockSymBandMatrix<Complex> &>(A).hdfload();
+            
+            Aview.reset(A.data().size(), A.data().data());
+            Aview.connect(context_, largeDataFlags_);
+        }
+        
         // create segment views
         clArrayView<Complex> rview (r[ill], 0, Nsegsiz);  rview.connect(context_, largeDataFlags_);
         clArrayView<Complex> zview (z[ill], 0, Nsegsiz);  zview.connect(context_, largeDataFlags_);
-        
-        // initialize block preconditioner
-        this->CG_init(ill);
         
         // preconditioner matrices
         clArrayView<Complex> Cl1 (Nspline_inner_x * Nspline_inner_x, Hl_[0][l1].Cl.data().data());  Cl1.connect(context_, largeDataFlags_);
@@ -585,68 +602,82 @@ void GPUCGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArra
             
             Timer timer;
             
-            // one-electron contribution
-            clSetKernelArg(mml1_, 0, sizeof(Real),   &E_);
-            clSetKernelArg(mml1_, 1, sizeof(cl_mem), &S_inner_a_.handle());
-            clSetKernelArg(mml1_, 2, sizeof(cl_mem), &D_inner_a_.handle());
-            clSetKernelArg(mml1_, 3, sizeof(cl_mem), &Mm1_inner_a_.handle());
-            clSetKernelArg(mml1_, 4, sizeof(cl_mem), &Mm2_inner_a_.handle());
-            clSetKernelArg(mml1_, 5, sizeof(cl_mem), &S_inner_p_.handle());
-            clSetKernelArg(mml1_, 6, sizeof(cl_mem), &D_inner_p_.handle());
-            clSetKernelArg(mml1_, 7, sizeof(cl_mem), &Mm1_inner_p_.handle());
-            clSetKernelArg(mml1_, 8, sizeof(cl_mem), &Mm2_inner_p_.handle());
-            clSetKernelArg(mml1_, 9, sizeof(cl_int), &l1);
-            clSetKernelArg(mml1_,10, sizeof(cl_int), &l2);
-            clSetKernelArg(mml1_,11, sizeof(cl_mem), &a.handle());
-            clSetKernelArg(mml1_,12, sizeof(cl_mem), &b.handle());
-            clEnqueueNDRangeKernel(queue_, mml1_, 1, nullptr, &Nsegsiz, nullptr, 0, nullptr, nullptr);
-            clFinish(queue_);
-            
-            us_mmul_1 += timer.microseconds();
-            
-            // two-electron contribution
-            for (cl_int lambda = 0; lambda <= ang_->maxlambda(); lambda++) if (ang_->f(ill,ill,lambda) != 0)
+            if (cmd_->lightweight_simple or not cmd_->lightweight_full)
             {
-                timer.reset();
-                
-                cl_short zero = 0;
-                cl_short one = 1;
-                
-                clSetKernelArg(mml2_dcpl_,  0, sizeof(cl_mem),   &t_inner_a_.handle());
-                clSetKernelArg(mml2_dcpl_,  1, sizeof(cl_mem),   &t_inner_p_.handle());
-                clSetKernelArg(mml2_dcpl_,  2, sizeof(cl_mem),   &f.handle());
-                clSetKernelArg(mml2_dcpl_,  3, sizeof(cl_int),   &lambda);
-                clSetKernelArg(mml2_dcpl_,  4, sizeof(cl_mem),   &M_L_inner_a_[lambda].handle());
-                clSetKernelArg(mml2_dcpl_,  5, sizeof(cl_mem),   &M_mLm1_inner_a_[lambda].handle());
-                clSetKernelArg(mml2_dcpl_,  6, sizeof(cl_mem),   &M_L_inner_p_[lambda].handle());
-                clSetKernelArg(mml2_dcpl_,  7, sizeof(cl_mem),   &M_mLm1_inner_p_[lambda].handle());
-                clSetKernelArg(mml2_dcpl_,  8, sizeof(cl_mem),   &a.handle());
-                clSetKernelArg(mml2_dcpl_,  9, sizeof(cl_mem),   &b.handle());
-                clSetKernelArg(mml2_dcpl_, 10, sizeof(cl_short), &zero);
-                clSetKernelArg(mml2_dcpl_, 11, sizeof(cl_short), &one);
-                clSetKernelArg(mml2_dcpl_, 12, sizeof(cl_short), &zero);
-                clSetKernelArg(mml2_dcpl_, 13, sizeof(cl_short), &one);
-                clEnqueueNDRangeKernel(queue_, mml2_dcpl_, 1, nullptr, &Nsegsiz, nullptr, 0, nullptr, nullptr);
+                // special kernel for BlockSymBandMatrix::dot
+                clSetKernelArg(mmls_, 0, sizeof(cl_mem), &Aview.handle());
+                clSetKernelArg(mmls_, 1, sizeof(cl_mem), &a.handle());
+                clSetKernelArg(mmls_, 2, sizeof(cl_mem), &b.handle());
+                clEnqueueNDRangeKernel(queue_, mmls_, 1, nullptr, &Nsegsiz, nullptr, 0, nullptr, nullptr);
                 clFinish(queue_);
                 
-                us_mmul_2_dcpl += timer.microseconds();
-                timer.reset();
-                
-                clSetKernelArg(mml2_cpld_,  0, sizeof(cl_mem),   &f.handle());
-                clSetKernelArg(mml2_cpld_,  1, sizeof(cl_int),   &lambda);
-                clSetKernelArg(mml2_cpld_,  2, sizeof(cl_mem),   &R_coupled_p_[lambda].handle());
-                clSetKernelArg(mml2_cpld_,  3, sizeof(cl_mem),   &R_coupled_i_[lambda].handle());
-                clSetKernelArg(mml2_cpld_,  4, sizeof(cl_mem),   &R_coupled_x_[lambda].handle());
-                clSetKernelArg(mml2_cpld_,  5, sizeof(cl_mem),   &a.handle());
-                clSetKernelArg(mml2_cpld_,  6, sizeof(cl_mem),   &b.handle());
-                clSetKernelArg(mml2_cpld_,  7, sizeof(cl_short), &zero);
-                clSetKernelArg(mml2_cpld_,  8, sizeof(cl_short), &one);
-                clSetKernelArg(mml2_cpld_,  9, sizeof(cl_short), &zero);
-                clSetKernelArg(mml2_cpld_, 10, sizeof(cl_short), &one);
-                clEnqueueNDRangeKernel(queue_, mml2_cpld_, 1, nullptr, &Nsegsiz, nullptr, 0, nullptr, nullptr);
+                us_mmul_1 += timer.microseconds();
+            }
+            else
+            {
+                // one-electron contribution
+                clSetKernelArg(mml1_, 0, sizeof(Real),   &E_);
+                clSetKernelArg(mml1_, 1, sizeof(cl_mem), &S_inner_a_.handle());
+                clSetKernelArg(mml1_, 2, sizeof(cl_mem), &D_inner_a_.handle());
+                clSetKernelArg(mml1_, 3, sizeof(cl_mem), &Mm1_inner_a_.handle());
+                clSetKernelArg(mml1_, 4, sizeof(cl_mem), &Mm2_inner_a_.handle());
+                clSetKernelArg(mml1_, 5, sizeof(cl_mem), &S_inner_p_.handle());
+                clSetKernelArg(mml1_, 6, sizeof(cl_mem), &D_inner_p_.handle());
+                clSetKernelArg(mml1_, 7, sizeof(cl_mem), &Mm1_inner_p_.handle());
+                clSetKernelArg(mml1_, 8, sizeof(cl_mem), &Mm2_inner_p_.handle());
+                clSetKernelArg(mml1_, 9, sizeof(cl_int), &l1);
+                clSetKernelArg(mml1_,10, sizeof(cl_int), &l2);
+                clSetKernelArg(mml1_,11, sizeof(cl_mem), &a.handle());
+                clSetKernelArg(mml1_,12, sizeof(cl_mem), &b.handle());
+                clEnqueueNDRangeKernel(queue_, mml1_, 1, nullptr, &Nsegsiz, nullptr, 0, nullptr, nullptr);
                 clFinish(queue_);
                 
-                us_mmul_2_cpld += timer.microseconds();
+                us_mmul_1 += timer.microseconds();
+                
+                // two-electron contribution
+                for (cl_int lambda = 0; lambda <= ang_->maxlambda(); lambda++) if (ang_->f(ill,ill,lambda) != 0)
+                {
+                    timer.reset();
+                    
+                    cl_short zero = 0;
+                    cl_short one = 1;
+                    
+                    clSetKernelArg(mml2_dcpl_,  0, sizeof(cl_mem),   &t_inner_a_.handle());
+                    clSetKernelArg(mml2_dcpl_,  1, sizeof(cl_mem),   &t_inner_p_.handle());
+                    clSetKernelArg(mml2_dcpl_,  2, sizeof(cl_mem),   &f.handle());
+                    clSetKernelArg(mml2_dcpl_,  3, sizeof(cl_int),   &lambda);
+                    clSetKernelArg(mml2_dcpl_,  4, sizeof(cl_mem),   &M_L_inner_a_[lambda].handle());
+                    clSetKernelArg(mml2_dcpl_,  5, sizeof(cl_mem),   &M_mLm1_inner_a_[lambda].handle());
+                    clSetKernelArg(mml2_dcpl_,  6, sizeof(cl_mem),   &M_L_inner_p_[lambda].handle());
+                    clSetKernelArg(mml2_dcpl_,  7, sizeof(cl_mem),   &M_mLm1_inner_p_[lambda].handle());
+                    clSetKernelArg(mml2_dcpl_,  8, sizeof(cl_mem),   &a.handle());
+                    clSetKernelArg(mml2_dcpl_,  9, sizeof(cl_mem),   &b.handle());
+                    clSetKernelArg(mml2_dcpl_, 10, sizeof(cl_short), &zero);
+                    clSetKernelArg(mml2_dcpl_, 11, sizeof(cl_short), &one);
+                    clSetKernelArg(mml2_dcpl_, 12, sizeof(cl_short), &zero);
+                    clSetKernelArg(mml2_dcpl_, 13, sizeof(cl_short), &one);
+                    clEnqueueNDRangeKernel(queue_, mml2_dcpl_, 1, nullptr, &Nsegsiz, nullptr, 0, nullptr, nullptr);
+                    clFinish(queue_);
+                    
+                    us_mmul_2_dcpl += timer.microseconds();
+                    timer.reset();
+                    
+                    clSetKernelArg(mml2_cpld_,  0, sizeof(cl_mem),   &f.handle());
+                    clSetKernelArg(mml2_cpld_,  1, sizeof(cl_int),   &lambda);
+                    clSetKernelArg(mml2_cpld_,  2, sizeof(cl_mem),   &R_coupled_p_[lambda].handle());
+                    clSetKernelArg(mml2_cpld_,  3, sizeof(cl_mem),   &R_coupled_i_[lambda].handle());
+                    clSetKernelArg(mml2_cpld_,  4, sizeof(cl_mem),   &R_coupled_x_[lambda].handle());
+                    clSetKernelArg(mml2_cpld_,  5, sizeof(cl_mem),   &a.handle());
+                    clSetKernelArg(mml2_cpld_,  6, sizeof(cl_mem),   &b.handle());
+                    clSetKernelArg(mml2_cpld_,  7, sizeof(cl_short), &zero);
+                    clSetKernelArg(mml2_cpld_,  8, sizeof(cl_short), &one);
+                    clSetKernelArg(mml2_cpld_,  9, sizeof(cl_short), &zero);
+                    clSetKernelArg(mml2_cpld_, 10, sizeof(cl_short), &one);
+                    clEnqueueNDRangeKernel(queue_, mml2_cpld_, 1, nullptr, &Nsegsiz, nullptr, 0, nullptr, nullptr);
+                    clFinish(queue_);
+                    
+                    us_mmul_2_cpld += timer.microseconds();
+                }
             }
         };
         
@@ -808,6 +839,16 @@ void GPUCGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArra
             if (not cmd_->shared_scratch or par_->IamGroupMaster())
                 z.hdfsave(ill);
             z.drop(ill);
+        }
+        
+        if (cmd_->lightweight_simple or not cmd_->lightweight_full)
+        {
+            BlockSymBandMatrix<Complex> const & A = A_blocks_[ill * ang_->states().size() + ill];
+            
+            if (cmd_->outofcore)
+                const_cast<BlockSymBandMatrix<Complex> &>(A).drop();
+            
+            Aview.disconnect();
         }
         
         // release block preconditioner

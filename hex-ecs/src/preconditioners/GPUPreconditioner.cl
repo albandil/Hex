@@ -237,6 +237,46 @@ kernel void norm (global Complex *v, global Real *z)
 }
 
 /**
+ * @brief Multiplication by BlockSymBandMatrix.
+ * 
+ * Multiplies a vector by BlockSymBandMatrix,
+ * \f[
+ *     y = A \cdot x
+ * \f]
+ */
+kernel void mmul_simple (global Complex *A, global Complex *x, global Complex *y)
+{
+    // output vector element index
+    private int i = get_global_id(0) / NSPLINE_PROJ;
+    private int j = get_global_id(0) % NSPLINE_PROJ;
+    
+    // initialize the output element
+    private Complex result = 0;
+    
+    // for all source vector elements
+    if (i < NSPLINE_ATOM)
+    for (private int k = i - ORDER; k <= i + ORDER; k++) if (0 <= k && k < NSPLINE_ATOM)
+    for (private int l = j - ORDER; l <= j + ORDER; l++) if (0 <= l && l < NSPLINE_PROJ)
+    {
+        // compute multi-indices
+        private int ik = min(i,k) * (ORDER + 1) + abs(i - k);
+        private int jl = min(j,l) * (ORDER + 1) + abs(l - j);
+        
+        // get the matrix element
+        private Complex elem = A[ik * (ORDER + 1) * NSPLINE_PROJ + jl];
+        
+        // multiply right-hand side by that matrix element
+        result += cmul(elem, x[k * NSPLINE_PROJ + l]);
+    }
+    
+    // push result to global memory
+    if (i < NSPLINE_ATOM)
+    {
+        y[i * NSPLINE_PROJ + j] = result;
+    }
+}
+
+/**
  * @brief Multiplication by one-electron Hamiltonian matrix.
  * 
  * Multiplies given vector by one-electron part of the Hamiltonian matrix,
