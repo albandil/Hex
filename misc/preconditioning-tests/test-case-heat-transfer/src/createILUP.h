@@ -122,8 +122,9 @@
                     if (I[idx3] == j)
                         X[idx3] -= X[idx1] * X[idx2] / ilupd[k];
                     else if (modified)
-                        X[P[i]] -= X[idx1] * X[idx2] / ilupd[k];
+                        X[P[i]] += std::abs(X[idx1] * X[idx2] / ilupd[k]);
                 }
+                
                 // move to the next element of the k-th row
                 idx2++;
             }
@@ -139,6 +140,5 @@
     // create the L matrix
     CsrMatrix<LU_int_t,Complex> ilupU (std::size_t(N*N), std::size_t(N*N), std::move(P), std::move(I), std::move(X));
     CsrMatrix<LU_int_t,Complex> ilupL = ilupU.tocoo().transpose().tocsr();
-    
-    write_array(realpart(ilupd), "ILUP-" + std::to_string(level) + ".txt");
+    write_array(ilupd, "ILUP-" + std::to_string(level) + ".txt");
 #endif

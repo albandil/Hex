@@ -122,8 +122,9 @@
                     if (I[idx3] == j)
                         X[idx3] -= X[idx1] * X[idx2] / ilupd[k];
                     else if (modified)
-                        X[P[i]] -= X[idx1] * X[idx2] / ilupd[k];
+                        X[P[i]] += std::abs(X[idx1] * X[idx2] / ilupd[k]);
                 }
+                
                 // move to the next element of the k-th row
                 idx2++;
             }

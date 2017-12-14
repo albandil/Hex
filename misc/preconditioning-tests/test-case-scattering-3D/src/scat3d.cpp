@@ -14,8 +14,8 @@
 // #define CG_SSOR
 // #define CG_ILUT
 // #define CG_DILU
-#define CG_ILUP
-// #define CG_KPA
+// #define CG_ILUP
+#define CG_KPA
 
 int main (int argc, char* argv[])
 {
@@ -85,9 +85,6 @@ int main (int argc, char* argv[])
             
             cArray w (N*N*N);
             
-            RowMatrixView<Complex> A (N, N, KPAA.data());
-            RowMatrixView<Complex> B (N, N, KPAB.data());
-            
             for (int turn = 1; turn <= 3; turn++)
             {
                 for (int i = 0; i < N; i++)
@@ -95,7 +92,7 @@ int main (int argc, char* argv[])
                     RowMatrixView<Complex> Z (N, N, z.slice(i*N*N, (i+1)*N*N));
                     RowMatrixView<Complex> W (N, N, w.slice(i*N*N, (i+1)*N*N));
                     
-                    blas::gemm(1., Z, A, 0., W);
+                    blas::gemm(1., Z, V, 0., W);
                 }
                 
                 transpose(w, z, N, N, N);
@@ -113,7 +110,7 @@ int main (int argc, char* argv[])
                     RowMatrixView<Complex> Z (N, N, z.slice(i*N*N, (i+1)*N*N));
                     RowMatrixView<Complex> W (N, N, w.slice(i*N*N, (i+1)*N*N));
                     
-                    blas::gemm(1., Z, B, 0., W);
+                    blas::gemm(1., Z, Vt, 0., W);
                 }
                 
                 transpose(w, z, N, N, N);

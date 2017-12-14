@@ -44,12 +44,12 @@
         RowMatrix<Complex> R (N, N, S.data() - A.dot(x));
         
         // extract eigen-components of the right-hand side
-        blas::gemm(1.0, S,     C, 0.0, E);
-        blas::gemm(1.0, C.T(), E, 0.0, F);
+        blas::gemm(1.0, S,  V, 0.0, E);
+        blas::gemm(1.0, Vt, E, 0.0, F);
         
         // extract eigen-components of the residual
-        blas::gemm(1.0, R,     C, 0.0, E);
-        blas::gemm(1.0, C.T(), E, 0.0, G);
+        blas::gemm(1.0, R,  V, 0.0, E);
+        blas::gemm(1.0, Vt, E, 0.0, G);
         
         // resample
         int m = N;
