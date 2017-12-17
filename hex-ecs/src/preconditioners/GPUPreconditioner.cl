@@ -354,7 +354,7 @@ kernel void mmul_1el
  * 
  * This is a variant of @ref mmul_1el, which operates on segments.
  */
-kernel void mmul_1el_seg
+kernel void mmul_1el_segment
 (
     // energy
     private Real E,
@@ -374,7 +374,7 @@ kernel void mmul_1el_seg
     // source and target vector
     global Complex const * const restrict x,
     global Complex       * const restrict y,
-    // block and segment
+    // angular block and one-electron segment
     private int ill,
     private int k
 )
@@ -384,17 +384,17 @@ kernel void mmul_1el_seg
     
     // for all relevant target vector segments
     if (j < NSPLINE_PROJ)
-    for (private int i = k - ORDER; i <= k + ORDER; i++) if (0 <= i && i <= NSPLINE_ATOM)
+    for (private int i = k - ORDER; i <= k + ORDER; i++) if (0 <= i && i < NSPLINE_ATOM)
     {
         // initialize the output element
-        y[(ill * (2 * ORDER + 1) + k + ORDER - i) * NSPLINE_PROJ + j] = 0;
+        y[(ill * (2 * ORDER + 1) + i + ORDER - k) * NSPLINE_PROJ + j] = 0;
         
         // for all relevant source vector elements
         for (private int l = j - ORDER; l <= j + ORDER; l++) if (0 <= l && l < NSPLINE_PROJ)
         {
             // compute multi-indices
-            private int ik = min(i,k) * (ORDER + 1) + abs(i - k);
-            private int jl = min(j,l) * (ORDER + 1) + abs(l - j);
+            private int ik = min(i,k) * (ORDER + 1) + abs_diff(i,k);
+            private int jl = min(j,l) * (ORDER + 1) + abs_diff(j,l);
             
             // calculate the one-electron part of the hamiltonian matrix element Hijkl
             private Complex elem = E * cmul(Spa[ik],Spp[jl]);
@@ -403,7 +403,7 @@ kernel void mmul_1el_seg
             elem -= ZA * (-1) * cmul(M1pa[ik],Spp[jl]) + ZA * ZP * cmul(Spa[ik],M1pp[jl]);
             
             // multiply right-hand side by that matrix element
-            y[(ill * (2 * ORDER + 1) + k + ORDER - i) * NSPLINE_PROJ + j] += cmul(elem, x[ill * NSPLINE_PROJ + l]);
+            y[(ill * (2 * ORDER + 1) + i + ORDER - k) * NSPLINE_PROJ + j] += cmul(elem, x[ill * NSPLINE_PROJ + l]);
         }
     }
 }
@@ -495,8 +495,8 @@ kernel void mmul_2el_decoupled
     private Real tb1 = unrotateY(tp[b]), tb2 = unrotateY(tp[b + ORDER + 1]);
     
     // loop over free B-spline indices
-    for (private int c = a > ORDER ? a - ORDER : 0; c < NSPLINE_ATOM && c <= a + ORDER; c++)
-    for (private int d = b > ORDER ? b - ORDER : 0; d < NSPLINE_PROJ && d <= b + ORDER; d++)
+    for (private int c = a - ORDER; c <= a + ORDER; c++) if (0 <= c && c < NSPLINE_ATOM)
+    for (private int d = b - ORDER; d <= b + ORDER; d++) if (0 <= d && d < NSPLINE_PROJ)
     {
         // B-spline bounding knots
         private Real tc1 = unrotateX(ta[c]), tc2 = unrotateX(ta[c + ORDER + 1]);
@@ -562,8 +562,8 @@ kernel void mmul_2el_decoupled_segment
     private int j = get_global_id(0);
     
     if (j < NSPLINE_PROJ)
-    for (private int i = k > ORDER ? k - ORDER : 0; i < NSPLINE_ATOM && i <= k + ORDER; i++)
-    for (private int l = j > ORDER ? j - ORDER : 0; l < NSPLINE_PROJ && l <= j + ORDER; l++)
+    for (private int i = k - ORDER; i <= k + ORDER; i++) if (0 <= i && i < NSPLINE_ATOM)
+    for (private int l = j - ORDER; l <= j + ORDER; l++) if (0 <= l && l < NSPLINE_PROJ)
     {
         // B-spline bounding knots
         private Real ti1 = unrotateX(ta[i]), ti2 = unrotateX(ta[i + ORDER + 1]);
@@ -606,8 +606,9 @@ kernel void mmul_2el_decoupled_segment
         for (private int ill  = 0; ill  < ANGULAR_BASIS_SIZE; ill++)
         for (private int illp = 0; illp < ANGULAR_BASIS_SIZE; illp++)
         {
-            y[(ill * (2 * ORDER + 1) + i + ORDER - k) * NSPLINE_PROJ + j]
-                += ZP * f[lambda] * cmul(R, x[illp * NSPLINE_PROJ + l]);
+            y[(ill * (2 * ORDER + 1) + i + ORDER - k) * NSPLINE_PROJ + j] += ZP
+                * f[(lambda * ANGULAR_BASIS_SIZE + ill) * ANGULAR_BASIS_SIZE + illp]
+                * cmul(R, x[illp * NSPLINE_PROJ + l]);
         }
     }
 }
@@ -636,8 +637,8 @@ kernel void mmul_2el_coupled
     private int a = get_global_id(0) / NSPLINE_PROJ;
     private int b = get_global_id(0) % NSPLINE_PROJ;
     
-    for (private int c = a > ORDER ? a - ORDER : 0; c < NSPLINE_ATOM && c <= a + ORDER; c++)
-    for (private int d = b > ORDER ? b - ORDER : 0; d < NSPLINE_PROJ && d <= b + ORDER; d++)
+    for (private int c = a - ORDER; c <= a + ORDER; c++) if (0 <= c && c < NSPLINE_ATOM)
+    for (private int d = b - ORDER; d <= b + ORDER; d++) if (0 <= d && d < NSPLINE_PROJ)
     {
         private int I = min(a,c) * (ORDER + 1) + abs_diff(a,c);
         private int J = min(b,d) * (ORDER + 1) + abs_diff(b,d);
@@ -677,8 +678,8 @@ kernel void mmul_2el_coupled_segment
     private int j = get_global_id(0);
     
     if (j < NSPLINE_PROJ)
-    for (private int i = k > ORDER ? k - ORDER : 0; i < NSPLINE_ATOM && i <= k + ORDER; i++)
-    for (private int l = j > ORDER ? j - ORDER : 0; l < NSPLINE_PROJ && l <= j + ORDER; l++)
+    for (private int i = k - ORDER; i <= k + ORDER; i++) if (0 <= i && i < NSPLINE_ATOM)
+    for (private int l = j - ORDER; l <= j + ORDER; l++) if (0 <= l && l < NSPLINE_PROJ)
     {
         private int ik = min(i,k) * (ORDER + 1) + abs_diff(i,k);
         private int jl = min(j,l) * (ORDER + 1) + abs_diff(j,l);
@@ -690,9 +691,9 @@ kernel void mmul_2el_coupled_segment
                 for (private int ill  = 0; ill  < ANGULAR_BASIS_SIZE; ill++)
                 for (private int illp = 0; illp < ANGULAR_BASIS_SIZE; illp++)
                 {
-                    y[(ill * (2 * ORDER + 1) + i + ORDER - k) * NSPLINE_PROJ + j] += ZP *
-                        f[(lambda * ANGULAR_BASIS_SIZE + ill) * ANGULAR_BASIS_SIZE + illp] *
-                        cmul(Rx[idx], x[illp * NSPLINE_PROJ + l]);
+                    y[(ill * (2 * ORDER + 1) + i + ORDER - k) * NSPLINE_PROJ + j] += ZP
+                        * f[(lambda * ANGULAR_BASIS_SIZE + ill) * ANGULAR_BASIS_SIZE + illp]
+                        * cmul(Rx[idx], x[illp * NSPLINE_PROJ + l]);
                 }
             }
         }

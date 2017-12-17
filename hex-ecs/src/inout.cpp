@@ -272,7 +272,6 @@ void CommandLine::parse (int argc, char* argv[])
                     "\t--cl-device <index>              Use given OpenCL device for GPU preconditioner (default is 0, i.e. the first device found).\n"
                     "\t--cl-use-host-memory             Keep large data in RAM instead of copying everything to the compute device. This will slow down the solution.\n"
                     "\t--cl-multiply                    Do the sparse matrix multiplication on the OpenCL device (memory intensive!).\n"
-                    "\t--cl-host-multiply               Keep vectors in host memory when doing matrix multiplication on OpenCL device.\n"
 #endif
                     "\n"
                     "Multigrid preconditioner\n"
@@ -641,7 +640,6 @@ void CommandLine::parse (int argc, char* argv[])
             {
                 // keep large data in RAM
                 gpu_large_data = true;
-                gpu_host_multiply = true;
                 return true;
             },
         "cl-multiply", "", 0, [&](std::vector<std::string> const & optargs) -> bool
@@ -649,12 +647,6 @@ void CommandLine::parse (int argc, char* argv[])
                 // do the lightweight multiplication on OpenCL device
                 lightweight_radial_cache = true;
                 gpu_multiply = true;
-                return true;
-            },
-        "cl-host-multiply", "", 0, [&](std::vector<std::string> const & optargs) -> bool
-            {
-                // keep vectors in host memory when doing matrix multiplication on GPU
-                gpu_host_multiply = true;
                 return true;
             },
 #endif

@@ -6,7 +6,7 @@
 //                    / /   / /    \_\      / /  \ \                                 //
 //                                                                                   //
 //                                                                                   //
-//  Copyright (c) 2016, Jakub Benda, Charles University in Prague                    //
+//  Copyright (c) 2017, Jakub Benda, Charles University in Prague                    //
 //                                                                                   //
 // MIT License:                                                                      //
 //                                                                                   //
@@ -75,29 +75,8 @@ class GPUCGPreconditioner : public virtual KPACGPreconditioner
         // run-time selection mechanism
         preconditionerRunTimeSelectionDefinitions(GPUCGPreconditioner, "GPU")
         
-        typedef struct sData
-        {
-            /// Link the structure to a disk file.
-            void hdflink (const char * file);
-            
-            /// Try to load data from a disk file.
-            bool hdfload (const char * file = nullptr);
-            
-            /// Save data to disk.
-            bool hdfsave (const char * file = nullptr) const;
-            
-            /// One-electron hamiltonian diagonalization.
-            RowMatrix<Complex> invCl_invsqrtS, invsqrtS_Cl;
-            
-            /// Diagonal parts of one-electron hamiltonians.
-            cArray Dl;
-            
-            /// Filename.
-            std::string filename;
-        } Data;
-        
         // default constructor needed by the RTS mechanism
-        GPUCGPreconditioner () {}
+        GPUCGPreconditioner ();
         
         // constructor
         GPUCGPreconditioner
@@ -110,25 +89,7 @@ class GPUCGPreconditioner : public virtual KPACGPreconditioner
             Bspline const & bspline_full,
             Bspline const & bspline_panel_x,
             Bspline const & bspline_panel_y
-        ) : CGPreconditioner
-            (
-                cmd, inp, par, ang,
-                bspline_inner,
-                bspline_full,
-                bspline_panel_x,
-                bspline_panel_y
-            ),
-            KPACGPreconditioner
-            (
-                cmd, inp, par, ang,
-                bspline_inner,
-                bspline_full,
-                bspline_panel_x,
-                bspline_panel_y
-            )
-        {
-            // nothing more to do
-        }
+        );
         
         // preconditioner description
         virtual std::string description () const;
@@ -161,14 +122,10 @@ class GPUCGPreconditioner : public virtual KPACGPreconditioner
         cl_mem_flags largeDataFlags_;
         
         // computational kernels
-        cl_kernel mabt_, matbt_;
-        cl_kernel mmls_, mms1_, mms2d_, mms2c_;
-        cl_kernel mml1_;
-        cl_kernel mml2d_, mml2c_;
-        cl_kernel axby_;
-        cl_kernel norm_;
-        cl_kernel spro_;
-        cl_kernel krdv_;
+        cl_kernel mmls_, mabt_, matbt_;
+        cl_kernel mms1_, mms2d_, mms2c_;
+        cl_kernel mml1_, mml2d_, mml2c_;
+        cl_kernel axby_, norm_, spro_, krdv_;
         
         // device data connections
         mutable clArray<Complex> tmp_, tmA_;
@@ -180,8 +137,6 @@ class GPUCGPreconditioner : public virtual KPACGPreconditioner
         std::vector<clArrayView<Complex>> M_L_inner_p_, M_mLm1_inner_p_;
         std::vector<clArrayView<LU_int_t>> R_coupled_p_, R_coupled_i_;
         std::vector<clArrayView<Complex>> R_coupled_x_;
-        
-        cl_short nsrcseg_, ndstseg_;
 };
 
 // --------------------------------------------------------------------------------- //
