@@ -322,6 +322,9 @@ void GPUCGPreconditioner::setup ()
         largeDataFlags_ = CL_MEM_READ_WRITE | CL_MEM_USE_HOST_PTR;
     
     // set program entry points
+    A1el_  = clCreateKernel(program_, "A1el",                       nullptr);
+    A2elc_ = clCreateKernel(program_, "A2el_coupled",               nullptr);
+    A2eld_ = clCreateKernel(program_, "A2el_decoupled",             nullptr);
     mmls_  = clCreateKernel(program_, "mmul_simple",                nullptr);
     mml1_  = clCreateKernel(program_, "mmul_1el",                   nullptr);
     mms1_  = clCreateKernel(program_, "mmul_1el_segment",           nullptr);
@@ -542,6 +545,7 @@ void GPUCGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArra
     std::size_t Nspline_inner_x = rad_panel_->bspline_x().Nspline();
     std::size_t Nspline_inner_y = rad_panel_->bspline_y().Nspline();
     std::size_t Nsegsiz = Nspline_inner_x * Nspline_inner_y;
+    std::size_t order = rad_panel_->bspline_x().order();
     
     // performance timers
     std::size_t us_prec = 0, us_spro = 0, us_axby = 0, us_norm = 0;
@@ -556,13 +560,24 @@ void GPUCGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArra
     // for all diagonal blocks
     for (int ill = 0; ill < (int)ang_->states().size(); ill++) if (par_->isMyWork(ill))
     {
-        // initialize block preconditioner
-        // TODO : in lightweight-simple mode calculate A block on GPU, not in CGPreconditioner::CG_init
-        this->CG_init(ill);
-        
         // get angular momenta
         cl_int l1 = ang_->states()[ill].first;
         cl_int l2 = ang_->states()[ill].second;
+        
+        // initialize KPA preconditioner
+        lock_kpa_access();
+        {
+            // update reference count
+            refcount_atom_[l1]++;
+            refcount_proj_[l2]++;
+            
+            // load preconditioners from disk if needed
+            if (refcount_atom_[l1] == 1 and not Hl_[0][l1].hdfload())
+                HexException("Failed to read preconditioner matrix for l = %d.", l1);
+            if (refcount_proj_[l2] == 1 and not Hl_[1][l2].hdfload())
+                HexException("Failed to read preconditioner matrix for l = %d.", l2);
+        }
+        unlock_kpa_access();
         
         // load blocks
         if (cmd_->outofcore)
@@ -571,17 +586,57 @@ void GPUCGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArra
             z.hdfload(ill);
         }
         
-        // upload full matrix block to GPU's memory
-        clArrayView<Complex> Aview;
+        // copy angular integrals
+        clArray<Real> f (ang_->maxlambda() + 1, 0.);
+        for (int lambda = 0; lambda <= ang_->maxlambda(); lambda++)
+            f[lambda] = ang_->f(ill, ill, lambda);
+        f.connect(context_, smallDataFlags_);
+        
+        // prepare the matrix of the diagonal block
+        clArray<Complex> A;
         if (cmd_->lightweight_simple or not cmd_->lightweight_full)
         {
-            BlockSymBandMatrix<Complex> const & A = A_blocks_[ill * ang_->states().size() + ill];
+            A.resize((order + 1) * (order + 1) * Nspline_inner_x * Nspline_inner_y);
+            A.connect(context_, largeDataFlags_);
             
-            if (cmd_->outofcore)
-                const_cast<BlockSymBandMatrix<Complex> &>(A).hdfload();
+            clSetKernelArg(A1el_,  0, sizeof(Real),   &E_);
+            clSetKernelArg(A1el_,  1, sizeof(cl_mem), &S_inner_a_.handle());
+            clSetKernelArg(A1el_,  2, sizeof(cl_mem), &D_inner_a_.handle());
+            clSetKernelArg(A1el_,  3, sizeof(cl_mem), &Mm1_inner_a_.handle());
+            clSetKernelArg(A1el_,  4, sizeof(cl_mem), &Mm2_inner_a_.handle());
+            clSetKernelArg(A1el_,  5, sizeof(cl_mem), &S_inner_p_.handle());
+            clSetKernelArg(A1el_,  6, sizeof(cl_mem), &D_inner_p_.handle());
+            clSetKernelArg(A1el_,  7, sizeof(cl_mem), &Mm1_inner_p_.handle());
+            clSetKernelArg(A1el_,  8, sizeof(cl_mem), &Mm2_inner_p_.handle());
+            clSetKernelArg(A1el_,  9, sizeof(cl_int), &l1);
+            clSetKernelArg(A1el_, 10, sizeof(cl_int), &l2);
+            clSetKernelArg(A1el_, 11, sizeof(cl_mem), &A.handle());
+            clEnqueueNDRangeKernel(queue_, A1el_, 1, nullptr, &Nsegsiz, nullptr, 0, nullptr, nullptr);
+            clFinish(queue_);
             
-            Aview.reset(A.data().size(), A.data().data());
-            Aview.connect(context_, largeDataFlags_);
+            for (cl_int lambda = 0; lambda <= ang_->maxlambda(); lambda++) if (ang_->f(ill,ill,lambda) != 0)
+            {
+                clSetKernelArg(A2eld_,  0, sizeof(cl_mem),   &t_inner_a_.handle());
+                clSetKernelArg(A2eld_,  1, sizeof(cl_mem),   &t_inner_p_.handle());
+                clSetKernelArg(A2eld_,  2, sizeof(cl_mem),   &f.handle());
+                clSetKernelArg(A2eld_,  3, sizeof(cl_int),   &lambda);
+                clSetKernelArg(A2eld_,  4, sizeof(cl_mem),   &M_L_inner_a_[lambda].handle());
+                clSetKernelArg(A2eld_,  5, sizeof(cl_mem),   &M_mLm1_inner_a_[lambda].handle());
+                clSetKernelArg(A2eld_,  6, sizeof(cl_mem),   &M_L_inner_p_[lambda].handle());
+                clSetKernelArg(A2eld_,  7, sizeof(cl_mem),   &M_mLm1_inner_p_[lambda].handle());
+                clSetKernelArg(A2eld_,  8, sizeof(cl_mem),   &A.handle());
+                clEnqueueNDRangeKernel(queue_, A2eld_, 1, nullptr, &Nsegsiz, nullptr, 0, nullptr, nullptr);
+                clFinish(queue_);
+                
+                clSetKernelArg(A2elc_,  0, sizeof(cl_mem),   &f.handle());
+                clSetKernelArg(A2elc_,  1, sizeof(cl_int),   &lambda);
+                clSetKernelArg(A2elc_,  2, sizeof(cl_mem),   &R_coupled_p_[lambda].handle());
+                clSetKernelArg(A2elc_,  3, sizeof(cl_mem),   &R_coupled_i_[lambda].handle());
+                clSetKernelArg(A2elc_,  4, sizeof(cl_mem),   &R_coupled_x_[lambda].handle());
+                clSetKernelArg(A2elc_,  5, sizeof(cl_mem),   &A.handle());
+                clEnqueueNDRangeKernel(queue_, A2elc_, 1, nullptr, &Nsegsiz, nullptr, 0, nullptr, nullptr);
+                clFinish(queue_);
+            }
         }
         
         // create segment views
@@ -593,12 +648,6 @@ void GPUCGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArra
         clArrayView<Complex> Cl2 (Nspline_inner_y * Nspline_inner_y, Hl_[1][l2].Cl.data().data());  Cl2.connect(context_, largeDataFlags_);
         clArrayView<Complex> Dl1 (Nspline_inner_x,                   Hl_[0][l1].Dl.data());         Dl1.connect(context_, smallDataFlags_);
         clArrayView<Complex> Dl2 (Nspline_inner_y,                   Hl_[1][l2].Dl.data());         Dl2.connect(context_, smallDataFlags_);
-        
-        // copy angular integrals
-        clArray<Real> f (ang_->maxlambda() + 1, 0.);
-        for (int lambda = 0; lambda <= ang_->maxlambda(); lambda++)
-            f[lambda] = ang_->f(ill, ill, lambda);
-        f.connect(context_, smallDataFlags_);
         
         // allocation (and upload) of an OpenCL array
         auto new_opencl_array = [&](std::size_t n, std::string name) -> clArray<Complex>
@@ -624,7 +673,7 @@ void GPUCGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArra
             if (cmd_->lightweight_simple or not cmd_->lightweight_full)
             {
                 // special kernel for BlockSymBandMatrix::dot
-                clSetKernelArg(mmls_, 0, sizeof(cl_mem), &Aview.handle());
+                clSetKernelArg(mmls_, 0, sizeof(cl_mem), &A.handle());
                 clSetKernelArg(mmls_, 1, sizeof(cl_mem), &a.handle());
                 clSetKernelArg(mmls_, 2, sizeof(cl_mem), &b.handle());
                 clEnqueueNDRangeKernel(queue_, mmls_, 1, nullptr, &Nsegsiz, nullptr, 0, nullptr, nullptr);
@@ -851,12 +900,7 @@ void GPUCGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArra
         
         if (cmd_->lightweight_simple or not cmd_->lightweight_full)
         {
-            BlockSymBandMatrix<Complex> const & A = A_blocks_[ill * ang_->states().size() + ill];
-            
-            if (cmd_->outofcore)
-                const_cast<BlockSymBandMatrix<Complex> &>(A).drop();
-            
-            Aview.disconnect();
+            A.disconnect();
         }
         
         // release block preconditioner

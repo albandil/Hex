@@ -259,8 +259,8 @@ kernel void mmul_simple (global Complex *A, global Complex *x, global Complex *y
     for (private int l = j - ORDER; l <= j + ORDER; l++) if (0 <= l && l < NSPLINE_PROJ)
     {
         // compute multi-indices
-        private int ik = min(i,k) * (ORDER + 1) + abs(i - k);
-        private int jl = min(j,l) * (ORDER + 1) + abs(l - j);
+        private int ik = min(i,k) * (ORDER + 1) + abs_diff(i,k);
+        private int jl = min(j,l) * (ORDER + 1) + abs_diff(l,j);
         
         // get the matrix element
         private Complex elem = A[ik * (ORDER + 1) * NSPLINE_PROJ + jl];
@@ -273,6 +273,54 @@ kernel void mmul_simple (global Complex *A, global Complex *x, global Complex *y
     if (i < NSPLINE_ATOM)
     {
         y[i * NSPLINE_PROJ + j] = result;
+    }
+}
+
+/**
+ * @brief Update matrix block with one-electron contribution.
+ */
+kernel void A1el
+(
+    // energy
+    private Real E,
+    // row-padded one-electron matrices (atom)
+    global Complex const * const restrict Spa,
+    global Complex const * const restrict Dpa,
+    global Complex const * const restrict M1pa,
+    global Complex const * const restrict M2pa,
+    // row-padded one-electron matrices (projectile)
+    global Complex const * const restrict Spp,
+    global Complex const * const restrict Dpp,
+    global Complex const * const restrict M1pp,
+    global Complex const * const restrict M2pp,
+    // angular momenta
+    private int l1,
+    private int l2,
+    // source and target vector
+    global Complex       * const restrict A
+)
+{
+    // output vector element index
+    private int i = get_global_id(0) / NSPLINE_PROJ;
+    private int j = get_global_id(0) % NSPLINE_PROJ;
+    
+    // for all source vector elements
+    if (i < NSPLINE_ATOM)
+    for (private int k = i; k <= i + ORDER; k++) if (k < NSPLINE_ATOM)
+    for (private int l = j; l <= j + ORDER; l++) if (l < NSPLINE_PROJ)
+    {
+        // compute multi-indices
+        private int ik = i * (ORDER + 1) + k - i;
+        private int jl = j * (ORDER + 1) + l - j;
+        
+        // calculate the one-electron part of the hamiltonian matrix element Hijkl
+        private Complex elem = E * cmul(Spa[ik],Spp[jl]);
+        elem -= (Real)(0.5f) * (cmul(Dpa[ik],Spp[jl]) + cmul(Spa[ik],Dpp[jl]));
+        elem -= (Real)(0.5f) * l1 * (l1 + 1) * cmul(M2pa[ik],Spp[jl]) + (Real)(0.5f) * l2 * (l2 + 1) * cmul(Spa[ik],M2pp[jl]);
+        elem -= ZA * (-1) * cmul(M1pa[ik],Spp[jl]) + ZA * ZP * cmul(Spa[ik],M1pp[jl]);
+        
+        // multiply right-hand side by that matrix element
+        A[ik * NSPLINE_PROJ * (ORDER + 1) + jl] = elem;
     }
 }
 
@@ -531,6 +579,74 @@ kernel void mmul_2el_decoupled
     }
 }
 
+kernel void A2el_decoupled
+(
+    // B-spline knots (atom and projectile)
+    constant Complex const * const restrict ta,
+    constant Complex const * const restrict tp,
+    // angular integrals
+    constant Real  const * const restrict f,
+    // multipole
+    private int lambda,
+    // one-electron moments (atomic electron)
+    global Complex const * const restrict MLa,
+    global Complex const * const restrict MmLm1a,
+    // one-electron moments (projectile electron)
+    global Complex const * const restrict MLp,
+    global Complex const * const restrict MmLm1p,
+    // matrix
+    global Complex       * const restrict A
+)
+{
+    // B-spline indices
+    private int a = get_global_id(0) / NSPLINE_PROJ;
+    private int b = get_global_id(0) % NSPLINE_PROJ;
+    
+    // B-spline bounding knots
+    private Real ta1 = unrotateX(ta[a]), ta2 = unrotateX(ta[a + ORDER + 1]);
+    private Real tb1 = unrotateY(tp[b]), tb2 = unrotateY(tp[b + ORDER + 1]);
+    
+    // loop over free B-spline indices
+    for (private int c = a; c <= a + ORDER; c++) if (0 <= c && c < NSPLINE_ATOM)
+    for (private int d = b; d <= b + ORDER; d++) if (0 <= d && d < NSPLINE_PROJ)
+    {
+        // B-spline bounding knots
+        private Real tc1 = unrotateX(ta[c]), tc2 = unrotateX(ta[c + ORDER + 1]);
+        private Real td1 = unrotateY(tp[d]), td2 = unrotateY(tp[d + ORDER + 1]);
+        
+        if (max(ta1,tc1) >= min(ta2,tc2) || max(tb1,td1) >= min(tb2,td2))
+            continue;
+        
+        // restrict effective radius
+        private Real t_xmin = myclamp(max(ta1,tc1), RXMIN, RXMAX);
+        private Real t_xmax = myclamp(min(ta2,tc2), RXMIN, RXMAX);
+        private Real t_ymin = myclamp(max(tb1,td1), RYMIN, RYMAX);
+        private Real t_ymax = myclamp(min(tb2,td2), RYMIN, RYMAX);
+        
+        // multi-indices
+        private int ac = a * (ORDER + 1) + c - a;
+        private int bd = b * (ORDER + 1) + d - b;
+        
+        // decoupled y < x
+        if (t_ymax <= t_xmin)
+        {
+            private Real scale = pow_int(t_ymax / t_xmax, lambda) / t_xmax;
+            private Complex R = scale * cmul(MmLm1a[ac], MLp[bd]);
+            
+            A[ac * NSPLINE_PROJ * (ORDER + 1) + bd] += ZP * f[lambda] * R;
+        }
+        
+        // decoupled x < y
+        if (t_xmax <= t_ymin)
+        {
+            private Real scale = pow_int(t_xmax / t_ymax, lambda) / t_ymax;
+            private Complex R = scale * cmul(MLa[ac], MmLm1p[bd]);
+            
+            A[ac * NSPLINE_PROJ * (ORDER + 1) + bd] += ZP * f[lambda] * R;
+        }
+    }
+}
+
 /**
  * @brief Multiply by two-electron integral matrix.
  * 
@@ -648,6 +764,39 @@ kernel void mmul_2el_coupled
             if (Ri[idx] == J)
             {
                 y[a * NSPLINE_PROJ + b] += ZP * f[lambda] * cmul(Rx[idx], x[c * NSPLINE_PROJ + d]);
+            }
+        }
+    }
+}
+
+kernel void A2el_coupled
+(
+    // angular integrals
+    constant Real  const * const restrict f,
+    // multipole
+    private int lambda,
+    // radial integrals (CSR storage)
+    global Long    const * const restrict Rp,
+    global Long    const * const restrict Ri,
+    global Complex const * const restrict Rx,
+    // matrix
+    global Complex       * const restrict A
+)
+{
+    private int a = get_global_id(0) / NSPLINE_PROJ;
+    private int b = get_global_id(0) % NSPLINE_PROJ;
+    
+    for (private int c = a; c <= a + ORDER; c++) if (c < NSPLINE_ATOM)
+    for (private int d = b; d <= b + ORDER; d++) if (d < NSPLINE_PROJ)
+    {
+        private int I = a * (ORDER + 1) + c - a;
+        private int J = b * (ORDER + 1) + d - b;
+        
+        for (private int idx = Rp[I]; idx < Rp[I + 1]; idx++)
+        {
+            if (Ri[idx] == J)
+            {
+                A[I * NSPLINE_PROJ * (ORDER + 1) + J] += ZP * f[lambda] * Rx[idx];
             }
         }
     }

@@ -123,6 +123,7 @@ class GPUCGPreconditioner : public virtual KPACGPreconditioner
         
         // computational kernels
         cl_kernel mmls_, mabt_, matbt_;
+        cl_kernel A1el_, A2eld_, A2elc_;
         cl_kernel mms1_, mms2d_, mms2c_;
         cl_kernel mml1_, mml2d_, mml2c_;
         cl_kernel axby_, norm_, spro_, krdv_;
