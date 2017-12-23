@@ -450,9 +450,16 @@ void GPUCGPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Co
             // erase destination array
             dst.fill(0.);
             
+//             Timer t;
+            
             // send data to GPU
             src.connect(context_, smallDataFlags_);
             dst.connect(context_, smallDataFlags_);
+            
+//             std::cout << t.microseconds() << " ";
+            
+            // number of workitems
+            std::size_t sz = (2 * order + 1) * Nyspline;
             
             // multiply by one-electron (sub-)blocks
             for (cl_int ill = 0; ill < (cl_int)Nang; ill++)
@@ -475,10 +482,12 @@ void GPUCGPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Co
                 clSetKernelArg(mms1_, 12, sizeof(cl_mem), &dst.handle());
                 clSetKernelArg(mms1_, 13, sizeof(cl_int), &ill);
                 clSetKernelArg(mms1_, 14, sizeof(cl_int), &isrc);
-                clEnqueueNDRangeKernel(queue_, mms1_, 1, nullptr, &Nyspline, nullptr, 0, nullptr, nullptr);
+                clEnqueueNDRangeKernel(queue_, mms1_, 1, nullptr, &sz, nullptr, 0, nullptr, nullptr);
             }
             
             clFinish(queue_);
+            
+//             std::cout << t.microseconds() << " ";
             
             // multiply by two-electron (sub-)blocks
             for (cl_int lambda = 0; lambda <= rad_inner().maxlambda(); lambda++)
@@ -495,8 +504,10 @@ void GPUCGPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Co
                 clSetKernelArg(mms2d_,  8, sizeof(cl_mem), &src.handle());
                 clSetKernelArg(mms2d_,  9, sizeof(cl_mem), &dst.handle());
                 clSetKernelArg(mms2d_, 10, sizeof(cl_int), &isrc);
-                clEnqueueNDRangeKernel(queue_, mms2d_, 1, nullptr, &Nyspline, nullptr, 0, nullptr, nullptr);
+                clEnqueueNDRangeKernel(queue_, mms2d_, 1, nullptr, &sz, nullptr, 0, nullptr, nullptr);
                 clFinish(queue_);
+                
+//                 std::cout << t.microseconds() << " ";
                 
                 // two-electron block - coupled part
                 clSetKernelArg(mms2c_,  0, sizeof(cl_mem), &f.handle());
@@ -507,13 +518,17 @@ void GPUCGPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Co
                 clSetKernelArg(mms2c_,  5, sizeof(cl_mem), &src.handle());
                 clSetKernelArg(mms2c_,  6, sizeof(cl_mem), &dst.handle());
                 clSetKernelArg(mms2c_,  7, sizeof(cl_int), &isrc);
-                clEnqueueNDRangeKernel(queue_, mms2c_, 1, nullptr, &Nyspline, nullptr, 0, nullptr, nullptr);
+                clEnqueueNDRangeKernel(queue_, mms2c_, 1, nullptr, &sz, nullptr, 0, nullptr, nullptr);
                 clFinish(queue_);
+                
+//                 std::cout << t.microseconds() << " ";
             }
             
             // download the data from GPU
             dst.EnqueueDownload(queue_);
             clFinish(queue_);
+            
+//             std::cout << t.microseconds() << " ";
             
             // update the product array
             for (std::size_t ill = 0; ill < Nang; ill++) if (par_->isMyGroupWork(ill))
@@ -526,6 +541,8 @@ void GPUCGPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Co
             // disconnect from GPU
             src.disconnect();
             dst.disconnect();
+            
+//             std::cout << t.microseconds() << std::endl;
         }
         
         // send data to non-master group members
