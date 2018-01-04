@@ -274,6 +274,7 @@ void GPUCGPreconditioner::setup ()
     flags << " -D NLOCAL="       << Nlocal_      << " ";
     flags << " -D BLOCK_SIZE="   << blocksize_   << " ";
     flags << " -D ANGULAR_BASIS_SIZE=" << ang_->states().size() << " ";
+    flags << " -D MAXLAMBDA="    << ang_->maxlambda() << " ";
     flags << " -D ZA="           << inp_->Za      << " ";
     flags << " -D ZP="           << inp_->Zp     << " ";
     flags << " -D RXMIN="        << rad_inner().bspline_x().R1() << " ";
@@ -317,9 +318,13 @@ void GPUCGPreconditioner::setup ()
     }
     
     // determine where to place the data (device / host)
-    largeDataFlags_ = smallDataFlags_ = CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR;
+    largeRODataFlags_ = smallRODataFlags_ = CL_MEM_READ_ONLY  | CL_MEM_COPY_HOST_PTR;
+    largeRWDataFlags_ = smallRWDataFlags_ = CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR;
     if (cmd_->gpu_large_data)
-        largeDataFlags_ = CL_MEM_READ_WRITE | CL_MEM_USE_HOST_PTR;
+    {
+        largeRODataFlags_ = CL_MEM_READ_ONLY  | CL_MEM_USE_HOST_PTR;
+        largeRWDataFlags_ = CL_MEM_READ_WRITE | CL_MEM_USE_HOST_PTR;
+    }
     
     // set program entry points
     A1el_  = clCreateKernel(program_, "A1el",                       nullptr);
@@ -344,26 +349,26 @@ void GPUCGPreconditioner::setup ()
     std::size_t Nglobal = Nlocal_ * ((Nsegsiz + Nlocal_ - 1) / Nlocal_);
     
     // some OpenCL auxiliary storage arrays (used by kernels for temporary data)
-    tmp_.resize(Nglobal / Nlocal_); tmp_.connect(context_, smallDataFlags_);
-    nrm_.resize(Nglobal / Nlocal_); nrm_.connect(context_, smallDataFlags_);
+    tmp_.resize(Nglobal / Nlocal_); tmp_.connect(context_, smallRWDataFlags_);
+    nrm_.resize(Nglobal / Nlocal_); nrm_.connect(context_, smallRWDataFlags_);
     tmA_.resize(Nspline_inner_x * Nspline_inner_y);
-    tmA_.connect(context_, largeDataFlags_);
+    tmA_.connect(context_, largeRWDataFlags_);
     
     // connect B-spline knots
     t_inner_a_.reset(rad_panel_->bspline_x().t().size(), rad_panel_->bspline_x().t().data());
     t_inner_p_.reset(rad_panel_->bspline_y().t().size(), rad_panel_->bspline_y().t().data());
-    t_inner_a_.connect(context_, smallDataFlags_);
-    t_inner_p_.connect(context_, smallDataFlags_);
+    t_inner_a_.connect(context_, smallRODataFlags_);
+    t_inner_p_.connect(context_, smallRODataFlags_);
     
     // create OpenCL representation of the one-electron matrices + transfer data to GPU memory
-    S_inner_a_  .reset(rad_panel_->S_x()  .data().size(), rad_panel_->S_x()  .data().data()); S_inner_a_  .connect(context_, smallDataFlags_);
-    D_inner_a_  .reset(rad_panel_->D_x()  .data().size(), rad_panel_->D_x()  .data().data()); D_inner_a_  .connect(context_, smallDataFlags_);
-    Mm1_inner_a_.reset(rad_panel_->Mm1_x().data().size(), rad_panel_->Mm1_x().data().data()); Mm1_inner_a_.connect(context_, smallDataFlags_);
-    Mm2_inner_a_.reset(rad_panel_->Mm2_x().data().size(), rad_panel_->Mm2_x().data().data()); Mm2_inner_a_.connect(context_, smallDataFlags_);
-    S_inner_p_  .reset(rad_panel_->S_y()  .data().size(), rad_panel_->S_y()  .data().data()); S_inner_p_  .connect(context_, smallDataFlags_);
-    D_inner_p_  .reset(rad_panel_->D_y()  .data().size(), rad_panel_->D_y()  .data().data()); D_inner_p_  .connect(context_, smallDataFlags_);
-    Mm1_inner_p_.reset(rad_panel_->Mm1_y().data().size(), rad_panel_->Mm1_y().data().data()); Mm1_inner_p_.connect(context_, smallDataFlags_);
-    Mm2_inner_p_.reset(rad_panel_->Mm2_y().data().size(), rad_panel_->Mm2_y().data().data()); Mm2_inner_p_.connect(context_, smallDataFlags_);
+    S_inner_a_  .reset(rad_panel_->S_x()  .data().size(), rad_panel_->S_x()  .data().data()); S_inner_a_  .connect(context_, smallRODataFlags_);
+    D_inner_a_  .reset(rad_panel_->D_x()  .data().size(), rad_panel_->D_x()  .data().data()); D_inner_a_  .connect(context_, smallRODataFlags_);
+    Mm1_inner_a_.reset(rad_panel_->Mm1_x().data().size(), rad_panel_->Mm1_x().data().data()); Mm1_inner_a_.connect(context_, smallRODataFlags_);
+    Mm2_inner_a_.reset(rad_panel_->Mm2_x().data().size(), rad_panel_->Mm2_x().data().data()); Mm2_inner_a_.connect(context_, smallRODataFlags_);
+    S_inner_p_  .reset(rad_panel_->S_y()  .data().size(), rad_panel_->S_y()  .data().data()); S_inner_p_  .connect(context_, smallRODataFlags_);
+    D_inner_p_  .reset(rad_panel_->D_y()  .data().size(), rad_panel_->D_y()  .data().data()); D_inner_p_  .connect(context_, smallRODataFlags_);
+    Mm1_inner_p_.reset(rad_panel_->Mm1_y().data().size(), rad_panel_->Mm1_y().data().data()); Mm1_inner_p_.connect(context_, smallRODataFlags_);
+    Mm2_inner_p_.reset(rad_panel_->Mm2_y().data().size(), rad_panel_->Mm2_y().data().data()); Mm2_inner_p_.connect(context_, smallRODataFlags_);
     
     // create OpenCL representation of the one-electron partial integral moments + transfer data to GPU memory
     M_L_inner_a_.resize(rad_panel_->maxlambda() + 1); M_mLm1_inner_a_.resize(rad_panel_->maxlambda() + 1);
@@ -376,11 +381,11 @@ void GPUCGPreconditioner::setup ()
         M_mLm1_inner_a_[lambda].reset(rad_panel_->Mtr_mLm1_x(lambda).data().size(), const_cast<Complex*>(rad_panel_->Mtr_mLm1_x(lambda).data().data()));
         M_mLm1_inner_p_[lambda].reset(rad_panel_->Mtr_mLm1_y(lambda).data().size(), const_cast<Complex*>(rad_panel_->Mtr_mLm1_y(lambda).data().data()));
         
-        M_L_inner_a_[lambda].connect(context_, smallDataFlags_);
-        M_L_inner_p_[lambda].connect(context_, smallDataFlags_);
+        M_L_inner_a_[lambda].connect(context_, smallRODataFlags_);
+        M_L_inner_p_[lambda].connect(context_, smallRODataFlags_);
         
-        M_mLm1_inner_a_[lambda].connect(context_, smallDataFlags_);
-        M_mLm1_inner_p_[lambda].connect(context_, smallDataFlags_);
+        M_mLm1_inner_a_[lambda].connect(context_, smallRODataFlags_);
+        M_mLm1_inner_p_[lambda].connect(context_, smallRODataFlags_);
     }
     
     // create OpenCL representation of the coupled two-electron integrals + transfer data to GPU memory
@@ -393,9 +398,9 @@ void GPUCGPreconditioner::setup ()
         R_coupled_i_[lambda].reset(rad_panel_->R_coupled(lambda).i().size(), rad_panel_->R_coupled(lambda).i().data());
         R_coupled_x_[lambda].reset(rad_panel_->R_coupled(lambda).x().size(), rad_panel_->R_coupled(lambda).x().data());
         
-        R_coupled_p_[lambda].connect(context_, largeDataFlags_);
-        R_coupled_i_[lambda].connect(context_, largeDataFlags_);
-        R_coupled_x_[lambda].connect(context_, largeDataFlags_);
+        R_coupled_p_[lambda].connect(context_, largeRODataFlags_);
+        R_coupled_i_[lambda].connect(context_, largeRODataFlags_);
+        R_coupled_x_[lambda].connect(context_, largeRODataFlags_);
     }
 }
 
@@ -428,7 +433,7 @@ void GPUCGPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Co
         for (std::size_t illp = 0; illp < Nang; illp++)
         for (int lambda = 0; lambda <= ang_->maxlambda(); lambda++)
             f[(lambda * Nang + ill) * Nang + illp] = ang_->f(ill, illp, lambda);
-        f.connect(context_, smallDataFlags_);
+        f.connect(context_, smallRODataFlags_);
         
         // erase output vectors
         for (std::size_t ill = 0; ill < Nang; ill++)
@@ -450,13 +455,9 @@ void GPUCGPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Co
             // erase destination array
             dst.fill(0.);
             
-//             Timer t;
-            
             // send data to GPU
-            src.connect(context_, smallDataFlags_);
-            dst.connect(context_, smallDataFlags_);
-            
-//             std::cout << t.microseconds() << " ";
+            src.connect(context_, smallRODataFlags_);
+            dst.connect(context_, smallRWDataFlags_);
             
             // number of workitems
             std::size_t sz = (2 * order + 1) * Nyspline;
@@ -487,8 +488,6 @@ void GPUCGPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Co
             
             clFinish(queue_);
             
-//             std::cout << t.microseconds() << " ";
-            
             // multiply by two-electron (sub-)blocks
             for (cl_int lambda = 0; lambda <= rad_inner().maxlambda(); lambda++)
             {
@@ -507,8 +506,6 @@ void GPUCGPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Co
                 clEnqueueNDRangeKernel(queue_, mms2d_, 1, nullptr, &sz, nullptr, 0, nullptr, nullptr);
                 clFinish(queue_);
                 
-//                 std::cout << t.microseconds() << " ";
-                
                 // two-electron block - coupled part
                 clSetKernelArg(mms2c_,  0, sizeof(cl_mem), &f.handle());
                 clSetKernelArg(mms2c_,  1, sizeof(cl_int), &lambda);
@@ -520,15 +517,11 @@ void GPUCGPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Co
                 clSetKernelArg(mms2c_,  7, sizeof(cl_int), &isrc);
                 clEnqueueNDRangeKernel(queue_, mms2c_, 1, nullptr, &sz, nullptr, 0, nullptr, nullptr);
                 clFinish(queue_);
-                
-//                 std::cout << t.microseconds() << " ";
             }
             
             // download the data from GPU
             dst.EnqueueDownload(queue_);
             clFinish(queue_);
-            
-//             std::cout << t.microseconds() << " ";
             
             // update the product array
             for (std::size_t ill = 0; ill < Nang; ill++) if (par_->isMyGroupWork(ill))
@@ -541,8 +534,6 @@ void GPUCGPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Co
             // disconnect from GPU
             src.disconnect();
             dst.disconnect();
-            
-//             std::cout << t.microseconds() << std::endl;
         }
         
         // send data to non-master group members
@@ -607,14 +598,14 @@ void GPUCGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArra
         clArray<Real> f (ang_->maxlambda() + 1, 0.);
         for (int lambda = 0; lambda <= ang_->maxlambda(); lambda++)
             f[lambda] = ang_->f(ill, ill, lambda);
-        f.connect(context_, smallDataFlags_);
+        f.connect(context_, smallRODataFlags_);
         
         // prepare the matrix of the diagonal block
         clArray<Complex> A;
         if (cmd_->lightweight_simple or not cmd_->lightweight_full)
         {
             A.resize((order + 1) * (order + 1) * Nspline_inner_x * Nspline_inner_y);
-            A.connect(context_, largeDataFlags_);
+            A.connect(context_, largeRWDataFlags_);
             
             clSetKernelArg(A1el_,  0, sizeof(Real),   &E_);
             clSetKernelArg(A1el_,  1, sizeof(cl_mem), &S_inner_a_.handle());
@@ -657,14 +648,14 @@ void GPUCGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArra
         }
         
         // create segment views
-        clArrayView<Complex> rview (r[ill], 0, Nsegsiz);  rview.connect(context_, largeDataFlags_);
-        clArrayView<Complex> zview (z[ill], 0, Nsegsiz);  zview.connect(context_, largeDataFlags_);
+        clArrayView<Complex> rview (r[ill], 0, Nsegsiz);  rview.connect(context_, largeRODataFlags_);
+        clArrayView<Complex> zview (z[ill], 0, Nsegsiz);  zview.connect(context_, largeRWDataFlags_);
         
         // preconditioner matrices
-        clArrayView<Complex> Cl1 (Nspline_inner_x * Nspline_inner_x, Hl_[0][l1].Cl.data().data());  Cl1.connect(context_, largeDataFlags_);
-        clArrayView<Complex> Cl2 (Nspline_inner_y * Nspline_inner_y, Hl_[1][l2].Cl.data().data());  Cl2.connect(context_, largeDataFlags_);
-        clArrayView<Complex> Dl1 (Nspline_inner_x,                   Hl_[0][l1].Dl.data());         Dl1.connect(context_, smallDataFlags_);
-        clArrayView<Complex> Dl2 (Nspline_inner_y,                   Hl_[1][l2].Dl.data());         Dl2.connect(context_, smallDataFlags_);
+        clArrayView<Complex> Cl1 (Nspline_inner_x * Nspline_inner_x, Hl_[0][l1].Cl.data().data());  Cl1.connect(context_, largeRODataFlags_);
+        clArrayView<Complex> Cl2 (Nspline_inner_y * Nspline_inner_y, Hl_[1][l2].Cl.data().data());  Cl2.connect(context_, largeRODataFlags_);
+        clArrayView<Complex> Dl1 (Nspline_inner_x,                   Hl_[0][l1].Dl.data());         Dl1.connect(context_, smallRODataFlags_);
+        clArrayView<Complex> Dl2 (Nspline_inner_y,                   Hl_[1][l2].Dl.data());         Dl2.connect(context_, smallRODataFlags_);
         
         // allocation (and upload) of an OpenCL array
         auto new_opencl_array = [&](std::size_t n, std::string name) -> clArray<Complex>
@@ -673,7 +664,7 @@ void GPUCGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArra
             clArray<Complex> a(n);
             
             // connect the array to GPU
-            a.connect(context_, largeDataFlags_);
+            a.connect(context_, largeRWDataFlags_);
             
             // use this array
             return a;
