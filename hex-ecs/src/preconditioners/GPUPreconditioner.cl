@@ -442,7 +442,6 @@ kernel void mmul_1el_segment
         y[(ill * (2 * ORDER + 1) + d) * NSPLINE_PROJ + j] = 0;
         
         // for all relevant source vector elements
-        # pragma unroll
         for (private int l = j - ORDER; l <= j + ORDER; l++) if (0 <= l && l < NSPLINE_PROJ)
         {
             // compute multi-indices
@@ -690,7 +689,6 @@ kernel void mmul_2el_decoupled_segment
     
     if (0 <= i && i < NSPLINE_ATOM)
     {
-        # pragma unroll
         for (private int l = j - ORDER; l <= j + ORDER; l++) if (0 <= l && l < NSPLINE_PROJ)
         {
             // B-spline bounding knots
@@ -730,22 +728,18 @@ kernel void mmul_2el_decoupled_segment
             }
             
             // update all angular blocks
-            if (R.x != 0 || R.y != 0)
+            for (private int ill  = 0; ill  < ANGULAR_BASIS_SIZE; ill++)
             {
+                private Complex z = 0;
+                
                 # pragma unroll
-                for (private int ill  = 0; ill  < ANGULAR_BASIS_SIZE; ill++)
+                for (private int illp = 0; illp < ANGULAR_BASIS_SIZE; illp++)
                 {
-                    private Complex z = 0;
-                    
-                    # pragma unroll
-                    for (private int illp = 0; illp < ANGULAR_BASIS_SIZE; illp++)
-                    {
-                        z += f[(lambda * ANGULAR_BASIS_SIZE + ill) * ANGULAR_BASIS_SIZE + illp]
-                            * cmul(R, x[illp * NSPLINE_PROJ + l]);
-                    }
-                    
-                    y[(ill * (2 * ORDER + 1) + d) * NSPLINE_PROJ + j] += ZP * z;
+                    z += f[(lambda * ANGULAR_BASIS_SIZE + ill) * ANGULAR_BASIS_SIZE + illp]
+                        * cmul(R, x[illp * NSPLINE_PROJ + l]);
                 }
+                
+                y[(ill * (2 * ORDER + 1) + d) * NSPLINE_PROJ + j] += ZP * z;
             }
         }
     }
@@ -857,7 +851,6 @@ kernel void mmul_2el_coupled_segment
     
     if (0 <= i && i < NSPLINE_ATOM)
     {
-        # pragma unroll
         for (private int l = j - ORDER; l <= j + ORDER; l++) if (0 <= l && l < NSPLINE_PROJ)
         {
             private int ik = min(i,k) * (ORDER + 1) + abs_diff(i,k);
@@ -867,7 +860,6 @@ kernel void mmul_2el_coupled_segment
             {
                 private Complex R = Rx[idx];
                 
-                # pragma unroll
                 for (private int ill  = 0; ill  < ANGULAR_BASIS_SIZE; ill++)
                 {
                     private Complex z = 0;
