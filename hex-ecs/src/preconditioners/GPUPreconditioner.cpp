@@ -503,8 +503,13 @@ void GPUCGPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Co
                 clSetKernelArg(mms2d_,  8, sizeof(cl_mem), &src.handle());
                 clSetKernelArg(mms2d_,  9, sizeof(cl_mem), &dst.handle());
                 clSetKernelArg(mms2d_, 10, sizeof(cl_int), &isrc);
-                clEnqueueNDRangeKernel(queue_, mms2d_, 1, nullptr, &sz, nullptr, 0, nullptr, nullptr);
-                clFinish(queue_);
+                
+                for (cl_int offset = 0; offset <= 2 * order; offset++)
+                {
+                    clSetKernelArg(mms2d_, 11, sizeof(cl_int), &offset);
+                    clEnqueueNDRangeKernel(queue_, mms2d_, 1, nullptr, &sz, nullptr, 0, nullptr, nullptr);
+                    clFinish(queue_);
+                }
                 
                 // two-electron block - coupled part
                 clSetKernelArg(mms2c_,  0, sizeof(cl_mem), &f.handle());

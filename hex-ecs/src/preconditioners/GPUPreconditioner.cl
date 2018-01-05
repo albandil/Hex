@@ -675,7 +675,8 @@ kernel void mmul_2el_decoupled_segment
     global Complex const * const restrict x,
     global Complex       * const restrict y,
     // segment
-    private int k
+    private int k,
+    private int offset
 )
 {
     // diagonal (i + ORDER - k)
@@ -687,61 +688,63 @@ kernel void mmul_2el_decoupled_segment
     // j = 0, ..., NSPLINE_PROJ - 1
     private int j = get_global_id(0) / (2 * ORDER + 1);
     
-    if (0 <= i && i < NSPLINE_ATOM)
+    // l = j - ORDER, ..., j + ORDER
+    private int l = j + offset - ORDER;
+    
+    // skip invalid B-spline indices
+    if (i < 0 || NSPLINE_ATOM <= i || l < 0 || NSPLINE_PROJ <= l)
+        return;
+    
+    // B-spline bounding knots
+    private Real ti1 = unrotateX(ta[i]), ti2 = unrotateX(ta[i + ORDER + 1]);
+    private Real tj1 = unrotateY(tp[j]), tj2 = unrotateY(tp[j + ORDER + 1]);
+    private Real tk1 = unrotateX(ta[k]), tk2 = unrotateX(ta[k + ORDER + 1]);
+    private Real tl1 = unrotateY(tp[l]), tl2 = unrotateY(tp[l + ORDER + 1]);
+    
+    // skip non-overlapping B-spline pairs
+    if (max(ti1,tk1) >= min(ti2,tk2) || max(tj1,tl1) >= min(tj2,tl2))
+        return;
+    
+    // restrict effective radius
+    private Real t_xmin = myclamp(max(ti1,tk1), RXMIN, RXMAX);
+    private Real t_xmax = myclamp(min(ti2,tk2), RXMIN, RXMAX);
+    private Real t_ymin = myclamp(max(tj1,tl1), RYMIN, RYMAX);
+    private Real t_ymax = myclamp(min(tj2,tl2), RYMIN, RYMAX);
+    
+    // multi-indices
+    private int ik = min(i,k) * (ORDER + 1) + abs_diff(i,k);
+    private int jl = min(j,l) * (ORDER + 1) + abs_diff(j,l);
+    
+    // radial integral
+    private Complex R = 0;
+    
+    // decoupled y < x
+    if (t_ymax <= t_xmin)
     {
-        for (private int l = j - ORDER; l <= j + ORDER; l++) if (0 <= l && l < NSPLINE_PROJ)
+        private Real scale = pow_int(t_ymax / t_xmax, lambda) / t_xmax;
+        R = scale * cmul(MmLm1a[ik], MLp[jl]);
+    }
+    
+    // decoupled x < y
+    if (t_xmax <= t_ymin)
+    {
+        private Real scale = pow_int(t_xmax / t_ymax, lambda) / t_ymax;
+        R = scale * cmul(MLa[ik], MmLm1p[jl]);
+    }
+    
+    // update all angular blocks
+    for (private int ill  = 0; ill  < ANGULAR_BASIS_SIZE; ill++)
+    {
+        private Complex z = 0;
+        
+        # pragma unroll
+        for (private int illp = 0; illp < ANGULAR_BASIS_SIZE; illp++)
         {
-            // B-spline bounding knots
-            private Real ti1 = unrotateX(ta[i]), ti2 = unrotateX(ta[i + ORDER + 1]);
-            private Real tj1 = unrotateY(tp[j]), tj2 = unrotateY(tp[j + ORDER + 1]);
-            private Real tk1 = unrotateX(ta[k]), tk2 = unrotateX(ta[k + ORDER + 1]);
-            private Real tl1 = unrotateY(tp[l]), tl2 = unrotateY(tp[l + ORDER + 1]);
-            
-            if (max(ti1,tk1) >= min(ti2,tk2) || max(tj1,tl1) >= min(tj2,tl2))
-                continue;
-            
-            // restrict effective radius
-            private Real t_xmin = myclamp(max(ti1,tk1), RXMIN, RXMAX);
-            private Real t_xmax = myclamp(min(ti2,tk2), RXMIN, RXMAX);
-            private Real t_ymin = myclamp(max(tj1,tl1), RYMIN, RYMAX);
-            private Real t_ymax = myclamp(min(tj2,tl2), RYMIN, RYMAX);
-            
-            // multi-indices
-            private int ik = min(i,k) * (ORDER + 1) + abs_diff(i,k);
-            private int jl = min(j,l) * (ORDER + 1) + abs_diff(j,l);
-            
-            // radial integral
-            private Complex R = 0;
-            
-            // decoupled y < x
-            if (t_ymax <= t_xmin)
-            {
-                private Real scale = pow_int(t_ymax / t_xmax, lambda) / t_xmax;
-                R = scale * cmul(MmLm1a[ik], MLp[jl]);
-            }
-            
-            // decoupled x < y
-            if (t_xmax <= t_ymin)
-            {
-                private Real scale = pow_int(t_xmax / t_ymax, lambda) / t_ymax;
-                R = scale * cmul(MLa[ik], MmLm1p[jl]);
-            }
-            
-            // update all angular blocks
-            for (private int ill  = 0; ill  < ANGULAR_BASIS_SIZE; ill++)
-            {
-                private Complex z = 0;
-                
-                # pragma unroll
-                for (private int illp = 0; illp < ANGULAR_BASIS_SIZE; illp++)
-                {
-                    z += f[(lambda * ANGULAR_BASIS_SIZE + ill) * ANGULAR_BASIS_SIZE + illp]
-                        * cmul(R, x[illp * NSPLINE_PROJ + l]);
-                }
-                
-                y[(ill * (2 * ORDER + 1) + d) * NSPLINE_PROJ + j] += ZP * z;
-            }
+            z += f[(lambda * ANGULAR_BASIS_SIZE + ill) * ANGULAR_BASIS_SIZE + illp]
+                * cmul(R, x[illp * NSPLINE_PROJ + l]);
         }
+        
+        y[(ill * (2 * ORDER + 1) + d) * NSPLINE_PROJ + j] += ZP * z;
     }
 }
 
