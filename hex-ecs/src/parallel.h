@@ -299,51 +299,6 @@ class Parallel
         }
         
         /**
-         * @brief Send data to a process.
-         */
-        template <class T> void send (T const * array, std::size_t size, int origin, int destination) const
-        {
-#ifdef WITH_MPI
-            if (active_ and iproc_ == origin)
-            {
-                MPI_Send
-                (
-                    const_cast<T*>(array),
-                    typeinfo<T>::ncmpt * size,
-                    typeinfo<T>::mpicmpttype(),
-                    destination,
-                    origin,
-                    MPI_COMM_WORLD
-                );
-            }
-#endif
-        }
-        
-        /**
-         * @brief Receive data from a process.
-         */
-        template <class T> void recv (T * array, std::size_t size, int origin, int destination) const
-        {
-#ifdef WITH_MPI
-            if (active_ and iproc_ == destination)
-            {
-                MPI_Status status;
-                
-                MPI_Recv
-                (
-                    array,
-                    typeinfo<T>::ncmpt * size,
-                    typeinfo<T>::mpicmpttype(),
-                    origin,
-                    origin,
-                    MPI_COMM_WORLD,
-                    &status
-                );
-            }
-#endif
-        }
-        
-        /**
          * @brief Synchronize across processes by composition.
          * 
          * Synchronize array across processes. It is assumed that i-th chunk of the array is
@@ -426,7 +381,7 @@ class Parallel
          * Synchronize array across processes by summing.
          * 
          * @param array Pointer to data array to synchronize.
-         * @param Nchunk Number of elements in the array to sum-synchronize. If there are some
+         * @param N      Number of elements in the array to sum-synchronize. If there are some
          *               elements more, they will be left untouched (and un-broadcast).
          */
         template <class T> void syncsum (T* array, std::size_t N) const
@@ -453,7 +408,7 @@ class Parallel
          * Synchronize array across group's processes by summing.
          * 
          * @param array Pointer to data array to synchronize.
-         * @param Nchunk Number of elements in the array to sum-synchronize. If there are some
+         * @param N     Number of elements in the array to sum-synchronize. If there are some
          *               elements more, they will be left untouched (and un-broadcast).
          */
         template <class T> void syncsum_g (T* array, std::size_t N) const
