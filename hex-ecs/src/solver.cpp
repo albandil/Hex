@@ -669,8 +669,8 @@ void Solver::process_solution_ (unsigned iteration, BlockArray<Complex> const & 
             {
                 X[ill] = x[ill].slice
                 (
-                    X[ill].size() *  i      / instates_.size(),
-                    X[ill].size() * (i + 1) / instates_.size()
+                    x[ill].size() *  i      / instates_.size(),
+                    x[ill].size() * (i + 1) / instates_.size()
                 );
             }
             
