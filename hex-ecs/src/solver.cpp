@@ -6,7 +6,7 @@
 //                    / /   / /    \_\      / /  \ \                                 //
 //                                                                                   //
 //                                                                                   //
-//  Copyright (c) 2017, Jakub Benda, Charles University in Prague                    //
+//  Copyright (c) 2018, Jakub Benda, Charles University in Prague                    //
 //                                                                                   //
 // MIT License:                                                                      //
 //                                                                                   //
@@ -31,6 +31,12 @@
 
 #include <cmath>
 #include <csignal>
+
+#if __cplusplus >= 201703L
+    // "--purge" functionality depends on std::filesystem
+    // however, it is still too early for everyone to support C++17 ...
+    #include <filesystem>
+#endif
 
 // --------------------------------------------------------------------------------- //
 
@@ -66,7 +72,8 @@ Solver::Solver
 ) : cmd_(cmd), inp_(inp), par_(par), ang_(ang),
     bspline_inner_(bspline_inner),
     bspline_full_ (bspline_full),
-    prec_(nullptr)
+    prec_(nullptr),
+    autostop_(false)
 {
     // nothing to do
 }
@@ -134,11 +141,11 @@ void Solver::solve ()
     E_ = special::constant::Nan;
     int iterations_done = 0, computations_done = 0;
     
-    for (unsigned ie = 0; ie < inp_.Etot.size(); ie++)
+    for (iE_ = 0; iE_ < (int)inp_.Etot.size(); iE_++)
     {
         // print progress information
-        std::cout << "\nSolving the system for Etot[" << ie << "] = " << inp_.Etot[ie] << " ("
-                  << int(std::trunc(ie * 100. / inp_.Etot.size() + 0.5)) << " % finished, typically "
+        std::cout << "\nSolving the system for Etot[" << iE_ << "] = " << inp_.Etot[iE_] << " ("
+                  << int(std::trunc(iE_ * 100. / inp_.Etot.size() + 0.5)) << " % finished, typically "
                   << (computations_done == 0 ? 0 : iterations_done / computations_done)
                   << " CG iterations per energy)" << std::endl;
         
@@ -151,7 +158,7 @@ void Solver::solve ()
             int l2 = ang_.states()[ill].second;
             
             // get number of bound states for each particle at this energy
-            channels_[ill] = prec_->bstates(std::max(inp_.Etot[ie], inp_.channel_max_E), l1, l2);
+            channels_[ill] = prec_->bstates(std::max(inp_.Etot[iE_], inp_.channel_max_E), l1, l2);
             
             // the number of scattering channels
             std::swap(channels_[ill].first, channels_[ill].second);
@@ -188,7 +195,7 @@ void Solver::solve ()
             int mi = std::get<2>(inp_.instates[instate]);
             
             // skip energy-forbidden states
-            if (inp_.Etot[ie] <= -1./(ni*ni))
+            if (inp_.Etot[iE_] <= -1./(ni*ni))
             {
                 std::cout << "\tSkip initial state " << Hydrogen::stateName(ni,li,mi) << " (S = " << Spin
                           << ") : not allowed by total E." << std::endl;;
@@ -216,7 +223,7 @@ void Solver::solve ()
             }
             
             // check if there is some precomputed solution on the disk
-            SolutionIO reader (inp_.L, Spin, inp_.Pi, ni, li, mi, inp_.Etot[ie], ang_.states(), channels_);
+            SolutionIO reader (inp_.L, Spin, inp_.Pi, ni, li, mi, inp_.Etot[iE_], ang_.states(), channels_);
             std::size_t size = 0;
             reader.check(SolutionIO::All, size);
             
@@ -241,13 +248,13 @@ void Solver::solve ()
         // skip this energy if nothing to compute
         if (work[0].empty() and work[1].empty())
         {
-            std::cout << "\tAll solutions for Etot[" << ie << "] = " << inp_.Etot[ie] << " loaded." << std::endl;
+            std::cout << "\tAll solutions for Etot[" << iE_ << "] = " << inp_.Etot[iE_] << " loaded." << std::endl;
             continue;
         }
         
         // update the preconditioner, if this is the first energy to compute or it changed from previous iteration
-        if (not (E_ == 0.5 * inp_.Etot[ie]))
-            prec_->update(E_ = 0.5 * inp_.Etot[ie]);
+        if (not (E_ == 0.5 * inp_.Etot[iE_]))
+            prec_->update(E_ = 0.5 * inp_.Etot[iE_]);
         
         // for all initial states
         for (int Spin : inp_.Spin)
@@ -295,7 +302,7 @@ void Solver::solve ()
                     
                     // use the preconditioner setup routine
                     Timer t;
-                    prec_->rhs(chiseg, ie, instates_[i]);
+                    prec_->rhs(chiseg, iE_, instates_[i]);
                     for (unsigned ill = 0; ill < ang_.states().size(); ill++)
                     if (par_.isMyGroupWork(ill))
                     {
@@ -371,6 +378,7 @@ void Solver::solve ()
             // set up the linear system solver
             Timer t;
             progress_ = 0;
+            autostop_ = false;
             unsigned max_iter = (inp_.maxell + 1) * (std::size_t)Nspline_inner;
             std::cout << "\tStart linear solver with tolerance " << cmd_.itertol << std::endl;
             std::cout << "\t   i | time        | residual        | min  max  avg  block precond. iter." << std::endl;
@@ -539,6 +547,13 @@ Complex Solver::scalar_product_ (BlockArray<Complex> const & x, BlockArray<Compl
 
 Real Solver::compute_norm_ (BlockArray<Complex> const & r) const
 {
+    // return zero (and reset) if autostop has been triggered
+    if (autostop_)
+    {
+        autostop_ = false;
+        return 0;
+    }
+    
     // compute norm
     Real rnorm2 = 0;
     
@@ -654,11 +669,20 @@ BlockArray<Complex> Solver::new_array_ (std::size_t N, std::string name) const
 
 void Solver::process_solution_ (unsigned iteration, BlockArray<Complex> const & x) const
 {
-    std::string dir = format("iter-%d", iteration);
+    static cArray Tmats;
     
-    if (cmd_.write_intermediate_solutions or cmd_.runtime_postprocess)
+    std::string dir = format("iter-%d", iteration);
+    std::string pdir = format("iter-%d", iteration - cmd_.purge);
+    
+    if (cmd_.write_intermediate_solutions)
     {
+        // create new directory for the current wave function data
+#if __cplusplus >= 201703L
+        std::filesystem::remove_all(dir);
+        std::filesystem::create_directory(dir);
+#else
         create_directory(dir);
+#endif
         
         // for all initial states that have been solved
         for (unsigned i = 0; i < instates_.size(); i++)
@@ -688,14 +712,40 @@ void Solver::process_solution_ (unsigned iteration, BlockArray<Complex> const & 
     
     if (cmd_.runtime_postprocess)
     {
-        create_directory(dir);
+        // only does the post-processing (FIXME)
+        if (par_.IamMaster())
+        {
+            // extract amplitudes
+            Amplitudes ampl (bspline_inner_, bspline_full_, inp_, par_, cmd_, ang_.states());
+            ampl.verbose(false);
+            ampl.extract(dir);
+            ampl.writeSQL_files(dir);
+            ampl.writeICS_files(dir);
+            
+            // get extracted T-matrices
+            cArray newTmats = filter_Tmat_data_(ampl.T_matrices());
+            
+            // check convergence (compare both ways)
+            if (iteration > 1 and cmd_.autostop_tolerance > 0)
+                autostop_ = check_convergence_(Tmats, newTmats);
+            
+            // remember the extracted data
+            Tmats = newTmats;
+        }
         
-        // extract amplitudes
-        Amplitudes ampl (bspline_inner_, bspline_full_, inp_, par_, cmd_, ang_.states());
-        ampl.verbose(false);
-        ampl.extract(dir);
-        ampl.writeSQL_files(dir);
-        ampl.writeICS_files(dir);
+        // communicate the autostop status
+        par_.bcast(0, &autostop_, 1);
+        if (autostop_)
+            std::cout << "\n\tT-matrices converged within " << cmd_.autostop_tolerance << ", stopping calculation.";
+    }
+    
+    if (cmd_.write_intermediate_solutions)
+    {
+        // erase old directory
+#if __cplusplus >= 201703L
+        if (cmd_.purge > (int)iteration)
+            std::filesystem::remove_all(pdir);
+#endif
     }
 }
 
@@ -742,4 +792,75 @@ void Solver::finish ()
     prec_->finish();
     delete prec_;
     prec_ = nullptr;
+}
+
+cArray Solver::filter_Tmat_data_ (Amplitudes::TmatArray const & T) const
+{
+    cArray data;
+    
+    // only keep transitions starting with the state(s) currently being solved
+    for (Amplitudes::TmatArray::const_iterator I = T.begin(); I != T.end(); I++)
+    {
+        // check that this transition starts with the appropriate (ni,li,mi)
+        if
+        (
+            std::find_if
+            (
+                instates_.begin(),
+                instates_.end(),
+                [&] (int istate) -> bool
+                {
+                    return I->first.ni == std::get<0>(inp_.instates[istate]) and
+                           I->first.li == std::get<1>(inp_.instates[istate]) and
+                           I->first.mi == std::get<2>(inp_.instates[istate]);
+                }
+            ) != instates_.end()
+        )
+        {
+            // for each partial wave momentum
+            for (std::pair<cArray,cArray> const & T_ell : I->second)
+            {
+                // get singlet or triplet data, depending on the current spin
+                cArray const & curr = (ang_.S() == 0 ? T_ell.first : T_ell.second);
+                
+                // get the T-matrix for the current energy
+                if (iE_ < (int)curr.size())
+                    data.push_back(curr[iE_]);
+            }
+        }
+    }
+    
+    return data;
+}
+
+bool Solver::check_convergence_ (cArray const & T1, cArray const & T2) const
+{
+    // the amount of data from different iterations must be the same
+    if (T1.size() != T2.size())
+        return false;
+    
+    // compare T-matrices
+    for (std::size_t i = 0; i < T1.size(); i++)
+    {
+        // they may be totally identical (most likely both zero)
+        if (T1[i] == T2[i])
+            continue;
+        
+        // otherwise, compare squared magnitude (partial cross section)
+        double A1 = sqrabs(T1[i]);
+        double A2 = sqrabs(T2[i]);
+        double A_reldiff = 2.0_r * std::abs(A1 - A2) / (A1 + A2);
+        if (not std::isfinite(A_reldiff) or A_reldiff > cmd_.autostop_tolerance)
+            return false;
+        
+        // and then compare phase factors
+        double D1 = std::atan2(T1[i].real(), T1[i].imag());
+        double D2 = std::atan2(T2[i].real(), T2[i].imag());
+        double D_reldiff = 2.0_r * std::abs(D1 - D2) / (std::abs(D1) + std::abs(D2));
+        if (not std::isfinite(D_reldiff) or D_reldiff > cmd_.autostop_tolerance)
+            return false;
+    }
+    
+    // converged!
+    return true;
 }
