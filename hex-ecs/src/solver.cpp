@@ -743,7 +743,7 @@ void Solver::process_solution_ (unsigned iteration, BlockArray<Complex> const & 
     {
         // erase old directory
 #if __cplusplus >= 201703L
-        if (cmd_.purge > (int)iteration)
+        if (cmd_.purge < (int)iteration)
             std::filesystem::remove_all(pdir);
 #endif
     }
