@@ -6,7 +6,7 @@
 //                    / /   / /    \_\      / /  \ \                                 //
 //                                                                                   //
 //                                                                                   //
-//  Copyright (c) 2017, Jakub Benda, Charles University in Prague                    //
+//  Copyright (c) 2018, Jakub Benda, Charles University in Prague                    //
 //                                                                                   //
 // MIT License:                                                                      //
 //                                                                                   //
@@ -112,6 +112,12 @@ class Solver
         // constrain the residual
         void constrain_ (BlockArray<Complex> & r) const;
         
+        // filter data in the Amplitudes::TmatArray to contain only transition for the current initial state, spin, energy
+        cArray filter_Tmat_data_ (Amplitudes::TmatArray const & T) const;
+        
+        // compare two T-matrix arrays
+        bool check_convergence_ (cArray const & T1, cArray const & T2) const;
+        
     private:
         
         /// Command line parameters.
@@ -138,9 +144,13 @@ class Solver
         
         /// States currently being solved.
         iArray instates_;
+        
+        /// Runtime information.
         Real E_;
+        int iE_;
         mutable Real progress_;
         mutable Real bnorm_;
+        mutable int autostop_;
         
         /// Asymptotic bound channels for every angular momentum state (l₁,l₂) and r₁- or r₂-asymptotics.
         std::vector<std::pair<iArray,iArray>> bstates_;

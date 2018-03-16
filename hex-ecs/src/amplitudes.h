@@ -6,7 +6,7 @@
 //                    / /   / /    \_\      / /  \ \                                 //
 //                                                                                   //
 //                                                                                   //
-//  Copyright (c) 2017, Jakub Benda, Charles University in Prague                    //
+//  Copyright (c) 2018, Jakub Benda, Charles University in Prague                    //
 //                                                                                   //
 // MIT License:                                                                      //
 //                                                                                   //
@@ -79,6 +79,11 @@ class Amplitudes
          * B-spline basis) and computations of various coupling coefficients. In the
          * end the class will contain T-matrices and partial cross sections for
          * transitions requested in the input file.
+         * 
+         * @param directory If set, it specifies an alternative directory where the
+         *                  calculated wavefunctions are to be sought. This is used
+         *                  in the run-time postprocessing, when the solutions are
+         *                  written to a new directory on every iteration.
          */
         void extract (std::string directory = ".");
         
@@ -120,8 +125,6 @@ class Amplitudes
          */
         void verbose (bool b) { verbose_ = b; }
         
-    private:
-        
         /**
          * @brief Transition description.
          * 
@@ -159,17 +162,28 @@ class Amplitudes
         }
         Transition;
         
+        // Other types.
+        typedef std::map<Transition,std::vector<std::pair<cArray,cArray>>> XiArray;
+        typedef std::map<Transition,std::vector<std::pair<cArray,cArray>>> LambdaArray;
+        typedef std::map<Amplitudes::Transition,std::vector<std::pair<cArray,cArray>>> TmatArray;
+        typedef std::map<Transition,std::pair<rArray,rArray>> SigmaArray;
+        
+        // Member access.
+        TmatArray const & T_matrices () const { return Tmat_Slp; }
+        
+    private:
+        
         // Λ[ie] for both spins indexed by (ni,li,mi,nf,lf,mf) and l'
-        std::map<Transition,std::vector<std::pair<cArray,cArray>>> Lambda_Slp;
+        LambdaArray Lambda_Slp;
         
         // T[ie] for both spins indexed by (ni,li,mi,nf,lf,mf) and l'
-        std::map<Transition,std::vector<std::pair<cArray,cArray>>> Tmat_Slp;
+        TmatArray Tmat_Slp;
         
         // σ[ie] for both spins indexed by (ni,li,mi,nf,lf,mf)
-        std::map<Transition,std::pair<rArray,rArray>> sigma_S;
+        SigmaArray sigma_S;
         
         // Ξ[ie] (lists of Chebyshev coefficients) indexed by (ni,li,mi) and (l1,l2)
-        std::map<Transition,std::vector<std::pair<cArray,cArray>>> Xi_Sl1l2;
+        XiArray Xi_Sl1l2;
         
         /**
          * @brief Extract radial part of scattering amplitude.

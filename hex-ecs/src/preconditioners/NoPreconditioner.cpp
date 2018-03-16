@@ -138,6 +138,13 @@ void NoPreconditioner::setup ()
     for (std::pair<int,int> ll : ang_->states()) ells[0].push_back(ll.first);
     for (std::pair<int,int> ll : ang_->states()) ells[1].push_back(ll.second);
     
+    // add all final angular momenta
+    for (std::tuple<int,int,int> const & st : inp_->outstates)
+    {
+        ells[0].push_back(std::get<1>(st));
+        ells[1].push_back(std::get<1>(st));
+    }
+    
     // sort electrons' angular momenta in ascending order
     std::sort(ells[0].begin(), ells[0].end());
     std::sort(ells[1].begin(), ells[1].end());

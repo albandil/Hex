@@ -6,7 +6,7 @@
 //                    / /   / /    \_\      / /  \ \                                 //
 //                                                                                   //
 //                                                                                   //
-//  Copyright (c) 2016, Jakub Benda, Charles University in Prague                    //
+//  Copyright (c) 2018, Jakub Benda, Charles University in Prague                    //
 //                                                                                   //
 // MIT License:                                                                      //
 //                                                                                   //
@@ -911,7 +911,7 @@ template <class T, class Alloc_> class NumberArray : public Array<T, Alloc_>
         /// Fill array with zeros.
         void clear ()
         {
-            std::memset(ArrayView<T>::array_, 0, size() * sizeof(T));
+            this->fill(0);
         }
         
         /// Reset array: deallocate everything, resize to zero.
@@ -1286,7 +1286,6 @@ template <class T, class Alloc_> class NumberArray : public Array<T, Alloc_>
             
             // resize and clean internal storage
             NumberArray<DataType> unpack(final_size);
-            std::memset(&(unpack[0]), 0, final_size * sizeof(T));
             
             // copy nonzero chunks
             int this_end = 0;   // index of last updated element in "this"
