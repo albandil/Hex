@@ -103,6 +103,11 @@ int main (int argc, char* argv[])
         std::cout << logo(" ") << std::endl;
         std::cout << "=== Exterior complex scaling in B-splines ===" << std::endl << std::endl;
         
+        // display hostname (useful for later interpretation of output)
+        char hname[256] = "(unknown)";
+        gethostname(hname, sizeof hname);
+        std::cout << "Running on \"" << hname << "\", " << current_time() << std::endl << std::endl;
+        
         // echo command line
         std::cout << "Command line used" << std::endl;
         std::cout << "\t";
