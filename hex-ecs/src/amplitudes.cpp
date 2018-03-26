@@ -6,7 +6,7 @@
 //                    / /   / /    \_\      / /  \ \                                 //
 //                                                                                   //
 //                                                                                   //
-//  Copyright (c) 2017, Jakub Benda, Charles University in Prague                    //
+//  Copyright (c) 2018, Jakub Benda, Charles University in Prague                    //
 //                                                                                   //
 // MIT License:                                                                      //
 //                                                                                   //
@@ -138,6 +138,25 @@ void Amplitudes::extract (std::string directory)
                 int li = std::get<1>(instate);
                 int mi = std::get<2>(instate);
                 
+                // is this solution allowed at all for the given angular basis?
+                bool allowed = false;
+                
+                // -> find a valid combination of atomic and projectile angular momentum
+                for (int l = std::abs(li - inp_.L); l <= li + inp_.L; l++)
+                {
+                    // does this combination conserve parity?
+                    if ((inp_.L + li + l) % 2 != inp_.Pi)
+                        continue;
+                    
+                    // does this combination have valid 'mi' for this partial wave?
+                    if (special::ClebschGordan(li,mi,l,0,inp_.L,mi) != 0)
+                        allowed = true;
+                }
+                
+                // skip forbidden wave functions
+                if (not allowed)
+                    continue;
+                
                 // check existence of the solution; take into account distributed calculations
                 reader_ = SolutionIO (inp_.L, Spin, inp_.Pi, ni, li, mi, inp_.Etot[ie], ang_, std::vector<std::pair<int,int>>(), directory + "/psi");
                 BlockArray<Complex> solution (ang_.size(), true, "sol");
@@ -151,9 +170,6 @@ void Amplitudes::extract (std::string directory)
                 
                 if (valid_blocks != ang_.size())
                 {
-                    // complain only if the solution is allowed
-                    // TODO
-                    
                     if (verbose_)
                         std::cout << "\t\t\tSolution files for L = " << inp_.L << ", Pi = " << inp_.Pi << ", (ni,li,mi) = (" << ni << "," << li << "," << mi << ") not found." << std::endl;
                     
@@ -165,19 +181,6 @@ void Amplitudes::extract (std::string directory)
                 {
                     int nf = std::get<0>(outstate);
                     int lf = std::get<1>(outstate);
-                    
-                    // check if the right hand side will be zero for this instate
-                    bool allowed = false;
-                    for (int l = std::abs(li - inp_.L); l <= li + inp_.L; l++)
-                    {
-                        // does this combination conserve parity?
-                        if ((inp_.L + li + l) % 2 != inp_.Pi)
-                            continue;
-                        
-                        // does this combination have valid 'mi' for this partial wave?
-                        if (special::ClebschGordan(li,mi,l,0,inp_.L,mi) != 0)
-                            allowed = true;
-                    }
                     
                     // skip angular forbidden states
                     if (not allowed)
