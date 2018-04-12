@@ -518,7 +518,9 @@ public:
     /// Remove null entries to allow for easy addition of other elements.
     void squeeze ()
     {
-        for (IdxT idx = 0, pos = 0; idx < (IdxT)i_.size(); idx++)
+        IdxT idx, pos;
+        
+        for (idx = 0, pos = 0; idx < (IdxT)i_.size(); idx++)
         {
             i_[pos] = i_[idx];
             j_[pos] = j_[idx];
