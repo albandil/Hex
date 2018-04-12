@@ -5,7 +5,7 @@
 
 # ---------------------------------------------------------------------------- #
 # Compiler and linker + flags                                                  #
-#  - Hex-ecs requires compiler with C++11 support (GCC >= 4.8, ICC >= 2015)    #
+#  - Hex-ecs requires compiler with C++14 support (GCC >= 5.1, ICC >= 2017)    #
 # ---------------------------------------------------------------------------- #
 
 # C++ compiler (g++, clang, ...)
