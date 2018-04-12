@@ -132,12 +132,12 @@ public:
      * @param d Band halfwidth (full width is 2 * d + 1).
      * @param f Object compatible with signature:
      * @code
-     *  Complex (*) (long, long)
+     *  DataT (*) (IdxT, IdxT)
      * @endcode
      */
     template <class Functor> CooMatrix& symm_populate_band (IdxT d, Functor f)
     {
-        Complex val;
+        DataT val;
         
         for (IdxT row = 0; row < m_; row++)
         {
@@ -172,12 +172,12 @@ public:
      * Sets all values. The matrix can become easily dense!
      * @param f Object compatible with signature:
      * @code
-     *  Complex (*) (long, long)
+     *  DataT (*) (IdxT, IdxT)
      * @endcode
      */
     template <class Functor> CooMatrix& populate (Functor f)
     {
-        Complex val;
+        DataT val;
         
         for (IdxT row = 0; row < m_; row++)
         {
@@ -513,6 +513,24 @@ public:
     {
         // ugly and memory inefficient method... FIXME
         return tocsr().tocoo();
+    }
+    
+    /// Remove null entries to allow for easy addition of other elements.
+    void squeeze ()
+    {
+        for (IdxT idx = 0, pos = 0; idx < (IdxT)i_.size(); idx++)
+        {
+            i_[pos] = i_[idx];
+            j_[pos] = j_[idx];
+            x_[pos] = x_[idx];
+            
+            if (x_[pos] != DataT(0))
+                pos++;
+        }
+        
+        i_.resize(pos);
+        j_.resize(pos);
+        x_.resize(pos);
     }
     
     /**
