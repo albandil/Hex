@@ -6,7 +6,7 @@
 //                    / /   / /    \_\      / /  \ \                                 //
 //                                                                                   //
 //                                                                                   //
-//  Copyright (c) 2017, Jakub Benda, Charles University in Prague                    //
+//  Copyright (c) 2018, Jakub Benda, Charles University in Prague                    //
 //                                                                                   //
 // MIT License:                                                                      //
 //                                                                                   //
@@ -112,6 +112,9 @@ class ILUCGPreconditioner : public virtual CGPreconditioner
         
         // prepare data structures for LU factorizations
         void reset_lu ();
+        
+        // compose name of the LU disk file
+        std::string lu_filename (int iblock) const;
         
 #ifdef _OPENMP
         // factorization lock

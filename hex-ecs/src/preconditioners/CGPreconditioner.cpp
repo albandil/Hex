@@ -6,7 +6,7 @@
 //                    / /   / /    \_\      / /  \ \                                 //
 //                                                                                   //
 //                                                                                   //
-//  Copyright (c) 2016, Jakub Benda, Charles University in Prague                    //
+//  Copyright (c) 2018, Jakub Benda, Charles University in Prague                    //
 //                                                                                   //
 // MIT License:                                                                      //
 //                                                                                   //
@@ -37,6 +37,7 @@
 #include "hex-arrays.h"
 #include "hex-itersolve.h"
 #include "hex-misc.h"
+#include "hex-vtkfile.h"
 
 // --------------------------------------------------------------------------------- //
 
@@ -50,8 +51,122 @@ std::string CGPreconditioner::description () const
     return "Block inversion using plain conjugate gradients. Use --tolerance option to set the termination tolerance.";
 }
 
+void CGPreconditioner::update (Real E)
+{
+    // update parent
+    NoPreconditioner::update(E);
+    
+    // in arrowhead mode calculate LU decompositions of the diagonal B blocks
+    if (cmd_->arrowhead)
+    {
+        luB1_.resize(ang_->states().size());
+        luB2_.resize(ang_->states().size());
+        
+        // for all angular states
+        for (unsigned ill = 0; ill < ang_->states().size(); ill++)
+        {
+            // get number of asymptotic channels
+            int Nchan1 = Nchan_[ill].first;
+            int Nchan2 = Nchan_[ill].second;
+            
+            // reserve space for LU decompositions
+            luB1_[ill].resize(Nchan1);
+            luB2_[ill].resize(Nchan2);
+            
+            // for all asymptotic channels of the first electron
+            for (int ichan1 = 0; ichan1 < Nchan1; ichan1++)
+            {
+                luB1_[ill][ichan1].reset(LUft::Choose("lapack"));
+                luB1_[ill][ichan1]->factorize(B1_blocks_[ill][ichan1 * Nchan1 + ichan1].tocoo<LU_int_t>().tocsr());
+            }
+            
+            // for all asymptotic channels of the second electron
+            for (int ichan2 = 0; ichan2 < Nchan2; ichan2++)
+            {
+                luB2_[ill][ichan2].reset(LUft::Choose("lapack"));
+                luB2_[ill][ichan2]->factorize(B2_blocks_[ill][ichan2 * Nchan2 + ichan2].tocoo<LU_int_t>().tocsr());
+            }
+        }
+    }
+}
+
+int CGPreconditioner::solve_channels (int ill, const cArrayView r, cArrayView z) const
+{
+    std::cout << std::endl << "   CGPreconditioner::solve_channels" << std::endl;
+    std::cout << "    - |r| = " << r.norm() << std::endl;
+    std::cout << "    - |z| = " << z.norm() << std::endl;
+    
+    int Nchan1 = Nchan_[ill].first;
+    int Nchan2 = Nchan_[ill].second;
+    
+    std::cout << "    - Nchan1 = " << Nchan1 << std::endl;
+    std::cout << "    - Nchan2 = " << Nchan2 << std::endl;
+    
+    std::size_t Nspline_full_x  = rad_panel_->bspline_x().Nspline();
+    std::size_t Nspline_inner_x = rad_panel_->bspline_x().hash() == rad_full_->bspline().hash() ? rad_inner_->bspline().Nspline() : rad_panel_->bspline_x().Nspline();
+    std::size_t Nspline_outer_x = Nspline_full_x - Nspline_inner_x;
+    
+    std::size_t Nspline_full_y  = rad_panel_->bspline_y().Nspline();
+    std::size_t Nspline_inner_y = rad_panel_->bspline_y().hash() == rad_full_->bspline().hash() ? rad_inner_->bspline().Nspline() : rad_panel_->bspline_y().Nspline();
+    std::size_t Nspline_outer_y = Nspline_full_y - Nspline_inner_y;
+    
+    // solve using the CG solver
+    ConjugateGradients < Complex, cArray, cArrayView > CG;
+    CG.reset();
+    CG.verbose              = true; // <- temporary
+    CG.scalar_product       = [ ](const cArrayView a, const cArrayView b) { return ( a | b ); };
+    CG.compute_norm         = [ ](const cArrayView a) { return a.norm(); };
+    CG.axby                 = [ ](Complex a, cArrayView x, Complex b, const cArrayView y) { x = a * x + b * y; };
+    CG.new_array            = [ ](std::size_t n, std::string name) { return cArray(n); };
+    CG.apply_preconditioner = [&](const cArrayView a, cArrayView b)
+    {
+        for (int ichan1 = 0; ichan1 < Nchan1; ichan1++)
+        {
+            cArrayView src (a, ichan1 * Nspline_outer_x, Nspline_outer_x);
+            cArrayView dst (b, ichan1 * Nspline_outer_x, Nspline_outer_x);
+            luB1_[ill][ichan1]->solve(src, dst, 1);
+        }
+        for (int ichan2 = 0; ichan2 < Nchan2; ichan2++)
+        {
+            cArrayView src (a, Nchan1 * Nspline_outer_x + ichan2 * Nspline_outer_y, Nspline_outer_y);
+            cArrayView dst (b, Nchan1 * Nspline_outer_x + ichan2 * Nspline_outer_y, Nspline_outer_y);
+            luB2_[ill][ichan2]->solve(src, dst, 1);
+        }
+        
+        std::cout << "      prec " << a.norm() << " " << b.norm() << std::endl;
+    };
+    CG.matrix_multiply      = [&](const cArrayView a, cArrayView b)
+    {
+        for (int ichan1 = 0; ichan1 < Nchan1; ichan1 ++)
+        for (int ichan1p= 0; ichan1p< Nchan1; ichan1p++)
+        {
+            cArrayView src (a, ichan1p * Nspline_outer_x, Nspline_outer_x);
+            cArrayView dst (b, ichan1  * Nspline_outer_x, Nspline_outer_x);
+            B1_blocks_[ill][ichan1 * Nchan1 + ichan1p].dot(1., src, 1., dst);
+        }
+        for (int ichan2 = 0; ichan2 < Nchan2; ichan2 ++)
+        for (int ichan2p= 0; ichan2p< Nchan2; ichan2p++)
+        {
+            cArrayView src (a, Nchan1 * Nspline_outer_x + ichan2p * Nspline_outer_y, Nspline_outer_y);
+            cArrayView dst (b, Nchan1 * Nspline_outer_x + ichan2  * Nspline_outer_y, Nspline_outer_y);
+            B1_blocks_[ill][ichan2 * Nchan2 + ichan2p].dot(1., src, 1., dst);
+        }
+        
+        std::cout << "      mmul " << a.norm() << " " << b.norm() << std::endl;
+    };
+    
+    int n = CG.solve(r, z, cmd_->prec_itertol, 0, 100);
+    
+    std::cout << "    - |z| = " << z.norm() << std::endl;
+    std::cout << "    - n = " << n << std::endl;
+    
+    return n;
+}
+
 int CGPreconditioner::solve_block (int ill, const cArrayView r, cArrayView z) const
 {
+    std::cout << std::endl << "CGPreconditioner::solve_block" << std::endl;
+    
     // shorthands
     int Nspline_inner_x = rad_panel_->bspline_x().hash() == rad_full_->bspline().hash() ? rad_inner_->bspline().Nspline() : rad_panel_->bspline_x().Nspline();
     int Nspline_inner_y = rad_panel_->bspline_y().hash() == rad_full_->bspline().hash() ? rad_inner_->bspline().Nspline() : rad_panel_->bspline_y().Nspline();
@@ -72,6 +187,51 @@ int CGPreconditioner::solve_block (int ill, const cArrayView r, cArrayView z) co
     {
         if (cmd_->ilu_max_iter > 0)
             max_iterations = cmd_->ilu_max_iter;
+    }
+    
+    // views to the source and solution; FIXME : combination arrowhead + multiple RHSs not implemented
+    cArrayView rview (r);
+    cArrayView zview (z);
+    
+    // views of the inner region part of sources and solution
+    cArrayView inner_sources   (r, 0, Nspline_inner_x * Nspline_inner_y);
+    cArrayView inner_solutions (z, 0, Nspline_inner_x * Nspline_inner_y);
+    
+    // views of the outer region part of sources and solution
+    cArrayView channel_sources   (r, Nspline_inner_x * Nspline_inner_y, r.size() - Nspline_inner_x * Nspline_inner_y);
+    cArrayView channel_solutions (z, Nspline_inner_x * Nspline_inner_y, r.size() - Nspline_inner_x * Nspline_inner_y);
+    
+    // auxiliary arrays used by arrowhead decomposition
+    cArray modified_inner_sources, modified_channel_sources;
+    
+    std::cout << " - #r = " << r.size() << std::endl;
+    std::cout << " - |r| = " << r.norm() << std::endl;
+    std::cout << " - #inner_sources = " << inner_sources.size() << std::endl;
+    std::cout << " - |inner_sources| = " << inner_sources.norm() << std::endl;
+    std::cout << " - #channel_sources = " << channel_sources.size() << std::endl;
+    std::cout << " - |channel_sources| = " << channel_sources.norm() << std::endl;
+    
+    // modify vectors for arrowhead decomposition
+    if (cmd_->arrowhead)
+    {
+        // In the case of arrowhead decomposition we solve only for the inner wave function
+        // iteratively. The outer (channel) wave functions are solved once and for all before
+        // (to correct the source) and after.
+        
+        
+        // solve detached outer problem
+        solve_channels(ill, channel_sources, channel_solutions);
+        std::cout << " - |channel_solutions| = " << channel_solutions.norm() << std::endl;
+        
+        // correct right-hand side of the inner problem
+        modified_inner_sources = r;
+        Cu_blocks_[ill].dot(-1., z, 1., modified_inner_sources);
+        
+        std::cout << " - |modified_inner_sources| = " << modified_inner_sources.norm() << std::endl;
+        
+        // redirect views to inner data only (which is what preconditioners expect in arrowhead mode)
+        rview.reset(Nspline_inner_x * Nspline_inner_y, modified_inner_sources.data());
+        zview.reset(Nspline_inner_x * Nspline_inner_y, z.data());
     }
     
     // solve using the CG solver
@@ -123,7 +283,7 @@ int CGPreconditioner::solve_block (int ill, const cArrayView r, cArrayView z) co
                               {
                                   this->CG_constrain(r);
                               };
-    int n = CG.solve(r, z, cmd_->prec_itertol, 0, max_iterations);
+    int n = CG.solve(rview, zview, cmd_->prec_itertol, 0, max_iterations);
     
     if (n >= max_iterations)
     {
@@ -132,6 +292,24 @@ int CGPreconditioner::solve_block (int ill, const cArrayView r, cArrayView z) co
         else
             std::cout << "\tWarning: Maximal number of iterations (" << max_iterations << ") reached in the sub-preconditioner." << std::endl;
     }
+    
+    std::cout << " - |inner_solutions| = " << zview.norm() << std::endl;
+    
+    // finalize arrowhead solution
+    if (cmd_->arrowhead)
+    {
+        
+        // correct right-hand sides of the outer problems using the inner solution
+        cArray modified_channel_sources = channel_sources;
+        Cl_blocks_[ill].dot(-1., zview, 1., modified_channel_sources);
+        
+        // solve channels
+        solve_channels(ill, modified_channel_sources, channel_solutions);
+        
+        std::cout << " - final |channel_solutions| = " << channel_solutions.norm() << std::endl;
+    }
+    
+    std::cout << " - final |z| = " << z.norm() << std::endl;
     
     // release block-preconditioner block-specific data
     this->CG_exit(ill);
@@ -264,10 +442,15 @@ void CGPreconditioner::CG_mmul (int iblock, const cArrayView p, cArrayView q) co
     std::size_t Nang = ang_->states().size();
     std::size_t iang = iblock * Nang + iblock;
     
+    // FIXME : multi-rhs in arrowhead mode
+    if (cmd_->arrowhead)
+        Nini = 1;
+    
+    q.fill(0.0_z);
+    
     for (std::size_t ini = 0; ini < Nini; ini++)
     {
         std::size_t offset = block_rank_[iblock] * ini;
-        cArrayView(q, offset, block_rank_[iblock]).fill(0.0_z);
         
         // inner-region subset of the vectors
         cArrayView p_inner (p, offset, Nspline_inner_x * Nspline_inner_y);
@@ -321,7 +504,7 @@ void CGPreconditioner::CG_mmul (int iblock, const cArrayView p, cArrayView q) co
             if (not cmd_->lightweight_simple and cmd_->outofcore and cmd_->wholematrix) const_cast<BlockSymBandMatrix<Complex> &>(A_blocks_[iang]).drop();
         }
         
-        if (not inp_->inner_only)
+        if (not inp_->inner_only and not cmd_->arrowhead)
         {
             std::size_t Nchan1 = Nchan_[iblock].first;
             std::size_t Nchan2 = Nchan_[iblock].second;
@@ -346,14 +529,63 @@ void CGPreconditioner::CG_mmul (int iblock, const cArrayView p, cArrayView q) co
                 if (cmd_->outofcore) const_cast<SymBandMatrix<Complex>&>(B2_blocks_[iang][m * Nchan2 + n]).hdfload();
                 B2_blocks_[iang][m * Nchan2 + n].dot
                 (
-                    1.0_r, cArrayView(p, offset + Nspline_inner_x * Nspline_inner_y + (Nchan1 + n) * Nspline_outer_y, Nspline_outer_y),
-                    1.0_r, cArrayView(q, offset + Nspline_inner_x * Nspline_inner_y + (Nchan1 + m) * Nspline_outer_y, Nspline_outer_y)
+                    1.0_r, cArrayView(p, offset + Nspline_inner_x * Nspline_inner_y + Nchan1 * Nspline_outer_x + n * Nspline_outer_y, Nspline_outer_y),
+                    1.0_r, cArrayView(q, offset + Nspline_inner_x * Nspline_inner_y + Nchan1 * Nspline_outer_x + m * Nspline_outer_y, Nspline_outer_y)
                 );
                 if (cmd_->outofcore) const_cast<SymBandMatrix<Complex>&>(B2_blocks_[iang][m * Nchan2 + n]).drop();
             }
             
             Cu_blocks_[iang].dot(1.0_r, cArrayView(p, offset, block_rank_[iblock]), 1.0_r, cArrayView(q, offset, block_rank_[iblock]));
             Cl_blocks_[iang].dot(1.0_r, cArrayView(p, offset, block_rank_[iblock]), 1.0_r, cArrayView(q, offset, block_rank_[iblock]));
+        }
+        
+        std::cout << "(mmul) |p| = " << p_inner.norm() << std::endl;
+        std::cout << "(mmul) |q| = " << q_inner.norm() << std::endl;
+        
+        if (cmd_->arrowhead) // FIXME : multi-rhs in arrohead mode
+        {
+            cArray tmp1 (block_rank_[iblock]);
+            cArray tmp2 (block_rank_[iblock]);
+            
+            cArrayView tmp1_inner (tmp1, 0, Nspline_inner_x * Nspline_inner_y);
+            cArrayView tmp2_inner (tmp2, 0, Nspline_inner_x * Nspline_inner_y);
+            
+            cArrayView tmp1_outer (tmp1, Nspline_inner_x * Nspline_inner_y, tmp1.size() - Nspline_inner_x * Nspline_inner_y);
+            cArrayView tmp2_outer (tmp2, Nspline_inner_x * Nspline_inner_y, tmp2.size() - Nspline_inner_x * Nspline_inner_y);
+            
+            std::cout << "(mmul) |Cl| = " << Cl_blocks_[iblock].v().norm() << std::endl;
+            std::cout << "(mmul) |Cu| = " << Cu_blocks_[iblock].v().norm() << std::endl;
+            
+            if (p.norm() != 0)
+            {
+                VTKRectGridFile vtk;
+                
+                rArray grid = linspace(0., rad_inner().bspline().R2(), 500);
+                cArray eval = rad_inner().bspline().zip(p, grid, grid);
+                
+                vtk.setGridX(grid);
+                vtk.setGridY(grid);
+                vtk.setGridZ({ 0. });
+                
+                vtk.appendScalarAttribute("RePsi", realpart(eval));
+                vtk.appendScalarAttribute("ImPsi", imagpart(eval));
+                
+                vtk.writePoints("p.vtk");
+                
+                std::exit(0);
+            }
+            
+            tmp1_inner = p;
+            Cl_blocks_[iblock].dot(1., tmp1, 0., tmp2);
+            std::cout << "(mmul) | Cl p | = " << tmp2.norm() << std::endl;
+            
+            solve_channels(iblock, tmp2_outer, tmp1_outer);
+            std::cout << "(mmul) | B-1 Cl p | = " << tmp1_outer.norm() << std::endl;
+            
+            Cu_blocks_[iblock].dot(-1., tmp1, 1., tmp2);
+            q = tmp2_inner;
+            
+            std::cout << "(mmul) -> |q| = " << q.norm() << std::endl;
         }
     }
 }
@@ -375,6 +607,8 @@ void CGPreconditioner::CG_exit (int iblock) const
 void CGPreconditioner::finish ()
 {
     n_.fill(-1);
+    luB1_.clear();
+    luB2_.clear();
     NoPreconditioner::finish();
 }
 

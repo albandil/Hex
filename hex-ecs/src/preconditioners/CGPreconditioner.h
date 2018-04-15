@@ -6,7 +6,7 @@
 //                    / /   / /    \_\      / /  \ \                                 //
 //                                                                                   //
 //                                                                                   //
-//  Copyright (c) 2016, Jakub Benda, Charles University in Prague                    //
+//  Copyright (c) 2018, Jakub Benda, Charles University in Prague                    //
 //                                                                                   //
 // MIT License:                                                                      //
 //                                                                                   //
@@ -84,16 +84,17 @@ class CGPreconditioner : public NoPreconditioner
         
         // reuse parent definitions
         using NoPreconditioner::setup;
-        using NoPreconditioner::update;
         using NoPreconditioner::rhs;
         using NoPreconditioner::multiply;
         
         // declare own definitions
+        virtual void update (Real E);
         virtual void precondition (BlockArray<Complex> const & r, BlockArray<Complex> & z) const;
         virtual void finish ();
         
         // solve diagonal block
         virtual int solve_block (int ill, const cArrayView r, cArrayView z) const;
+        virtual int solve_channels (int ill, const cArrayView r, cArrayView z) const;
         
         // inner CG driver
         virtual void CG_init (int iblock) const;
@@ -114,6 +115,9 @@ class CGPreconditioner : public NoPreconditioner
         
         // timing
         mutable std::size_t us_axby_, us_mmul_, us_norm_, us_prec_, us_spro_;
+        
+        // LU decompositions of diagonal B-blocks
+        std::vector<std::vector<std::shared_ptr<LUft>>> luB1_, luB2_;
 };
 
 // --------------------------------------------------------------------------------- //

@@ -6,7 +6,7 @@
 //                    / /   / /    \_\      / /  \ \                                 //
 //                                                                                   //
 //                                                                                   //
-//  Copyright (c) 2017, Jakub Benda, Charles University in Prague                    //
+//  Copyright (c) 2018, Jakub Benda, Charles University in Prague                    //
 //                                                                                   //
 // MIT License:                                                                      //
 //                                                                                   //
@@ -101,7 +101,7 @@ void ILUCGPreconditioner::reset_lu ()
             std::cout << "\tUsing factorizer \"" << lu_[iblock]->name() << "\" (use --lu <factorizer> to change this)" << std::endl;
         
         // associate existing disk files
-        lu_[iblock]->link(format("lu-E%+g-%d-%4x-%4x.bin", E_, iblock, rad_panel().bspline_x().hash(), rad_panel().bspline_y().hash()));
+        lu_[iblock]->link(lu_filename(iblock));
     }
     
 #ifdef WITH_SUPERLU_DIST
@@ -120,6 +120,16 @@ void ILUCGPreconditioner::reset_lu ()
         superlu_gridinit((MPI_Comm)par_->groupcomm(), nprow, npcol, &grid_);
     }
 #endif // WITH_SUPERLU_DIST
+}
+
+std::string ILUCGPreconditioner::lu_filename (int iblock) const
+{
+    return format
+    (
+        "lu-E%+g-%d-%4x-%4x%s.bin",
+        E_, iblock, rad_panel().bspline_x().hash(), rad_panel().bspline_y().hash(),
+        cmd_->arrowhead ? "-a" : ""
+    );
 }
 
 void ILUCGPreconditioner::setup ()
@@ -168,8 +178,13 @@ void ILUCGPreconditioner::CG_init (int iblock) const
         // start timer
         Timer timer;
         
-        // create the CSR block that will be factorized
-        CsrMatrix<LU_int_t,Complex> csr = calc_full_block(iblock, iblock).tocsr();
+        // recast to CSR to be factorized
+        CsrMatrix<LU_int_t,Complex> csr = std::move
+        (
+            cmd_->arrowhead ?
+                calc_A_block(iblock, iblock).tocoo<LU_int_t>().tocsr() :
+                calc_full_block(iblock, iblock).tocsr()
+        );
         
         // set up factorization data
         lu_[iblock]->rdata("drop_tolerance") = cmd_->droptol;
@@ -211,7 +226,7 @@ void ILUCGPreconditioner::CG_init (int iblock) const
                 std::cout << std::endl << std::setw(37) << format
                 (
                     "\tLU #%d (%d,%d) in %d:%02d (%s, cond %1.0e)",
-                    iblock, ang_->states()[iblock].first, ang_->states()[iblock].second,      // block identification (id, ℓ₁, ℓ₂)
+                    iblock, ang_->states()[iblock].first, ang_->states()[iblock].second,    // block identification (id, ℓ₁, ℓ₂)
                     timer.seconds() / 60, timer.seconds() % 60,                             // factorization time
                     nice_size(lu_[iblock]->size()).c_str(),                                 // final memory size
                     lu_[iblock]->cond()                                                     // estimation of the condition number
@@ -222,7 +237,7 @@ void ILUCGPreconditioner::CG_init (int iblock) const
                 std::cout << std::endl << std::setw(37) << format
                 (
                     "\tLU #%d (%d,%d) in %d:%02d (%s)",
-                    iblock, ang_->states()[iblock].first, ang_->states()[iblock].second,      // block identification (id, ℓ₁, ℓ₂)
+                    iblock, ang_->states()[iblock].first, ang_->states()[iblock].second,    // block identification (id, ℓ₁, ℓ₂)
                     timer.seconds() / 60, timer.seconds() % 60,                             // factorization time
                     nice_size(lu_[iblock]->size()).c_str()                                  // final memory size
                 );
@@ -230,7 +245,7 @@ void ILUCGPreconditioner::CG_init (int iblock) const
         }
         
         // save the diagonal block's factorization
-        lu_[iblock]->link(format("lu-E%+g-%d-%4x-%4x.bin", E_, iblock, rad_panel().bspline_x().hash(), rad_panel().bspline_y().hash()));
+        lu_[iblock]->link(lu_filename(iblock));
         lu_[iblock]->save();
         
 #ifdef _OPENMP
@@ -250,6 +265,10 @@ void ILUCGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z)
     
     // number of right-hand sides
     std::size_t Nini = r.size() / block_rank_[iblock];
+    
+    // FIXME : multi-rhs in arrowhead mode
+    if (cmd_->arrowhead)
+        Nini = 1;
     
     // precondition by LU
     lu_[iblock]->solve(r, z, Nini);

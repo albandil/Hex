@@ -255,6 +255,7 @@ void CommandLine::parse (int argc, char* argv[])
                     "\t--no-lu-update                   Do not recalculate LU factorization for different energies, use the first factorization for all of them.\n"
                     "\t--ilu-max-iter <number>          Maximal number of iterations of the nested ILU preconditioner. When the number is exceeded, exception is thrown.\n"
                     "\t--scratch <path>                 Scratch directory for out-of-core factorizers (currently only MUMPS). Also read from the $SCRATCHDIR env variable.\n"
+                    "\t--arrowhead                      Use arrowhead decomposition (only meaningful with channel reduction).\n"
                     "\n"
                     "KPA preconditioner\n"
                     "\t--kpa-simple-rad           (-R)  Use simplified radial integral matrix for nested KPA iterations (experimental).\n"
@@ -468,6 +469,12 @@ void CommandLine::parse (int argc, char* argv[])
                 write_intermediate_solutions = true;
                 runtime_postprocess = true;
                 autostop_tolerance = std::stod(optargs[0]);
+                return true;
+            },
+        "arrowhead", "", 0, [&](std::vector<std::string> const & optargs) -> bool
+            {
+                // use arrowhead decomposition
+                arrowhead = true;
                 return true;
             },
         "list-preconditioners", "P", 0, [&](std::vector<std::string> const & optargs) -> bool
