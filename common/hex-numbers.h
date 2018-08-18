@@ -312,7 +312,7 @@ template<> class typeinfo<long double>
 };
 
 /// Data-type info class specialization for 'std::complex'.
-template<> template<class T> class typeinfo<std::complex<T>>
+template<class T> class typeinfo<std::complex<T>>
 {
     public:
         /// Component data type.
