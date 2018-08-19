@@ -1366,7 +1366,7 @@ void zip_solution
         }
         
         // write to file
-        std::ofstream out (format("%s-channel-X-%d.vtk", cmd.zipdata.file.c_str(), n).c_str());
+        std::ofstream out (format("%s-channel1-%d.vtk", cmd.zipdata.file.c_str(), n).c_str());
         writeVTK_points
         (
             out,
@@ -1392,7 +1392,7 @@ void zip_solution
         }
         
         // write to file
-        std::ofstream out (format("%s-channel-%d-X.vtk", cmd.zipdata.file.c_str(), n).c_str());
+        std::ofstream out (format("%s-channel2-%d.vtk", cmd.zipdata.file.c_str(), n).c_str());
         writeVTK_points
         (
             out,
