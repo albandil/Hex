@@ -6,7 +6,7 @@
 //                    / /   / /    \_\      / /  \ \                                 //
 //                                                                                   //
 //                                                                                   //
-//  Copyright (c) 2016, Jakub Benda, Charles University in Prague                    //
+//  Copyright (c) 2019, Jakub Benda, Charles University in Prague                    //
 //                                                                                   //
 // MIT License:                                                                      //
 //                                                                                   //
@@ -36,6 +36,7 @@
 #include "hex-cmdline.h"
 #include "hex-special.h"
 #include "hex-version.h"
+#include "hex-vtkfile.h"
 
 #include "amplitudes.h"
 #include "ang.h"
