@@ -141,16 +141,16 @@ void hex_scattering_amplitude_dir_
     // set up and clean the output storage
     cArrayView resarr(*N,reinterpret_cast<Complex*>(result));
     resarr.fill(0.);
-    
+
     // create the scattering amplitudes (for one term of the sum)
     cArray amplitudes(*N, 0.);
-    
+
     // sum over all initial and final magnetic quantum numbers
     for (int mi_ = -(*li); mi_ <= (*li); mi_++)
     for (int mf_ = -(*lf); mf_ <= (*lf); mf_++)
     {
         int one = 1;
-        
+
         // compute the scattering amplitude (ni,li,mi_)->(nf,lf,mf_)
         hex_scattering_amplitude_
         (
@@ -162,15 +162,15 @@ void hex_scattering_amplitude_dir_
             reinterpret_cast<double*>(amplitudes.data()),
             nullptr
         );
-        
+
         // calculate the Wigner d-matrix factors
         double di = special::Wigner_d(2*(*li),2*(*mi),2*mi_,*beta);
         double df = special::Wigner_d(2*(*lf),2*(*mf),2*mf_,*beta);
-        
+
         // calculate the whole transformation factor (D-matrices)
         Complex D = std::exp(Complex(0.,(*alpha)*((*mf) - (*mi)))) * di * df *
                     std::exp(Complex(0.,(*gamma)*(  mf_ -   mi_)));
-        
+
         // contribute to the result
         resarr += D * amplitudes;
     }
@@ -184,7 +184,7 @@ bool ScatteringAmplitudeDir::run (std::map<std::string,std::string> const & sdat
     double efactor = change_units(Eunits, eUnit_Ry);
     double lfactor = change_units(lUnit_au, Lunits);
     double afactor = change_units(Aunits, aUnit_rad);
-    
+
     // scattering event parameters
     int ni = Conv<int>(sdata, "ni", name());
     int li = Conv<int>(sdata, "li", name());
@@ -197,29 +197,29 @@ bool ScatteringAmplitudeDir::run (std::map<std::string,std::string> const & sdat
     double alpha = Conv<double>(sdata, "alpha", name()) * afactor;
     double beta  = Conv<double>(sdata, "beta",  name()) * afactor;
     double gamma = Conv<double>(sdata, "gamma", name()) * afactor;
-    
+
     // use mi >= 0; if mi < 0, flip both signs
     int mi = (mi0 < 0 ? -mi0 : mi0);
     int mf = (mi0 < 0 ? -mf0 : mf0);
-    
+
     // angles
     rArray angles;
-    
+
     // get angle / angles
     try {
-        
+
         // is there a single angle specified using command line ?
         angles.push_back(Conv<double>(sdata, "theta", name()));
-        
+
     } catch (std::exception e) {
-        
+
         // are there more angles specified using the STDIN ?
         angles = readStandardInput<double>();
     }
-    
+
     // the scattering angles in radians
     rArray scaled_angles = angles * afactor;
-    
+
     // the scattering amplitudes
     cArray amplitudes(angles.size(),0.0);
     hex_scattering_amplitude_dir
@@ -232,7 +232,7 @@ bool ScatteringAmplitudeDir::run (std::map<std::string,std::string> const & sdat
         scaled_angles.data(),
         reinterpret_cast<double*>(amplitudes.data())
     );
-    
+
     // write out
     std::cout << logo("#") <<
         "# Scattering amplitudes in " << unit_name(Lunits) << " for\n"
@@ -250,6 +250,6 @@ bool ScatteringAmplitudeDir::run (std::map<std::string,std::string> const & sdat
             amplitudes[i].real() * lfactor << "\t" <<
             amplitudes[i].imag() * lfactor << "\n";
     }
-    
+
     return true;
 }

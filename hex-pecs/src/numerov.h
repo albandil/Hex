@@ -41,17 +41,17 @@
 class Numerov2d
 {
     public:
-        
+
         Numerov2d (InputFile const & inp, AngularBasis const & ang, RadialBasis const & rad);
-        
+
         void A (std::size_t i, Complex * M) const;
         void B (std::size_t i, Complex * M) const;
         void C (std::size_t i, Complex * M) const;
-        
+
         void F (std::size_t i, Complex * v, unsigned istate) const;
-        
+
     private:
-        
+
         /**
          * @brief Return a summation mask for construction of A, B, C Numerov matrices.
          * 
@@ -81,9 +81,9 @@ class Numerov2d
             std::size_t i, std::size_t j,
             std::array<std::tuple<int,unsigned,unsigned,std::size_t,std::size_t>, 9> & mask
         ) const;
-        
+
         void calc_mat (std::size_t i, int term, Complex * M) const;
-        
+
         template <class T> T coef_A (int i, int k, T h, T a, unsigned l) const
         {
             if (i > 1)
@@ -95,7 +95,7 @@ class Numerov2d
             if (l == 0)
             {
                 double u = 2. * inp_.Z;
-                
+
                 if (k  < i) return 0;
                 if (k == i) return (a + 1.) * (3.*u*u*a*a*h*h + 4.*u*u*h*h*a - 30.*u*a*h + u*u*h*h - 24.*u*h + 72.);
                 if (k  > i) return  -u*u*h*h - 6.*u*a*h + 2.*u*u*h*h*a + 24.*u*h - 72.;
@@ -104,13 +104,13 @@ class Numerov2d
             {
                 double u = 2. * inp_.Z;
                 double v = -(l * (l + 1.)); // do not remove the outer bracket!
-                
+
                 if (k  < i) return 0.;
                 if (k == i) return special::pow_int(1.+a,2+l) * (a*(2.+l)*(l*l+l+v+u*h) - 6. - 9.*l + v - 3.*l*l + u*h);
                 if (k  > i) return a*a*u*h*(l+1.) + a*(l*l*l + 6.*l*l + (u*h + v + 11.)*l + v + 6.) + 9.*l + 6. - u*h - v + 3.*l*l;
             }
         }
-        
+
         template <class T> T coef_B (int i, int k, T h, T a, unsigned l) const
         {
             if (i > 1)
@@ -122,7 +122,7 @@ class Numerov2d
             if (l == 0)
             {
                 double u = 2. * inp_.Z;
-                
+
                 if (k  < i) return 6.*a*(a*a - a - 1.);
                 if (k == i) return (a + 1.)*(3.*u*a*a*h - 6.*a*a - 18.*a + 4.*u*a*h + u*h - 6.);
                 if (k  > i) return 2.*u*a*a*h - 6.*a*a + u*a*h - u*h - 6.*a + 6.;
@@ -134,7 +134,7 @@ class Numerov2d
                 if (k  > i) return special::pow_int(1.+a,2) * (l*a + a - 1.);
             }
         }
-        
+
         InputFile const & inp_;
         AngularBasis const & ang_;
         RadialBasis const & rad_;

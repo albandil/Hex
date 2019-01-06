@@ -37,49 +37,49 @@
   @author Jakub Benda, MFF UK, jakub.benda&at;seznam.cz
   @date 10. 3. 2016
   @section ecs Hex-ecs
-  
+
   <b>Hex-ecs</b> computes partial T-matrices for elastic, excitation and ionization
   electron-hydrogen scattering. Together with the interface program <b>hex-db</b>
   it offers the possibility of generating many scatterign quantities like
   differential or integral cross sections.
-  
+
   @subsection libs Language and libraries
-  
+
   Hex is written in C++11 to make use of comfort of the modern C++ extensions,
   so one may need a newer compiler. Tested compilers are:
-  
+
   - GCC 5.3.0
   - Intel C++ Composer XE 16.0.0
-  
+
   Both worked with the same Makefile, just by setting the variable CPP to "g++"
   or "icpc". The program also uses following external packages (tested versions
   are given in parentheses):
-  
+
   - <a href="http://www.gnu.org/software/gsl/">GNU Scientific Library</a> (2.1):
     for Wigner coupling coefficients and some other special functions.
   - <a href="http://www.cise.ufl.edu/research/sparse/SuiteSparse/">SuiteSparse/UMFPACK</a> (4.5.1/5.7.4):
     for sparse matrix manipulation and for a direct sparse system solver.
   - OpenMP (2.1): for parallelization at single machine.
   - MPI (OpenMPI 1.8, MSMPI 7): for parallelization at cluster.
-  
+
   The next libraries are optional:
   - <a href="http://www.openblas.net/">OpenBLAS</a> (0.2.15):
     Free BLAS implementation that can be compiled for a specific
     CPU. OpenBLAS is able to run in parallel using pthreads or OpenMP.
     OpenBLAS is optional because SuiteSparse can be configured to use
     a different BLAS implementation.
-  
+
   All listed libraries are open-source and easily obtainable on the internet
   and/or in the repositories of some Linux distributions.
-  
+
   Equations in this documentation use MathJax, which should work in every
   up-to-date JavaScript-enabled web browser. Tested browsers are:
-  
+
   - Mozilla Firefox 44.0.2
   - Konqueror 4.14.17
-  
+
   @subsection usage Usage
-  
+
   The program can be launched simply by
   <pre>
   hex-ecs
@@ -97,7 +97,7 @@
   </pre>
   The last option will weaken the ILU preconditioner (entries smaller than 1e-7 will be discarded),
   so that less memory (and disk space) is consumed.
-  
+
   The input file is expected to be something like
   @verbatim
   # B-spline order.
@@ -146,23 +146,23 @@
   last value and number of values. The geometric sequence is specified by first value, last value, length of the interval
   between the first and second value and the quotient for the interval expansion. The explicitely listed sequence is given
   by the list of values terminated by -1. B-spline knot specification consists of several sequences. The last one is terminated by -1.
-  
+
   @subsection theory Theory
-  
+
   Unknown scattering state, eigenfunction of the full system hamiltonian, is
   split into two parts, asymptotic “incoming particle” state and the scattered
   part, which is a solution of the driven Schrödinger equation,
-  
+
   <table width = "100%" corder = "0"><tr><td width = "100%" align = "center">
   @f[
       \left(E - H\right) \Psi_{\mathrm{sc}} =
   	    H_{\mathrm{int}} \Psi_{\mathrm{inc}} \ .
   @f]
   </td><td width="0px">(1)</td></tr></table>
-  
+
   The state @f$ \Psi_{\mathrm{inc}} @f$ is a product of initial atomic state
   and a projectile plane wave,
-  
+
   <table width = "100%" corder = "0"><tr><td width = "100%" align = "center">
   @f[
       \Psi_{\mathrm{inc}}(\mathbf{r}_1, \mathbf{r}_2) =
@@ -172,10 +172,10 @@
        Y_{lm}^\ast(\mathbf{{r}}_2) \ ,
   @f]
   </td><td width="0px">(2)</td></tr></table>
-  
+
   and anti/symmetrized with respect to electron exchange, according to
   total spin,
-  
+
   <table width = "100%" corder = "0"><tr><td width = "100%" align = "center">
   @f[
       \Psi^S_{\mathrm{inc}}(\mathbf{r}_1, \mathbf{r}_2) = 
@@ -183,35 +183,35 @@
        \Psi_{\mathrm{inc}}(\mathbf{r}_2, \mathbf{r}_1) \ .
   @f]
   </td><td width="0px">(3)</td></tr></table>
-  
+
   Hamiltonian @f$ {H} @f$ is a sum of free hamiltonian and interaction hamiltonian.
   Free hamiltonian is the hamilton operator for electron and atom separated 
   far away,
-  
+
   <table width = "100%" corder = "0"><tr><td width = "100%" align = "center">
   @f[
       {H}_{\mathrm{free}} = -\frac{\nabla_1^2}{2} - \frac{\nabla_2^2}{2}
         -\frac{1}{r_1} \ ,
   @f]
   </td><td width="0px">(4)</td></tr></table>
-  
+
   whereas the interaction hamiltonian contains the interaction between projectile
   and the atomic constituents, that is
-  
+
   <table width = "100%" corder = "0"><tr><td width = "100%" align = "center">
   @f[
       {H}_{\mathrm{int}} = \frac{1}{r_{12}} - \frac{1}{r_2}
   @f]
   </td><td width="0px">(5a)</td></tr></table>
-  
+
   for direct case and
- 
+
   <table width = "100%" corder = "0"><tr><td width = "100%" align = "center">
   @f[
       {H}_{\mathrm{int}} = \frac{1}{r_{12}} - \frac{1}{r_1}
   @f]
   </td><td width="0px">(5b)</td></tr></table>
-  
+
   for exchange (anti/symmetrized) case. Having the solution of equation (1),
   we can extract the scattering amplitude, which is a matrix element of
   @f$ {H}_{\mathrm{int}} @f$ between the solution
@@ -222,32 +222,32 @@
   different from the original, with an outgoing plane wave of the projectile.
   Any exchange effect are already included in the original anti/symmetrization,
   so they need not be considered now. The projection
-  
+
   <table width = "100%" corder = "0"><tr><td width = "100%" align = "center">
   @f[
       f = -4\pi^2 \left<\Psi_{\mathrm{out}}\right|{H}_{\mathrm{int}}\left|\Psi\right>
   @f]
   </td><td width="0px">(6)</td></tr></table>
-  
+
   can be also written as
-  
+
   <table width = "100%" corder = "0"><tr><td width = "100%" align = "center">
   @f[
       f = -4\pi^2 \left<\Psi_{\mathrm{out}}\right|E - {H}_{\mathrm{free}}\left|\Psi_{\mathrm{sc}}\right> \ ,
   @f]
   </td><td width="0px">(7)</td></tr></table>
-  
+
   where the following was used: @f$ {H}_{\mathrm{int}} = {H} - {H}_{\mathrm{free}} @f$,
   @f$ \Psi = \Psi_{\mathrm{sc}} + \Psi_{\mathrm{inc}} @f$ and @f$ {H}\Psi = E\Psi @f$.
-  
-  
+
+
   @subsection method Method
-  
+
   All computations are done in time-independent way, and 
   the exterior complex scaling is used instead of boundary condition fitting.
   Radial part of sought wave-functions is expanded in a B-spline basis
   @f$ \left\{B_i\right\}_{i = 0}^{\mathrm{Nspline}-1} @f$ of a given order,
-  
+
   <table width = "100%" corder = "0"><tr><td width = "100%" align = "center">
   @f[
       \Psi_{\mathrm{sc}}^{LM}(\mathbf{r}_1, \mathbf{r}_2) = \sum_{l_1 l_2}
@@ -255,20 +255,20 @@
        \mathcal{Y}_{l_1 l_2}^{LM}(\mathbf{{r}}_1, \mathbf{{r}}_2) \ ,
   @f]
   </td><td width="0px">(8)</td></tr></table>
-  
+
   <table width = "100%" corder = "0"><tr><td width = "100%" align = "center">
   @f[
       \psi^{LM}_{\mathrm{sc},l_1 l_2}(\mathrm{r}_1, \mathrm{r}_2) = \frac{1}{r_1 r_2}
        \sum_{ij} \psi_{l_1 l_2,ij}^{LM} B_i(r_1) B_j(r_2) \ ,
   @f]
   </td><td width="0px">(9)</td></tr></table>
-  
+
   and when projecting the equation (1) on a bipolar spherical function
   @f$ \left<\mathcal{Y}_{l_1 l_2}^{LM}\right| @f$ to get rid of angular
   dependence, and on a pair of B-splines to get rid of radial dependence and
   keep only matrix elements, one arrives at a
   matrix equation for components of @f$ \psi_{l_1 l_2}^{LM}(\mathrm{r}_1,\mathrm{r}_2) @f$,
-  
+
   <table width = "100%" corder = "0"><tr><td width = "100%" align = "center">
   @f[
       \left[\left(ES_{ik}S_{jl} - \frac{1}{2} D_{ik}S_{jl} - \frac{1}{2} S_{ik} D_{jl}
@@ -279,9 +279,9 @@
        \right] \psi_{l_1' l_2',kl}^{LMS}  = \chi_{l_1l_2,kl}^{LMS} \ ,
   @f]
   </td><td width="0px">(10)</td></tr></table>
-  
+
   or symbolically
-  
+
   <table width = "100%" corder = "0"><tr><td width = "100%" align = "center">
   @f[
       \left[ \mathsf{Id}_1 \otimes \mathsf{Id}_2 \otimes
@@ -296,7 +296,7 @@
        \right] \mathsf{\psi}^{LMS}  = \mathsf{\chi}^{LMS} \ .
   @f]
   </td><td width="0px">(10*)</td></tr></table>
-  
+
   Symbol @f$ \otimes @f$ stands for Kronecker product (“flattened tensor product”)
   and matrices have following meanings:
   - Matrix @f$ \mathsf{Id}_1 @f$ is identity of rank equal to maximal allowed
@@ -329,10 +329,10 @@
   @f]
     flattened so that “l₁” and “l₂” form one multiindex [l₁l₂] and the other two indices
     the second.
-  
+
   Finally, the symbol @f$ \chi^{LMS} @f$ stands for projection of the right hand side,
   which is
-  
+
   <table width = "100%" corder = "0"><tr><td width = "100%" align = "center">
   @f[
       \chi_{l_1 l_2, ij}^{LMS} = 
@@ -347,9 +347,9 @@
        \right\}
   @f]
   </td><td width="0px">(11)</td></tr></table>
-  
+
   or symbolically
-  
+
   <table width = "100%" corder = "0"><tr><td width = "100%" align = "center">
   @f[
       \chi^{LMS} = 
@@ -366,19 +366,19 @@
        \right\} \ .
   @f]
   </td><td width="0px">(11*)</td></tr></table>
-  
+
   Here, the one-dimensional (!) vectors @f$ \Delta @f$ are zero vectors with
   only one element equal to one at position @f$ l_1 = l_i @f$ (etc.).
   P- and j- vectors are components of respective function in chosen B-spline
   basis.
-  
+
   Factor C in the expression (11*) is the Clebsch-Gordan coefficient and the
   zero projection of @f$ \ell @f$-momentum reflect the deliberate choice
   of scattering axis along the projectile moemntum, so that the angular
   momentum projection is zero.
-  
+
   @subsection restrict ECS restrictions on potential
-  
+
   Exterior complex scaling of right hand side poses a serious problem for typical
   (not exponentially decreasing) potentials. One of the factors in the right hand
   side is the Riccati-Bessel functions @f$ \hat{j} @f$, which exponentially
@@ -390,18 +390,18 @@
   - Matrices @f$ \mathsf{S}, \mathsf{M}^{(-1)}, \mathsf{R}^\lambda @f$ in (11), (11*)
     are to be computed, again, for @f$ r_1,r_2 \le R_0 @f$. These are referenced
     as “<i>truncated</i> overlap matrices” in the source code.
-  
-  
+
+
   @subsection amplitude Cross section
-  
+
   As was said above, the scattering amplitude is
-  
+
   <table width = "100%" corder = "0"><tr><td width = "100%" align = "center">
   @f[
   f = -4\pi^2 \left<\Psi_{\mathrm{out}}\right|E - {H}_{\mathrm{free}}\left|\Psi_{\mathrm{sc}}\right>_{R_0}\ ,
   @f]
   </td><td width="0px">(12)</td></tr></table>
-  
+
   where the subscript @f$ R_0 @f$ means, that the radial integration is done only
   for radii less than @f$ R_0 @f$ (because the original matrix, @f$ {H}_{\mathrm{int}} @f$,
   has to be truncated at such distance to avoid far-region divergence. The outgoing – detected –
@@ -409,21 +409,21 @@
   initial to final quantum numbers. Substituting such expansion into the equation (12)
   and once again using zero boundary trait of chosen B-spline basis when doing
   per parts integration one easily arrives at the formula for cross section
-  
+
   <table width = "100%" corder = "0"><tr><td width = "100%" align = "center">
   @f[
       \sigma = \frac{4}{k_i k_f} \sum_{\ell L L'} C_{l_f m_f \ell 0}^{L m_f} C_{l_f m_f \ell 0}^{L' m_f}
        \left| \psi_{l_f \ell, ij}^{LMS} W[P]_i S[j]_j + \psi_{l_f \ell, ij}^{L'MS} S[P]_i W[j]_j \right|^2 \ ,
   @f]
   </td><td width="0px">(13)</td></tr></table>
-  
+
   where @f$ W[P]_i @f$ and @f$ W[j]_j @f$ stand for wronskian (evaluated at @f$ R_0 - \varepsilon @f$)
   of the i-th B-spline and the (final) hydrogenic or Riccatti-Bessel function, and @f$ S[P]_i @f$
   and @f$ S[j]_i @f$ stand for (truncated) overlap integrals of the i-th B-spline and
   the (final) hydrogenic or Riccatti-Bessel function.
- 
+
   @subsection code Implementation in the code
- 
+
   The code runs along the following outline:
   - The program is initialized. Parameters from the command line are stored for later
     use in the class CommandLine.

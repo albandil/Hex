@@ -81,10 +81,10 @@ int main (int argc, char* argv[])
     //
     // Program initialization
     //
-    
+
         // disable buffering of the standard output (-> immediate logging)
         std::setvbuf(stdout, nullptr, _IONBF, 0);
-        
+
 #ifdef WITH_BOINC
         // initialize Boinc
         BOINC_OPTIONS options;
@@ -92,35 +92,35 @@ int main (int argc, char* argv[])
         options.multi_thread = true;
         options.multi_process = false;
         boinc_init_options(&options);
-        
+
         // redirect output to "stdout.txt"
         std::ofstream stdoutFile ("stdout.txt", std::ios::out | std::ios::app);
         std::cout.rdbuf(stdoutFile.rdbuf());
         std::cerr.rdbuf(stdoutFile.rdbuf());
 #endif
-        
+
         // display logo
         std::cout << logo(" ") << std::endl;
         std::cout << "=== Exterior complex scaling in B-splines ===" << std::endl << std::endl;
-        
+
         // display hostname (useful for later interpretation of output)
         char hname[256] = "(unknown)";
         gethostname(hname, sizeof hname);
         std::cout << "Running on \"" << hname << "\", " << current_time() << std::endl << std::endl;
-        
+
         // echo command line
         std::cout << "Command line used" << std::endl;
         std::cout << "\t";
         for (int iarg = 0; iarg < argc; iarg++)
             std::cout << argv[iarg] << " ";
         std::cout << std::endl << std::endl;
-        
+
         // turn off GSL exceptions
         gsl_set_error_handler_off();
-        
+
         // get input from command line
         CommandLine cmd (argc, argv);
-        
+
 #ifdef __linux__
         if (cmd.fpe)
         {
@@ -128,11 +128,11 @@ int main (int argc, char* argv[])
             feenableexcept(FE_INVALID);
         }
 #endif
-    
+
     //
     // Setup parallel environments
     //
-    
+
         // some factorizers need MPI environment
         if (not cmd.parallel)
         {
@@ -151,10 +151,10 @@ int main (int argc, char* argv[])
 #endif
             }
         }
-        
+
         // setup MPI
         Parallel par (&argc, &argv, cmd.parallel, cmd.groupsize);
-        
+
         // print information
         if (par.active())
         {
@@ -164,26 +164,26 @@ int main (int argc, char* argv[])
             std::cout << "\tID within group:  " << 1 + par.igroupproc() << " / " << par.groupsize() << std::endl;
             std::cout << std::endl;
         }
-        
+
 #ifdef _OPENMP
         omp_set_num_threads(cmd.nthreads);
-        
+
         # pragma omp parallel
         # pragma omp master
         {
             int nthreads = omp_get_num_threads();
             bool nested = omp_get_nested();
-            
+
             std::cout << "OpenMP environment" << std::endl;
             std::cout << "\tthreads: " << nthreads << std::endl;
             std::cout << "\tnesting: " << (nested ? "on" : "off") << std::endl;
         }
 #endif
-    
+
     //
     // Read input file
     //
-    
+
         // check input file
         if (not cmd.inputfile.is_open())
         {
@@ -198,21 +198,21 @@ int main (int argc, char* argv[])
                 return EXIT_FAILURE;
             };
         }
-        
+
         // get input from input file
         InputFile inp (cmd.inputfile);
-        
+
         // is there something to compute?
         if (inp.Etot.empty() or inp.instates.empty() or inp.outstates.empty())
         {
             std::cout << "Nothing to compute." << std::endl;
             return EXIT_SUCCESS;
         }
-    
+
     //
     // Setup B-spline basis
     //
-    
+
         // create new B-spline basis for inner problem
         Bspline bspline_inner
         (
@@ -222,7 +222,7 @@ int main (int argc, char* argv[])
             inp.rknots,
             inp.rknots_ext.empty() ? inp.rknots.back() + inp.cknots : rArray{ inp.rknots.back() }
         );
-        
+
         // create new B-spline basis for inner and outer problem (will be the same as 'bspline_atom' if 'rknots_ext' is empty)
         Bspline bspline_full
         (
@@ -232,37 +232,37 @@ int main (int argc, char* argv[])
             inp.rknots_ext.empty() ? inp.rknots : concatenate(inp.rknots, inp.rknots.back() + inp.rknots_ext.slice(1, inp.rknots_ext.size())),
             inp.rknots_ext.empty() ? inp.rknots.back() + inp.cknots : inp.rknots.back() + inp.rknots_ext.back() + inp.cknots
         );
-    
+
     //
     // Setup angular data
     //
-    
+
         AngularBasis ang (inp);
-        
+
         std::cout << "\t-> The matrix of the set contains " << ang.states().size()
                 << " diagonal blocks." << std::endl;
-        
+
         // skip if there is nothing to compute
         if (ang.states().empty())
             return EXIT_SUCCESS;
-        
+
         std::cout << std::endl;
-    
+
     //
     // Zip solution file into VTK geometry if told so
     //
-    
+
         if (cmd.zipdata.file.size() != 0 and par.IamMaster())
         {
             zip_solution(cmd, inp, par, bspline_inner, bspline_full, ang.states());
             std::cout << std::endl << "Done." << std::endl << std::endl;
             return EXIT_SUCCESS;
         }
-    
+
     //
     // Write grid into VTK file if told so.
     //
-    
+
         if (cmd.writegrid and par.IamMaster())
         {
             write_grid(bspline_inner, "grid-inner");
@@ -270,14 +270,14 @@ int main (int argc, char* argv[])
             std::cout << std::endl << "Done." << std::endl << std::endl;
             return EXIT_SUCCESS;
         }
-    
+
     //
     // Solve the equations
     //
-    
+
         // create the solver instance
         Solver solver (cmd, inp, par, ang, bspline_inner, bspline_full);
-        
+
         std::cout << std::endl;
         std::cout << "Bspline basis summary" << std::endl;
         if (bspline_inner.Nspline() != bspline_full.Nspline())
@@ -292,16 +292,16 @@ int main (int argc, char* argv[])
         std::cout << "\t\t- real knots : " << bspline_full.rknots().front() << " to " << bspline_full.rknots().back() << std::endl;
         std::cout << "\t\t- complex knots : " << bspline_full.cknots2().front() << " to " << bspline_full.cknots2().back() << std::endl;
         std::cout << std::endl;
-        
+
         // pick preconditioner according to the user preferences
         solver.choose_preconditioner();
-        
+
         // initialize preconditioner
         solver.setup_preconditioner();
-        
+
         // find the solution of the scattering equations
         solver.solve();
-        
+
         // release resources
         solver.finish();
 
@@ -314,10 +314,10 @@ int main (int argc, char* argv[])
             // extract amplitudes
             Amplitudes ampl (bspline_inner, bspline_full, inp, par, cmd, ang.states());
             ampl.extract();
-            
+
             // write T-matrices to a text file as SQL statements 
             ampl.writeSQL_files();
-            
+
             // write integral cross sections to a text file
             ampl.writeICS_files();
         }
@@ -331,7 +331,7 @@ int main (int argc, char* argv[])
     //
 
         std::cout << std::endl << "Done." << std::endl << std::endl;
-        
+
 #ifdef WITH_BOINC
         boinc_finish(EXIT_SUCCESS);
 #else

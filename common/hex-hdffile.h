@@ -65,7 +65,7 @@
 class HDFFile
 {
 public:
-    
+
     /**
      * @brief Access mode.
      * 
@@ -81,82 +81,82 @@ public:
         readwrite
     }
     FileAccess;
-    
+
     /// Header size.
     static const std::size_t header_byte_size;
-    
+
     /// Constructor from filename and access mode.
     HDFFile (std::string filename, FileAccess flag);
-    
+
     /// Destructor.
     ~HDFFile ();
-    
+
     /// Get size of the dataset of valid file.
     std::size_t size (std::string dataset) const;
-    
+
     /// Load data from a valid file.
     template <typename T> bool read (std::string dataset, T * buffer, std::size_t length, std::size_t offset = 0) const
     {
         return read_(dataset, buffer, length * typeinfo<T>::ncmpt, offset * typeinfo<T>::ncmpt, typeinfo<T>::hdfcmpttype());
     }
-    
+
     /// Write data to a valid file.
     template <typename T> bool write (std::string dataset, T const * buffer, std::size_t length, std::size_t offset = 0)
     {
         return write_(dataset, buffer, length * typeinfo<T>::ncmpt, offset * typeinfo<T>::ncmpt, typeinfo<T>::hdfcmpttype());
     }
-    
+
     /// Check that the file is valid.
     bool valid () const { return file_.is_open(); }
-    
+
     /// Prefix for dataset paths.
     std::string prefix;
-    
+
     /// Error stack.
     std::string const & error () const { return error_; };
-    
+
     typedef struct
     {
         /// Name of the dataset.
         std::string name;
-        
+
         /// Data type of the elements.
         std::size_t datatype;
-        
+
         /// Number of elements.
         std::size_t elements;
     }
     DatasetInfo;
-    
+
     /// File name.
     std::string const & name () const { return name_; }
-    
+
     /// Dataset information.
     std::vector<DatasetInfo> const & datasets () const { return datasets_; }
-    
+
 private:
-    
+
     /// File stream.
     mutable std::fstream file_;
-    
+
     /// Header
     std::vector<DatasetInfo> datasets_;
-    
+
     /// Filename.
     std::string name_;
-    
+
     /// Error message.
     mutable std::string error_;
-    
+
     /// Whether the dataset layout has been changed.
     bool changed_;
-    
+
     /// Auxiliary read function.
     bool read_(std::string dataset, void * buffer, std::size_t length, std::size_t offset, HDFDataType dtype) const;
-    
+
     /// Auxiliary write function.
     bool write_(std::string dataset, void const * buffer, std::size_t length, std::size_t offset, HDFDataType dtype);
-    
+
     /// Set error and return false.
     void save_error () const;
 };

@@ -138,21 +138,21 @@ void blas::gemm (Complex a, DenseMatrixView<Complex> const & A, DenseMatrixView<
     if (A.cols() != B.rows() or A.rows() != C.rows() or B.cols() != C.cols())
         HexException("Incompatible dimensions: [%d x %d] [%d x %d] != [%d x %d].", A.rows(), A.cols(), B.rows(), B.cols(), C.rows(), C.cols());
 #endif
-    
+
     // get matrix layouts
     char layout_A = A.layout(), layout_B = B.layout();
-    
+
     // get matrix leading dimensions
     Int ld_A = A.ld(), ld_B = B.ld(), ld_C = C.ld();
-    
+
     // get matrix dimensions
     Int m = A.rows(), n = B.cols(), k = A.cols();
-    
+
     // get data pointers
     Complex * pA = const_cast<Complex*>(A.data().data());
     Complex * pB = const_cast<Complex*>(B.data().data());
     Complex * pC = C.data().data();
-    
+
     // call the dedicated BLAS routine
 #ifdef SINGLE
     cgemm_(&layout_A, &layout_B, &m, &n, &k, &a, pA, &ld_A, pB, &ld_B, &b, pC, &ld_C);
@@ -168,24 +168,24 @@ void blas::gemm (Complex a, DenseMatrixView<Complex> const & A, DenseMatrixView<
     if (A.cols() != B.rows() or A.rows() != C.rows() or B.cols() != C.cols())
         HexException("Incompatible dimensions: [%d x %d] [%d x %d] != [%d x %d].", A.rows(), A.cols(), B.rows(), B.cols(), C.rows(), C.cols());
 #endif
-    
+
     // NOTE: To obtain row-major C, we need to multiply transpose: C' = B' A'
-    
+
     // get transposed matrix layouts
     char layout_A = (A.layout() == 'N' ? 'T' : 'N');
     char layout_B = (B.layout() == 'N' ? 'T' : 'N');
-    
+
     // get matrix leading dimensions
     Int ld_A = A.ld(), ld_B = B.ld(), ld_C = C.ld();
-    
+
     // get matrix dimensions
     Int m = B.cols(), n = A.rows(), k = B.rows();
-    
+
     // get data pointers
     Complex * pA = const_cast<Complex*>(A.data().data());
     Complex * pB = const_cast<Complex*>(B.data().data());
     Complex * pC = C.data().data();
-    
+
     // call the dedicated BLAS routine
 #ifdef SINGLE
     cgemm_(&layout_B, &layout_A, &m, &n, &k, &a, pB, &ld_B, pA, &ld_A, &b, pC, &ld_C);
@@ -201,19 +201,19 @@ void blas::gemv (Real a, DenseMatrixView<Real> const & A, const rArrayView v, Re
     if (A.cols() != (int)v.size() or A.rows() != (int)w.size())
         HexException("Incompatible dimensions: [%d x %d] [%d x 1] != [%d x 1].", A.rows(), A.cols(), v.size(), w.size());
 #endif
-    
+
     // get matrix data
     char layout_A = A.layout();
     Int ld_A = A.ld();
     Int m = A.rows();
     Int n = A.cols();
     Real * pA = const_cast<Real*>(A.data().data());
-    
+
     // get array data
     Int incv = 1, incw = 1;
     Real * pv = const_cast<Real*>(v.data());
     Real * pw = w.data();
-    
+
     // call the dedicated BLAS routine
 #ifdef SINGLE
     sgemv_(&layout_A, &m, &n, &a, pA, &ld_A, pv, &incv, &b, pw, &incw);
@@ -229,19 +229,19 @@ void blas::gemv (Complex a, DenseMatrixView<Complex> const & A, const cArrayView
     if (A.cols() != (int)v.size() or A.rows() != (int)w.size())
         HexException("Incompatible dimensions: [%d x %d] [%d x 1] != [%d x 1].", A.rows(), A.cols(), v.size(), w.size());
 #endif
-    
+
     // get matrix data
     char layout_A = A.layout();
     Int ld_A = A.ld();
     Int m = A.rows();
     Int n = A.cols();
     Complex * pA = const_cast<Complex*>(A.data().data());
-    
+
     // get array data
     Int incv = 1, incw = 1;
     Complex * pv = const_cast<Complex*>(v.data());
     Complex * pw = w.data();
-    
+
     // call the dedicated BLAS routine
 #ifdef SINGLE
     cgemv_(&layout_A, &m, &n, &a, pA, &ld_A, pv, &incv, &b, pw, &incw);
@@ -257,14 +257,14 @@ void blas::xpby (cArrayView x, Complex b, const cArrayView y)
     if (x.size() != y.size())
         HexException("Incompatible dimensions: %d != %d", x.size(), y.size());
 #endif
-    
+
     // get length of the arrays
     std::size_t N = x.size();
-    
+
     // get pointers to the data
     Complex       * const restrict px = x.data();
     Complex const * const restrict py = y.data();
-    
+
     // run the vectorized loop
     # pragma omp simd
     for (std::size_t i = 0; i < N; i++)
@@ -275,13 +275,13 @@ blas::Int blas::sbtrf (blas::Int n, blas::Int k, rArrayView ab, ArrayView<blas::
 {
     blas::Int info;
     blas::Int ldab = 3*k + 1;
-    
+
 #ifdef SINGLE
     sgbtrf_(&n, &n, &k, &k, &ab[0], &ldab, &ipiv[0], &info);
 #else
     dgbtrf_(&n, &n, &k, &k, &ab[0], &ldab, &ipiv[0], &info);
 #endif
-    
+
     return info;
 }
 
@@ -290,13 +290,13 @@ blas::Int blas::sbtrf (blas::Int n, blas::Int k, cArrayView ab, ArrayView<blas::
 {
     blas::Int info;
     blas::Int ldab = 3*k + 1;
-    
+
 #ifdef SINGLE
     cgbtrf_(&n, &n, &k, &k, &ab[0], &ldab, &ipiv[0], &info);
 #else
     zgbtrf_(&n, &n, &k, &k, &ab[0], &ldab, &ipiv[0], &info);
 #endif
-    
+
     return info;
 }
 
@@ -306,13 +306,13 @@ blas::Int blas::sbtrs (blas::Int n, blas::Int k, rArrayView ab, ArrayView<blas::
     blas::Int ldab = 3*k + 1;
     blas::Int nrhs = bx.size() / n;
     char trans = 'N';
-    
+
 #ifdef SINGLE
     sgbtrs_(&trans, &n, &k, &k, &nrhs, &ab[0], &ldab, &ipiv[0], &bx[0], &n, &info);
 #else
     dgbtrs_(&trans, &n, &k, &k, &nrhs, &ab[0], &ldab, &ipiv[0], &bx[0], &n, &info);
 #endif
-    
+
     return info;
 }
 
@@ -322,12 +322,12 @@ blas::Int blas::sbtrs (blas::Int n, blas::Int k, cArrayView ab, ArrayView<blas::
     blas::Int ldab = 3*k + 1;
     blas::Int nrhs = bx.size() / n;
     char trans = 'N';
-    
+
 #ifdef SINGLE
     cgbtrs_(&trans, &n, &k, &k, &nrhs, &ab[0], &ldab, &ipiv[0], &bx[0], &n, &info);
 #else
     zgbtrs_(&trans, &n, &k, &k, &nrhs, &ab[0], &ldab, &ipiv[0], &bx[0], &n, &info);
 #endif
-    
+
     return info;
 }

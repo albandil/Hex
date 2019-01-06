@@ -37,33 +37,33 @@
 rArray abs (const cArrayView u)
 {
     rArray v(u.size());
-    
+
     auto iu = u.begin();
     auto iv = v.begin();
-    
+
     while (iu != u.end())
         *(iv++) = abs(*(iu++));
-    
+
     return v;
 }
 
 rArrays abs (cArrays const &u)
 {
     rArrays v(u.size());
-    
+
     auto iu = u.begin();
     auto iv = v.begin();
-    
+
     while (iu != u.end())
         *(iv++) = abs(*(iu++));
-    
+
     return v;
 }
 
 NumberArray<Real> hypot (NumberArray<Real> const & A, NumberArray<Real> const & B)
 {
     assert(A.size() == B.size());
-    
+
     std::size_t N = A.size();
     NumberArray<Real> C (N);
 
@@ -133,7 +133,7 @@ template<> void write_array (const ArrayView<Real> grid, const ArrayView<Complex
 rArray threshold (const rArrayView a, double eps)
 {
     rArray b(a.size());
-    
+
     for (std::size_t i = 0; i < a.size(); i++)
     {
         if (std::abs(a[i]) > eps)
@@ -141,7 +141,7 @@ rArray threshold (const rArrayView a, double eps)
             b[i] = a[i];
         }
     }
-    
+
     return b;
 }
 
@@ -149,14 +149,14 @@ cArray interleave (const rArrayView re, const rArrayView im)
 {
     if (re.size() != im.size())
         HexException("Cannot interleave arrays of different sizes (%ld != %ld).", re.size(), im.size());
-    
+
     cArray output (re.size());
-    
+
     for (std::size_t i = 0; i < re.size(); i++)
     {
         output[i].real(re[i]);
         output[i].imag(im[i]);
     }
-    
+
     return output;
 }

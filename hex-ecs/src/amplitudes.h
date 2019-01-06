@@ -60,7 +60,7 @@
 class Amplitudes
 {
     public:
-        
+
         Amplitudes
         (
             Bspline const & bspline_inner,
@@ -70,7 +70,7 @@ class Amplitudes
             CommandLine const & cmd,
             std::vector<std::pair<int,int>> const & ang
         );
-        
+
         /**
          * @brief Extract the amplitudes.
          * 
@@ -86,7 +86,7 @@ class Amplitudes
          *                  written to a new directory on every iteration.
          */
         void extract (std::string directory = ".");
-        
+
         /**
          * @brief Write SQL batch file.
          * 
@@ -96,7 +96,7 @@ class Amplitudes
          * See the documentation of hex-db for details on the output format.
          */
         void writeSQL_files (std::string directory = ".");
-        
+
         /**
          * @brief Write integral cross sections to file.
          * 
@@ -117,14 +117,14 @@ class Amplitudes
          * @f$ |nlm\rangle |\mathbf{k}\rangle = |2,1,1\rangle |\mathbf{k}_f\rangle @f$.
          */
         void writeICS_files (std::string directory = ".");
-        
+
         /**
          * @brief Set verbosity level.
          * 
          * This function can be used to mute the text output of this class.
          */
         void verbose (bool b) { verbose_ = b; }
-        
+
         /**
          * @brief Transition description.
          * 
@@ -143,48 +143,48 @@ class Amplitudes
         {
             // initial state
             int ni, li, mi;
-            
+
             // final state
             int nf, lf, mf;
-            
+
             // necessary ordering operator so that we can use this structure as an index in std::map
             bool operator < (tTransition const & t) const
             {
                 #define Compare(x) if (x < t.x) return true; if (x > t.x) return false;
-                
+
                 // perform standard lexicographic comparison (by components)
                 Compare(ni); Compare(li); Compare(mi);
                 Compare(nf); Compare(lf); Compare(mf);
-                
+
                 // they are equal
                 return false;
             }
         }
         Transition;
-        
+
         // Other types.
         typedef std::map<Transition,std::vector<std::pair<cArray,cArray>>> XiArray;
         typedef std::map<Transition,std::vector<std::pair<cArray,cArray>>> LambdaArray;
         typedef std::map<Amplitudes::Transition,std::vector<std::pair<cArray,cArray>>> TmatArray;
         typedef std::map<Transition,std::pair<rArray,rArray>> SigmaArray;
-        
+
         // Member access.
         TmatArray const & T_matrices () const { return Tmat_Slp; }
-        
+
     private:
-        
+
         // Λ[ie] for both spins indexed by (ni,li,mi,nf,lf,mf) and l'
         LambdaArray Lambda_Slp;
-        
+
         // T[ie] for both spins indexed by (ni,li,mi,nf,lf,mf) and l'
         TmatArray Tmat_Slp;
-        
+
         // σ[ie] for both spins indexed by (ni,li,mi,nf,lf,mf)
         SigmaArray sigma_S;
-        
+
         // Ξ[ie] (lists of Chebyshev coefficients) indexed by (ni,li,mi) and (l1,l2)
         XiArray Xi_Sl1l2;
-        
+
         /**
          * @brief Extract radial part of scattering amplitude.
          * 
@@ -201,7 +201,7 @@ class Amplitudes
          * @f]
          */
         void computeLambda_ (Transition T, BlockArray<Complex> & solution, int ie, int Spin);
-        
+
         /**
          * @brief Evaluate T-matrices.
          * 
@@ -216,7 +216,7 @@ class Amplitudes
          * (the angular momenta of the projectile).
          */
         void computeTmat_ (Transition T);
-        
+
         /**
          * @brief Extract radial part of ionization amplitude.
          * 
@@ -251,7 +251,7 @@ class Amplitudes
          * @return Vector of radial integrals.
          */
         void computeXi_ (Transition T, BlockArray<Complex> & solution, int ie, int Spin);
-        
+
         /**
          * @brief Evaluate cross sections.
          * 
@@ -259,34 +259,34 @@ class Amplitudes
          * and compute the cross sections.
          */
         void computeSigma_ (Transition T);
-        
+
         Chebyshev<double,Complex> fcheb (cArrayView const & PsiSc, Real kmax, int l1, int l2);
         void computeSigmaIon_ (Transition T);
-        
+
         cArray readAtomPseudoState (int lf, int ichan) const;
-        
+
         // B-spline environment
         Bspline const & bspline_inner_;
         Bspline const & bspline_full_;
-        
+
         // radial integrals
         RadialIntegrals rad_;
-        
+
         // input data
         InputFile const & inp_;
-        
+
         // parallel environment
         Parallel const & par_;
-        
+
         // command line switches
         CommandLine const & cmd_;
-        
+
         // angular basis
         std::vector<std::pair<int,int>> const & ang_;
-        
+
         // solution reader
         SolutionIO reader_;
-        
+
         // standard output verbosity
         bool verbose_;
 };

@@ -54,35 +54,35 @@ CarthesianBoundWaveFunction::CarthesianBoundWaveFunction (int N, int L, int M)
         * (2*L+1) / (4 * special::constant::pi)
         * gsl_sf_fact(L - std::abs(M)) / gsl_sf_fact(L + std::abs(M))
     ) * std::pow(1./N,L);
-    
+
     // for all terms of the Laguerre polynomial
     for (int i = 0; i <= N - L - 1; i++)
     {
         Real Nfactor = (i % 2 == 0 ? 1. : -1.) * std::pow(2./N,i) * gsl_sf_choose(N+L,N-L-1-i) / gsl_sf_fact(i);
-        
+
         // for all terms of the z-dependent angular factor
         for (int k = 0; k <= (L - std::abs(M))/2; k++)
         {
             Real Lfactor = (k % 2 == 0 ? 1. : -1.) * gsl_sf_choose(L,k) * gsl_sf_choose(2*L-2*k,L)
                                 * gsl_sf_fact(L-2*k) / gsl_sf_fact(L-2*k-M);
-            
+
             // for all terms of the x,y-dependent angular factor
             for (int p = 0; p <= std::abs(M); p++)
             {
                 Complex Mfactor = gsl_sf_choose(std::abs(M),p);
-                
+
                 if (M > 0) // (-1)^m * (Am + i*Bm)
                 {
                     Mfactor *= (std::abs(M) % 2 == 0 ? 1.0_r : -1.0_r) * std::pow(Complex(0.,1.),std::abs(M)-p);
                 }
-                
+
                 if (M < 0) // Am - i * Bm
                 {
                     Mfactor *= std::pow(Complex(0.,1.),p-std::abs(M));
                 }
-                
+
                 std::cout << "i = " << i << ", k = " << k << ", p = " << p << std::endl;
-                
+
                 // append new term to the list of terms
                 Term term;
                 term.c = Nfactor * Lfactor * Mfactor;
@@ -98,67 +98,67 @@ CarthesianBoundWaveFunction::CarthesianBoundWaveFunction (int N, int L, int M)
 
 CarthesianBoundWaveFunction::~CarthesianBoundWaveFunction ()
 {
-    
+
 }
 
 Complex CarthesianBoundWaveFunction::operator() (double x, double y, double z) const
 {
     Complex result = 0;
     Real r = std::sqrt(x*x+y*y+z*z);
-    
+
     for (Term const & T : terms_)
     {
         Complex term = T.c;
-        
+
         if (T.u != 0) term *= std::pow(x,T.u);
         if (T.v != 0) term *= std::pow(y,T.v);
         if (T.w != 0) term *= std::pow(z,T.w);
         if (T.n != 0) term *= std::pow(r,T.n);
-        
+
         result += term;
     }
-    
+
     return result * std::exp(-r / N_);
 }
 
 std::string stateName (int n, int l)
 {
     static const std::string ang = "spdfghiklmno";
-    
+
     std::ostringstream oss;
-    
+
     if (n == 0)
         oss << "ion";
     else if (l < (int)ang.size())
         oss << n << ang[l];
     else
         oss << n << '[' << l << ']';
-    
+
     return oss.str();
 }
 
 std::string stateName (int n, int l, int m)
 {
     std::string name = stateName(n,l);
-    
+
     if (n != 0)
         name += "(" + std::to_string(m) + ")";
-    
+
     return name;
 }
 
 std::string stateRName (int n, int l, int two_j, int two_m)
 {
     static const char ang[] = { 's', 'p', 'd', 'f', 'g', 'h', 'i', 'k', 'l', 'm', 'n', 'o' };
-    
+
     assert(l < (int)sizeof(ang));
-    
+
     std::ostringstream oss;
     if (n != 0)
         oss << n << ang[l] << two_j << "/2(" << two_m << "/2)";
     else
         oss << "ion";
-    
+
     return oss.str();
 }
 
@@ -172,7 +172,7 @@ double getBoundFar (int n, int l, double eps, int max_steps)
 {
     // all Laguerre(2r/n) roots are less or equal to
     double last_zero_ubound = lastZeroBound(n, l) * 0.5 * n;
-    
+
     // hunt for low value
     double far_r = std::max(last_zero_ubound, 1.);
     double far_val, der;
@@ -180,15 +180,15 @@ double getBoundFar (int n, int l, double eps, int max_steps)
     {
         // move further
         far_r *= 2;
-        
+
         // evaluate function in 'far'
         far_val = fabs(P(n,l,far_r));
-        
+
         // compute forward h-diference in 'far'
         der = far_val - std::fabs(P(n,l,far_r+1e-5));
     }
     while (der > 0 or far_val > eps);
-    
+
     // bisect for exact value
     int steps = 0;
     double near_r = last_zero_ubound;
@@ -211,7 +211,7 @@ double getBoundFar (int n, int l, double eps, int max_steps)
         if (near_val == far_val)
             break;
     }
-    
+
     // return bisection
     return 0.5 * (near_r + far_r);
 }
@@ -225,7 +225,7 @@ double getSturmFar (int n, int l, double lambda, double eps, int max_steps)
 {
     // all Laguerre(2r) roots are less or equal to
     double last_zero_ubound = lastZeroBound(n,l) * 0.5;
-    
+
     // hunt for low value
     double far_r = std::max(last_zero_ubound, 1.);
     double far_val, der;
@@ -233,15 +233,15 @@ double getSturmFar (int n, int l, double lambda, double eps, int max_steps)
     {
         // move further
         far_r *= 2;
-        
+
         // evaluate function in 'far'
         far_val = std::fabs(S(n,l,far_r,lambda));
-        
+
         // compute forward h-diference in 'far'
         der = std::fabs(S(n,l,far_r+0.001,lambda)) - far_val;
     }
     while (der > 0 or far_val > eps);
-    
+
     // bisect for exact value
     int steps = 0;
     double near_r = last_zero_ubound;
@@ -264,7 +264,7 @@ double getSturmFar (int n, int l, double lambda, double eps, int max_steps)
         if (near_val == far_val)
             break;
     }
-    
+
     // return bisection
     return 0.5 * (near_r + far_r);
 }
@@ -274,17 +274,17 @@ double P (unsigned n, unsigned l, double r, double Z)
     // bound orbital is a regular solution
     if (r == 0.)
         return 0.;
-    
+
     // compute the radial function by GSL
     gsl_sf_result R;
     int err = gsl_sf_hydrogenicR_e(n, l, Z, r, &R);
-    
+
     // silent underflows -> zero
     if (err == GSL_EUNDRFLW)
     {
         return 0.;
     }
-    
+
     // abort on other errors
     if (err != GSL_SUCCESS)
     {
@@ -294,7 +294,7 @@ double P (unsigned n, unsigned l, double r, double Z)
             Z, n, l, r, gsl_strerror(err)
         );
     }
-    
+
     // return the radial orbital (multiply by radius)
     return r * R.val;
 }
@@ -304,29 +304,29 @@ double F (double k, int l, double r, double sigma)
     // Coulomb wave is a regular solution
     if (r == 0.)
         return 0.;
-    
+
     // classical turning point
     double rt = (std::sqrt(1 + k*k*l*(l+1))-1)/(k*k);
-    
+
     // normalization
     double norm = special::constant::sqrt_two / (k * special::constant::sqrt_pi);
-    
+
     // some local variables
     double F, exp_F, Fp;
     int err;
-    
+
     // evaluate the function
     if ((err = gsl_sf_coulomb_wave_F_array(l, 0, -1./k, k*r, &F, &exp_F)) == GSL_SUCCESS)
         return norm * F;
-    
+
     // high distances => use asymptotic form
     if (r > rt)
         return norm * special::coul_F_asy(l, k, r, (std::isfinite(sigma) ? sigma : special::coul_F_sigma(l,k)));
-    
+
     // low energies => use uniform WKB approximation by Michel
     if ((err = special::coul_F_michel(l, k, r, F, Fp)) == GSL_SUCCESS)
         return norm * F;
-    
+
     // some other problem
     HexException
     (
@@ -356,14 +356,14 @@ double getFreeAsyZero (double k, int l, double Sigma, double eps, int max_steps,
     // find solution (r) of
     //    n*pi = k*r - l*pi/2 + log(2*k*r)/k + Sigma
     // using trivial Banach contraction
-    
+
     double kr = (2*nzero+l)*special::constant::pi_half - Sigma;
     if (kr < 0)
         return kr;
-    
+
     while (max_steps-- > 0 and std::abs(kr) > eps)
         kr = (2*nzero+l)*special::constant::pi_half - Sigma - std::log(2*kr)/k;
-    
+
     return kr / k;
 }
 
@@ -372,14 +372,14 @@ double getFreeAsyTop (double k, int l, double Sigma, double eps, int max_steps, 
     // find solution (r) of
     //    (n+1/4)*2*pi = k*r - l*pi/2 + log(2*k*r)/k + Sigma
     // using trivial Banach contraction
-    
+
     double kr = (2*ntop+0.5*(l+1))*special::constant::pi - Sigma;
     if (kr < 0)
         return kr;
-    
+
     while (max_steps-- > 0 and std::abs(kr) > eps)
         kr = (2*ntop+0.5*(l+1))*special::constant::pi - Sigma - std::log(2*kr)/k;
-    
+
     return kr / k;
 }
 
@@ -387,14 +387,14 @@ double getFreeFar (double k, int l, double Sigma, double eps, int max_steps)
 {
     // precompute Coulomb shift
     Sigma = std::isfinite(Sigma) ? Sigma : special::coul_F_sigma(l,k);
-    
+
     //
     // hunt phase
     //
-    
+
     int idx;
     double rzero = 0., eval = 0.;
-    
+
     // loop over sine zeros
     int limit = max_steps;
     for (idx = 1; limit > 0; idx *= 2, limit--)
@@ -403,23 +403,23 @@ double getFreeFar (double k, int l, double Sigma, double eps, int max_steps)
         rzero = getFreeAsyZero(k,l,Sigma,eps/100,max_steps,idx);
         if (rzero < 0)
             continue;
-        
+
         // evaluate Coulomb wave
         eval = std::abs(F(k,l,rzero,Sigma));
-        
+
         // terminate if requested precision met
         if (eval < eps)
             break;
     }
-    
+
     // if a boundary was chosen, exit
     if (idx == 1 or limit == 0)
         return std::max(0., rzero);
-    
+
     //
     // bisect phase
     //
-    
+
     int idx_left = idx/2;
     int idx_right = idx;
     int idx_mid = (idx_right - idx_left) / 2;
@@ -427,22 +427,22 @@ double getFreeFar (double k, int l, double Sigma, double eps, int max_steps)
     {
         // get sine zero for current index
         rzero = getFreeAsyZero(k,l,Sigma,eps/100,max_steps,idx_mid);
-        
+
         // evaluate Coulomb wave
         eval = std::abs(F(k,l,rzero,Sigma));
-        
+
         // move bisection guardians
         if (eval > eps)
             idx_left = idx_mid;
         else
             idx_right = idx_mid;
-        
+
         idx_mid = (idx_right + idx_left) / 2;
     }
-    
+
     return idx_mid * M_PI;
 }
-    
+
 } // endof namespace Hydrogen
 
 double HydrogenFunction::operator() (double r) const
@@ -450,7 +450,7 @@ double HydrogenFunction::operator() (double r) const
     // if too near, return simplified value
 //     if (r < 1e-5)
 //         return Hydrogen::getBoundN(n,l) * gsl_sf_pow_int(r,l+1);
-        
+
     // else compute precise value
     return Hydrogen::P(n_, l_, r);
 }
@@ -460,7 +460,7 @@ double HydrogenFunction::getTurningPoint () const
     // bound state
 //     if (n_ != 0)
         return n_ * (n_ - std::sqrt(n_*n_ - l_*(l_+1.)));
-    
+
     // free state
 //         return sqrt(l*(l+1))/k;
 }

@@ -56,40 +56,40 @@ template <class IdxT, class DataT> class CsrMatrix;
 class LUft
 {
     public:
-        
+
         //
         // Run-time selection mechanism (object factory).
         //
-        
+
             baseClassRunTimeSelectionDefinitions(LUft, ())
-        
+
         //
         // Class member functions.
         //
-        
+
             /// Default constructor.
             LUft () : filename_() {}
-            
+
             /// Destructor.
             virtual ~LUft () {}
-            
+
             /// Factorize.
             virtual void factorize (CsrMatrix<LU_int_t,Complex> const & matrix) = 0;
-            
+
             /**
              * @brief Validity indicator.
              * 
              * Returns true when the object contains a valid LU factorization.
              */
             virtual bool valid () const { return false; }
-            
+
             /**
              * @brief Free memory.
              * 
              * Release memory occupied by the LU-factorization numeric object.
              */
             virtual void drop () {}
-            
+
             /**
              * @brief Size of the numerical data.
              * 
@@ -97,14 +97,14 @@ class LUft
              * of the LU-factorization. This doesn't contain any other structural data.
              */
             virtual std::size_t size () const { return 0; }
-            
+
             /**
              * @brief Estimation of the condition number.
              * 
              * Note: Currently implemented only for UMFPACK backend.
              */
             virtual Real cond () const { return 0; }
-            
+
             /**
              * @brief Solve equations.
              * 
@@ -114,7 +114,7 @@ class LUft
              * as "b".
              */
             virtual void solve (const cArrayView b, cArrayView x, int eqs) const = 0;
-            
+
             /**
              * @brief Solve equations.
              * 
@@ -126,14 +126,14 @@ class LUft
             {
                 // reserve space for the solution
                 cArray x (b.size());
-                
+
                 // solve
                 this->solve(b, x, eqs);
-                
+
                 // return the result
                 return x;
             }
-            
+
             /**
              * @brief Get the factorization as a sparse matrix.
              * 
@@ -143,7 +143,7 @@ class LUft
             {
                 HexException("The \"get\" method is not implemented in chosen factorizer.");
             }
-            
+
             /**
              * @brief Link to a disk file.
              * 
@@ -152,17 +152,17 @@ class LUft
              * a specific filename.
              */
             virtual void link (std::string name) { filename_ = name; }
-            
+
             /**
              * @brief Unlink disk file.
              */
             virtual void unlink () { filename_.clear(); }
-            
+
             /**
              * @brief Name of the linked disk file.
              */
             virtual std::string filename () const { return filename_; }
-            
+
             /**
              * @brief Save factorization object to a disk file.
              * 
@@ -171,26 +171,26 @@ class LUft
              */
             virtual void save (std::string name) const = 0;
             virtual void save () const { this->save(filename_); }
-            
+
             /**
              * @brief Load factorization object from a disk file.
              */
             virtual void load (std::string name, bool throw_on_io_failure = true) = 0;
             virtual void load () { this->load(filename_, true); }
             virtual void silent_load () { this->load(filename_, false); }
-            
+
             /**
              * @brief Set various parameters specific for the factorization method.
              */
             virtual void* & pdata (std::string name) { return pdata_[name]; }
             virtual int   & idata (std::string name) { return idata_[name]; }
             virtual Real  & rdata (std::string name) { return rdata_[name]; }
-        
+
     protected:
-        
+
         /// Name of the disk file.
         std::string filename_;
-        
+
         /// Factorization setup.
         std::map<std::string,int>   idata_;
         std::map<std::string,Real>  rdata_;

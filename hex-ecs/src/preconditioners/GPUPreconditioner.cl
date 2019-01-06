@@ -40,7 +40,7 @@
     #include <clc/clc.h>
 
     // Necessary compile-time definitions
-    
+
     #define Long      long  // or int
     #define Real     float  // or double
     #define Complex float2  // or double2
@@ -57,7 +57,7 @@
     #define RYMIN        0  // potential bound
     #define RYMAX        0  // potential bound
     #define ROTFACT      1  // rotation factor, cos(ecs_theta)
-    
+
 #endif
 
 // --------------------------------------------------------------------------------- //
@@ -91,10 +91,10 @@ Real myclamp (Real x, Real a, Real b)
 Complex cmul (private Complex a, private Complex b)
 {
     private Complex c;
-    
+
     c.x = a.x * b.x - a.y * b.y;
     c.y = a.x * b.y + a.y * b.x;
-    
+
     return c;
 }
 
@@ -108,10 +108,10 @@ Complex cdiv (private Complex a, private Complex b)
 {
     private Complex c;
     private Real b2 = b.x * b.x + b.y * b.y;
-    
+
     c.x = (a.x * b.x + a.y * b.y) / b2;
     c.y = (a.y * b.x - a.x * b.y) / b2;
-    
+
     return c;
 }
 
@@ -126,17 +126,17 @@ Complex cdiv (private Complex a, private Complex b)
 Real pow_int (private Real x, private int n)
 {
     private Real value = 1; // = x^0
-    
+
     do
     {
         if (n % 2 == 1)
             value *= x;
-        
+
         n /= 2;
         x *= x;
     }
     while (n != 0);
-    
+
     return value;
 }
 
@@ -157,7 +157,7 @@ Real pow_int (private Real x, private int n)
 kernel void a_vec_b_vec (private Complex a, global Complex *x, private Complex b, global Complex *y)
 {
     private int i = get_global_id(0);
-    
+
     if (i < NROW)
         x[i] = cmul(a,x[i]) + cmul(b,y[i]);
 }
@@ -177,12 +177,12 @@ kernel void scalar_product (global Complex *u, global Complex *v, global Complex
     // position of this thread among other threads
     private int iglobal = get_global_id(0);
     private int ilocal = get_local_id(0);
-    
+
     // calculate product of array elements
     local Complex uv[NLOCAL];
     uv[ilocal] = (iglobal < NROW ? cmul(u[iglobal],v[iglobal]) : (Complex)(0,0));
     barrier(CLK_LOCAL_MEM_FENCE);
-    
+
     // reduce the per-element products
     int stride = 1;
     while (stride < NLOCAL)
@@ -192,7 +192,7 @@ kernel void scalar_product (global Complex *u, global Complex *v, global Complex
         stride *= 2;
         barrier(CLK_LOCAL_MEM_FENCE);
     }
-    
+
     // write the reduced scalar product as computed by this group
     if (ilocal == 0)
         z[get_group_id(0)] = uv[0];
@@ -212,15 +212,15 @@ kernel void norm (global Complex *v, global Real *z)
     // position of this thread among other threads
     private int iglobal = get_global_id(0);
     private int ilocal = get_local_id(0);
-    
+
     // get element to process by this thread
     private Complex vi = v[iglobal];
-    
+
     // calculate squared modulus of an array element
     local Real vv[NLOCAL];
     vv[ilocal] = (iglobal < NROW ? vi.x * vi.x + vi.y * vi.y : 0);
     barrier(CLK_LOCAL_MEM_FENCE);
-    
+
     // reduce the per-element products
     private int stride = 1;
     while (stride < NLOCAL)
@@ -230,7 +230,7 @@ kernel void norm (global Complex *v, global Real *z)
         stride *= 2;
         barrier(CLK_LOCAL_MEM_FENCE);
     }
-    
+
     // write the reduced scalar product as computed by this group
     if (ilocal == 0)
         z[get_group_id(0)] = vv[0];
@@ -249,10 +249,10 @@ kernel void mmul_simple (global Complex *A, global Complex *x, global Complex *y
     // output vector element index
     private int i = get_global_id(0) / NSPLINE_PROJ;
     private int j = get_global_id(0) % NSPLINE_PROJ;
-    
+
     // initialize the output element
     private Complex result = 0;
-    
+
     // for all source vector elements
     if (i < NSPLINE_ATOM)
     for (private int k = i - ORDER; k <= i + ORDER; k++) if (0 <= k && k < NSPLINE_ATOM)
@@ -261,14 +261,14 @@ kernel void mmul_simple (global Complex *A, global Complex *x, global Complex *y
         // compute multi-indices
         private int ik = min(i,k) * (ORDER + 1) + abs_diff(i,k);
         private int jl = min(j,l) * (ORDER + 1) + abs_diff(l,j);
-        
+
         // get the matrix element
         private Complex elem = A[ik * (ORDER + 1) * NSPLINE_PROJ + jl];
-        
+
         // multiply right-hand side by that matrix element
         result += cmul(elem, x[k * NSPLINE_PROJ + l]);
     }
-    
+
     // push result to global memory
     if (i < NSPLINE_ATOM)
     {
@@ -303,7 +303,7 @@ kernel void A1el
     // output vector element index
     private int i = get_global_id(0) / NSPLINE_PROJ;
     private int j = get_global_id(0) % NSPLINE_PROJ;
-    
+
     // for all source vector elements
     if (i < NSPLINE_ATOM)
     for (private int k = i; k <= i + ORDER; k++) if (k < NSPLINE_ATOM)
@@ -312,13 +312,13 @@ kernel void A1el
         // compute multi-indices
         private int ik = i * (ORDER + 1) + k - i;
         private int jl = j * (ORDER + 1) + l - j;
-        
+
         // calculate the one-electron part of the hamiltonian matrix element Hijkl
         private Complex elem = E * cmul(Spa[ik],Spp[jl]);
         elem -= (Real)(0.5f) * (cmul(Dpa[ik],Spp[jl]) + cmul(Spa[ik],Dpp[jl]));
         elem -= (Real)(0.5f) * l1 * (l1 + 1) * cmul(M2pa[ik],Spp[jl]) + (Real)(0.5f) * l2 * (l2 + 1) * cmul(Spa[ik],M2pp[jl]);
         elem -= ZA * (-1) * cmul(M1pa[ik],Spp[jl]) + ZA * ZP * cmul(Spa[ik],M1pp[jl]);
-        
+
         // multiply right-hand side by that matrix element
         A[ik * NSPLINE_PROJ * (ORDER + 1) + jl] = elem;
     }
@@ -373,10 +373,10 @@ kernel void mmul_1el
     // output vector element index
     private int i = get_global_id(0) / NSPLINE_PROJ;
     private int j = get_global_id(0) % NSPLINE_PROJ;
-    
+
     // initialize the output element
     y[i * NSPLINE_PROJ + j] = 0;
-    
+
     // for all source vector elements
     if (i < NSPLINE_ATOM)
     for (private int k = i - ORDER; k <= i + ORDER; k++) if (0 <= k && k < NSPLINE_ATOM)
@@ -385,13 +385,13 @@ kernel void mmul_1el
         // compute multi-indices
         private int ik = min(i,k) * (ORDER + 1) + abs(i - k);
         private int jl = min(j,l) * (ORDER + 1) + abs(l - j);
-        
+
         // calculate the one-electron part of the hamiltonian matrix element Hijkl
         private Complex elem = E * cmul(Spa[ik],Spp[jl]);
         elem -= (Real)(0.5f) * (cmul(Dpa[ik],Spp[jl]) + cmul(Spa[ik],Dpp[jl]));
         elem -= (Real)(0.5f) * l1 * (l1 + 1) * cmul(M2pa[ik],Spp[jl]) + (Real)(0.5f) * l2 * (l2 + 1) * cmul(Spa[ik],M2pp[jl]);
         elem -= ZA * (-1) * cmul(M1pa[ik],Spp[jl]) + ZA * ZP * cmul(Spa[ik],M1pp[jl]);
-        
+
         // multiply right-hand side by that matrix element
         y[i * NSPLINE_PROJ + j] += cmul(elem, x[k * NSPLINE_PROJ + l]);
     }
@@ -429,31 +429,31 @@ kernel void mmul_1el_segment
 {
     // diagonal (i + ORDER - k)
     private int d = get_global_id(0) % (2 * ORDER + 1);
-    
+
     // i = k - ORDER, ..., k + ORDER
     private int i = k + d - ORDER;
-    
+
     // j = 0, ..., NSPLINE_PROJ - 1
     private int j = get_global_id(0) / (2 * ORDER + 1);
-    
+
     if (0 <= i && i < NSPLINE_ATOM)
     {
         // initialize the output element
         y[(ill * (2 * ORDER + 1) + d) * NSPLINE_PROJ + j] = 0;
-        
+
         // for all relevant source vector elements
         for (private int l = j - ORDER; l <= j + ORDER; l++) if (0 <= l && l < NSPLINE_PROJ)
         {
             // compute multi-indices
             private int ik = min(i,k) * (ORDER + 1) + abs_diff(i,k);
             private int jl = min(j,l) * (ORDER + 1) + abs_diff(j,l);
-            
+
             // calculate the one-electron part of the hamiltonian matrix element Hijkl
             private Complex elem = E * cmul(Spa[ik],Spp[jl]);
             elem -= (Real)(0.5f) * (cmul(Dpa[ik],Spp[jl]) + cmul(Spa[ik],Dpp[jl]));
             elem -= (Real)(0.5f) * l1 * (l1 + 1) * cmul(M2pa[ik],Spp[jl]) + (Real)(0.5f) * l2 * (l2 + 1) * cmul(Spa[ik],M2pp[jl]);
             elem -= ZA * (-1) * cmul(M1pa[ik],Spp[jl]) + ZA * ZP * cmul(Spa[ik],M1pp[jl]);
-            
+
             // multiply right-hand side by that matrix element
             y[(ill * (2 * ORDER + 1) + d) * NSPLINE_PROJ + j] += cmul(elem, x[ill * NSPLINE_PROJ + l]);
         }
@@ -482,7 +482,7 @@ kernel void kron_div
 {
     // get worker's offset index (0 <= j < NSPLINE_PROJ)
     private int j = get_global_id(0);
-    
+
     // y = y / (E (I kron I) - (D1 kron I) - (I kron D2))
     for (private int i = 0; i < NSPLINE_ATOM; i++)
         y[i * NSPLINE_PROJ + j] = cdiv(y[i * NSPLINE_PROJ + j], E - D1[i] - D2[j]);
@@ -492,10 +492,10 @@ Real unrotateX (private Complex A)
 {
     // left complex part
     if (A.x < RXMIN)   return RXMIN + (A.x - RXMIN) / ROTFACT;
-    
+
     // right complex part
     if (A.x > RXMAX)   return RXMAX + (A.x - RXMAX) / ROTFACT;
-    
+
     // only real part
     return A.x;
 }
@@ -504,10 +504,10 @@ Real unrotateY (private Complex A)
 {
     // left complex part
     if (A.x < RYMIN)   return RYMIN + (A.x - RYMIN) / ROTFACT;
-    
+
     // right complex part
     if (A.x > RYMAX)   return RYMAX + (A.x - RYMAX) / ROTFACT;
-    
+
     // only real part
     return A.x;
 }
@@ -541,11 +541,11 @@ kernel void mmul_2el_decoupled
     // B-spline indices
     private int a = get_global_id(0) / NSPLINE_PROJ;
     private int b = get_global_id(0) % NSPLINE_PROJ;
-    
+
     // B-spline bounding knots
     private Real ta1 = unrotateX(ta[a]), ta2 = unrotateX(ta[a + ORDER + 1]);
     private Real tb1 = unrotateY(tp[b]), tb2 = unrotateY(tp[b + ORDER + 1]);
-    
+
     // loop over free B-spline indices
     for (private int c = a - ORDER; c <= a + ORDER; c++) if (0 <= c && c < NSPLINE_ATOM)
     for (private int d = b - ORDER; d <= b + ORDER; d++) if (0 <= d && d < NSPLINE_PROJ)
@@ -553,31 +553,31 @@ kernel void mmul_2el_decoupled
         // B-spline bounding knots
         private Real tc1 = unrotateX(ta[c]), tc2 = unrotateX(ta[c + ORDER + 1]);
         private Real td1 = unrotateY(tp[d]), td2 = unrotateY(tp[d + ORDER + 1]);
-        
+
         if (max(ta1,tc1) >= min(ta2,tc2) || max(tb1,td1) >= min(tb2,td2))
             continue;
-        
+
         // restrict effective radius
         private Real t_xmin = myclamp(max(ta1,tc1), RXMIN, RXMAX);
         private Real t_xmax = myclamp(min(ta2,tc2), RXMIN, RXMAX);
         private Real t_ymin = myclamp(max(tb1,td1), RYMIN, RYMAX);
         private Real t_ymax = myclamp(min(tb2,td2), RYMIN, RYMAX);
-        
+
         // decoupled y < x
         if (t_ymax <= t_xmin)
         {
             private Real scale = pow_int(t_ymax / t_xmax, lambda) / t_xmax;
             private Complex R = scale * cmul(MmLm1a[min(a,c) * (ORDER + 1) + abs_diff(a,c)], MLp[min(b,d) * (ORDER + 1) + abs_diff(b,d)]);
-            
+
             y[a * NSPLINE_PROJ + b] += ZP * f[lambda] * cmul(R, x[c * NSPLINE_PROJ + d]);
         }
-        
+
         // decoupled x < y
         if (t_xmax <= t_ymin)
         {
             private Real scale = pow_int(t_xmax / t_ymax, lambda) / t_ymax;
             private Complex R = scale * cmul(MLa[min(a,c) * (ORDER + 1) + abs_diff(a,c)], MmLm1p[min(b,d) * (ORDER + 1) + abs_diff(b,d)]);
-            
+
             y[a * NSPLINE_PROJ + b] += ZP * f[lambda] * cmul(R, x[c * NSPLINE_PROJ + d]);
         }
     }
@@ -605,11 +605,11 @@ kernel void A2el_decoupled
     // B-spline indices
     private int a = get_global_id(0) / NSPLINE_PROJ;
     private int b = get_global_id(0) % NSPLINE_PROJ;
-    
+
     // B-spline bounding knots
     private Real ta1 = unrotateX(ta[a]), ta2 = unrotateX(ta[a + ORDER + 1]);
     private Real tb1 = unrotateY(tp[b]), tb2 = unrotateY(tp[b + ORDER + 1]);
-    
+
     // loop over free B-spline indices
     for (private int c = a; c <= a + ORDER; c++) if (0 <= c && c < NSPLINE_ATOM)
     for (private int d = b; d <= b + ORDER; d++) if (0 <= d && d < NSPLINE_PROJ)
@@ -617,35 +617,35 @@ kernel void A2el_decoupled
         // B-spline bounding knots
         private Real tc1 = unrotateX(ta[c]), tc2 = unrotateX(ta[c + ORDER + 1]);
         private Real td1 = unrotateY(tp[d]), td2 = unrotateY(tp[d + ORDER + 1]);
-        
+
         if (max(ta1,tc1) >= min(ta2,tc2) || max(tb1,td1) >= min(tb2,td2))
             continue;
-        
+
         // restrict effective radius
         private Real t_xmin = myclamp(max(ta1,tc1), RXMIN, RXMAX);
         private Real t_xmax = myclamp(min(ta2,tc2), RXMIN, RXMAX);
         private Real t_ymin = myclamp(max(tb1,td1), RYMIN, RYMAX);
         private Real t_ymax = myclamp(min(tb2,td2), RYMIN, RYMAX);
-        
+
         // multi-indices
         private int ac = a * (ORDER + 1) + c - a;
         private int bd = b * (ORDER + 1) + d - b;
-        
+
         // decoupled y < x
         if (t_ymax <= t_xmin)
         {
             private Real scale = pow_int(t_ymax / t_xmax, lambda) / t_xmax;
             private Complex R = scale * cmul(MmLm1a[ac], MLp[bd]);
-            
+
             A[ac * NSPLINE_PROJ * (ORDER + 1) + bd] += ZP * f[lambda] * R;
         }
-        
+
         // decoupled x < y
         if (t_xmax <= t_ymin)
         {
             private Real scale = pow_int(t_xmax / t_ymax, lambda) / t_ymax;
             private Complex R = scale * cmul(MLa[ac], MmLm1p[bd]);
-            
+
             A[ac * NSPLINE_PROJ * (ORDER + 1) + bd] += ZP * f[lambda] * R;
         }
     }
@@ -680,13 +680,13 @@ kernel void mmul_2el_decoupled_segment
 {
     // diagonal (i + ORDER - k)
     private int d = get_global_id(0) % (2 * ORDER + 1);
-    
+
     // i = k - ORDER, ..., k + ORDER
     private int i = k + d - ORDER;
-    
+
     // j = 0, ..., NSPLINE_PROJ - 1
     private int j = get_global_id(0) / (2 * ORDER + 1);
-    
+
     if (0 <= i && i < NSPLINE_ATOM)
     {
         for (private int l = j - ORDER; l <= j + ORDER; l++) if (0 <= l && l < NSPLINE_PROJ)
@@ -696,49 +696,49 @@ kernel void mmul_2el_decoupled_segment
             private Real tj1 = unrotateY(tp[j]), tj2 = unrotateY(tp[j + ORDER + 1]);
             private Real tk1 = unrotateX(ta[k]), tk2 = unrotateX(ta[k + ORDER + 1]);
             private Real tl1 = unrotateY(tp[l]), tl2 = unrotateY(tp[l + ORDER + 1]);
-            
+
             if (max(ti1,tk1) >= min(ti2,tk2) || max(tj1,tl1) >= min(tj2,tl2))
                 continue;
-            
+
             // restrict effective radius
             private Real t_xmin = myclamp(max(ti1,tk1), RXMIN, RXMAX);
             private Real t_xmax = myclamp(min(ti2,tk2), RXMIN, RXMAX);
             private Real t_ymin = myclamp(max(tj1,tl1), RYMIN, RYMAX);
             private Real t_ymax = myclamp(min(tj2,tl2), RYMIN, RYMAX);
-            
+
             // multi-indices
             private int ik = min(i,k) * (ORDER + 1) + abs_diff(i,k);
             private int jl = min(j,l) * (ORDER + 1) + abs_diff(j,l);
-            
+
             // radial integral
             private Complex R = 0;
-            
+
             // decoupled y < x
             if (t_ymax <= t_xmin)
             {
                 private Real scale = pow_int(t_ymax / t_xmax, lambda) / t_xmax;
                 R = scale * cmul(MmLm1a[ik], MLp[jl]);
             }
-            
+
             // decoupled x < y
             if (t_xmax <= t_ymin)
             {
                 private Real scale = pow_int(t_xmax / t_ymax, lambda) / t_ymax;
                 R = scale * cmul(MLa[ik], MmLm1p[jl]);
             }
-            
+
             // update all angular blocks
             for (private int ill  = 0; ill  < ANGULAR_BASIS_SIZE; ill++)
             {
                 private Complex z = 0;
-                
+
                 # pragma unroll
                 for (private int illp = 0; illp < ANGULAR_BASIS_SIZE; illp++)
                 {
                     z += f[(lambda * ANGULAR_BASIS_SIZE + ill) * ANGULAR_BASIS_SIZE + illp]
                         * cmul(R, x[illp * NSPLINE_PROJ + l]);
                 }
-                
+
                 y[(ill * (2 * ORDER + 1) + d) * NSPLINE_PROJ + j] += ZP * z;
             }
         }
@@ -768,13 +768,13 @@ kernel void mmul_2el_coupled
 {
     private int a = get_global_id(0) / NSPLINE_PROJ;
     private int b = get_global_id(0) % NSPLINE_PROJ;
-    
+
     for (private int c = a - ORDER; c <= a + ORDER; c++) if (0 <= c && c < NSPLINE_ATOM)
     for (private int d = b - ORDER; d <= b + ORDER; d++) if (0 <= d && d < NSPLINE_PROJ)
     {
         private int I = min(a,c) * (ORDER + 1) + abs_diff(a,c);
         private int J = min(b,d) * (ORDER + 1) + abs_diff(b,d);
-        
+
         for (private int idx = Rp[I]; idx < Rp[I + 1]; idx++)
         {
             if (Ri[idx] == J)
@@ -801,13 +801,13 @@ kernel void A2el_coupled
 {
     private int a = get_global_id(0) / NSPLINE_PROJ;
     private int b = get_global_id(0) % NSPLINE_PROJ;
-    
+
     for (private int c = a; c <= a + ORDER; c++) if (c < NSPLINE_ATOM)
     for (private int d = b; d <= b + ORDER; d++) if (d < NSPLINE_PROJ)
     {
         private int I = a * (ORDER + 1) + c - a;
         private int J = b * (ORDER + 1) + d - b;
-        
+
         for (private int idx = Rp[I]; idx < Rp[I + 1]; idx++)
         {
             if (Ri[idx] == J)
@@ -842,38 +842,38 @@ kernel void mmul_2el_coupled_segment
 {
     // diagonal (i + ORDER - k)
     private int d = get_global_id(0) % (2 * ORDER + 1);
-    
+
     // i = k - ORDER, ..., k + ORDER
     private int i = k + d - ORDER;
-    
+
     // j = 0, ..., NSPLINE_PROJ - 1
     private int j = get_global_id(0) / (2 * ORDER + 1);
-    
+
     if (0 <= i && i < NSPLINE_ATOM)
     {
         for (private int l = j - ORDER; l <= j + ORDER; l++) if (0 <= l && l < NSPLINE_PROJ)
         {
             private int ik = min(i,k) * (ORDER + 1) + abs_diff(i,k);
             private int jl = min(j,l) * (ORDER + 1) + abs_diff(j,l);
-            
+
             for (private int idx = Rp[ik]; idx < Rp[ik + 1]; idx++) if (Ri[idx] == jl)
             {
                 private Complex R = Rx[idx];
-                
+
                 for (private int ill  = 0; ill  < ANGULAR_BASIS_SIZE; ill++)
                 {
                     private Complex z = 0;
-                    
+
                     # pragma unroll
                     for (private int illp = 0; illp < ANGULAR_BASIS_SIZE; illp++)
                     {
                         z += f[(lambda * ANGULAR_BASIS_SIZE + ill) * ANGULAR_BASIS_SIZE + illp]
                             * cmul(R, x[illp * NSPLINE_PROJ + l]);
                     }
-                    
+
                     y[(ill * (2 * ORDER + 1) + d) * NSPLINE_PROJ + j] += ZP * z;
                 }
-                
+
                 break;
             }
         }
@@ -905,44 +905,44 @@ kernel void mul_ABt
     // destination block indices
     private int irow_block = get_group_id(0);
     private int icol_block = get_group_id(1);
-    
+
     // global destination index
     private int irow_glob = get_global_id(0);
     private int icol_glob = get_global_id(1);
-    
+
     // group worker threads; indices within the destination block
     private int irow_loc = get_local_id(0);
     private int icol_loc = get_local_id(1);
-    
+
     // work arrays
     local Complex Aloc[BLOCK_SIZE][BLOCK_SIZE];
     local Complex Bloc[BLOCK_SIZE][BLOCK_SIZE];
-    
+
     // aggregated scalar product of the destination element C[idy,idx]
     private Complex res = 0;
-    
+
     // calculate number of blocks
     private int Nblock = ((k + BLOCK_SIZE - 1) / BLOCK_SIZE);
-    
+
     // for all source blocks
     for (private int iblock = 0; iblock < Nblock; iblock++)
     {
         // get indices of the current elements in the matrices
         private int Arow = irow_glob, Acol = iblock * BLOCK_SIZE + icol_loc;
         private int Bcol = icol_glob, Brow = iblock * BLOCK_SIZE + irow_loc;
-        
+
         // load elements of the source blocks into the local memory, pad by zeros
         barrier(CLK_LOCAL_MEM_FENCE);
         Aloc[icol_loc][irow_loc] = (Arow < m && Acol < k ? A[Arow * k + Acol] : (Complex)(0.,0.));
         Bloc[irow_loc][icol_loc] = (Brow < k && Bcol < n ? B[Brow + k * Bcol] : (Complex)(0.,0.));
         barrier(CLK_LOCAL_MEM_FENCE);
-        
+
         // each group's thread will calculate one of the scalar products
         for (private int K = 0; K < BLOCK_SIZE; K++)
             if (iblock * BLOCK_SIZE + K < k)
                 res += cmul(Aloc[K][irow_loc],Bloc[K][icol_loc]);
     }
-    
+
     // store result to device memory
     if (irow_glob < m && icol_glob < n)
         C[irow_glob * n + icol_glob] = res;
@@ -973,45 +973,45 @@ kernel void mul_AtBt
     // destination block indices
     private int irow_block = get_group_id(0);
     private int icol_block = get_group_id(1);
-    
+
     // global destination index
     private int irow_glob = get_global_id(0);
     private int icol_glob = get_global_id(1);
-    
+
     // group worker threads; indices within the destination block
     private int irow_loc = get_local_id(0);
     private int icol_loc = get_local_id(1);
-    
+
     // work arrays
     local Complex Aloc[BLOCK_SIZE][BLOCK_SIZE];
     local Complex Bloc[BLOCK_SIZE][BLOCK_SIZE];
-    
+
     // aggregated scalar product of the destination element C[idy,idx]
     private Complex res = 0;
-    
+
     // calculate number of blocks
     private int Nblock = ((k + BLOCK_SIZE - 1) / BLOCK_SIZE);
-    
+
     // for all source blocks
     for (private int iblock = 0; iblock < Nblock; iblock++)
     {
         // get indices of the current elements in the matrices
         private int Arow = irow_glob, Acol = iblock * BLOCK_SIZE + icol_loc;
         private int Bcol = icol_glob, Brow = iblock * BLOCK_SIZE + irow_loc;
-        
+
         // load elements of the source blocks into the local memory, pad by zeros
         barrier(CLK_LOCAL_MEM_FENCE);
         Aloc[icol_loc][irow_loc] = (Arow < m && Acol < k ? A[Arow + k * Acol] : (Complex)(0.,0.));
         Bloc[irow_loc][icol_loc] = (Brow < k && Bcol < n ? B[Brow + k * Bcol] : (Complex)(0.,0.));
         barrier(CLK_LOCAL_MEM_FENCE);
-        
+
         // each group's thread will calculate one of the scalar products
         # pragma unroll
         for (private int K = 0; K < BLOCK_SIZE; K++)
             if (iblock * BLOCK_SIZE + K < k)
                 res += cmul(Aloc[K][irow_loc],Bloc[K][icol_loc]);
     }
-    
+
     // store result to device memory
     if (irow_glob < m && icol_glob < n)
         C[irow_glob * n + icol_glob] = res;

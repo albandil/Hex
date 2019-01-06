@@ -57,11 +57,11 @@ namespace Hydrogen
 class CarthesianBoundWaveFunction
 {
     public:
-        
+
         CarthesianBoundWaveFunction (int N, int L, int M);
-        
+
         ~CarthesianBoundWaveFunction ();
-        
+
         /**
          * @brief Term of the multidimensional hydrogen bound function.
          * 
@@ -76,26 +76,26 @@ class CarthesianBoundWaveFunction
             unsigned u, v, w, n;
         }
         Term;
-        
+
         /**
          * @brief Evaluate the function.
          * 
          * Evaluates the hydrogen function at @f$ \mathbf{r} = (x,y,z) @f$.
          */
         Complex operator() (double x, double y, double z) const;
-        
+
         /**
          * @brief Access the overall normalization factor.
          */
         double norm () const { return norm_; }
-        
+
         /**
          * @brief Access the list of terms.
          */
         std::vector<Term> const & terms () const { return terms_; }
-        
+
     private:
-        
+
         int N_, L_, M_;
         double norm_;
         std::vector<Term> terms_;
@@ -271,11 +271,11 @@ double getFreeFar
 class HydrogenFunction : public special::RadialFunction<double>
 {
 public:
-    
+
     /// Constructor for bound state
     HydrogenFunction (int n, int l)
         : n_(n), l_(l) {}
-    
+
     /**
      * \brief Get far radius.
      * 
@@ -290,30 +290,30 @@ public:
     {
         return Hydrogen::getBoundFar(n_,l_,eps,max_steps);
     };
-    
+
     /// Get principal quantum number.
     int n () const { return n_; }
-    
+
     /// Get orbital quantum number.
     int l () const { return l_; }
-    
+
     /// Evaluate the function.
     double operator() (double r) const;
-    
+
     /// Classical turning point.
     double getTurningPoint () const;
-    
+
     /// Comparison
     bool operator== (HydrogenFunction const & psi) const
     {
         return n_ == psi.n_ and l_ == psi.l_;
     }
-    
+
 private:
-    
+
     /// Principal quantum number of bound state.
     int n_;
-    
+
     /// Angular momentum.
     int l_;
 };

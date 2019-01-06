@@ -48,15 +48,15 @@ template<typename T> void load_and_write(const char* hdf, int samples)
         std::cerr << "Can't read file \"" << hdf << "\"\n";
         std::exit(EXIT_FAILURE);
     }
-    
+
     // create the expansion
     Chebyshev<double,T> expansion(coefs, -1, 1);
-    
+
     // evaluate the expansion
     for (int i = 0; i <= samples; i++)
     {
         double x = (2.*i-samples) / samples;
-        
+
         Complex y = expansion.clenshaw(x,coefs.size());
         std::cout << x << "\t" << y.real() << "\t" << y.imag() << "\n";
     }
@@ -67,7 +67,7 @@ int main (int argc, char *argv[])
     bool cpx = false;    // whether to zip complex expansion
     std::string hdf;
     int samples = -1;
-    
+
     for (int iarg = 1; iarg < argc; iarg++)
     {
         if (strcmp(argv[iarg],"--complex") == 0)
@@ -86,17 +86,17 @@ int main (int argc, char *argv[])
                 samples = -1;
         }
     }
-    
+
     if (samples < 0)
     {
         std::cerr << "\nUsage: ./chebeval [--complex] <HDFfile> <samples>\n\n";
         std::exit(EXIT_FAILURE);
     }
-    
+
     if (cpx)
         load_and_write<Complex>(hdf.c_str(), samples);
     else
         load_and_write<double>(hdf.c_str(), samples);
-    
+
     return 0;
 }

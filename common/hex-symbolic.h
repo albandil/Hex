@@ -110,21 +110,21 @@ extern rational onehalf;
 class term
 {
 public:
-    
+
     /**
      * @brief Default constructor.
      * 
      * Create a new symbolic term that will evaluate to zero.
      */
     term () : ki(1), kr(0), a(0), gf(GF_NONE), b(0), c(0) {}
-    
+
     /**
      * @brief Construct from fraction.
      * 
      * Create a new symbolic term that will evaluate to a rational number.
      */
     term (rational x) : ki(1), kr(x), a(0), gf(GF_NONE), b(0), c(0) {}
-    
+
     /**
      * @brief Conversion to plain number.
      * 
@@ -132,7 +132,7 @@ public:
      * factors are equal to 1. Otherwise throws an exception.
      */
     double todouble() const;
-    
+
     /**
      * @brief Ordering function.
      * 
@@ -143,29 +143,29 @@ public:
      * come first.
      */
     static bool ordering (term const & a, term const & b);
-    
+
     //
     // data fields
     //
-    
+
     /// positive (!) irrational multiplication factor
     double ki;
-    
+
     /// rational multiplication factor
     rational kr;
-    
+
     /// exponent
     int a;
-    
+
     /// goniometric function (none, sin or cos)
     int gf;
-    
+
     /// goniometric function wave number
     double b;
-    
+
     /// exponential factor
     rational c;
-    
+
 };
 
 /**
@@ -208,11 +208,11 @@ term expm (rational c);
 class poly
 {
 public:
-    
+
     //
     // constructors
     //
-    
+
     /**
      * @brief Default constructor.
      * 
@@ -220,7 +220,7 @@ public:
      * no terms and evaluates to zero.
      */
     poly() {}
-    
+
     /**
      * @brief Size constructor.
      * 
@@ -228,7 +228,7 @@ public:
      * will evaluate to zero unless modified.
      */
     poly(int n) : terms(n) {}
-    
+
     /**
      * @brief Single-term constructor.
      * 
@@ -236,7 +236,7 @@ public:
      * just a single term, which is copied from the argument.
      */
     poly(term const & T) : terms({T}) {}
-    
+
     /**
      * @brief Copy constructor.
      * 
@@ -245,11 +245,11 @@ public:
      * the argument.
      */
     poly(poly const & P) : terms(P.terms) {}
-    
+
     //
     // data storage
     //
-    
+
     /**
      * @brief Terms array.
      * 
@@ -257,7 +257,7 @@ public:
      * Every term is represented by a single item in the array.
      */
     std::vector<term> terms;
-    
+
     /**
      * @brief Optimize the polynomial.
      * 
@@ -267,12 +267,12 @@ public:
      * is utterly omitted.
      */
     void optimize();
-    
-    
+
+
     //
     // std::vector-like interface
     //
-    
+
     typedef std::vector<term>::iterator       iterator;
     typedef std::vector<term>::const_iterator const_iterator;
     inline iterator begin() { return terms.begin(); }
@@ -288,13 +288,13 @@ public:
     inline size_t size() const { return terms.size(); }
     inline term & operator [] (size_t i) { return terms[i]; }
     inline term const & operator [] (size_t i) const { return terms[i]; }
-    
+
     void clear () { terms.clear(); }
-    
+
     //
     // stream output
     //
-    
+
     /**
      * @brief Formatted output.
      * 

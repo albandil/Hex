@@ -90,7 +90,7 @@
 #ifdef __linux__
     #include <sys/mman.h>
     #include <sys/stat.h>
-    
+
     #include <fcntl.h>
     #include <unistd.h>
 #endif
@@ -107,7 +107,7 @@
 template <class T> class PlainAllocator
 {
     public:
-        
+
         /**
          * @brief Get alignment of a type.
          * 
@@ -117,7 +117,7 @@ template <class T> class PlainAllocator
         {
             return std::alignment_of<T>::value;
         }
-        
+
         /**
          * @brief Allocate array.
          * 
@@ -139,13 +139,13 @@ template <class T> class PlainAllocator
                     bytes < 1024*1204      ? format("%.2f kiB", bytes / 1024.) : (
                     bytes < 1024*1024*1024 ? format("%.2f MiB", bytes / (1024. * 1024.)) :
                       /* else */             format("%.2f GiB", bytes / (1024. * 1024 * 1024.)))));
-                
+
                 HexException("Insufficent memory (unable to allocate next %s).", strsize.c_str());
             }
-            
+
             return nullptr;
         }
-        
+
         /**
          * @brief Free array.
          * 
@@ -160,12 +160,12 @@ template <class T> class PlainAllocator
             if (ptr != nullptr)
                 delete [] ptr;
         }
-        
+
         T * allocate (std::size_t n, T const * hint)
         {
             return PlainAllocator<T>::alloc(n);
         }
-        
+
         void deallocate (T * ptr, std::size_t n)
         {
             PlainAllocator<T>::free(ptr);
@@ -190,9 +190,9 @@ template <class T> class PlainAllocator
 template <class T, std::size_t alignment_ = std::alignment_of<T>::value> class AlignedAllocator
 {
     public:
-        
+
         static const std::size_t alignment = alignment_;
-        
+
         /**
          * @brief Allocate aligned memory.
          * 
@@ -221,16 +221,16 @@ template <class T, std::size_t alignment_ = std::alignment_of<T>::value> class A
             // is there anything to allocate?
             if (n < 1)
                 return nullptr;
-            
+
             // get the alignment and raise it to nearest multiple of sizeof(void*)
             std::size_t align = std::max(alignment_, alignof(max_align_t));
             if (align % sizeof(void*) != 0)
                 align += sizeof(void*) - align % sizeof(void*);
-            
+
             // count elements (make the count even) and compute upper memory bound
             std::size_t elems = n + (n % 2);
             std::size_t bytes = elems * sizeof(T) + sizeof(std::uintptr_t) + align;
-            
+
             // allocate memory pool
             void * root;
             try
@@ -244,30 +244,30 @@ template <class T, std::size_t alignment_ = std::alignment_of<T>::value> class A
                     bytes < 1024*1204      ? format("%.2f kiB", bytes / 1024.) : (
                     bytes < 1024*1024*1024 ? format("%.2f MiB", bytes / (1024. * 1024.)) :
                       /* else */             format("%.2f GiB", bytes / (1024. * 1024 * 1024.)))));
-                
+
                 HexException("Insufficent memory (unable to allocate next %s).", strsize.c_str());
             }
             std::uintptr_t root_address = (std::uintptr_t)root;
-            
+
             // compute padding
             unsigned padding = 0;
             if ((root_address + sizeof(root_address)) % align != 0)
                 padding = align - (root_address + sizeof(root_address)) % align;
-            
+
             // place origin
             std::uintptr_t origin_address = root_address + sizeof(root_address) + padding;
             T * origin = reinterpret_cast<T*>(origin_address);
-            
+
             // store the address of 'root' just before the 'origin'
             *(reinterpret_cast<std::uintptr_t*>(origin_address) - 1) = root_address;
-            
+
             // clear the last element so that we may disregard it during multiplication
             *(origin + n + (n % 2) - 1) = 0;
-            
+
             // return the pointer
             return origin;
         }
-        
+
         /**
          * @brief Deallocate aligned memory.
          * 
@@ -283,12 +283,12 @@ template <class T, std::size_t alignment_ = std::alignment_of<T>::value> class A
             {
                 // get root address from the location just before the pointer
                 std::uintptr_t root_address = *(reinterpret_cast<std::uintptr_t*>(origin) - 1);
-                
+
                 // free the whole memory pool
                 delete [] reinterpret_cast<char*>(root_address);
             }
         }
-        
+
         /**
          * @brief Test aligned pointer.
          * 
@@ -301,15 +301,15 @@ template <class T, std::size_t alignment_ = std::alignment_of<T>::value> class A
             // only test non-null pointes
             if (origin == nullptr)
                 return;
-            
+
             // get root and origin addresses
             std::uintptr_t root_address = *(reinterpret_cast<std::uintptr_t const*>(origin) - 1);
             std::uintptr_t origin_address = reinterpret_cast<std::uintptr_t>(origin);
-            
+
             // get distance between 'root' and 'origin'; also get the root pointer
             unsigned d = origin_address - root_address;
             void * root = reinterpret_cast<void*>(root_address);
-            
+
             // compute maximal usable alignment of this aligned pointer
             std::size_t align = 1;
             for (; ; align *= 2)
@@ -317,7 +317,7 @@ template <class T, std::size_t alignment_ = std::alignment_of<T>::value> class A
                 if (origin_address % (2*align) != 0)
                     break;
             }
-            
+
             // write information to stdout
             std::cout << "Aligned pointer information:" << std::endl;
             std::cout << "   root pointer : " << root << std::endl;
@@ -326,12 +326,12 @@ template <class T, std::size_t alignment_ = std::alignment_of<T>::value> class A
             std::cout << "   padding      : " << d - sizeof(root_address) << " Bytes" << std::endl;
             std::cout << "   alignment    : " << align << " Bytes (default: " << alignof(max_align_t) << ")" << std::endl;
         }
-        
+
         T * allocate (std::size_t n, T const * hint)
         {
             return AlignedAllocator<T,alignment>::alloc(n);
         }
-        
+
         void deallocate (T * ptr, std::size_t n)
         {
             AlignedAllocator<T,alignment>::free(ptr);
@@ -351,9 +351,9 @@ template <class T, std::size_t alignment_ = std::alignment_of<T>::value> class A
 template <class T, std::size_t pagesize_ = PAGE_SIZE> class vMemAllocator
 {
     public:
-        
+
         static const std::size_t pagesize = pagesize_;
-        
+
         /**
          * @brief Allocate virtual memory.
          * 
@@ -369,22 +369,22 @@ template <class T, std::size_t pagesize_ = PAGE_SIZE> class vMemAllocator
             // create a unique temporary file with the given prefix
             std::string filename = tmpdir + "/" + prefix + "XXXXXX";
             int fd = mkstemp64(const_cast<char*>(filename.c_str()));
-            
+
             if (fd == -1)
                 HexException("Failed to create scratch file %s: %s", filename.c_str(), std::strerror(errno));
-            
+
             // header size
             std::size_t header = std::max<std::size_t>(SIMD_VECTOR_BYTES, 4*sizeof(int));
-            
+
             // calculate number of pages the file will span, reserve space for header, round up
             std::size_t npages = (n * sizeof(T) + header + pagesize_ - 1) / pagesize_;
             std::size_t filesize = npages * pagesize_;
-            
+
             // preallocate scratchfile on disk
             int status = posix_fallocate64(fd, 0, filesize);
             if (status != 0)
                 HexException("Cannot pre-allocate file %s: %s", filename.c_str(), std::strerror(status));
-            
+
             // map the file to memory
             int* buffer = (int*)mmap64
             (
@@ -395,20 +395,20 @@ template <class T, std::size_t pagesize_ = PAGE_SIZE> class vMemAllocator
                 fd,                     // file desccriptor
                 0                       // file offset
             );
-            
+
             if (buffer == MAP_FAILED)
                 HexException("Failed to map scratch file %s to memory: %s", filename.c_str(), std::strerror(errno));
-            
+
             buffer[0] = fd;
             buffer[1] = filesize % INT_MAX;
             buffer[2] = filesize / INT_MAX;
-            
+
             return (T*)(buffer + header / sizeof(int));
 #else
             return nullptr;
 #endif
         }
-        
+
         static void free (T * origin)
         {
 #ifdef __linux__
@@ -416,44 +416,44 @@ template <class T, std::size_t pagesize_ = PAGE_SIZE> class vMemAllocator
             {
                 // header size
                 std::size_t header = std::max<std::size_t>(SIMD_VECTOR_BYTES, 4*sizeof(int));
-                
+
                 // shfit pointer to the beginning of the data array
                 int* buffer = ((int*)origin) - header / sizeof(int);
-                
+
                 // read allocation data
                 int fd = buffer[0];
                 int lo = buffer[1];
                 int hi = buffer[2];
-                
+
                 // calculate memory size
                 size_t filesize = hi;
                 filesize *= INT_MAX;
                 filesize += lo;
-                
+
                 // get scratch filename
                 char link[PATH_MAX], filename[PATH_MAX];
                 snprintf(link, PATH_MAX, "/proc/%d/fd/%d", getpid(), fd);
                 if (realpath(link, filename) == nullptr)
                     HexException("Failed to retrieve filename from %s: %s", link, std::strerror(errno));
-                
+
                 // safely unmap the disk file
                 if (munmap(buffer, filesize) == -1)
                     HexException("Failed to deallocate virtual memory: %s", std::strerror(errno));
-                
+
                 // close the file
                 close(fd);
-                
+
                 // remove the file
                 std::remove(filename);
             }
 #endif
         }
-        
+
         T * allocate (std::size_t n, T const * hint)
         {
             return vMemAllocator<T,pagesize>::alloc(n);
         }
-        
+
         void deallocate (T * ptr, std::size_t n)
         {
             vMemAllocator<T,pagesize>::free(ptr);

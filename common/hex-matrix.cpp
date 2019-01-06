@@ -73,16 +73,16 @@ void ColMatrix<Complex>::invert (ColMatrix<Complex> & inv) const
 #ifndef NO_LAPACK
     if (rows() != cols())
         HexException("Only square matrices can be diagonalized.");
-    
+
     int N = rows();
     iArray IPIV(N);
     int LWORK = -1;
     cArray WORK(1);
     int INFO;
-    
+
     // create copy of current matrix (will be overwritten)
     inv = *this;
-    
+
     // compute the LU factorization
 #ifdef SINGLE
     cgetrf_
@@ -97,7 +97,7 @@ void ColMatrix<Complex>::invert (ColMatrix<Complex> & inv) const
         &IPIV[0],       // pivot indices
         &INFO           // diagnostic information
     );
-    
+
     // query for optimal work size for inversion
 #ifdef SINGLE
     cgetri_
@@ -113,11 +113,11 @@ void ColMatrix<Complex>::invert (ColMatrix<Complex> & inv) const
         &LWORK,         // work array length
         &INFO           // diagnostic information
     );
-    
+
     // resize work array
     LWORK = WORK.front().real();
     WORK.resize(LWORK);
-    
+
     // compute the inverse
 #ifdef SINGLE
     cgetri_
@@ -133,7 +133,7 @@ void ColMatrix<Complex>::invert (ColMatrix<Complex> & inv) const
         &LWORK,         // work array length
         &INFO           // diagnostic information
     );
-    
+
 #else
     HexException("Cannot invert dense matrix without LAPACK support.");
 #endif
@@ -151,44 +151,44 @@ void ColMatrix<Complex>::diagonalize_g
 #ifndef NO_LAPACK
     if (rows() != cols())
         HexException("Only square matrices can be diagonalized.");
-    
+
     Complex* B = const_cast<Complex*>(S.data().data());
-    
+
     int N = rows();
     cArray WORK(1);
     rArray RWORK(8*N);
     int LWORK = -1, INFO;
     char JOBL = 'N', JOBR = 'N';
     Complex *pVL = nullptr, *pVR = nullptr;
-    
+
     cArray U (N);
     W.resize(N);
-    
+
     if (VL != nullptr)
     {
         // compute left eigenvectors
         JOBL = 'V';
-        
+
         // resize output data
         if (VL->rows() != N or VL->cols() != N)
             *VL = std::move(ColMatrix<Complex>(N,N));
         pVL = VL->begin();
     }
-    
+
     if (VR != nullptr)
     {
         // compute right eigenvectors
         JOBR = 'V';
-        
+
         // resize output data
         if (VR->rows() != N or VR->cols() != N)
             *VR = std::move(ColMatrix<Complex>(N,N));
         pVR = VR->begin();
     }
-    
+
     // copy matrix data (it will be overwritten)
     cArray A = data();
-    
+
     // get work size
 #ifdef SINGLE
     cggev_
@@ -214,11 +214,11 @@ void ColMatrix<Complex>::diagonalize_g
         &RWORK[0],  // work array
         &INFO       // diagnostic information
     );
-    
+
     // resize work array
     LWORK = WORK[0].real();
     WORK.resize(LWORK);
-    
+
     // run the diagonalization
 #ifdef SINGLE
     cggev_
@@ -244,14 +244,14 @@ void ColMatrix<Complex>::diagonalize_g
         &RWORK[0],  // work array
         &INFO       // diagnostic information
     );
-    
+
     if (INFO != 0)
     {
         std::cerr << "Diagonalization error: " << INFO << std::endl;
     }
-    
+
     W /= U;
-    
+
 #else
     HexException("Cannot diagonalize dense matrix without LAPACK support.");
 #endif
@@ -269,41 +269,41 @@ void ColMatrix<Complex>::diagonalize
 #ifndef NO_LAPACK
     if (rows() != cols())
         HexException("Only square matrices can be diagonalized.");
-    
+
     int N = rows();
     cArray WORK(1);
     rArray RWORK(2*N);
     int LWORK = -1, INFO;
     char JOBL = 'N', JOBR = 'N';
     Complex *pVL = nullptr, *pVR = nullptr;
-    
+
     W.resize(N);
-    
+
     if (VL != nullptr)
     {
         // compute left eigenvectors
         JOBL = 'V';
-        
+
         // resize output data
         if (VL->rows() != N or VL->cols() != N)
             *VL = std::move(ColMatrix<Complex>(N,N));
         pVL = VL->begin();
     }
-    
+
     if (VR != nullptr)
     {
         // compute right eigenvectors
         JOBR = 'V';
-        
+
         // resize output data
         if (VR->rows() != N or VR->cols() != N)
             *VR = std::move(ColMatrix<Complex>(N,N));
         pVR = VR->begin();
     }
-    
+
     // copy matrix data (it will be overwritten)
     cArray A = data();
-    
+
     // get work size
 #ifdef SINGLE
     cgeev_
@@ -326,11 +326,11 @@ void ColMatrix<Complex>::diagonalize
         &RWORK[0],  // work array
         &INFO       // diagnostic information
     );
-    
+
     // resize work array
     LWORK = WORK[0].real();
     WORK.resize(LWORK);
-    
+
     // run the diagonalization
 #ifdef SINGLE
     cgeev_
@@ -353,7 +353,7 @@ void ColMatrix<Complex>::diagonalize
         &RWORK[0],  // work array
         &INFO       // diagnostic information
     );
-    
+
     if (INFO != 0)
     {
         std::cerr << "Diagonalization error: " << INFO << std::endl;
@@ -373,40 +373,40 @@ void SymBandMatrix<Complex>::sym_band_dot (int n, int d, const cArrayView M, Com
     // check dimensions
     if (A.size() % n != 0)
         HexException("Incompatible dimensions: %d (mat) × %ld (vec). You are probably mixing radial data for different grids.", n, A.size());
-    
+
     // get number of source vectors
     int Nvec = A.size() / n;
-    
+
     // skip if there are no data
     if (n == 0 or d == 0)
         return;
-    
+
     // matrix data pointer
     Complex const * const restrict pM = M.data();
-    
+
     // source and destination vector pointers
     Complex const * restrict pA = A.data();
     Complex       * restrict pB = B.data();
-    
+
     // for all source vectors (columns)
     for (int j = 0; j < Nvec; j++)
     {
         // scale the destination vector
         for (int k = 0; k < n; k++)
             pB[k] *= beta;
-        
+
         // for all rows/cols of the matrix (and of the target vector)
         for (int k = 0; k < n; k++)
         {
             // Diagonal element
-            
+
                 if (tri & MatrixSelection::Diagonal)
                 {
                     pB[k] += pM[k * d] * alpha * pA[k];
                 }
-            
+
             // Direct pass (~ strict upper triangle)
-        
+
                 if (tri & MatrixSelection::StrictUpper)
                 {
 /*#if !defined(SINGLE) && defined(__AVX512F__)
@@ -418,11 +418,11 @@ void SymBandMatrix<Complex>::sym_band_dot (int n, int d, const cArrayView M, Com
                         //   pB[k] += alpha * (pA[k + 2] * pM[k * d + 2]);
                         //   pB[k] += alpha * (pA[k + 3] * pM[k * d + 3]);
                         //   pB[k] += alpha * (pA[k + 4] * pM[k * d + 4]);
-                        
+
                         Complex X[4] = { 0., 0., 0., 0. };
-                        
+
                         cmul4xd(X, pA + k + 1, pM + k * d + 1); // AVX 512
-                        
+
                         pB[k] += alpha * (X[0] + X[1] + X[2] + X[3]);
                     }
                     else
@@ -436,12 +436,12 @@ void SymBandMatrix<Complex>::sym_band_dot (int n, int d, const cArrayView M, Com
                         //
                         //   pB[k] += alpha * pA[k + 3] * pM[k * d + 3];
                         //   pB[k] += alpha * pA[k + 4] * pM[k * d + 4];
-                        
+
                         Complex X[2] = { 0., 0. };
-                        
+
                         cmul2xd(X, pA + k + 1, pM + k * d + 1); // AVX2
                         cmul2xd(X, pA + k + 3, pM + k * d + 3); // AVX2
-                        
+
                         pB[k] += alpha * (X[0] + X[1]);
                     }
                     else
@@ -451,9 +451,9 @@ void SymBandMatrix<Complex>::sym_band_dot (int n, int d, const cArrayView M, Com
                             pB[k] += pM[k * d + l] * alpha * pA[k + l];
                     }
                 }
-        
+
             // Mirror pass (~ strict lower triangle)
-                
+
                 if (tri & MatrixSelection::StrictLower)
                 {
 /*#if !defined(SINGLE) && defined(__AVX512F__)
@@ -465,11 +465,11 @@ void SymBandMatrix<Complex>::sym_band_dot (int n, int d, const cArrayView M, Com
                         //   pB[k + 2] += (alpha * pA[k]) * pM[k * d + 2];
                         //   pB[k + 3] += (alpha * pA[k]) * pM[k * d + 3];
                         //   pB[k + 4] += (alpha * pA[k]) * pM[k * d + 4];
-                        
+
                         Complex X[4];
-                        
+
                         X[0] = X[1] = X[2] = X[3] = alpha * pA[k];
-                        
+
                         cmul4xd(pB + k + 1, X, pM + k * d + 1); // AVX 512
                     }
                     else
@@ -483,11 +483,11 @@ void SymBandMatrix<Complex>::sym_band_dot (int n, int d, const cArrayView M, Com
                         //
                         //   pB[k + 3] += (alpha * pA[k]) * pM[k * d + 3];
                         //   pB[k + 4] += (alpha * pA[k]) * pM[k * d + 4];
-                        
+
                         Complex X[2];
-                        
+
                         X[0] = X[1] = alpha * pA[k];
-                        
+
                         cmul2xd(pB + k + 1, X, pM + k * d + 1); // AVX2
                         cmul2xd(pB + k + 3, X, pM + k * d + 3); // AVX2
                     }
@@ -499,12 +499,12 @@ void SymBandMatrix<Complex>::sym_band_dot (int n, int d, const cArrayView M, Com
                     }
                 }
         }
-        
+
         // move on to the next source vector
         pA += n;
         pB += n;
     }
-    
+
     return;
 }
 
@@ -514,7 +514,7 @@ CsrMatrix<LU_int_t,Complex> CooMatrix<LU_int_t,Complex>::tocsr () const
     // get number of structurally non-zero elements
     LU_int_t nz = x_.size();
     assert((LU_int_t)i_.size() == nz);
-    
+
     // get row lengths
     std::vector<LU_int_t> len (m_, 0);
     for (LU_int_t n = 0; n < nz; n++) 
@@ -525,27 +525,27 @@ CsrMatrix<LU_int_t,Complex> CooMatrix<LU_int_t,Complex>::tocsr () const
             len[i_[n]]++;
         }
     }
-    
+
     // create element pointer array for each matrix row
     std::vector<std::vector<LU_int_t>> elem_ptrs (m_);
-    
+
     // reserve memory for the row data
     for (LU_int_t n = 0; n < m_; n++)
         elem_ptrs[n].reserve(len[n]);
-    
+
     // store index of each element into the appropriate row
     for (LU_int_t n = 0; n < nz; n++) if (x_[n] != 0.0_r)
         elem_ptrs[i_[n]].push_back(n);
-    
+
     // sort element pointers by their column index
     # pragma omp parallel for
     for (LU_int_t n = 0; n < m_; n++)
         std::sort(elem_ptrs[n].begin(), elem_ptrs[n].end(), [&](LU_int_t a, LU_int_t b) { return j_[a] < j_[b]; });
-    
+
     // allocate output arrays
     NumberArray<LU_int_t> Ap(m_ + 1), Ai(nz);
     cArray Ax(nz);
-    
+
     // copy & sum entries
     LU_int_t pos = 0;
     for (LU_int_t m = 0; m < m_; m++)
@@ -555,23 +555,23 @@ CsrMatrix<LU_int_t,Complex> CooMatrix<LU_int_t,Complex>::tocsr () const
         {
             // get global index
             LU_int_t gid = elem_ptrs[m][n];
-            
+
             // update elements
             Ai[pos]  = j_[gid];
             Ax[pos] += x_[gid];
-            
+
             // if the next row entry is in the same column, do not advance position counter,
             // so that the element will be added to current position
             if (n < (LU_int_t)elem_ptrs[m].size() - 1 and j_[gid] == j_[elem_ptrs[m][n + 1]])
                 continue;
-            
+
             // otherwise move on to the next position
             pos++;
         }
-        
+
         // insert next row pointer
         Ap[m + 1] = pos;
     }
-    
+
     return CsrMatrix<LU_int_t,Complex> (m_, n_, std::move(Ap), std::move(Ai), std::move(Ax));
 }

@@ -49,11 +49,11 @@
  */
 template <class IdxT, class DataT> class CscMatrix
 {
-    
+
 public:
-    
+
     // Constructors
-    
+
     CscMatrix ()
         : m_(0), n_(0) {}
     CscMatrix (IdxT m, IdxT n)
@@ -62,16 +62,16 @@ public:
         : m_(A.m_), n_(A.n_), p_(A.p_), i_(A.i_), x_(A.x_) {}
     CscMatrix (IdxT m, IdxT n, const ArrayView<IdxT> p, const ArrayView<IdxT> i, const ArrayView<DataT> x)
         : m_(m), n_(n), p_(p), i_(i), x_(x) {}
-    
+
     // Destructor
-    
+
     ~CscMatrix () {}
-    
+
     /**
      * Convert to COO-matrix.
      */
     CooMatrix<IdxT,DataT> tocoo () const;
-    
+
     /**
      * Matrix-vector product using a transposed matrix, \f$ A^T \cdot b \f$.
      * For ordinary matrix vector product convert this matrix first to CSR
@@ -82,36 +82,36 @@ public:
     {
         // create output array
         NumberArray<DataT> c (n_);
-        
+
         // the matrix "*this" is actually transposed
         for (IdxT icol = 0; icol < n_; icol++)
         {
             IdxT idx1 = p_[icol];
             IdxT idx2 = p_[icol+1];
-            
+
             // for all nonzero elements in this column
             for (IdxT idx = idx1; idx < idx2; idx++)
             {
                 // get row number
                 IdxT irow = i_[idx];
-                
+
                 // store product
                 c[icol] += x_[idx] * b[irow];
             }
         }
-        
+
         return c;
     }
-    
+
     // Getters
-    
+
     std::size_t size () const { return i_.size(); }
     std::size_t rows () const { return m_; }
     std::size_t cols () const { return n_; }
     lArray const & p () const { return p_; }
     lArray const & i () const { return i_; }
     cArray const & x () const { return x_; }
-    
+
     /**
      * Multiplication by a number.
      */
@@ -122,7 +122,7 @@ public:
             x_[i] *= r;
         return *this;
     }
-    
+
     /**
      * Addition of another CSC matrix.
      * The matrices MUST HAVE THE SAME SPARSE STRUCTURE, as no indices are
@@ -131,21 +131,21 @@ public:
     CscMatrix<IdxT,DataT> & operator &= (CscMatrix<IdxT,DataT> const &  B)
     {
         std::size_t N = i_.size();
-        
+
         assert(m_ == B.m_);
         assert(n_ == B.n_);
         assert(N == B.i_.size());
-        
+
         for (std::size_t i = 0; i < N; i++)
         {
             assert(i_[i] == B.i_[i]);
-            
+
             x_[i] += B.x_[i];
         }
-        
+
         return *this;
     }
-    
+
     /**
      * Subtraction of another CSC matrix.
      * The matrices MUST HAVE THE SAME SPARSE STRUCTURE, as no indices are
@@ -154,21 +154,21 @@ public:
     CscMatrix<IdxT,DataT> & operator ^= (CscMatrix<IdxT,DataT> const &  B)
     {
         std::size_t N = i_.size();
-        
+
         assert(m_ == B.m_);
         assert(n_ == B.n_);
         assert(N == B.i_.size());
-        
+
         for (std::size_t i = 0; i < N; i++)
         {
             assert(i_[i] == B.i_[i]);
-            
+
             x_[i] -= B.x_[i];
         }
-        
+
         return *this;
     }
-    
+
     /**
      * Save matrix to HDF file.
      * @param name Filename.
@@ -176,17 +176,17 @@ public:
     bool hdfsave (const char* name) const
     {
         HDFFile file(name, HDFFile::overwrite);
-        
+
         // write dimensions
         file.write("m", &m_, 1);
         file.write("n", &n_, 1);
-        
+
         // write indices
         if (not p_.empty())
             file.write("p", &(p_[0]), p_.size());
         if (not i_.empty())
             file.write("i", &(i_[0]), i_.size());
-        
+
         // write complex data as a "double" array
         if (not x_.empty())
         {
@@ -197,10 +197,10 @@ public:
                 x_.size() * typeinfo<DataT>::ncmpt
             );
         }
-        
+
         return true;
     }
-    
+
     /**
      * Load matrix from HDF file.
      * @param name Filename.
@@ -208,17 +208,17 @@ public:
     bool hdfload (const char* name)
     {
         HDFFile hdf(name, HDFFile::readonly);
-        
+
         // read dimensions
         hdf.read("m", &m_, 1);
         hdf.read("n", &n_, 1);
-        
+
         // read indices
         if (p_.resize(hdf.size("p")))
             hdf.read("p", &(p_[0]), p_.size());
         if (i_.resize(hdf.size("i")))
             hdf.read("i", &(i_[0]), i_.size());
-        
+
         // read data
         if (x_.resize(hdf.size("x") / 2))
         {
@@ -229,16 +229,16 @@ public:
                 x_.size() * typeinfo<DataT>::ncmpt
             );
         }
-        
+
         return true;
     }
-    
+
 private:
-    
+
     // dimensions
     IdxT m_;
     IdxT n_;
-    
+
     // representation
     NumberArray<IdxT> p_;
     NumberArray<IdxT> i_;

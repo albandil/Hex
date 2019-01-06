@@ -35,15 +35,15 @@ AngularBasis::AngularBasis (InputFile const & inp)
     : L_(inp.L), S_(0), Pi_(inp.Pi), nL_(inp.nL), maxlambda_(inp.L + 2 * inp.nL), maxell_(nL_ + L_ + Pi_)
 {
     std::cout << "Setting up the coupled angular states..." << std::endl;
-    
+
     // for given L, Π and levels list all available (ℓ₁ℓ₂) pairs
     for (int ell = 0; ell <= inp.nL; ell++)
     {
         std::cout << "\t- [" << ell << "] ";
-        
+
         // get sum of the angular momenta for this angular level
         int sum = 2 * ell + inp.L + inp.Pi;
-        
+
         // for all angular momentum pairs that do compose L
         for (int l1 = ell; l1 <= sum - ell; l1++)
         {
@@ -56,7 +56,7 @@ AngularBasis::AngularBasis (InputFile const & inp)
         }
         std::cout << std::endl;
     }
-    
+
     // precompute angular integrals
     std::cout << "\t- calculating angular integrals ... " << std::flush;
     for (unsigned lambda = 0; lambda <= maxlambda_; lambda++)
@@ -75,7 +75,7 @@ AngularBasis::AngularBasis (InputFile const & inp)
                 L_
             )
         );
-        
+
         if (not std::isfinite(f_.back()))
         {
             HexException
@@ -108,7 +108,7 @@ double AngularBasis::f (unsigned lambda, unsigned l1, unsigned l2, unsigned l1p,
     // find the matching angular states
     unsigned m = index(l1,l2);
     unsigned n = index(l1p,l2p);
-    
+
     // call the other getter
     return f(lambda, m, n);
 }

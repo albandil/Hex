@@ -68,30 +68,30 @@ template <class IdxT, class DataT>
 class LUft
 {
     public:
-        
+
         /// Default constructor.
         LUft () : filename_() {}
-        
+
         /// Get new empty factorization object.
         static LUft * New (int factorizer);
-        
+
         /// Destructor.
         virtual ~LUft () {}
-        
+
         /**
          * @brief Validity indicator.
          * 
          * Returns true when the object contains a valid LU factorization.
          */
         virtual bool valid () const { return false; }
-        
+
         /**
          * @brief Free memory.
          * 
          * Release memory occupied by the LU-factorization numeric object.
          */
         virtual void drop () {}
-        
+
         /**
          * @brief Size of the numerical data.
          * 
@@ -99,14 +99,14 @@ class LUft
          * of the LU-factorization. This doesn't contain any other structural data.
          */
         virtual std::size_t size () const { return 0; }
-        
+
         /**
          * @brief Estimation of the condition number.
          * 
          * Note: Currently implemented only for UMFPACK backend.
          */
         virtual Real cond () const { return 0; }
-        
+
         /**
          * @brief Solve equations.
          * 
@@ -119,7 +119,7 @@ class LUft
         {
             std::cout << "Warning: I'm placeholder LUft::solve, not solving anything!" << std::endl;
         }
-        
+
         /**
          * @brief Solve equations.
          * 
@@ -131,14 +131,14 @@ class LUft
         {
             // reserve space for the solution
             NumberArray<DataT> x (b.size());
-            
+
             // solve
             this->solve(b, x, eqs);
-            
+
             // return the result
             return x;
         }
-        
+
         /**
          * @brief Link to a disk file.
          * 
@@ -147,17 +147,17 @@ class LUft
          * a specific filename.
          */
         virtual void link (std::string name) { filename_ = name; }
-        
+
         /**
          * @brief Unlink disk file.
          */
         virtual void unlink () { filename_.clear(); }
-        
+
         /**
          * @brief Name of the linked disk file.
          */
         virtual std::string name () const { return filename_; }
-        
+
         /**
          * @brief Save factorization object to a disk file.
          * 
@@ -169,7 +169,7 @@ class LUft
             std::cout << "Warning: I'm placeholder LUft::save, not saving anything!" << std::endl;
         }
         virtual void save () const { this->save(filename_); }
-        
+
         /**
          * @brief Load factorization object from a disk file.
          */
@@ -180,9 +180,9 @@ class LUft
         }
         virtual void load () { this->load(filename_, true); }
         virtual void silent_load () { this->load(filename_, false); }
-        
+
     private:
-        
+
         /// Name of the disk file.
         std::string filename_;
 };
@@ -229,57 +229,57 @@ template <class IdxT, class DataT>
 class LUft_UMFPACK : public LUft<IdxT,DataT>
 {
     public:
-    
+
         /// Default constructor.
         LUft_UMFPACK ()
             : LUft<IdxT,DataT>(), numeric_(nullptr), info_(UMFPACK_INFO) {}
-        
+
         /// Initialize the structure using the matrix and its numeric decomposition.
         LUft_UMFPACK (CsrMatrix<IdxT,DataT> const & matrix, void * numeric)
             : LUft<IdxT,DataT>(), numeric_(numeric), matrix_(matrix), info_(UMFPACK_INFO) {}
-        
+
         /// Destructor.
         virtual ~LUft_UMFPACK () { drop(); }
-        
+
         /// Return factorization information.
         rArray const & info () const { return info_; }
-        
+
         /// Validity indicator.
         virtual bool valid () const;
-        
+
         /// Return LU byte size.
         virtual std::size_t size () const;
-        
+
         /// Return condition number.
         virtual Real cond () const;
-        
+
         /// Solve equations.
         virtual void solve (const ArrayView<DataT> b, ArrayView<DataT> x, int eqs) const;
-        
+
         /// Save factorization data to disk.
         virtual void save (std::string name) const;
-        
+
         /// Load factorization data from disk.
         virtual void load (std::string name, bool throw_on_io_failure = true);
-        
+
         /// Release memory.
         virtual void drop ();
-        
+
     private:
-        
+
         /// Numeric decomposition as produced by UMFPACK.
         void * numeric_;
-        
+
         /// Matrix data, needed for solution.
         mutable CsrMatrix<IdxT,DataT> matrix_;
-        
+
     public:
-        
+
         /// Set of status flags produced by UMFPACK.
         mutable rArray info_;
-        
+
     private:
-        
+
         // Disable bitwise copy
         LUft_UMFPACK const & operator= (LUft_UMFPACK const &);
 };
@@ -303,11 +303,11 @@ template <class IdxT, class DataT>
 class LUft_SUPERLU : public LUft<IdxT,DataT>
 {
     public:
-    
+
         /// Default constructor.
         LUft_SUPERLU ()
             : LUft<IdxT,DataT>(), matrix_(), size_(0) {}
-        
+
         /// Initialize the structure using the matrix and its numeric decomposition.
         LUft_SUPERLU
         (
@@ -328,25 +328,25 @@ class LUft_SUPERLU : public LUft<IdxT,DataT>
         {
             // nothing to do
         }
-        
+
         /// Destructor.
         virtual ~LUft_SUPERLU () { drop(); }
-        
+
         /// Validity indicator.
         virtual bool valid () const { return matrix_.size() != 0; }
-        
+
         /// Return LU byte size.
         virtual std::size_t size () const { return size_; }
-        
+
         /// Solve equations.
         virtual void solve (const ArrayView<DataT> b, ArrayView<DataT> x, int eqs) const;
-        
+
         /// Save factorization data to disk.
         virtual void save (std::string name) const { /*HexException("SuperLU factorizer does not yet support --out-of-core option.");*/ }
-        
+
         /// Load factorization data from disk.
         virtual void load (std::string name, bool throw_on_io_failure = true) { if (throw_on_io_failure) HexException("SuperLU factorizer does not yet support --out-of-core option."); }
-        
+
         /// Release memory.
         virtual void drop ()
         {
@@ -357,45 +357,45 @@ class LUft_SUPERLU : public LUft<IdxT,DataT>
                 size_ = 0;
             }
         }
-        
+
     private:
-        
+
         /// Matrix that has been factorized.
         CsrMatrix<IdxT,DataT> matrix_;
-        
+
         /// Row permutations.
         iArray perm_c_;
-        
+
         /// Column permutations.
         iArray perm_r_;
-        
+
         /// Elimitation tree.
         iArray etree_;
-        
+
         /// Equilibration done.
         char equed_;
-        
+
         /// Row scale factors.
         rArray R_;
-        
+
         /// Column scale factors.
         rArray C_;
-        
+
         /// L-factor.
         SuperMatrix L_;
-        
+
         /// U-factor.
         SuperMatrix U_;
-        
+
         /// Reusable information.
         GlobalLU_t Glu_;
-        
+
         /// Memory size.
         std::size_t size_;
-        
+
         /// Drop tolerance.
         Real droptol_;
-        
+
         // Disable bitwise copy
         LUft_SUPERLU const & operator= (LUft_SUPERLU const &);
 };
@@ -415,11 +415,11 @@ template <class IdxT, class DataT>
 class LUft_SUPERLU_DIST : public LUft<IdxT,DataT>
 {
     public:
-        
+
         /// Default constructor.
         LUft_SUPERLU_DIST ()
             : LUft<IdxT,DataT>() {}
-        
+
         /// Initialize the structure using the matrix and its numeric decomposition.
         LUft_SUPERLU_DIST
         (
@@ -434,25 +434,25 @@ class LUft_SUPERLU_DIST : public LUft<IdxT,DataT>
         {
             // nothing to do
         }
-        
+
         /// Destructor.
         virtual ~LUft_SUPERLU_DIST () { drop (); }
-        
+
         /// Validity indicator.
         virtual bool valid () const;
-        
+
         /// Return LU byte size.
         virtual std::size_t size () const { return size_; }
-        
+
         /// Solve equations.
         virtual void solve (const ArrayView<DataT> b, ArrayView<DataT> x, int eqs) const;
-        
+
         /// Save factorization data to disk.
         virtual void save (std::string name) const { HexException("SuperLU_dist factorizer does not yet support --out-of-core option."); }
-        
+
         /// Load factorization data from disk.
         virtual void load (std::string name, bool throw_on_io_failure = true) { HexException("SuperLU_dist factorizer does not yet support --out-of-core option."); }
-        
+
         /// Release memory.
         virtual void drop ()
         {
@@ -465,24 +465,24 @@ class LUft_SUPERLU_DIST : public LUft<IdxT,DataT>
                 size_ = 0;
             }
         }
-        
+
     private:
-        
+
         /// Matrix that has been factorized.
         CsrMatrix<IdxT,DataT> matrix_;
-        
+
         // scaling and permutation data
         ScalePermstruct_t ScalePermstruct_;
-        
+
         // factorization data
         LUstruct_t LUstruct_;
-        
+
         // process grid
         gridinfo_t * grid_;
-        
+
         /// Memory size.
         std::size_t size_;
-        
+
         // Disable bitwise copy
         LUft_SUPERLU_DIST const & operator= (LUft_SUPERLU_DIST const &);
 };
@@ -523,37 +523,37 @@ template <class IdxT, class DataT>
 class LUft_MUMPS : public LUft<IdxT,DataT>
 {
     public:
-        
+
         /// Default constructor.
         LUft_MUMPS ()
             : LUft<IdxT,DataT> (), settings (nullptr) {}
-        
+
         /// Construct from data.
         LUft_MUMPS (MUMPS_STRUC_C * s, NumberArray<MUMPS_INT> && i, NumberArray<MUMPS_INT> && j, NumberArray<DataT> && a)
             : LUft<IdxT,DataT>(), settings(s), I(std::move(i)), J(std::move(j)), A(std::move(a)) {}
-        
+
         /// Destructor.
         virtual ~LUft_MUMPS ();
-        
+
         /// Validity indicator.
         virtual bool valid () const
         {
             return settings != nullptr and mmin(I.size(), J.size(), A.size()) > 0;
         }
-        
+
         /// Return LU byte size.
         virtual std::size_t size () const;
-        
+
         /// Condition number.
         virtual Real cond () const
         {
             #define RINFO(x) rinfo[x-1]
             return settings ? settings->RINFO(11) : 0.0_r;
         }
-        
+
         /// Solve equations.
         virtual void solve (const ArrayView<DataT> b, ArrayView<DataT> x, int eqs) const;
-        
+
         /// Save large data to disk.
         virtual void save (std::string name) const
         {
@@ -561,7 +561,7 @@ class LUft_MUMPS : public LUft<IdxT,DataT>
             J.hdfsave("J-" + name);
             A.hdfsave("A-" + name);
         }
-        
+
         /// Load large data from disk.
         virtual void load (std::string name, bool throw_on_io_failure = true)
         {
@@ -573,7 +573,7 @@ class LUft_MUMPS : public LUft<IdxT,DataT>
                     HexException("Failed to load MUMPS IJV matrices.");
             }
         }
-        
+
         /// Release memory.
         virtual void drop ()
         {
@@ -581,16 +581,16 @@ class LUft_MUMPS : public LUft<IdxT,DataT>
             J.drop();
             A.drop();
         }
-        
+
     private:
-        
+
         // Internal data of the library.
         mutable MUMPS_STRUC_C * settings;
-        
+
         // data arrays
         NumberArray<MUMPS_INT> I, J;
         NumberArray<DataT> A;
-        
+
         // Disable bitwise copy
         LUft_MUMPS const & operator= (LUft_MUMPS const &);
 };

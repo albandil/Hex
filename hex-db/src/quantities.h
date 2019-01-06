@@ -52,69 +52,69 @@
 class ScatteringQuantity
 {
     protected:
-        
+
         /// Database session.
         sqlitepp::session * db;
-    
+
     public:
-        
+
         // run-time selection mechanism
-        
+
             baseClassRunTimeSelectionDefinitions(ScatteringQuantity, ())
-        
+
         // properties
-            
+
             /// Longer description text for use in program help.
             virtual std::string description ()
             {
                 return "";
             }
-            
+
             /// List of all scattering event parameters (with description) that have to be specified by user.
             virtual std::vector<std::pair<std::string,std::string>> params ()
             {
                 return std::vector<std::pair<std::string,std::string>>();
             }
-            
+
             /// List of vectorizable scattering event parameters that have to be specified by user.
             virtual std::vector<std::string> vparams ()
             {
                 return std::vector<std::string>();
             }
-            
+
             /// List of other scattering quantities that need to be initialized/updated/etc before this class
             /// because this class makes use of their data.
             virtual std::vector<std::string> dependencies ()
             {
                 return std::vector<std::string>();
             }
-            
+
         // database interface
-            
+
             sqlitepp::session & session ()
             {
                 return *db;
             }
-            
+
             /// initialize (e.g.) by defining external routines for SQLite
             virtual bool initialize (sqlitepp::session & db)
             {
                 this->db = &db;
                 return true;
             }
-            
+
             /// SQL statements that create the required table, or empty vector if not needed.
             virtual bool createTable ()
             {
                 return true;
             }
-            
+
             /// SQL statements that update the table after insetion of new data.
             virtual bool updateTable ()
             {
                 return true;
             }
-            
+
             /// write out requested data
             virtual bool run (std::map<std::string,std::string> const & params)
             {

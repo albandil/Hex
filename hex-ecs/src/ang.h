@@ -44,55 +44,55 @@
 class AngularBasis
 {
     public:
-        
+
         /// Constructor.
         AngularBasis (InputFile const & inp);
         AngularBasis (AngularBasis const & ang)
             : L_(ang.L_), S_(ang.S_), Pi_(ang.Pi_), maxell_(ang.maxell_),
             maxlambda_(ang.maxlambda_), states_(ang.states_), f_(ang.f_) {}
-        
+
         /// List of coupled angular states.
         std::vector<std::pair<int,int>> const & states () const { return states_; }
-        
+
         /// Highest orbital number.
         int maxell () const { return maxell_; }
-        
+
         /// Highest multipole.
         int maxlambda () const { return maxlambda_; }
-        
+
         /// Angular integrals.
         Real f (int ill, int illp, int lambda) const
         {
             return f_[(lambda * states_.size() + ill) * states_.size() + illp];
         }
-        
+
         /// Angular integrals.
         rArray const & f () const { return f_; }
-        
+
         /// Total angular momentum.
         int L () const { return L_; }
-        
+
         /// Total spin.
         int S () const { return S_; }
         int & S () { return S_; }
-        
+
         /// Total parity.
         int Pi () const { return Pi_; }
-        
+
     private:
-        
+
         // Quantum numbers.
         int L_, S_, Pi_, nL_;
-        
+
         // Highest orbital number.
         int maxell_;
-        
+
         // Highest multipole.
         int maxlambda_;
-        
+
         // List of coupled angular states.
         std::vector<std::pair<int,int>> states_;
-        
+
         // Angular integrals.
         rArray f_;
 };

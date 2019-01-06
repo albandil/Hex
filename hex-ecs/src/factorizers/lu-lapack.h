@@ -50,54 +50,54 @@
 class LUft_LAPACK : public LUft
 {
     public:
-        
+
         // run-time selection mechanism
         factorizerRunTimeSelectionDefinitions(LUft_LAPACK, "lapack")
-        
+
         /// Default constructor.
         LUft_LAPACK ();
-        
+
         /// Destructor.
         virtual ~LUft_LAPACK();
-        
+
         // Disable bitwise copy
         LUft_LAPACK const & operator= (LUft_LAPACK const &) = delete;
-        
+
         /// Factorize.
         virtual void factorize (CsrMatrix<LU_int_t,Complex> const & matrix);
-        
+
         /// Validity indicator.
         virtual bool valid () const { return size() != 0; }
-        
+
         /// Return LU byte size.
         virtual std::size_t size () const;
-        
+
         /// Solve equations.
         virtual void solve (const cArrayView b, cArrayView x, int eqs) const;
-        
+
         /// Save to disk.
         virtual void save (std::string name) const;
-        
+
         /// Load from disk.
         virtual void load (std::string name, bool throw_on_io_failure = true);
-        
+
         /// Release memory.
         virtual void drop ();
-    
+
     private:
-        
+
         /// Cuthill-McKee ordering.
         NumberArray<LU_int_t> R_;
-        
+
         /// Factorization computed by xGBTRF use in xGBTRS.
         cArray LU_;
-        
+
         /// Pivot sequence.
         NumberArray<blas::Int> ipiv_;
-        
+
         /// Matrix rank.
         blas::Int n_;
-        
+
         /// Matrix half-bandwidth.
         blas::Int k_;
 };

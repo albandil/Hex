@@ -93,24 +93,24 @@ void writeVTK_cells
 class VTKRectGridFile
 {
     public:
-        
+
         void setGridX (rArray const & grid);
         void setGridY (rArray const & grid);
         void setGridZ (rArray const & grid);
-        
+
         void appendScalarAttribute
         (
             std::string name,
             rArray const & array
         );
-        
+
         void appendVector2DAttribute
         (
             std::string name,
             rArray const & xcomp,
             rArray const & ycomp
         );
-        
+
         void appendVector3DAttribute
         (
             std::string name,
@@ -118,12 +118,12 @@ class VTKRectGridFile
             rArray const & ycomp,
             rArray const & zcomp
         );
-        
+
         void writePoints (std::string filename) const;
         void writeCells (std::string filename) const;
-    
+
     private:
-        
+
         rArray xgrid_, ygrid_, zgrid_;
         std::vector<std::pair<std::string,std::vector<rArray>>> fields_;
 };

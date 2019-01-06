@@ -54,11 +54,11 @@
  */
 template <class IdxT, class DataT> class CooMatrix
 {
-    
+
 public:
-    
+
     // Empty constructors
-    
+
     CooMatrix ()
         : m_(0), n_(0), sorted_(true) {}
     CooMatrix (IdxT m, IdxT n)
@@ -69,7 +69,7 @@ public:
         : m_(m), n_(n), i_(i), j_(j), x_(x), sorted_(false) {}
     CooMatrix (std::size_t m, std::size_t n, NumberArray<IdxT> && i, NumberArray<IdxT> && j, NumberArray<DataT> && x)
         : m_(m), n_(n), i_(std::move(i)), j_(std::move(j)), x_(std::move(x)), sorted_(false) {}
-    
+
     /**
      * Copy constructor initialized from dense array.
      * @param m Row counz of new matrix.
@@ -87,7 +87,7 @@ public:
             {
                 // get element from array
                 DataT val = *(a + i);
-                
+
                 // if nonzero, store
                 if (val != 0.)
                 {
@@ -95,25 +95,25 @@ public:
                     j_.push_back(col);
                     x_.push_back(val);
                 }
-                
+
                 // move to next element
                 i++;
             }
         }
     }
-    
+
     // Destructor
     ~CooMatrix () {}
-    
+
     // Getters
-    
+
     std::size_t rows () const { return m_; }
     std::size_t cols () const { return n_; }
     std::size_t size () const { return i_.size(); }
     NumberArray<IdxT> const & i () const { return i_; }
     NumberArray<IdxT> const & j () const { return j_; }
     NumberArray<DataT> const & v () const { return x_; }
-    
+
     /// Index operator. Returns the existing value or zero.
     DataT operator() (IdxT ix, IdxT iy) const
     {
@@ -122,7 +122,7 @@ public:
                 return x_[n];
         return 0.;
     }
-    
+
     /**
      * @brief Symmetrical band populator.
      * 
@@ -138,19 +138,19 @@ public:
     template <class Functor> CooMatrix& symm_populate_band (IdxT d, Functor f)
     {
         DataT val;
-        
+
         for (IdxT row = 0; row < m_; row++)
         {
             for (IdxT col = row; col < n_ and col - row <= d; col++)
             {
                 val = f(row,col);
-                
+
                 if (val != 0.0_r)
                 {
                     i_.push_back(row);
                     j_.push_back(col);
                     x_.push_back(val);
-                    
+
                     if (row != col)
                     {
                         i_.push_back(col);
@@ -160,12 +160,12 @@ public:
                 }
             }
         }
-        
+
         sorted_ = false;
-        
+
         return *this;
     }
-    
+
     /**
      * @brief Full populator.
      * 
@@ -178,13 +178,13 @@ public:
     template <class Functor> CooMatrix& populate (Functor f)
     {
         DataT val;
-        
+
         for (IdxT row = 0; row < m_; row++)
         {
             for (IdxT col = 0; col < n_; col++)
             {
                 val = f(row,col);
-                
+
                 if (val != 0.0_r)
                 {
                     i_.push_back(row);
@@ -193,12 +193,12 @@ public:
                 }
             }
         }
-        
+
         sorted_ = false;
-        
+
         return *this;
     }
-    
+
     // Assignment
     CooMatrix & operator = (CooMatrix const & A)
     {
@@ -207,12 +207,12 @@ public:
         i_ = A.i_;
         j_ = A.j_;
         x_ = A.x_;
-        
+
         sorted_ = A.sorted_;
-        
+
         return *this;
     }
-    
+
     /**
      * @brief Addition of an element to matrix.
      * 
@@ -223,91 +223,91 @@ public:
     {
         assert(0 <= i and i < m_);
         assert(0 <= j and j < n_);
-        
+
         i_.push_back(i);
         j_.push_back(j);
         x_.push_back(v);
-        
+
         sorted_ = false;
     }
-    
+
     /// Transposition, implemented as an interchange of "i" and "j" data.
     CooMatrix<IdxT,DataT> transpose () const
     {
         CooMatrix<IdxT,DataT> tr;
-        
+
         tr.m_ = n_;
         tr.n_ = m_;
         tr.i_ = j_;
         tr.j_ = i_;
         tr.x_ = x_;
-        
+
         tr.sorted_ = false;
-        
+
         return tr;
     }
-    
+
     /// Addition.
     CooMatrix<IdxT,DataT>& operator += (CooMatrix<IdxT,DataT> const & A)
     {
         assert(m_ == A.m_);
         assert(n_ == A.n_);
-        
+
         i_.append(A.i_.begin(), A.i_.end());
         j_.append(A.j_.begin(), A.j_.end());
         x_.append(A.x_.begin(), A.x_.end());
-        
+
         sorted_ = false;
-        
+
         return *this;
     }
-    
+
     /// Subtraction.
     CooMatrix<IdxT,DataT>& operator -= (CooMatrix<IdxT,DataT> const & A)
     {
         assert(m_ == A.m_);
         assert(n_ == A.n_);
-        
+
         size_t prev_size = x_.size();
-        
+
         i_.append(A.i_.begin(), A.i_.end());
         j_.append(A.j_.begin(), A.j_.end());
         x_.append(A.x_.begin(), A.x_.end());
-        
+
         // negate the newly added elements
         for (std::size_t i = prev_size; i < x_.size(); i++)
             x_[i] = -x_[i];
-        
+
         sorted_ = false;
-        
+
         return *this;
     }
-    
+
     /// Element-wise multiplication by complex number.
     CooMatrix<IdxT,DataT>& operator *= (DataT c)
     {
         std::size_t nz = i_.size();
         for (std::size_t i = 0; i < nz; i++)
             x_[i] *= c;
-        
+
         return *this;
     }
-    
+
     /// Inplace SpMV multiplication.
     void dot (DataT a, const ArrayView<DataT> x, DataT b, ArrayView<DataT> y) const
     {
         assert(x.size() == (unsigned)n_);
         assert(y.size() == (unsigned)m_);
-        
+
         for (IdxT i = 0; i < (IdxT)x_.size(); i++)
         {
             IdxT row = i_[i];
             IdxT col = j_[i];
-            
+
             y[row] = a * x_[i] * x[col] + b * y[row];
         }
     }
-    
+
     /**
      * @brief Double inner matrix-matrix product.
      * 
@@ -319,21 +319,21 @@ public:
     {
         assert(m_ == B.m_);
         assert(n_ == B.n_);
-        
+
         // sort by i_ and j_
         if (not sorted() or not B.sorted())
             HexException("[CooMatrix] Sort matrices before ddot!");
-            
+
         DataT result = 0;
-        
+
         auto Ai = i_.begin();
         auto Aj = j_.begin();
         auto Av = x_.begin();
-        
+
         auto Bi = B.i_.begin();
         auto Bj = B.j_.begin();
         auto Bv = x_.begin();
-        
+
         while (Av != x_.end() and Bv != B.x_.end())
         {
             if (*Ai < *Bi or (*Ai == *Bi and *Aj < *Bj))
@@ -351,10 +351,10 @@ public:
                 Bi++; Bj++; Bv++;
             }
         }
-        
+
         return result;
     }
-    
+
     /**
      * @brief SpMV multiplication.
      * @param B Dense column-major ordered 1D-array. It's row count
@@ -367,13 +367,13 @@ public:
     {
         return *this = this->dot(B);
     }
-    
+
     /// Element-wise divide by a complex number.
     CooMatrix<IdxT,DataT>& operator /= (DataT c)
     {
         return *this *= 1./c;
     }
-    
+
     /**
      * @brief Change dimension of the matrix.
      * @warning No row/column index range checking.
@@ -383,7 +383,7 @@ public:
         m_ = m;
         n_ = n;
     }
-    
+
     /**
      * @brief Change matrix shape.
      * 
@@ -397,56 +397,56 @@ public:
     CooMatrix<IdxT,DataT> reshape (IdxT m, IdxT n) const
     {
         CooMatrix<IdxT,DataT> C = *this;
-        
+
         // conserved dimensions
         IdxT N = C.i_.size();
         IdxT H = C.m_;
-        
+
         // check dimensions
         assert(m * n == C.m_ * C.n_);
-        
+
         // reshape
         for (IdxT i = 0; i < N; i++)
         {
             // conserved position in column-ordered array
             IdxT idx = C.i_[i] + C.j_[i] * H;
-            
+
             // new coordinates
             IdxT row = idx % m;
             IdxT col = idx / m;
-            
+
             // update values
             C.i_[i] = row;
             C.j_[i] = col;
         }
-        
+
         C.m_ = m;
         C.n_ = n;
         return C;
     }
-    
+
     /// Convert matrix to dense column-major ordered 1D-array.
     NumberArray<DataT> todense () const
     {
         NumberArray<DataT> v (m_ * n_);
-        
+
         IdxT N = i_.size();
         for (IdxT i = 0; i < N; i++)
             v[i_[i] + j_[i] * m_] += x_[i];
-        
+
         return v;
     }
-    
+
     /// Sort indices (by i_, then by j_)
     void sort ();
     bool sorted () const { return sorted_; }
-    
+
     /// Convert to CSC matrix.
     CscMatrix<IdxT,DataT> tocsc () const;
-    
+
     /// Convert to CSR matrix.
     CsrMatrix<IdxT,DataT> tocsr () const;
-    
+
     /// Convert to dense matrix of a given underlying type.
     template <typename DenseMatrixType> DenseMatrixType todense () const
     {
@@ -455,19 +455,19 @@ public:
             M (i_[idx], j_[idx]) = x_[idx];
         return M;
     }
-    
+
     /// Convert to dense matrix (row-ordered).
     RowMatrix<DataT> torow () const
     {
         return todense<RowMatrix<DataT>>();
     }
-    
+
     /// Convert to dense matrix (column-ordered).
     ColMatrix<DataT> tocol () const
     {
         return todense<ColMatrix<DataT>>();
     }
-    
+
     /**
      * @brief Solve matrix equation.
      * 
@@ -482,7 +482,7 @@ public:
         // COO format is not optimal for solving -> covert to CSC
         return tocsr().solve(b, eqs);
     }
-    
+
     /**
      * @brief Write the matrix data to a file.
      * 
@@ -496,9 +496,9 @@ public:
     void write (std::string const & filename) const
     {
         std::ofstream f (filename);
-        
+
         f << "# Matrix " << m_ << " × " << n_ << " with " << x_.size() << " nonzero elements:\n\n";
-        
+
         for (IdxT i = 0; i < (IdxT)i_.size(); i++)
         {
             f << i_[i] << "\t" << j_[i];
@@ -507,34 +507,34 @@ public:
             f << "\n";
         }
     }
-    
+
     /// Shake the content, i.e. sum same element entries.
     CooMatrix<IdxT,DataT> shake () const
     {
         // ugly and memory inefficient method... FIXME
         return tocsr().tocoo();
     }
-    
+
     /// Remove null entries to allow for easy addition of other elements.
     void squeeze ()
     {
         IdxT idx, pos;
-        
+
         for (idx = 0, pos = 0; idx < (IdxT)i_.size(); idx++)
         {
             i_[pos] = i_[idx];
             j_[pos] = j_[idx];
             x_[pos] = x_[idx];
-            
+
             if (x_[pos] != DataT(0))
                 pos++;
         }
-        
+
         i_.resize(pos);
         j_.resize(pos);
         x_.resize(pos);
     }
-    
+
     /**
      * @brief Save matrix to HDF file.
      * @param name Filename.
@@ -542,17 +542,17 @@ public:
     bool hdfsave (std::string const & name) const
     {
         HDFFile hdf (name, HDFFile::overwrite);
-        
+
         // write dimensions
         hdf.write("m", &m_, 1);
         hdf.write("n", &n_, 1);
-        
+
         // write indices
         if (not i_.empty())
             hdf.write("i", &(i_[0]), i_.size());
         if (not j_.empty())
             hdf.write("j", &(j_[0]), j_.size());
-        
+
         // write data
         if (not x_.empty())
         {
@@ -566,7 +566,7 @@ public:
 
         return true;
     }
-    
+
     /**
      * @brief Load matrix from HDF file.
      * @param name Filename.
@@ -574,19 +574,19 @@ public:
     bool hdfload (std::string const & name)
     {
         sorted_ = false;
-        
+
         HDFFile hdf (name, HDFFile::readonly);
-        
+
         // read dimensions
         hdf.read("m", &m_, 1);
         hdf.read("n", &n_, 1);
-        
+
         // read indices
         if (i_.resize(hdf.size("i")))
             hdf.read("i", &(i_[0]), i_.size());
         if (j_.resize(hdf.size("j")))
             hdf.read("j", &(j_[0]), j_.size());
-        
+
         // read data
         if (x_.resize(hdf.size("x") / 2))
         {
@@ -597,7 +597,7 @@ public:
                 x_.size() * typeinfo<DataT>::ncmpt
             );
         }
-        
+
         return true;
     }
 
@@ -605,11 +605,11 @@ private:
 
     // dimensions
     IdxT m_, n_;
-    
+
     // ijv-representation
     NumberArray<IdxT> i_, j_;
     NumberArray<DataT> x_;
-    
+
     bool sorted_;
 };
 

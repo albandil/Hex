@@ -118,27 +118,27 @@ inline std::istream & operator >> (std::istream & is, iArray & p)
     {
         std::size_t idx, idx1, idx2;
         int value = std::stoi(token, &idx);
-        
+
         // convert token to integer
         if (idx == token.size())
         {
             p.push_back(value);
         }
-        
+
         // convert token to range
         else
         {
             std::size_t pos = token.find('-', 1);
             if (pos == std::string::npos)
                 HexException("Failed to parse \"%s\"", token.c_str());
-            
+
             std::string str_a = token.substr(0, pos);
             std::string str_b = token.substr(pos + 1);
             int a = std::stoi(str_a, &idx1);
             int b = std::stoi(str_b, &idx2);
             if (idx1 != str_a.size() or idx2 != str_b.size())
                 HexException("Failed to parse \"%s\"", token.c_str());
-            
+
             iArray values = linspace(a, b, b - a + 1);
             p.append(values.begin(), values.end());
         }
@@ -152,7 +152,7 @@ inline std::istream & operator >> (std::istream & is, iArray & p)
 template<typename T> std::vector<T> readStandardInput ()
 {
     std::vector<T> data;
-    
+
     T x;
     while (not std::cin.eof())
     {
@@ -161,7 +161,7 @@ template<typename T> std::vector<T> readStandardInput ()
         std::cin >> std::ws;
         data.push_back(x);
     }
-    
+
     return data;
 }
 
@@ -187,7 +187,7 @@ template <typename T> T Conv
     std::map<std::string,std::string>::const_iterator it = dict.find(keyword);
     if (it == dict.end())
         throw exception ("ERROR: \"%s\" requires specifying the parameter \"--%s\"!\n", name.c_str(), keyword.c_str());
-    
+
     // convert to int
     T x;
     std::istringstream ss(it->second);

@@ -70,13 +70,13 @@
 class DOMPreconditioner : public NoPreconditioner
 {
     public:
-        
+
         // run-time selection mechanism
         preconditionerRunTimeSelectionDefinitions(DOMPreconditioner, "DOM")
-        
+
         // default constructor needed by the RTS mechanism
         DOMPreconditioner () {}
-        
+
         // constructor
         DOMPreconditioner
         (
@@ -89,22 +89,22 @@ class DOMPreconditioner : public NoPreconditioner
             Bspline const & bspline_panel_x,
             Bspline const & bspline_panel_y
         );
-        
+
         // description of the preconditioner
         virtual std::string description () const;
-        
+
         // reuse parent definitions
         using NoPreconditioner::rhs;
         using NoPreconditioner::multiply;
-        
+
         // declare own definitions
         virtual void setup ();
         virtual void update (Real E);
         virtual void precondition (BlockArray<Complex> const & r, BlockArray<Complex> & z) const;
         virtual void finish ();
-    
+
     protected:
-        
+
         // neighbour panels
         enum Neighbours
         {
@@ -114,7 +114,7 @@ class DOMPreconditioner : public NoPreconditioner
             Up     = 3,
             nNbrs  = 4
         };
-        
+
         // get reverse direction for a given direction
         int rev (int dir) const
         {
@@ -125,15 +125,15 @@ class DOMPreconditioner : public NoPreconditioner
                 case Down  : return Up;
                 case Up    : return Down;
             };
-            
+
             return nNbrs;
         }
-        
+
         // solutions on the sub-domains
         class PanelSolution
         {
             public:
-                
+
                 PanelSolution
                 (
                     int ixpanel, int iypanel,
@@ -147,26 +147,26 @@ class DOMPreconditioner : public NoPreconditioner
                     rArray cyspline1_full,  rArray ryspline_full,  rArray cyspline2_full,
                     int Nang, int Nini
                 );
-                
+
                 Bspline xspline_inner;  // inner x-axis B-spline basis
                 Bspline yspline_inner;  // inner y-axis B-spline basis
-                
+
                 Bspline xspline_full;   // full x-axis B-spline basis
                 Bspline yspline_full;   // full y-axis B-spline basis
-                
+
                 cBlockArray r;  // original source
                 cBlockArray z;  // solution
-                
+
                 int ixpanel;   // which panel (x-dir)
                 int iypanel;   // which panel (y-dir)
-                
+
                 int xoffset;   // x-offset of the real basis of panel
                 int yoffset;   // y-offset of the real basis of panel
-                
+
                 int minpxspline, maxpxspline; // B-splines that have a counterpart in the global basis (x-dir)
                 int minpyspline, maxpyspline; // B-splines that have a counterpart in the global basis (y-dir)
         };
-        
+
         // find solution on a sub-domain
         void solvePanel
         (
@@ -174,7 +174,7 @@ class DOMPreconditioner : public NoPreconditioner
             std::vector<PanelSolution> & p,
             int i, int j
         ) const;
-        
+
         // add neighbour field interfaces
         void correctSource
         (
@@ -182,14 +182,14 @@ class DOMPreconditioner : public NoPreconditioner
             std::vector<PanelSolution> const & panels,
             int ipanel, int jpanel
         ) const;
-        
+
         // evaluate matrix element
         Complex couplingMatrixElement
         (
             int ill, int illp,
             int i, int j, int k, int l
         ) const;
-        
+
         // get knot sub-sequences
         void knotSubsequence
         (
@@ -200,16 +200,16 @@ class DOMPreconditioner : public NoPreconditioner
             rArray & cknots1,
             rArray & cknots2
         ) const;
-        
+
         // interpolate residual to sub-domains
         void splitResidual (cBlockArray const & r, std::vector<PanelSolution> & p) const;
-        
+
         // interpolate solution from sub-domains
         void collectSolution (cBlockArray & z, std::vector<PanelSolution> & p) const;
-        
+
         // gap of real knots between the panel seam and the complex absorption layer
         int gap_;
-        
+
         // number of initial states (right-hand sides)
         mutable int Nini_;
 };

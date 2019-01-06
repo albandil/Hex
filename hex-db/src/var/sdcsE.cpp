@@ -107,20 +107,20 @@ bool SingleDifferentialCrossSectionWrtEnergyShare::run (std::map<std::string,std
     // manage units
     double efactor = change_units(Eunits, eUnit_Ry);
     double lfactor = change_units(lUnit_au, Lunits);
-    
+
     // scattering event parameters
     int ni = Conv<int>(sdata, "ni", name());
     int li = Conv<int>(sdata, "li", name());
     int mi = Conv<int>(sdata, "mi", name());
     int  S = Conv<int>(sdata, "S",  name());
     double Ei = Conv<double>(sdata, "Ei", name()) * efactor;
-    
+
     // energy shares and cross sections
     int l1, l2, L;
     std::string blob;
     std::vector<Chebyshev<double,Complex>> CB;
     rArray energy_shares;
-    
+
     // get energy / energies
     try
     {
@@ -132,7 +132,7 @@ bool SingleDifferentialCrossSectionWrtEnergyShare::run (std::map<std::string,std
         // are there more energies specified using the STDIN ?
         energy_shares = readStandardInput<double>();
     }
-    
+
     // write header
     std::cout << logo("#") <<
         "# Single differential cross section (wrt energy share) in " << unit_name(Lunits) << " for\n" <<
@@ -145,7 +145,7 @@ bool SingleDifferentialCrossSectionWrtEnergyShare::run (std::map<std::string,std
     table.setAlignment(OutputTable::left);
     table.write("# Eshare   ", "dsigma   ");
     table.write("# ---------", "---------");
-    
+
     // compose query
     sqlitepp::statement st (session());
     st << "SELECT L,l1,l2,QUOTE(cheb) FROM 'ionf' "
@@ -158,7 +158,7 @@ bool SingleDifferentialCrossSectionWrtEnergyShare::run (std::map<std::string,std
         sqlitepp::into(L), sqlitepp::into(l1), sqlitepp::into(l2), sqlitepp::into(blob),
         sqlitepp::use(ni), sqlitepp::use(li), sqlitepp::use(mi),
         sqlitepp::use(S), sqlitepp::use(Ei);
-    
+
     // retrieve data (terminate if no data)
     while (st.exec())
     {
@@ -170,7 +170,7 @@ bool SingleDifferentialCrossSectionWrtEnergyShare::run (std::map<std::string,std
             CB.emplace_back(coeffs, 0, 1);
         }
     }
-    
+
     // process all energy shares
     for (double x : energy_shares)
     {
@@ -182,21 +182,21 @@ bool SingleDifferentialCrossSectionWrtEnergyShare::run (std::map<std::string,std
         //
         // summed over all partial waves.
         double dsigma = 0;
-        
+
         // translate energy share to hyper-angle and momenta
         double Etot = Ei - 1./(ni*ni);
         double kmax = std::sqrt(Etot);
         double k1 = std::sqrt(Etot * x);
         double k2 = std::sqrt(Etot * (1 - x));
         double alpha = k1/kmax;
-        
+
         // process all partial wave contributions
         for (Chebyshev<double,Complex> const & cb : CB)
             dsigma += sqrabs(cb.clenshaw(alpha, cb.tail(1e-10)));
-        
+
         // write line to table
         table.write(x, dsigma * lfactor * lfactor / (k1 * k2));
     }
-    
+
     return true;
 }

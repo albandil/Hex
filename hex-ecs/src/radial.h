@@ -89,7 +89,7 @@ typedef std::function<Complex(Complex,Complex)> C2CFunction;
 class RadialIntegrals
 {
     public:
-        
+
         /**
          * @brief Constructor.
          * 
@@ -102,7 +102,7 @@ class RadialIntegrals
             Bspline const & bspline_y,
             int Nlambdas
         );
-        
+
         /**
          * @brief Calculate one-electron integral matrices.
          * 
@@ -112,7 +112,7 @@ class RadialIntegrals
          * the same file.
          */
         void setupOneElectronIntegrals (bool sharedscratch = false, bool iammaster = true);
-        
+
         /**
          * @brief Calculate one-electron integral matrices.
          * 
@@ -120,7 +120,7 @@ class RadialIntegrals
          * appropriate parameters.
          */
         void setupOneElectronIntegrals (Parallel const & par, CommandLine const & cmd);
-        
+
         /**
          * @brief Calculate the two-electron integral matrix.
          * 
@@ -128,14 +128,14 @@ class RadialIntegrals
          * matrices.
          */
         void setupTwoElectronIntegrals (Parallel const & par, CommandLine const & cmd);
-        
+
         /**
          * @brief Verbosity control.
          * 
          * Setting this to false will inhibit standard output messages from this class.
          */
         void verbose (bool v) { verbose_ = v; }
-        
+
         /**
          * @brief Maximal multipole moment.
          *
@@ -143,12 +143,12 @@ class RadialIntegrals
          * for which there are precomputed two-electron integrals.
          */
         int maxlambda () const { return Nlambdas_ - 1; }
-        
+
         // compute overlap matrix of radial function
         Complex computeOverlapMatrixElement_iknot (Bspline const & bspline, GaussLegendre const & g, int i, int j, CCFunction func, int iknot) const;
         Complex computeOverlapMatrixElement (Bspline const & bspline, GaussLegendre const & g, int i, int j, CCFunction func) const;
         SymBandMatrix<Complex> computeOverlapMatrix (Bspline const & bspline, CCFunction func) const;
-        
+
         /**
          * @brief Compute overlap matrix of two B-spline bases.
          * 
@@ -164,7 +164,7 @@ class RadialIntegrals
             Real R_left,
             Real R_right
         );
-        
+
         /**
          * @brief Partial derivative overlap.
          * 
@@ -180,7 +180,7 @@ class RadialIntegrals
             GaussLegendre const & g,
             int i, int j, int iknot
         ) const;
-        
+
         /**
          * @brief Derivative overlap.
          * 
@@ -194,7 +194,7 @@ class RadialIntegrals
             GaussLegendre const & g,
             int i, int j
         ) const;
-        
+
         /**
          * @brief Partial integral moment.
          * 
@@ -216,7 +216,7 @@ class RadialIntegrals
             Real rmin, Real rmax,
             Real scale
         ) const;
-        
+
         /**
          * @brief Integral moments.
          * 
@@ -234,7 +234,7 @@ class RadialIntegrals
             Real rmin, Real rmax,
             bool scale = false
         ) const;
-        
+
         /**
          * @brief Integral moments.
          * 
@@ -253,7 +253,7 @@ class RadialIntegrals
             Real rmin, Real rmax,
             bool scale = false
         ) const;
-        
+
         /**
          * @brief Partial integral moments.
          * 
@@ -272,7 +272,7 @@ class RadialIntegrals
             int a,
             Real rmin, Real rmax
         ) const;
-        
+
         /**
          * @brief Two-electron integral for multipole @f$ lambda @f$.
          * 
@@ -281,10 +281,10 @@ class RadialIntegrals
          * contributions calculated from products of the partial moments.
          */
         Complex computeR (int lambda, int i, int j, int k, int l) const;
-        
+
         void diagonalR (int lambda);
         void coupledR (int lambda);
-        
+
         /**
          * @brief Triangular R-integral.
          * 
@@ -326,7 +326,7 @@ class RadialIntegrals
             Bspline const & yspline, GaussLegendre const & yg,
             int m, int n, int iknoty, Real ty1, Real ty2
         ) const;
-        
+
         /**
          * @brief Calculate particular sub-matrix of the radial integrals matrix.
          * 
@@ -338,7 +338,7 @@ class RadialIntegrals
             unsigned lambda,
             int i, int k
         ) const;
-        
+
         /**
          * @brief Multiply vector by matrix of two-electron integrals.
          * 
@@ -357,7 +357,7 @@ class RadialIntegrals
             int x_row_limit = -1,
             int y_row_limit = -1
         ) const;
-        
+
         /** 
          * @brief Compute B-spline overlaps of arbitrary one-dimensional function.
          * 
@@ -371,7 +371,7 @@ class RadialIntegrals
             GaussLegendre const & g,
             CCFunction funct
         ) const;
-        
+
         /** 
          * @brief Compute B-spline overlaps of arbitrary two-dimensional function.
          * 
@@ -390,7 +390,7 @@ class RadialIntegrals
             C2CFunction funct,
             int points = EXPANSION_QUADRATURE_POINTS
         ) const;
-        
+
         /** 
          * @brief Compute P-overlaps
          * 
@@ -407,7 +407,7 @@ class RadialIntegrals
             GaussLegendre const & g,
             Real Z, int n, int l
         );
-        
+
         /**
          * @brief Compute j-overlaps
          * 
@@ -425,41 +425,41 @@ class RadialIntegrals
             const rArrayView vk,
             bool fast_bessel = false
         );
-        
+
         // Return reference to the B-spline object.
         Bspline const & bspline () const { return bspline_x_; }
         Bspline const & bspline_x () const { return bspline_x_; }
         Bspline const & bspline_y () const { return bspline_y_; }
-        
+
         // Return the Gauss-Legendre integrator object.
         GaussLegendre const & gaussleg () const { return g_x_; }
         GaussLegendre const & gaussleg_x () const { return g_x_; }
         GaussLegendre const & gaussleg_y () const { return g_y_; }
-        
+
         #define OneElectronMatrixAccessors(M) \
             SymBandMatrix<Complex> const & M () const { return M##_x_; } \
             SymBandMatrix<Complex> const & M##_x () const { return M##_x_; } \
             SymBandMatrix<Complex> const & M##_y () const { return M##_y_; } \
             Complex M##_x (std::size_t i, std::size_t j) const { return M##_x_(i,j); } \
             Complex M##_y (std::size_t i, std::size_t j) const { return M##_y_(i,j); } \
-            
+
         // Access the precomputed one-electron overlap matrices.
         OneElectronMatrixAccessors(D)
         OneElectronMatrixAccessors(S)
         OneElectronMatrixAccessors(Mm1)
         OneElectronMatrixAccessors(Mm2)
-        
+
         #define OneElectronMatrixArrayAccessors(M) \
             SymBandMatrix<Complex> const & M (int L) const { return M##_x_[L]; } \
             SymBandMatrix<Complex> const & M##_x (int L) const { return M##_x_[L]; } \
             SymBandMatrix<Complex> const & M##_y (int L) const { return M##_y_[L]; } \
             Complex M##_x (int L, std::size_t i, std::size_t j) const { return M##_x_[L](i,j); } \
             Complex M##_y (int L, std::size_t i, std::size_t j) const { return M##_y_[L](i,j); } \
-        
+
         // Access the precomputed scaled full integral moments of order L / -L-1.
         OneElectronMatrixArrayAccessors(Mtr_L)
         OneElectronMatrixArrayAccessors(Mtr_mLm1)
-        
+
         #define OneElectronPartialMatrixAccessors(M) \
             cArrayView M##_x (int L = -1) const \
             { \
@@ -473,21 +473,21 @@ class RadialIntegrals
                 std::size_t mi_size = bspline_y_.Nspline() * (2 * bspline_y_.order() + 1) * (bspline_y_.order() + 1); \
                 return cArrayView (M##_y_, L * mi_size, mi_size); \
             }
-        
+
         // Access the precomputed scaled partial overlap matrices of order L / -L-1.
         OneElectronPartialMatrixAccessors(Mitr_L)
         OneElectronPartialMatrixAccessors(Mitr_mLm1)
-        
+
         // Return reference to the precomputed matrix of two-electron integrals for given multipole.
         BlockSymBandMatrix<Complex> const & R_tr_dia (unsigned i) const { return R_tr_dia_[i]; }
         CsrMatrix<LU_int_t,Complex> const & R_coupled (unsigned i) const { return R_coupled_[i]; }
-        
+
     private:
-        
+
         // B-spline environment
         Bspline bspline_x_;
         Bspline bspline_y_;
-        
+
         // Asymptotic radiuses
         // - These are somewhat arbitrary radiuses that restrict position dependence of the Coulombic
         //   interaction. When either of the coordinates exceeds the limit, it is assumed to be exactly equal
@@ -497,30 +497,30 @@ class RadialIntegrals
         //   for large distances, which is irrelevant. The importance lies in the multi-domain solution,
         //   where the potential may diverge in prepended complex grid.
         Real rxmin_, rymin_, rxmax_, rymax_;
-        
+
         // Gauss-Legendre integrator
         GaussLegendre g_x_;
         GaussLegendre g_y_;
-        
+
         // one-electron moment and overlap matrices
         SymBandMatrix<Complex> D_x_, S_x_, Mm1_x_, Mm2_x_;
         SymBandMatrix<Complex> D_y_, S_y_, Mm1_y_, Mm2_y_;
-        
+
         // one-electron full integral moments for various orders (used to calculate R-integrals)
         std::vector<SymBandMatrix<Complex>> Mtr_L_x_, Mtr_mLm1_x_;
         std::vector<SymBandMatrix<Complex>> Mtr_L_y_, Mtr_mLm1_y_;
-        
+
         // partial one-electron integral moments for various orders (used to calculate R-integrals)
         cArray Mitr_L_x_, Mitr_mLm1_x_;
         cArray Mitr_L_y_, Mitr_mLm1_y_;
-        
+
         // two-electron integral matrices
         std::vector<BlockSymBandMatrix<Complex>> R_tr_dia_;
         std::vector<CsrMatrix<LU_int_t,Complex>> R_coupled_;
-        
+
         // verbose output
         bool verbose_;
-        
+
         // number of multipole matrices
         int Nlambdas_;
 };

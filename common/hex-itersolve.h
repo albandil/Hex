@@ -189,7 +189,7 @@ template
 class ConjugateGradients
 {
     public:
-        
+
         ConjugateGradients ()
             : verbose(false), 
               compute_norm(default_compute_norm<TArrayView>),
@@ -204,10 +204,10 @@ class ConjugateGradients
         {
             // nothing
         }
-        
+
         // verbosity control
         bool verbose;
-        
+
         // callback functions
         std::function<void (const TArrayView, TArrayView)> apply_preconditioner;
         std::function<void (const TArrayView, TArrayView)> matrix_multiply;
@@ -219,10 +219,10 @@ class ConjugateGradients
         std::function<void (unsigned, const TArrayView)> process_solution;
         std::function<void (const TArrayView)> checkpoint_array;
         std::function<void (TArrayView)> recover_array;
-        
+
         // internal Krylov and residual vectors
         TArray r, p, z;
-        
+
         // main solution routine
         unsigned solve
         (
@@ -235,10 +235,10 @@ class ConjugateGradients
         {
             Timer timer (time_offset);
             ok = false;
-            
+
             // compute norm of the right hand side
             double bnorm = compute_norm(b), rnorm;
-            
+
             // trivial solution for zero right hand side
             if (bnorm == 0)
             {
@@ -246,10 +246,10 @@ class ConjugateGradients
                 ok = true;
                 return 0;
             }
-            
+
             // get size of the problem
             std::size_t N = b.size();
-            
+
             // residual; initialized to starting residual using the initial guess
             r = std::move(new_array(N, "cg-r"));
             if (not recovered)
@@ -260,14 +260,14 @@ class ConjugateGradients
             constrain(r);
             rnorm = compute_norm(r);
             recovered = false;
-            
+
             // terminate if the initial guess is already fine enough
             if (rnorm / bnorm < eps)
             {
                 ok = true;
                 return 0;
             }
-            
+
             // if the (non-zero) initial guess seems horribly wrong,
             //    use rather the right hand side as the initial guess
             if (rnorm / bnorm > 1000)
@@ -276,13 +276,13 @@ class ConjugateGradients
                 axby(0., r, 1., b); // r = b
                 constrain(r);
             }
-            
+
             // some auxiliary arrays (search directions etc.)
             p = std::move(new_array(N, "cg-p"));
             z = std::move(new_array(N, "cg-z"));
-            
+
             // Iterate
-            
+
             for (; k <= max_iterations; k++)
             {
                 if (verbose)
@@ -294,15 +294,15 @@ class ConjugateGradients
                     std::cout << " | ";
                     std::cout << std::setw(15) << std::left << rnorm / bnorm;
                 }
-                
+
                 time_offset = timer.seconds();
-                
+
                 // apply desired preconditioner
                 apply_preconditioner(r, z); // z = M⁻¹r
-                
+
                 // compute projection ρ = r·z
                 rho_new = scalar_product(r, z);
-                
+
                 // setup search direction p
                 if (k == 1 or stationary)
                 {
@@ -319,10 +319,10 @@ class ConjugateGradients
                     }
                     axby(beta, p, 1, z); // p = beta p + z
                 }
-                
+
                 // move to next Krylov subspace by multiplying A·p
                 matrix_multiply(p, z);
-                
+
                 // compute projection ratio α
                 alpha = stationary ? 1. : rho_new / scalar_product(p, z);
                 if (not std::isfinite(std::abs(alpha)))
@@ -331,13 +331,13 @@ class ConjugateGradients
                     ok = false;
                     return k;
                 }
-                
+
                 // update the solution and the residual
                 axby(1., x, alpha, p); // x = x + α p
                 axby(1., r, -alpha, z); // r = r - α z
                 process_solution(k, x);
                 constrain(r);
-                
+
                 // compute and check norm
                 rnorm = compute_norm(r);
                 residual = rnorm / bnorm;
@@ -349,7 +349,7 @@ class ConjugateGradients
                     ok = false;
                     break;
                 }
-                
+
                 // check convergence, but always do at least "min_iterations" iterations
                 if (k >= min_iterations and residual < eps)
                 {
@@ -358,14 +358,14 @@ class ConjugateGradients
                         std::cout << "\tConvergence reached, final residual " << residual << std::endl;
                     break;
                 }
-                
+
                 // move to the next iteration: store previous projection
                 rho_old = rho_new;
             }
-            
+
             return k;
         }
-        
+
         void dump () const
         {
             std::ofstream out ("cg.dat");
@@ -373,12 +373,12 @@ class ConjugateGradients
             out << rho_old.real() << std::endl;
             out << rho_old.imag() << std::endl;
             out << time_offset << std::endl;
-            
+
             checkpoint_array(const_cast<const TArrayView>(r));
             checkpoint_array(const_cast<const TArrayView>(p));
             checkpoint_array(const_cast<const TArrayView>(z));
         }
-        
+
         void recover ()
         {
             std::ifstream in ("cg.dat");
@@ -390,7 +390,7 @@ class ConjugateGradients
                 in >> x; rho_old.imag(x);
                 in >> time_offset;
                 recovered = true;
-                
+
                 recover_array(r);
                 recover_array(p);
                 recover_array(z);
@@ -400,7 +400,7 @@ class ConjugateGradients
                 reset();
             }
         }
-        
+
         void reset ()
         {
             recovered = false;
@@ -408,11 +408,11 @@ class ConjugateGradients
             rho_new = rho_old = alpha = beta = 0;
             time_offset = 0;
         }
-        
+
         Complex rho_new;
         Complex rho_old;
         Complex alpha, beta;
-        
+
         unsigned k;
         unsigned time_offset;
         bool recovered;

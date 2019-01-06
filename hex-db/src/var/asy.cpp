@@ -111,7 +111,7 @@ bool SpinAsymmetry::run (std::map<std::string,std::string> const & sdata)
     // manage units
     double efactor = change_units(Eunits, eUnit_Ry);
     double afactor = change_units(Aunits, aUnit_rad);
-    
+
     // scattering event parameters
     int ni = Conv<int>(sdata, "ni", name());
     int li = Conv<int>(sdata, "li", name());
@@ -120,35 +120,35 @@ bool SpinAsymmetry::run (std::map<std::string,std::string> const & sdata)
     int lf = Conv<int>(sdata, "lf", name());
     int mf0= Conv<int>(sdata, "mf", name());
     double E = Conv<double>(sdata, "Ei", name()) * efactor;
-    
+
     // use mi >= 0; if mi < 0, flip both signs
     int mi = (mi0 < 0 ? -mi0 : mi0);
     int mf = (mi0 < 0 ? -mf0 : mf0);
-    
+
     // angles
     rArray angles;
-    
+
     // get angle / angles
     try {
-        
+
         // is there a single angle specified using command line ?
         angles.push_back(Conv<double>(sdata, "theta", name()));
-        
+
     } catch (std::exception e) {
-        
+
         // are there more angles specified using the STDIN ?
         angles = readStandardInput<double>();
     }
-    
+
     // compute cross sections
     rArray scaled_angles = angles * afactor, dcs0(angles.size()), dcs1(angles.size()), dcs0_ex(angles.size()), dcs1_ex(angles.size());
     hex_differential_cross_section (ni,li,mi, nf,lf,mf, 0, 1,&E, angles.size(),scaled_angles.data(), dcs0.data(), dcs0_ex.data());
     hex_differential_cross_section (ni,li,mi, nf,lf,mf, 1, 1,&E, angles.size(),scaled_angles.data(), dcs1.data(), dcs1_ex.data());
-    
+
     // compute spin asymetry
     rArray asy = (dcs0 - dcs1 / 3.) / (dcs0 + dcs1);
     rArray asy_ex = (dcs0_ex - dcs1_ex / 3.) / (dcs0_ex + dcs1_ex);
-    
+
     // write out
     std::cout << logo("#") <<
         "# Spin asymetry for \n" <<
@@ -161,7 +161,7 @@ bool SpinAsymmetry::run (std::map<std::string,std::string> const & sdata)
     table.setAlignment(OutputTable::left);
     table.write("# angle    ", "asymetry ");
     table.write("# ---------", "---------");
-    
+
     for (std::size_t i = 0; i < angles.size(); i++)
     {
         table.write
@@ -171,6 +171,6 @@ bool SpinAsymmetry::run (std::map<std::string,std::string> const & sdata)
             std::isfinite(asy_ex[i])? asy_ex[i] : 0
         );
     }
-    
+
     return true;
 }

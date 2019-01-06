@@ -132,7 +132,7 @@ bool MomentumTransfer::run (std::map<std::string,std::string> const & sdata)
     // manage units
     double efactor = change_units(Eunits, eUnit_Ry);
     double lfactor = change_units(lUnit_au, Lunits);
-    
+
     // atomic and projectile data
     int ni = Conv<int>(sdata, "ni", name());
     int li = Conv<int>(sdata, "li", name());
@@ -141,29 +141,29 @@ bool MomentumTransfer::run (std::map<std::string,std::string> const & sdata)
     int lf = Conv<int>(sdata, "lf", name());
     int mf0= Conv<int>(sdata, "mf", name());
     int  S = Conv<int>(sdata,  "S", name());
-    
+
     // use mi >= 0; if mi < 0, flip both signs
     int mi = (mi0 < 0 ? -mi0 : mi0);
     int mf = (mi0 < 0 ? -mf0 : mf0);
-    
+
     // energies
     rArray energies;
-    
+
     // get energy / energies
     try {
-        
+
         // is there a single energy specified using command line ?
         energies.push_back(Conv<double>(sdata, "Ei", name()));
-        
+
     } catch (std::exception e) {
-        
+
         // are there more energies specified using the STDIN ?
         energies = readStandardInput<double>();
     }
-    
+
     // convert energies to Ry
     rArray scaled_energies = energies * efactor;
-    
+
     // get available energies if requested
     if (not scaled_energies.empty() and scaled_energies.front() == -1)
     {
@@ -186,16 +186,16 @@ bool MomentumTransfer::run (std::map<std::string,std::string> const & sdata)
             scaled_energies.push_back(E);
         }
     }
-    
+
     // output data
     rArray eta (scaled_energies.size()), eta_ex (scaled_energies.size());
-    
+
     // T-matrices for the last three partial waves
     std::deque<int> ells;
     std::deque<iArrays> conv;
     std::deque<iArrays> cmpl;
     std::deque<cArrays> tmat;
-    
+
     // callback for collecting T-matrices (called for every partial wave starting with ell = |mi - mf|)
     auto callback = [&]
     (
@@ -209,7 +209,7 @@ bool MomentumTransfer::run (std::map<std::string,std::string> const & sdata)
         conv.push_back(converged);
         cmpl.push_back(complete);
         tmat.push_back(tmatrices);
-        
+
         while (ells.size() > 3)
         {
             ells.pop_front();
@@ -217,34 +217,34 @@ bool MomentumTransfer::run (std::map<std::string,std::string> const & sdata)
             cmpl.pop_front();
             tmat.pop_front();
         }
-        
+
         if (ells.size() >= 2)
         {
             // sum over
             //   l = |mi-mf|, |mi-mf|+1, ...
             // and
             //   lp = l - 1, l, l + 1
-            
+
             int il = ells.size() - 2;
             int l = ells[il];
-            
+
             for (unsigned ilp = 0; ilp < ells.size(); ilp++)
             {
                 int lp = ells[ilp];
-                
+
                 // angular integral
                 double angintg = (
                     l == lp ?
                     1.0 :
                     std::sqrt((2*l + 1.) / (2*lp + 1.)) * special::ClebschGordan(l,mi-mf,1,0,lp,mi-mf) * special::ClebschGordan(l,0,1,0,lp,0)
                 );
-                
+
                 for (unsigned i = 0; i < scaled_energies.size(); i++)
                 {
                     // update momentum transfer with this partial wave if contained in database (and not yet converged)
                     if (not conv[il][S][i] and cmpl[il][S][i])
                         eta[i] += angintg * ( tmat[il][S][i] * std::conj(tmat[ilp][S][i]) ).real();
-                    
+
                     // update extrapolated momentum transfer always
                     if (true)
                         eta_ex[i] += angintg * ( tmat[il][S][i] * std::conj(tmat[ilp][S][i]) ).real();
@@ -252,7 +252,7 @@ bool MomentumTransfer::run (std::map<std::string,std::string> const & sdata)
             }
         }
     };
-    
+
     // call the T-matrix retrieval driver
     hex_tmat_pw_transform
     (
@@ -261,15 +261,15 @@ bool MomentumTransfer::run (std::map<std::string,std::string> const & sdata)
         true,
         callback
     );
-    
+
     // momenta
     rArray ki = sqrt(scaled_energies);
     rArray kf = sqrt(scaled_energies - 1.0 / (ni * ni) + 1.0 / (nf * nf));
-    
+
     // add prefactor
     eta *= kf / ki * (2 * S + 1) / 157.9136704174297;
     eta_ex *= kf / ki * (2 * S + 1) / 157.9136704174297;
-    
+
     // write header
     std::cout << logo("#") <<
         "# Momentum transfer in " << unit_name(Lunits) << " for\n" <<
@@ -283,7 +283,7 @@ bool MomentumTransfer::run (std::map<std::string,std::string> const & sdata)
     table.setAlignment(OutputTable::left);
     table.write("# E        ", "momtransfer", "momtransfer [ex]");
     table.write("# ---------", "-----------", "----------------");
-    
+
     for (unsigned i = 0; i < scaled_energies.size(); i++)
     {
         table.write
@@ -293,6 +293,6 @@ bool MomentumTransfer::run (std::map<std::string,std::string> const & sdata)
             std::isfinite(eta_ex[i]) ? eta_ex[i] * lfactor * lfactor : 0
         );
     }
-    
+
     return true;
 }

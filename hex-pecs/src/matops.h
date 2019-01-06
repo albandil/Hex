@@ -36,27 +36,27 @@ namespace matops
     /// Save dense object (matrix, vector) to disk.
     template <class T>
     bool save (T const * data, std::size_t N, std::string filename);
-    
+
     /// Load dense object (matrix, vector) from disk.
     template <class T>
     bool load (T * data, std::size_t N, std::string filename);
-    
+
     /// Sum two dense arrays.
     template <class T>
     void sum (std::size_t N, T const * restrict x, T const * restrict y, T * restrict z);
-    
+
     /// Subtract two dense arrays.
     template <class T>
     void subtract (std::size_t N, T const * restrict x, T const * restrict y, T * restrict z);
-    
+
     /// Flip sign of a dense array.
     template <class T>
     void flip_sign (std::size_t N, T * restrict x);
-    
+
     /// Multiply vector by a dense column-matrix.
     template <class T>
     void dense_mul_vector (std::size_t M, std::size_t N, T const * restrict A, T const * restrict v, T * restrict w);
-    
+
     /**
      * @brief Multiply banded matrix by a dense column-matrix.
      * 
@@ -70,7 +70,7 @@ namespace matops
         std::size_t Nblocks, std::size_t M, std::size_t K, std::size_t N, std::size_t Ndiag,
         T const * restrict D, T const * restrict B, T * restrict R
     );
-    
+
     /**
      * @brief Multiply block-band matrix by a dense matrix.
      * 
@@ -82,11 +82,11 @@ namespace matops
         std::size_t Nblocks, std::size_t M, std::size_t K, std::size_t N, std::size_t Ndiag,
         T const * restrict D, T const * restrict B, T * restrict C
     );
-    
+
     /// Add a block-band matrix to dense matrix; 'Ndiag' is the number of upper diagonals.
     template <class T>
     void dense_add_blockband (std::size_t Nblocks, std::size_t N, std::size_t Ndiag, T * restrict D, T const * restrict B);
-    
+
     /**
      * @brief A simple Wrapper around xGETRF + xGETRI.
      * 
@@ -95,11 +95,11 @@ namespace matops
      */
     template <class T>
     void dense_invert (std::size_t N, T * A, int * pivots, T * work);
-    
+
     /// Multiply vector by a block-band matrix.
     template <class T>
     void blockband_mul_vector (std::size_t Nblocks, std::size_t M, std::size_t N,  std::size_t Ndiag, T const * restrict A, T const * restrict v, T * restrict w);
-    
+
     /**
      * @brief Multiply dense matrix by a block-band matrix.
      * 

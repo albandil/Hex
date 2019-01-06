@@ -37,7 +37,7 @@
 #ifdef __linux__
     #include <sys/stat.h>
     #include <unistd.h>
-    
+
     #ifdef __GNUC__
         #include <execinfo.h>
         #include <cxxabi.h>
@@ -62,7 +62,7 @@ std::string get_executable_path ()
     // allocate output string
     std::string path;
     path.resize(256);
-    
+
 #if defined(__linux__)
     std::size_t n = path.size();
     while (n == path.size())
@@ -74,16 +74,16 @@ std::string get_executable_path ()
 #elif defined(_WIN32)
     GetModuleFileNameA(GetModuleHandle(nullptr), &path[0], sizeof(path));
 #endif
-    
+
     return path;
 }
 
 void print_stack_trace ()
 {
 #if (defined(__linux__) && defined(__GNUC__))
-    
+
     std::cerr << "Stack trace:" << std::endl;
-    
+
     // retrieve the backtrace
     void* addrlist[65];
     int addrlen = backtrace(addrlist, sizeof(addrlist) / sizeof(void*));
@@ -96,53 +96,53 @@ void print_stack_trace ()
         std::abort();
 #endif
     }
-    
+
     // translate the backtrace
     char** symbollist = backtrace_symbols(addrlist, addrlen);
-    
+
     // for all lines of the list
     for (int i = 1; i < addrlen; i++)
     {
         // convert line to string
         std::string line (symbollist[i]);
-        
+
         // get module name
         std::string module;
         std::size_t module_begin = 0, module_end = line.find('(');
         if (module_end != std::string::npos)
             module = line.substr(module_begin, module_end - module_begin);
-        
+
         std::cerr << " #" << i << " " << module << " : ";
-        
+
         // get function name
         std::string function;
         std::size_t function_begin = line.find('(') + 1, function_end = line.find('+');
         if (function_begin != std::string::npos and function_end != std::string::npos and function_end > function_begin)
             function = line.substr(function_begin, function_end - function_begin);
-        
+
         // demangle function name
         int status;
         char* funcname = nullptr;
         std::size_t funcnamesize = 0;
         char* ret = abi::__cxa_demangle(function.c_str(), funcname, &funcnamesize, &status);
         funcname = (status == 0 ? ret : nullptr);
-        
+
         if (not function.empty() and funcname != nullptr)
             std::cerr << "[" << funcname << "] ";
         else if (not function.empty())
             std::cerr << "[" << function << "] ";
         else
             std::cerr << "[unknown] ";
-        
+
         // get address
         std::string address;
         std::size_t address_begin = line.find('[') + 1, address_end = line.find(']');
         if (address_begin != std::string::npos and address_end != std::string::npos and address_end > address_begin)
             address = line.substr(address_begin, address_end - address_begin);
-        
+
         // translated address into line in source file
         std::string srcfile;
-        
+
 #if _POSIX_C_SOURCE >= 2
         // compose the command line
         std::string cmd = format
@@ -151,7 +151,7 @@ void print_stack_trace ()
             get_executable_path().c_str(),
             address.c_str()
         );
-        
+
         // launch "addr2line" (if available) and connect its output as a pipe
         FILE * pipe = popen(cmd.c_str(), "r");
         if (pipe != nullptr)
@@ -159,7 +159,7 @@ void print_stack_trace ()
             // read all characters from the pipe
             while (not std::feof(pipe))
                 srcfile.push_back(std::getc(pipe));
-            
+
             // check whether the executable has been found
             if (srcfile.find("No such file") != std::string::npos)
             {
@@ -172,7 +172,7 @@ void print_stack_trace ()
                 std::size_t pos = srcfile.rfind('/');
                 if (pos != std::string::npos)
                     srcfile = srcfile.substr(pos + 1, std::string::npos);
-                
+
                 // ... and erase trailing white/invalid characters
                 while (not srcfile.empty() and (std::isspace(srcfile.back()) or srcfile.back() < 0))
                         srcfile.pop_back();
@@ -180,13 +180,13 @@ void print_stack_trace ()
         }
         pclose(pipe);
 #endif
-        
+
         // print info
         if (srcfile.empty())
             std::cerr << "@ [" << address << "]" << std::endl;
         else
             std::cerr << "@ " << srcfile << std::endl;
-        
+
         // cleanup
         std::free(funcname);
     }
@@ -201,12 +201,12 @@ std::string nice_size (std::size_t bytes)
     std::size_t MiB = kiB * kiB;
     std::size_t GiB = kiB * kiB * kiB;
     std::size_t TiB = kiB * kiB * kiB * kiB;
-    
+
     if (bytes < kiB) return format("%d B", bytes);
     if (bytes < MiB) return format("%d kiB", bytes / kiB);
     if (bytes < GiB) return format("%d MiB", bytes / MiB);
     if (bytes < TiB) return format("%d GiB", bytes / GiB);
-    
+
     return format("%d TiB", bytes / TiB);
 }
 
@@ -240,19 +240,19 @@ void cmul2xd
     // [ -- ] * [ -- ] = [ -- ]   [ -- ]   [ -- ]   [ -- ]
     // [ a3 ]   [ b3 ]   [ a3 ] * [ b3 ] - [ a4 ] * [ b4 ]
     // [ a4 ]   [ b4 ]   [ a4 ] * [ b3 ] + [ a3 ] * [ b4 ]
-    
+
     __m256d A1234 = _mm256_loadu_pd(reinterpret_cast<const double*>(A));
     __m256d A2143 = _mm256_permute_pd(A1234, 0b01010101);
-    
+
     __m256d B1234 = _mm256_loadu_pd(reinterpret_cast<const double*>(B));
     __m256d B1133 = _mm256_unpacklo_pd(B1234, B1234);
     __m256d B2244 = _mm256_unpackhi_pd(B1234, B1234);
-    
+
     __m256d C1234 = _mm256_loadu_pd(reinterpret_cast<const double*>(C));
-    
+
     C1234 = _mm256_fmaddsub_pd(A2143, B2244, C1234);
     C1234 = _mm256_fmaddsub_pd(A1234, B1133, C1234);
-    
+
     _mm256_storeu_pd(reinterpret_cast<double*>(C), C1234);
 }
 #endif
@@ -278,19 +278,19 @@ void cmul4xd
     // [ -- ]   [ -- ]   [ -- ]   [ -- ]   [ -- ]   [ -- ]
     // [ a7 ]   [ b7 ]   [ a7 ] * [ b7 ] - [ a8 ] * [ b8 ]
     // [ a8 ]   [ b8 ]   [ a8 ] * [ b7 ] + [ a7 ] * [ b8 ]
-    
+
     __m512d A12345678 = _mm512_loadu_pd(reinterpret_cast<const double*>(A));
     __m512d A21436587 = _mm512_permute_pd(A12345678, 0b01010101);
-    
+
     __m512d B12345678 = _mm512_loadu_pd(reinterpret_cast<const double*>(B));
     __m512d B11335577 = _mm512_unpacklo_pd(B12345678, B12345678);
     __m512d B22446688 = _mm512_unpackhi_pd(B12345678, B12345678);
-    
+
     __m512d C12345678 = _mm512_loadu_pd(reinterpret_cast<const double*>(C));
-    
+
     C12345678 = _mm512_fmaddsub_pd(A21436587, B22446688, C12345678);
     C12345678 = _mm512_fmaddsub_pd(A12345678, B11335577, C12345678);
-    
+
     _mm512_storeu_pd(reinterpret_cast<double*>(C), C12345678);
 }
 #endif

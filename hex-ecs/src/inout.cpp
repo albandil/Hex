@@ -147,18 +147,18 @@ void CommandLine::parse (int argc, char* argv[])
     ParseCommandLine
     (
         argc, argv,
-        
+
         "example", "e", 0, [&](std::vector<std::string> const & optargs) -> bool
             {
                 std::cout << "Writing sample input file to \"example.inp\".\n\n";
-                
+
                 // produce sample input file
                 std::ofstream out("example.inp");
                 if (out.bad())
                     HexException("Error: Cannot write to \"example.inp\"\n");
-                
+
                 out << sample_input;
-                    
+
                 out.close();
                 std::exit(EXIT_SUCCESS);
             },
@@ -176,7 +176,7 @@ void CommandLine::parse (int argc, char* argv[])
                 std::ostringstream f;
                 for (LUft const * lu : *LUft::RTS_Table)
                     f << " '" << lu->name() << "'";
-                
+
                 // print usage information
                 std::cout << "\n"
                     "Available switches (short forms in parentheses):\n"
@@ -447,12 +447,12 @@ void CommandLine::parse (int argc, char* argv[])
                         return ptr->name() == optargs[0];
                     }
                 );
-                
+
                 if (ip == PreconditionerBase::RTS_Table->end())
                 {
                     HexException("Unknown preconditioner \"%s\".", optargs[0].c_str());
                 }
-                
+
                 preconditioner = optargs[0];
                 return true;
             },
@@ -745,11 +745,11 @@ void CommandLine::parse (int argc, char* argv[])
                         return ptr->name() == optargs[0];
                     }
                 );
-                
+
                 // check that it exists
                 if (ip == PreconditionerBase::RTS_Table->end())
                     HexException("Unknown coarse preconditioner");
-                
+
                 return true;
             },
         "dom-sweeps", "", 1, [&](std::vector<std::string> const & optargs) -> bool
@@ -762,29 +762,29 @@ void CommandLine::parse (int argc, char* argv[])
             {
                 // domain decomposition panels (x axis)
                 dom_x_panels = std::stoi(optargs[0]);
-                
+
                 // check that the number make sense
                 if (dom_x_panels < 1)
                     HexException("There must be at least one DOM panel in direction of X axis.");
-                
+
                 return true;
             },
         "dom-ypanels", "", 1, [&](std::vector<std::string> const & optargs) -> bool
             {
                 // domain decomposition panels (y axis)
                 dom_y_panels = std::stoi(optargs[0]);
-                
+
                 // check that the number make sense
                 if (dom_y_panels < 1)
                     HexException("There must be at least one DOM panel in direction of Y axis.");
-                
+
                 return true;
             },
         "dom-preconditioner", "", 1, [&](std::vector<std::string> const & optargs) -> bool
             {
                 // domain decomposition panels (y axis)
                 dom_preconditioner = optargs[0];
-                
+
                 // look-up the preconditioner
                 std::vector<PreconditionerBase*>::const_iterator ip = std::find_if
                 (
@@ -795,11 +795,11 @@ void CommandLine::parse (int argc, char* argv[])
                         return ptr->name() == dom_preconditioner;
                     }
                 );
-                
+
                 // check that it exists
                 if (ip == PreconditionerBase::RTS_Table->end())
                     HexException("Unknown domain decomposition panel preconditioner");
-                
+
                 return true;
             },
         "analytic-eigenstates", "", 0, [&](std::vector<std::string> const & optargs) -> bool
@@ -827,7 +827,7 @@ void CommandLine::parse (int argc, char* argv[])
                 multi_rhs = true;
                 return true;
             },
-        
+
         [&] (std::string optname, std::vector<std::string> const & optargs) -> bool
         {
             HexException("Unknown switch \"%s\".", optname.c_str());
@@ -846,12 +846,12 @@ void ReadArrays (std::ifstream & inf, rArray & arr)
             Real begin = ReadNext<Real>(inf).val;
             Real end = ReadNext<Real>(inf).val;
             int samples = ReadNext<int>(inf).val;
-            
+
             if (begin > end)
                 HexException("Start of linear sequence is larger than its end (%g > %g).", begin, end);
             if (samples < 0)
                 HexException("Invalid number of samples for linear sequence: %d.", samples);
-            
+
             arr.append(linspace(begin, end, samples));
         }
         else if (type[0] == 'G')
@@ -861,14 +861,14 @@ void ReadArrays (std::ifstream & inf, rArray & arr)
             Real d = ReadNext<Real>(inf).val;
             Real quotient = ReadNext<Real>(inf).val;
             int samples = std::ceil(1 + std::log(1 + (end - begin) * (quotient - 1) / d) / std::log(quotient));
-            
+
             if (begin > end)
                 HexException("Start of geometric sequence is larger than its end (%g > %g).", begin, end);
             if (d <= 0)
                 HexException("Initial interval size must be larger than zero (given: %g).", d);
             if (quotient <= 0)
                 HexException("Quotient must be positive (given: %g).", quotient);
-            
+
             arr.append(geomspace(begin, end, samples, quotient));
         }
         else if (type[0] == 'E')
@@ -888,22 +888,22 @@ void ReadArrays (std::ifstream & inf, rArray & arr)
 void InputFile::read (std::ifstream & inf)
 {
     ReadItem<int> idata;
-    
+
     // load B-spline parameters
     order = ReadNext<int>(inf).val;
     ecstheta = ReadNext<Real>(inf).val;
-    
+
     std::cout << std::endl;
     std::cout << "B-spline basis" << std::endl;
     std::cout << "\torder = " << order << std::endl;
     std::cout << "\tecs angle = " << ecstheta << std::endl;
-    
+
     //
     // load real atomic knot data
     //
-    
+
     ReadArrays(inf, rknots);
-    
+
     // print info
     std::cout << std::endl;
     if (rknots.size() < 2000)
@@ -922,18 +922,18 @@ void InputFile::read (std::ifstream & inf)
         for (std::string line : rknots.slice(rknots.size() - 1000, rknots.size()).lines(100))
             std::cout << '\t' << line << std::endl;
     }
-    
+
     // check order of knots
     for (unsigned i = 1; i < rknots.size(); i++)
         if (rknots[i] < rknots[i-1])
             HexException("The real knot sequence is not monotonous.");
-    
+
     //
     // load real projectile extension knot data
     //
-    
+
     ReadArrays(inf, rknots_ext);
-    
+
     // print info
     std::cout << std::endl;
     if (rknots_ext.size() < 2000)
@@ -952,25 +952,25 @@ void InputFile::read (std::ifstream & inf)
         for (std::string line : rknots_ext.slice(rknots_ext.size() - 1000, rknots_ext.size()).lines(100))
             std::cout << '\t' << line << std::endl;
     }
-    
+
     // check that the first knot is zero
     if (rknots_ext.size() > 0 and rknots_ext[0] != 0.)
         HexException("The first knot in overlap region must be zero.");
-    
+
     // check order of knots
     for (unsigned i = 1; i < rknots_ext.size(); i++)
         if (rknots_ext[i] < rknots_ext[i-1])
             HexException("The overlap knot sequence is not monotonous.");
-    
+
     // determine whether only the inner problem is to be solved (i.e. no projectile extension grid)
     inner_only = rknots_ext.empty();
-    
+
     //
     // load complex knot data
     //
-    
+
     ReadArrays(inf, cknots);
-    
+
     // print info
     std::cout << std::endl;
     if (cknots.size() < 2000)
@@ -989,37 +989,37 @@ void InputFile::read (std::ifstream & inf)
         for (std::string line : cknots.slice(rknots.size() - 1000, rknots.size()).lines(100))
             std::cout << '\t' << line << std::endl;
     }
-    
+
     // check that the first knot is zero
     if (cknots.size() > 0 and cknots[0] != 0.)
         HexException("The first knot in complex region must be zero.");
-    
+
     // check order of knots
     for (unsigned i = 1; i < cknots.size(); i++)
         if (cknots[i] < cknots[i-1])
             HexException("The complex knot sequence is not monotonous.");
-    
+
     //
     // load initial atomic quantum numbers
     //
-    
+
     std::cout << std::endl;
     std::cout << "Initial atomic states" << std::endl;
-    
+
     std::vector<ReadItem<int>> nis, lis, mis;
-    
+
     // load initial principal quantum numbers
     while ((idata = ReadNext<int>(inf)).val != -1)
         nis.push_back(idata);
-    
+
     // - orbital angular momentum
     for (std::size_t i = 0; i < nis.size(); i++)
         lis.push_back(ReadNext<int>(inf, ReadItem<int>::asterisk));
-    
+
     // - magnetic quantum number
     for (std::size_t i = 0; i < nis.size(); i++)
         mis.push_back(ReadNext<int>(inf, ReadItem<int>::asterisk));
-    
+
     for (unsigned i = 0; i < nis.size(); i++)
     for (int li = 0; li < nis[i].val; li++)
     for (int mi = -li; mi <= li; mi++)
@@ -1027,19 +1027,19 @@ void InputFile::read (std::ifstream & inf)
         // skip unused orbital angular momenta
         if (lis[i].val != li and not (lis[i].flags & ReadItem<int>::asterisk))
             continue;
-        
+
         // skip unused angular momentum projections
         if (mis[i].val != mi and not (mis[i].flags & ReadItem<int>::asterisk))
             continue;
-        
+
         // skip negative projections if asterisk was used (symmetry)
         if (mi < 0 and (mis[i].flags & ReadItem<int>::asterisk))
             continue;
-        
+
         // add this initial state
         instates.push_back(std::make_tuple(nis[i].val,li,mi));
     }
-    
+
     // print info
     std::cout << "\t[n l m]: ";
     for (auto state : instates)
@@ -1051,23 +1051,23 @@ void InputFile::read (std::ifstream & inf)
                   << "] ";
     }
     std::cout << std::endl;
-    
+
     //
     // load final atomic quantum numbers
     //
-    
+
     std::cout << std::endl;
     std::cout << "Final atomic states" << std::endl;
     std::vector<ReadItem<int>> nfs, lfs;
-    
+
     // - principal quantum number
     while ((idata = ReadNext<int>(inf)).val != -1)
         nfs.push_back(idata);
-    
+
     // - orbital angular momentum
     for (std::size_t i = 0; i < nfs.size(); i++)
         lfs.push_back(ReadNext<int>(inf, ReadItem<int>::asterisk));
-    
+
     // - construct final states
     for (unsigned f = 0; f < nfs.size(); f++)
     for (int lf = 0; lf <= nfs[f].val; lf++)
@@ -1075,18 +1075,18 @@ void InputFile::read (std::ifstream & inf)
         // l=n only in ionization specification
         if (lf == nfs[f].val and nfs[f].val != 0)
             continue;
-        
+
         // skip unused orbital angular momenta
         if (lfs[f].val != lf and not (lfs[f].flags & ReadItem<int>::asterisk))
             continue;
-        
+
         // add this initial state
         outstates.push_back(std::make_tuple(nfs[f].val,lf,0));
     }
-    
+
     // - asymptotic channel max energy
     channel_max_E = ReadNext<Real>(inf).val;
-    
+
     // get maximal bound state energy
     max_Ebound = -1;
     for (ReadItem<int> const & n : nis)
@@ -1103,7 +1103,7 @@ void InputFile::read (std::ifstream & inf)
         else if (n.val > 0)
             max_Ebound = std::max(max_Ebound, -1.0_r/(n.val * n.val));
     }
-    
+
     // print info
     std::cout << "\t[n l m]: ";
     for (auto state : outstates)
@@ -1114,69 +1114,69 @@ void InputFile::read (std::ifstream & inf)
                   << " *] ";
     }
     std::cout << "\n" << std::endl;
-    
+
     std::cout << "Asymptotic channels with energy up to " << channel_max_E << " Ry." << std::endl;
-    
+
     //
     // load total quantum numbers etc.
     //
-    
+
     std::cout << std::endl;
     std::cout << "Angular momentum limits" << std::endl;
-    
+
     // total angular momentum
     L = ReadNext<int>(inf).val;
-    
+
     // spin
     ReadItem<int> Sp = ReadNext<int>(inf, ReadItem<int>::asterisk);
     if ((Sp.flags & ReadItem<int>::asterisk) or Sp.val == 0) Spin.push_back(0);
     if ((Sp.flags & ReadItem<int>::asterisk) or Sp.val == 1) Spin.push_back(1);
-    
+
     // parity
     Pi = ReadNext<int>(inf).val % 2;
-    
+
     // number of angular momentum pairs per total angular momentum
     levels = ReadNext<int>(inf).val;
-    
+
     // single-electron angular momentum limit
     limit = ReadNext<int>(inf).val;
-    
+
     // whether to include also l1 > l2, or only l1 <= l2
     exchange = ReadNext<int>(inf).val;
-    
+
     std::cout << "\tL = " << L << std::endl;
     std::cout << "\tS = " << Spin << std::endl;
     std::cout << "\tPi = " << Pi << std::endl;
     std::cout << "\tnL = " << levels << std::endl;
     std::cout << "\tlimit = " << limit << std::endl;
-    
+
     Za = 1;
     Zp = ReadNext<int>(inf).val;
-    
+
     if (Zp == 0)
         HexException("Invalid projectile charge 0. Use +1 or -1 for positron and electron respectively.");
-    
+
     Zp = Zp / std::abs(Zp);
-    
+
     std::cout << "\tZp = " << Zp << std::endl;
-    
+
     //
     // load initial energies
     //
-    
+
     ReadArrays(inf, Etot);
-    
+
     // print info
     std::cout << std::endl << "Total projectile + atom energies [Ry]" << std::endl;
     std::cout << "\tcount: "     << Etot.size()  << std::endl;
     std::cout << "\tfull list: " << Etot         << std::endl;
-    
+
     // check that all energies are allowed by the asymptotic expansion
     max_Etot = -1;
     if (not Etot.empty())
     {
         max_Etot = *std::max_element(Etot.begin(), Etot.end());
-        
+
         if (max_Etot > channel_max_E)
         {
             std::cout << std::endl;
@@ -1187,15 +1187,15 @@ void InputFile::read (std::ifstream & inf)
 
         }
     }
-    
+
     //
     // load some other optional data
     //
-    
+
     std::cout << std::endl;
     std::cout << "Other parameters" << std::endl;
     B = ReadNext<Real>(inf).val;
-    
+
     // print info
     std::cout << "\tmagnetic field: " << B << " a.u." << std::endl;
     std::cout << std::endl;
@@ -1215,14 +1215,14 @@ void zip_solution
     cArray ev;      // evaluated solution
     rArray grid_x;  // real evaluation grid (atomic electron)
     rArray grid_y;  // real evaluation grid (projectile electron)
-    
+
     // shorthands
     std::size_t Nspline_inner = bspline_inner.Nspline();
     std::size_t Nspline_full  = bspline_full .Nspline();
     std::size_t Nspline_outer = Nspline_full - Nspline_inner;
-    
+
     std::cout << "Zipping B-spline expansion of the solution: \"" << cmd.zipdata.file << "\"" << std::endl;
-    
+
     // evaluation grid
     Real Xmin = cmd.zipdata.Xmin < 0 ? 0 : cmd.zipdata.Xmin;
     Real Ymin = cmd.zipdata.Ymin < 0 ? 0 : cmd.zipdata.Ymin;
@@ -1230,12 +1230,12 @@ void zip_solution
     Real Ymax = cmd.zipdata.Ymax < 0 ? bspline_full.Rmax() : cmd.zipdata.Ymax;
     grid_x = linspace(Xmin, Xmax, cmd.zipdata.nX);
     grid_y = linspace(Ymin, Ymax, cmd.zipdata.nY);
-    
+
     // load the requested file
     HDFFile hdf (cmd.zipdata.file, HDFFile::readonly);
     if (not hdf.valid())
         HexException("Cannot load file %s.", cmd.zipdata.file.c_str());
-    
+
     // get solution information
     int l1, l2, Nchan1 = 0, Nchan2 = 0; Real E;
     if (not hdf.read("l1", &l1, 1) or
@@ -1243,25 +1243,25 @@ void zip_solution
         not hdf.read("E", &E, 1) or
         not sol.hdfload(cmd.zipdata.file))
         HexException("This is not a valid solution file.");
-    
+
     // get number of asymptotic channels
     hdf.read("Nchan1", &Nchan1, 1);
     hdf.read("Nchan2", &Nchan2, 1);
-    
+
     // prepare radial integrals structure
     RadialIntegrals r (bspline_inner, bspline_full, 0);
     r.verbose(false);
     r.setupOneElectronIntegrals(par, cmd);
-    
+
     // prepare quadrature structure
     GaussLegendre g_inner;
-    
+
     // factorize the overlap matrix
     CsrMatrix<LU_int_t,Complex> S_csr = r.S_x().tocoo<LU_int_t>().tocsr();
     std::shared_ptr<LUft> S_lu;
     S_lu.reset(LUft::Choose("lapack"));
     S_lu->factorize(S_csr);
-    
+
     // compute all needed bound states
     cArrays Xp1 (Nchan2), Sp1 (Nchan2), Xp2 (Nchan1), Sp2 (Nchan1);
     for (int n1 = l1 + 1; n1 <= l1 + Nchan2; n1++)
@@ -1274,7 +1274,7 @@ void zip_solution
         Sp2[n2 - l2 - 1] = r.overlapP(bspline_inner, g_inner, inp.Za, n2, l2);
         Xp2[n2 - l2 - 1] = S_lu->solve(Sp2[n2 - l2 - 1]);
     }
-    
+
     // expand the solution
     cArray full_solution (Nspline_full * Nspline_full, 0.0_z);
     for (std::size_t i = 0; i < Nspline_full; i++)
@@ -1301,7 +1301,7 @@ void zip_solution
                 full_solution[i * Nspline_full + j] += Xp1[n][i] * sol[Nspline_inner * Nspline_inner + (Nchan1 + n) * Nspline_outer + j - Nspline_inner];
         }
     }
-    
+
     // evaluate the solution
     cArray evPsi = Bspline::zip
     (
@@ -1311,7 +1311,7 @@ void zip_solution
         grid_x,
         grid_y
     );
-    
+
     // evaluate the solution differentiated with respect to the first coordinate
     cArray evDxPsi = Bspline::zip
     (
@@ -1323,7 +1323,7 @@ void zip_solution
         &Bspline::dspline,
         &Bspline::bspline
     );
-    
+
     // evaluate the solution differentiated with respect to the second coordinate
     cArray evDyPsi = Bspline::zip
     (
@@ -1335,7 +1335,7 @@ void zip_solution
         &Bspline::bspline,
         &Bspline::dspline
     );
-    
+
     // write full solution to file
     VTKRectGridFile vtk;
     vtk.setGridX(grid_x);
@@ -1346,12 +1346,12 @@ void zip_solution
     vtk.appendScalarAttribute("probDensity", sqrabs(evPsi));
     vtk.appendVector3DAttribute("probFlux", imagpart(evPsi.conj() * evDxPsi), imagpart(evPsi.conj() * evDyPsi), rArray(evPsi.size(), 0.0_r));
     vtk.writePoints(cmd.zipdata.file + "-full.vtk");
-    
+
     // expand the channel functions
     for (int n = 0; n < Nchan1; n++)
     {
         cArray full_channel_function (Nspline_full, 0.0_z);
-        
+
         for (std::size_t i = 0; i < Nspline_full; i++)
         {
             if (i < Nspline_inner)
@@ -1364,7 +1364,7 @@ void zip_solution
                 full_channel_function[i] = sol[Nspline_inner * Nspline_inner + n * Nspline_outer + i - Nspline_inner];
             }
         }
-        
+
         // write to file
         std::ofstream out (format("%s-channel1-%d.vtk", cmd.zipdata.file.c_str(), n).c_str());
         writeVTK_points
@@ -1377,7 +1377,7 @@ void zip_solution
     for (int n = 0; n < Nchan2; n++)
     {
         cArray full_channel_function (Nspline_full);
-        
+
         for (std::size_t i = 0; i < Nspline_full; i++)
         {
             if (i < Nspline_inner)
@@ -1390,7 +1390,7 @@ void zip_solution
                 full_channel_function[i] = sol[Nspline_inner * Nspline_inner + (Nchan1 + n) * Nspline_outer + i - Nspline_inner];
             }
         }
-        
+
         // write to file
         std::ofstream out (format("%s-channel2-%d.vtk", cmd.zipdata.file.c_str(), n).c_str());
         writeVTK_points
@@ -1408,10 +1408,10 @@ void write_grid (Bspline const & bspline, std::string const & basename)
     rArray knots = bspline.rknots();
     knots.pop_back();
     knots.append(bspline.cknots2());
-    
+
     // output file
     std::ofstream out (basename + ".vtk");
-    
+
     // write knots (write header only for the first time)
     writeVTK_points(out, cArray(), knots, knots, rArray({0.}));
 }

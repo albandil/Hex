@@ -48,10 +48,10 @@ ScatteringQuantity * get_quantity (std::string name)
             return Q->name() == name;
         }
     );
-    
+
     if (iter == ScatteringQuantity::RTS_Table->end())
         return nullptr;
-    
+
     return *iter;
 }
 

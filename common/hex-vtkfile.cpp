@@ -53,7 +53,7 @@ void writeVTK_points
     unsigned ny = ygrid.size();
     unsigned nz = zgrid.size();
     unsigned N = nx * ny * nz;
-    
+
     // write VTK header
     if (with_header)
     {
@@ -61,7 +61,7 @@ void writeVTK_points
         out << "Wave function" << std::endl;
         out << "ASCII" << std::endl;
     }
-    
+
     // write grid data
     out << "DATASET RECTILINEAR_GRID" << std::endl;
     out << "DIMENSIONS " << nx << " " << ny << " " << nz << std::endl;
@@ -73,7 +73,7 @@ void writeVTK_points
     out << to_string(zgrid) << std::endl;
     out << "POINT_DATA " << N << std::endl;
     out << "FIELD wavefunction " << 2 * ev.size() / N << std::endl;
-    
+
     for (std::size_t iblock = 0; (iblock + 1) * N <= ev.size(); iblock++)
     {
         // save real part
@@ -85,7 +85,7 @@ void writeVTK_points
                 out << ev[((iblock * nx + i) * ny + j) * nz + k].real() << " ";
             out << std::endl;
         }
-        
+
         // save imaginary part
         out << "block_" << iblock << "_im 1 " << N << " float" << std::endl;
         for (unsigned i = 0; i < nx; i++)
@@ -112,9 +112,9 @@ void writeVTK_cells
     unsigned py = ygrid.size(), cy = py - 1;
     unsigned pz = zgrid.size(), cz = pz - 1;
     unsigned N = cx * cy * cz;
-    
+
     assert (ev.size() == N);
-    
+
     // write VTK header
     out << "# vtk DataFile Version 3.0" << std::endl;
     out << "Wave function" << std::endl;
@@ -129,7 +129,7 @@ void writeVTK_cells
     out << to_string(zgrid) << std::endl;
     out << "CELL_DATA " << N << std::endl;
     out << "FIELD wavefunction 2" << std::endl;
-    
+
     // save real part
     out << "Re 1 " << N << " float" << std::endl;
     for (unsigned i = 0; i < cx; i++)
@@ -139,7 +139,7 @@ void writeVTK_cells
             out << ev[(i * cy + j) * cz + k].real() << " ";
         out << std::endl;
     }
-    
+
     // save imaginary part
     out << "Im 1 " << N << " float" << std::endl;
     for (unsigned i = 0; i < cx; i++)
@@ -186,18 +186,18 @@ void VTKRectGridFile::appendVector3DAttribute (std::string name, rArray const & 
 void VTKRectGridFile::writePoints (std::string filename) const
 {
     std::ofstream out (filename);
-    
+
     // write VTK header
     out << "# vtk DataFile Version 3.0" << std::endl;
     out << "Wave function" << std::endl;
     out << "ASCII" << std::endl;
-    
+
     // get sizes
     std::size_t nx = xgrid_.size();
     std::size_t ny = ygrid_.size();
     std::size_t nz = zgrid_.size();
     std::size_t N = nx * ny * nz;
-    
+
     // write grid data
     out << "DATASET RECTILINEAR_GRID" << std::endl;
     out << "DIMENSIONS " << nx << " " << ny << " " << nz << std::endl;
@@ -209,13 +209,13 @@ void VTKRectGridFile::writePoints (std::string filename) const
     out << to_string(zgrid_) << std::endl;
     out << "POINT_DATA " << N << std::endl;
     out << "FIELD wavefunction " << fields_.size() << std::endl;
-    
+
     // write field data
     for (std::pair<std::string,std::vector<rArray>> const & field : fields_)
     {
         std::string const & fieldname = field.first;
         std::size_t ncomp = field.second.size();
-        
+
         out << fieldname << " " << ncomp << " " << N << " float" << std::endl;
         for (unsigned i = 0; i < nx; i++)
         {
@@ -233,26 +233,26 @@ void VTKRectGridFile::writePoints (std::string filename) const
 void VTKRectGridFile::writeCells (std::string filename) const
 {
     std::ofstream out (filename);
-    
+
     // write VTK header
     out << "# vtk DataFile Version 3.0" << std::endl;
     out << "Wave function" << std::endl;
     out << "ASCII" << std::endl;
-    
+
     // get number of points
     std::size_t nx = xgrid_.size();
     std::size_t ny = ygrid_.size();
     std::size_t nz = zgrid_.size();
-    
+
     if (nx == 0 or ny == 0 or nz == 0)
         HexException("All grids must be non-empty");
-    
+
     // get number of cells
     std::size_t cx = std::max<std::size_t>(nx - 1, 1);
     std::size_t cy = std::max<std::size_t>(ny - 1, 1);
     std::size_t cz = std::max<std::size_t>(nz - 1, 1);
     std::size_t Nc = cx * cy * cz;
-    
+
     // write grid data
     out << "DATASET RECTILINEAR_GRID" << std::endl;
     out << "DIMENSIONS " << nx << " " << ny << " " << nz << std::endl;
@@ -264,13 +264,13 @@ void VTKRectGridFile::writeCells (std::string filename) const
     out << to_string(zgrid_) << std::endl;
     out << "CELL_DATA " << Nc << std::endl;
     out << "FIELD wavefunction " << fields_.size() << std::endl;
-    
+
     // write field data
     for (std::pair<std::string,std::vector<rArray>> const & field : fields_)
     {
         std::string const & fieldname = field.first;
         std::size_t ncomp = field.second.size();
-        
+
         // check that all components have the right dimension
         for (unsigned icomp = 0; icomp < ncomp; icomp++)
         {
@@ -283,7 +283,7 @@ void VTKRectGridFile::writeCells (std::string filename) const
                 );
             }
         }
-        
+
         // write data to file
         out << fieldname << " " << ncomp << " " << Nc << " float" << std::endl;
         for (unsigned i = 0; i < cz; i++)

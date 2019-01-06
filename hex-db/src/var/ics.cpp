@@ -77,25 +77,25 @@ void db_sqrt (sqlite3_context* pdb, int n, sqlite3_value** val)
 void db_ioncs (sqlite3_context* pdb, int n, sqlite3_value** val)
 {
     assert(n == 1);
-    
+
     // get blob data as text; reinterpret_cast is safe as we are using
     // the low ASCII only
     std::string blob = reinterpret_cast<const char*>(sqlite3_value_text(*val));
-    
+
     // convert text data to binary array
     cArray coeffs;
     coeffs.fromBlob(blob);
-    
+
     // some blobs can be empty
     if (coeffs.empty())
     {
         sqlite3_result_double(pdb, 0.0);
         return;
     }
-    
+
     // reconstruct Chebyshev approximation object from the stored data
     Chebyshev<double,Complex> CB(coeffs, 0, 1);
-    
+
     // integrate
     //
     // 1/√2                π/4
@@ -110,7 +110,7 @@ void db_ioncs (sqlite3_context* pdb, int n, sqlite3_value** val)
     auto fsqr = [&](double beta) -> double { return sqrabs(CB.clenshaw(std::sin(beta), tail)); };
     ClenshawCurtis<decltype(fsqr),double> integrator(fsqr);
     double result = integrator.integrate(0, special::constant::pi_quart);
-    
+
     // use result of the integration
     sqlite3_result_double(pdb, result);
 }
@@ -122,14 +122,14 @@ void db_ioncs (sqlite3_context* pdb, int n, sqlite3_value** val)
 void db_interpolate (sqlite3_context* pdb, int n, sqlite3_value** val)
 {
     assert(n == 5);
-    
+
     // extract parameters
     double x1 = sqlite3_value_double(*(val + 0));
     double y1 = sqlite3_value_double(*(val + 1));
     double x2 = sqlite3_value_double(*(val + 2));
     double y2 = sqlite3_value_double(*(val + 3));
     double x  = sqlite3_value_double(*(val + 4));
-    
+
     // handle degenerate case
     if (x1 == x2)
     {
@@ -138,7 +138,7 @@ void db_interpolate (sqlite3_context* pdb, int n, sqlite3_value** val)
         else
             sqlite3_result_double(pdb, special::constant::Nan);
     }
-    
+
     // interpolate
     else
     {
@@ -192,13 +192,13 @@ bool IntegralCrossSection::initialize (sqlitepp::session & db)
 {
     // define square root function
     sqlite3_create_function(db.impl(), "SQRT", 1, SQLITE_UTF8, nullptr, &db_sqrt, nullptr, nullptr);
-    
+
     // define Gauss-Chebyshev integration of squared Chebyshev expansion
     sqlite3_create_function(db.impl(), "IONCS", 1, SQLITE_UTF8, nullptr, &db_ioncs, nullptr, nullptr);
-    
+
     // define linear interpolation of two data points (5 arguments: x1, y1, x2, y2, x)
     sqlite3_create_function(db.impl(), "INTERPOLATE", 5, SQLITE_UTF8, nullptr, &db_interpolate, nullptr, nullptr);
-    
+
     return ScatteringQuantity::initialize(db);
 }
 
@@ -220,7 +220,7 @@ bool IntegralCrossSection::createTable ()
             "sigma DOUBLE PRECISION, "
             "PRIMARY KEY (ni,li,mi,nf,lf,mf,S,Ei,ell)"
         ")";
-    
+
     try
     {
         st.exec();
@@ -231,7 +231,7 @@ bool IntegralCrossSection::createTable ()
         std::cerr << "       code = " << e.code() << " (\"" << e.what() << "\")" << std::endl;
         return false;
     }
-    
+
     return true;
 }
 
@@ -244,7 +244,7 @@ bool IntegralCrossSection::updateTable ()
         sqlitepp::into(ni), sqlitepp::into(li), sqlitepp::into(mi),
         sqlitepp::into(nf), sqlitepp::into(lf), sqlitepp::into(mf),
         sqlitepp::into(S),  sqlitepp::into(ell);
-    
+
     // for all transitions and partial waves
     while (st1.exec())
     {
@@ -264,7 +264,7 @@ bool IntegralCrossSection::updateTable ()
         {
             merged_energies.push_back(E);
         }
-        
+
         // get all total angular momenta and parities for this transition and partial wave
         int L;
         sqlitepp::statement st3 (session());
@@ -281,7 +281,7 @@ bool IntegralCrossSection::updateTable ()
         {
             angular_momenta.push_back(L);
         }
-        
+
         // merge-interpolate all T-matrix data for this transition and partial wave
         cArray merged_T (merged_energies.size());
         for (int L : angular_momenta)
@@ -306,11 +306,11 @@ bool IntegralCrossSection::updateTable ()
                 Re_T.push_back(ret * k.back());
                 Im_T.push_back(imt * k.back());
             }
-            
+
             // default to Akima spline interpolation, but fall back to linear if not enough points
             gsl_interp_type const * interp = gsl_interp_akima;
             bool enoughPoints = energies.size() >= gsl_interp_type_min_size(interp) or energies.size() >= gsl_interp_type_min_size(interp = gsl_interp_linear);
-            
+
             // interpolate data
             gsl_interp* spline_Re = enoughPoints ? gsl_interp_alloc(interp, energies.size()) : nullptr;
             gsl_interp* spline_Im = enoughPoints ? gsl_interp_alloc(interp, energies.size()) : nullptr;
@@ -320,9 +320,9 @@ bool IntegralCrossSection::updateTable ()
             {
                 gsl_interp_accel* accel_Re = spline_Re ? gsl_interp_accel_alloc() : nullptr;
                 gsl_interp_accel* accel_Im = spline_Im ? gsl_interp_accel_alloc() : nullptr;
-                
+
                 double ret, imt;
-                
+
                 # pragma omp for
                 for (std::size_t i = 0; i < merged_energies.size(); i++)
                 {
@@ -333,36 +333,36 @@ bool IntegralCrossSection::updateTable ()
                         // great, no need to interpolate -- let's just use the value
                         merged_T[i] = Complex(Re_T[j], Im_T[j]) / k[j];
                     }
-                    
+
                     // interpolate if within dataset
                     else if (energies.front() <= merged_energies[i] and merged_energies[i] <= energies.back() and enoughPoints)
                     {
                         int err_re = gsl_interp_eval_e(spline_Re, energies.data(), Re_T.data(), merged_energies[i], accel_Re, &ret);
                         int err_im = gsl_interp_eval_e(spline_Im, energies.data(), Im_T.data(), merged_energies[i], accel_Im, &imt);
-                        
+
                         if (err_re != GSL_SUCCESS)
                         {
                             std::cout << "Warning: Failed to interpolate real data for transition (" << ni << "," << li << "," << mi << ") -> (" << nf << "," << lf << "," << mf << "), "
                                 "L = " << L << ", ell = " << ell << ", Ei = " << merged_energies[i] << " (" << gsl_strerror(err_re) << ")" << std::endl;
                         }
-                        
+
                         if (err_im != GSL_SUCCESS)
                         {
                             std::cout << "Warning: Failed to interpolate imag data for transition (" << ni << "," << li << "," << mi << ") -> (" << nf << "," << lf << "," << mf << "), "
                                 "L = " << L << ", ell = " << ell << ", Ei = " << merged_energies[i] << " (" << gsl_strerror(err_re) << ")" << std::endl;
                         }
-                        
+
                         merged_T[i] += Complex(ret, imt) / std::sqrt(merged_energies[i]);
                     }
                 }
-                
+
                 if (accel_Re) gsl_interp_accel_free(accel_Re);
                 if (accel_Im) gsl_interp_accel_free(accel_Im);
             }
             if (spline_Re) gsl_interp_free(spline_Re);
             if (spline_Im) gsl_interp_free(spline_Im);
         }
-        
+
         // write interpolated data to the database
         sqlitepp::statement st5 (session());
         double ics, Ei, Ef;
@@ -373,18 +373,18 @@ bool IntegralCrossSection::updateTable ()
             // initial and final energies
             Ei = merged_energies[i];
             Ef = Ei - 1./(ni*ni) + 1./(nf*nf);
-            
+
             // skip forbidden channels
             if (Ef < 0)
                 continue;
-            
+
             // calculate partial integral cross section
             ics = std::sqrt(Ef/Ei) * (2 * S + 1) * sqrabs(merged_T[i]) / std::pow(4 * special::constant::pi, 2);
-            
+
             // separate data n-tuples with comma
             if (rows++ > 0)
                 st5.q() << ",";
-            
+
             // add another data n-tuple
             st5.q() << " (" << ni << "," << li << "," << mi << "," << nf << "," << lf << "," << mf << "," << S << "," << Ei << "," << ell << "," << ics << ")";
         }
@@ -394,9 +394,9 @@ bool IntegralCrossSection::updateTable ()
             st5.exec();
         }
     }
-    
+
     // Insert ionization (no interpolation needed: L is used as the partial wave number here.
-    
+
     sqlitepp::statement st6 (session());
     st6 << "INSERT OR REPLACE INTO 'ics' "
             "SELECT ni, li, mi, "
@@ -406,7 +406,7 @@ bool IntegralCrossSection::updateTable ()
                 "FROM 'ionf' "
                 "GROUP BY ni, li, mi, S, Ei, L";
     st6.exec();
-    
+
     return ScatteringQuantity::updateTable();
 }
 
@@ -417,7 +417,7 @@ bool IntegralCrossSection::run (std::map<std::string,std::string> const & sdata)
     // manage units
     double efactor = change_units(Eunits, eUnit_Ry);
     double lfactor = change_units(lUnit_au, Lunits);
-    
+
     // scattering event parameters
     int ni = Conv<int>(sdata, "ni", name());
     int li = Conv<int>(sdata, "li", name());
@@ -427,15 +427,15 @@ bool IntegralCrossSection::run (std::map<std::string,std::string> const & sdata)
     int mf0= Conv<int>(sdata, "mf", name());
     int ell= Conv<int>(sdata, "ell",name());
     int  S = Conv<int>(sdata, "S",  name());
-    
+
     // use mi >= 0; if mi < 0, flip both signs
     int mi = (mi0 < 0 ? -mi0 : mi0);
     int mf = (mi0 < 0 ? -mf0 : mf0);
-    
+
     // energies and cross sections
     double E, sigma;
     rArray energies, E_arr, sigma_arr;
-    
+
     // get energy / energies
     try
     {
@@ -447,7 +447,7 @@ bool IntegralCrossSection::run (std::map<std::string,std::string> const & sdata)
         // are there more energies specified using the STDIN ?
         energies = readStandardInput<double>();
     }
-    
+
     // compose query
     sqlitepp::statement st (session());
     st << "SELECT Ei, sigma FROM 'ics' "
@@ -464,14 +464,14 @@ bool IntegralCrossSection::run (std::map<std::string,std::string> const & sdata)
         sqlitepp::use(ni), sqlitepp::use(li), sqlitepp::use(mi),
         sqlitepp::use(nf), sqlitepp::use(lf), sqlitepp::use(mf),
         sqlitepp::use(ell), sqlitepp::use(S);
-    
+
     // retrieve data
     while (st.exec())
     {
         E_arr.push_back(E);
         sigma_arr.push_back(sigma);
     }
-    
+
     // write header
     std::cout << logo("#") <<
         "# Integral cross section in " << unit_name(Lunits) << " for\n" <<
@@ -485,11 +485,11 @@ bool IntegralCrossSection::run (std::map<std::string,std::string> const & sdata)
     table.setAlignment(OutputTable::left);
     table.write("# E        ", "sigma    ");
     table.write("# ---------", "---------");
-    
+
     // terminate if no data
     if (E_arr.empty())
         return true;
-    
+
     if (energies[0] < 0.)
     {
         // negative energy indicates full output
@@ -500,16 +500,16 @@ bool IntegralCrossSection::run (std::map<std::string,std::string> const & sdata)
     {
         // threshold for ionization
         double Eion = 1./(ni*ni);
-        
+
         // interpolate (linear below ionization threshold, cspline above)
         rArray ics = (efactor * energies.front() < Eion) ? 
             interpolate_real(E_arr, E_arr * sigma_arr, energies * efactor, gsl_interp_linear) / (energies * efactor) :
             interpolate_real(E_arr, E_arr * sigma_arr, energies * efactor, gsl_interp_akima ) / (energies * efactor);
-        
+
         // output
         for (std::size_t i = 0; i < energies.size(); i++)
             table.write(energies[i], ics[i] * lfactor * lfactor);
     }
-    
+
     return true;
 }

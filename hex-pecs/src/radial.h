@@ -41,13 +41,13 @@
 class RadialBasis
 {
     public:
-        
+
         RadialBasis (InputFile const & inp);
-        
+
         rArray rgrid;
         cArray cgrid;
         cArray grid;
-        
+
         std::size_t Npts;
 };
 

@@ -80,20 +80,20 @@ int solve2
     int status = GSL_SUCCESS, first_status = GSL_SUCCESS;
     size_t nsteps = 0;
     xg[0] = x0;
-    
+
     // setup the stepper
     const gsl_odeiv2_step_type * step_type = gsl_odeiv2_step_rkck;
     gsl_odeiv2_step * step = gsl_odeiv2_step_alloc(step_type, 2);
     gsl_odeiv2_control * control = gsl_odeiv2_control_y_new(1e-6, 0.0);
     gsl_odeiv2_evolve * evolve = gsl_odeiv2_evolve_alloc(2);
-    
+
     // setup the system
     gsl_odeiv2_system sys;
     sys.function = derivs;
     sys.jacobian = nullptr;
     sys.dimension = 2;
     sys.params = data;
-    
+
     // for all steps
     for(int i = 1; i < N - 1 and status == GSL_SUCCESS; i++)
     {
@@ -101,7 +101,7 @@ int solve2
         double * y_row = yg[i];
         y_row[0] = yg[i-1][0];
         y_row[1] = yg[i-1][1];
-        
+
         // Step until we reach the next grid point
         bool done = false;
         while (not done and status == GSL_SUCCESS)
@@ -116,18 +116,18 @@ int solve2
                 &h,
                 y_row
             );
-            
+
             // check finiteness
             if (not std::isfinite(y_row[0]))
                 HexException("[solve2] Infinite result (%g) for i = %d", y_row[0], i);
-            
+
             // advance number of steps
             nsteps++;
             if (status != GSL_SUCCESS and first_status != GSL_SUCCESS)
                 first_status = status;
             if (nsteps > ntrial)
                 std::cerr << "[solve2] Too many steps required (ntrial=" << ntrial << ", x=" << x << ").";
-            
+
             // avoid overflow (normalize)
             if (fabs(y_row[0]) > DIVERGENCE_THRESHOLD)
             {
@@ -149,7 +149,7 @@ int solve2
                     HexException("[solve2] Overflow error.");
                 }
             }
-            
+
             // decide if we have reached the grid point
             if (x1 > x0)
             {
@@ -161,14 +161,14 @@ int solve2
                 if (x <= xnext)
                     done = true;
             }
-            
+
         }
     }
-    
+
     gsl_odeiv2_evolve_free(evolve);
     gsl_odeiv2_control_free(control);
     gsl_odeiv2_step_free(step);
-    
+
     return N;
 }
 

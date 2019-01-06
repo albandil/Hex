@@ -62,7 +62,7 @@
 class H5File
 {
 public:
-    
+
     /**
      * @brief Access mode.
      * 
@@ -78,60 +78,60 @@ public:
         readwrite
     }
     FileAccess;
-    
+
     /// Constructor from filename and access mode.
     H5File (std::string filename, FileAccess flag);
-    
+
     /// Destructor.
     ~H5File ();
-    
+
     /// Get size of the dataset of valid file.
     std::size_t size (std::string dataset) const;
-    
+
     /// Load data from a valid file.
     template <typename T> bool read (std::string dataset, T * buffer, std::size_t length, std::size_t offset = 0) const
     {
         HexException("Unsupported data type %s.", typeid(T).name());
     }
-    
+
     /// Write data to a valid file.
     template <typename T> bool write (std::string dataset, T const * buffer, std::size_t length, std::size_t offset = 0)
     {
         HexException("Unsupported data type %s.", typeid(T).name());
     }
-    
+
     /// Check that the file is valid.
     bool valid () const { return valid_; }
-    
+
     /// Prefix for dataset paths.
     std::string prefix;
-    
+
     /// Internal HDF object.
     hid_t file () const { return file_; }
-    
+
     /// Error stack.
     std::string const & error () const { return error_; };
-    
+
 private:
-    
+
     /// Pointer to the HDF structure.
     hid_t file_;
-    
+
     /// Filename.
     std::string name_;
-    
+
     /// HDF library error stack (set on unsuccessful return).
     mutable std::string error_;
-    
+
     /// Whether the file is valid.
     bool valid_;
-    
+
     /// Auxiliary read function.
     bool read_(std::string dataset, void * buffer, hsize_t length, hsize_t offset, hid_t dtype) const;
-    
+
     /// Auxiliary write function.
     bool write_(std::string dataset, void const * buffer, hsize_t length, hsize_t offset, hid_t dtype);
-    
+
     /// Set error and return false.
     void save_error () const;
 };

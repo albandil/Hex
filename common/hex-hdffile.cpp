@@ -48,34 +48,34 @@ HDFFile::HDFFile (std::string filename, FileAccess flag)
         prefix = name_.substr(pos + 1);
         name_.resize(pos);
     }
-    
+
     // try to open the file
     switch (flag)
     {
         case overwrite:
             file_.open(name_.c_str(), std::ios::in | std::ios::out | std::ios::binary | std::ios::trunc);
             break;
-            
+
         case readonly:
             file_.open(name_.c_str(), std::ios::in | std::ios::binary);
             break;
-            
+
         case readwrite:
             file_.open(name_.c_str(), std::ios::in | std::ios::out | std::ios::binary);
             break;
     }
-    
+
     // read header
     if (file_.is_open() and (flag == readonly or flag == readwrite))
     {
         // read number of datasets
         std::size_t ndt;
         file_.read(reinterpret_cast<char*>(&ndt), sizeof(std::size_t));
-        
+
         // exit if there are no data in the header
         if (file_.fail())
             return;
-        
+
         // read dataset information
         datasets_.resize(ndt);
         for (std::size_t idt = 0; idt < ndt; idt++)
@@ -83,11 +83,11 @@ HDFFile::HDFFile (std::string filename, FileAccess flag)
             // read length of the dataset name
             std::size_t len;
             file_.read(reinterpret_cast<char*>(&len), sizeof(std::size_t));
-            
+
             // read dataset name
             datasets_[idt].name.resize(len);
             file_.read(&(datasets_[idt].name[0]), len);
-            
+
             // read datatype byte size and element count
             file_.read(reinterpret_cast<char*>(&(datasets_[idt].datatype)), sizeof(std::size_t));
             file_.read(reinterpret_cast<char*>(&(datasets_[idt].elements)), sizeof(std::size_t));
@@ -106,17 +106,17 @@ HDFFile::~HDFFile ()
             std::size_t ndt = datasets_.size();
             file_.seekp(file_.beg);
             file_.write(reinterpret_cast<char*>(&ndt), sizeof(ndt));
-            
+
             // write datasets information
             for (std::size_t idt = 0; idt < ndt; idt++)
             {
                 // write length of dataset name
                 std::size_t len = datasets_[idt].name.size();
                 file_.write(reinterpret_cast<char*>(&len), sizeof(ndt));
-                
+
                 // write dataset name
                 file_.write(&(datasets_[idt].name[0]), len);
-                
+
                 // write datatype byte size and element count
                 file_.write(reinterpret_cast<char*>(&(datasets_[idt].datatype)), sizeof(std::size_t));
                 file_.write(reinterpret_cast<char*>(&(datasets_[idt].elements)), sizeof(std::size_t));
@@ -134,7 +134,7 @@ std::size_t HDFFile::size (std::string dataset) const
         if (datasets_[i].name == dataset)
             return datasets_[i].elements;
     }
-    
+
     return 0;
 }
 
@@ -142,28 +142,28 @@ bool HDFFile::read_ (std::string dataset, void * buffer, std::size_t length, std
 {
     // decode byte size from the datatype
     std::size_t bytes = datatype % 0x100;
-    
+
     // skip reading invalid files
     if (not file_.is_open())
     {
         error_ = "Invalid file.";
         return false;
     }
-    
+
     // skip reading empty datasets
     if (length == 0)
         return true;
-    
+
     // skip reading into null buffer
     if (buffer == nullptr)
     {
         error_ = "Null buffer.";
         return false;
     }
-    
+
     // compose full dataset path
     dataset = prefix + dataset;
-    
+
     // try to find the dataset with this name
     int id = -1;
     std::size_t seek = header_byte_size;
@@ -179,7 +179,7 @@ bool HDFFile::read_ (std::string dataset, void * buffer, std::size_t length, std
             seek += datasets_[i].elements * (datasets_[i].datatype % 0x100);
         }
     }
-    
+
     // dataset not found
     if (id == -1)
     {
@@ -187,14 +187,14 @@ bool HDFFile::read_ (std::string dataset, void * buffer, std::size_t length, std
         std::cout << "Can't read dataset " << dataset << " in " << name_ << std::endl;
         return false;
     }
-    
+
     // check that the selection fits into the dataset
     if ((offset + length) * bytes > datasets_[id].elements * (datasets_[id].datatype % 0x100))
     {
         error_ = format("Selection does not fit into the dataset ((%ld + %ld) * %ld >= %ld * %ld).", offset, length, bytes, datasets_[id].elements, datasets_[id].datatype % 0x100);
         return false;
     }
-    
+
     // reposition stream according to the selection
     file_.seekg(seek + offset * bytes, std::ios_base::beg);
     if (file_.bad())
@@ -202,7 +202,7 @@ bool HDFFile::read_ (std::string dataset, void * buffer, std::size_t length, std
         std::cerr << "Error while reading dataset (seek failure)." << std::endl;
         return false;
     }
-    
+
     // read data
     file_.read(reinterpret_cast<char*>(buffer), bytes * length);
     if (file_.fail())
@@ -210,7 +210,7 @@ bool HDFFile::read_ (std::string dataset, void * buffer, std::size_t length, std
         error_ = format("Error while reading dataset: read failure.");
         return false;
     }
-    
+
     return true;
 }
 
@@ -218,21 +218,21 @@ bool HDFFile::write_ (std::string dataset, void const * buffer, std::size_t leng
 {
     // decode byte size
     std::size_t bytes = datatype % 0x100;
-    
+
     // skip writing into invalid files
     if (not file_.is_open())
     {
         error_ = "Invalid file.";
         return false;
     }
-    
+
     // skip writing empty datasets
     if (length == 0)
         return true;
-    
+
     // compose full dataset path
     dataset = prefix + dataset;
-    
+
     // try to find the dataset with this name
     int id = -1;
     std::size_t seek = header_byte_size;
@@ -248,7 +248,7 @@ bool HDFFile::write_ (std::string dataset, void const * buffer, std::size_t leng
             seek += datasets_[i].elements * (datasets_[i].datatype % 0x100);
         }
     }
-    
+
     // create a new dataset
     if (id < 0)
     {
@@ -261,14 +261,14 @@ bool HDFFile::write_ (std::string dataset, void const * buffer, std::size_t leng
         id = datasets_.size() - 1;
         changed_ = true;
     }
-    
+
     // check that the selection fits into the dataset
     if ((offset + length) * bytes > datasets_[id].elements * (datasets_[id].datatype % 0x100))
     {
         error_ = format("Selection does not fit into the dataset ((%ld + %ld) * %ld >= %ld * %ld).", offset, length, bytes, datasets_[id].elements, (datasets_[id].datatype % 0x100));
         return false;
     }
-    
+
     // use artificial single-character buffer when merely initializing the dataset
     char nul = 0;
     if (buffer == nullptr)
@@ -279,7 +279,7 @@ bool HDFFile::write_ (std::string dataset, void const * buffer, std::size_t leng
         bytes = 1;
         length = 1;
     }
-    
+
     // reposition stream according to the selection
     file_.seekp(seek + offset * bytes, std::ios_base::beg);
     if (file_.fail())
@@ -287,7 +287,7 @@ bool HDFFile::write_ (std::string dataset, void const * buffer, std::size_t leng
         error_ = format("Error while writing dataset (seek failure).");
         return false;
     }
-    
+
     // write data
     file_.write(reinterpret_cast<const char*>(buffer), bytes * length);
     if (file_.bad())
@@ -295,6 +295,6 @@ bool HDFFile::write_ (std::string dataset, void const * buffer, std::size_t leng
         error_ = format("Error while writing dataset.");
         return false;
     }
-    
+
     return true;
 }

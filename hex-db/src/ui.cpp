@@ -115,19 +115,19 @@ int main (int argc, char* argv[])
     {
         print_help_and_exit();
     }
-    
+
     // program parameters
     std::string dbname = "hex.db", dumpfile;
     std::vector<std::string> sqlfiles;
     bool create_new = false, doupdate = false, doimport = false;
     bool dooptimize = false;
-    
+
     // scattering variables to compute
     std::vector<std::string> vars;
-    
+
     // used scattering event data
     std::map<std::string,std::string> sdata;
-    
+
     // for all argv-s
     ParseCommandLine
     (
@@ -152,7 +152,7 @@ int main (int argc, char* argv[])
             table.write("(name)", "(description)");
             for (ScatteringQuantity * Q : *ScatteringQuantity::RTS_Table)
                 table.write(Q->name(), Q->description());
-            
+
             std::exit(EXIT_SUCCESS);
         },
         "params", "p",   1, [ & ](Args opts) -> bool
@@ -163,7 +163,7 @@ int main (int argc, char* argv[])
                 ScatteringQuantity::RTS_Table->end(),
                 [ & ](ScatteringQuantity* & it) -> bool { return it->name() == opts[0]; }
             );
-            
+
             if (it == ScatteringQuantity::RTS_Table->end())
             {
                 std::cout << "No such quantity \"" << opts[0] << "\"" << std::endl;
@@ -173,21 +173,21 @@ int main (int argc, char* argv[])
                 std::cout << std::endl;
                 std::cout << "Quantity \"" << opts[0] << "\" uses the following parameters:" << std::endl;
                 std::cout << std::endl;
-                
+
                 OutputTable table;
                 table.setAlignment(OutputTable::left, OutputTable::left);
                 table.setWidth(20,40);
                 for (std::pair<std::string,std::string> v : (*it)->params())
                     table.write(v.first, v.second);
-                
+
                 std::cout << std::endl;
-                
+
                 std::cout << "of which one of the following can be read from the standard input:" << std::endl;;
                 std::cout << std::endl;
-                
+
                 for (std::string v : (*it)->vparams())
                     std::cout << v << " ";
-                
+
                 std::cout << std::endl << std::endl;
             }
             std::exit(EXIT_SUCCESS);
@@ -202,7 +202,7 @@ int main (int argc, char* argv[])
                 Eunits = eUnit_eV;
             else
                 HexException("Unknown units \"%s\"", opts[0].c_str());
-            
+
             return true;
         },
         "Tunits", "", 1, [ & ](Args opts) -> bool
@@ -213,7 +213,7 @@ int main (int argc, char* argv[])
                 Lunits = lUnit_cgs;
             else
                 HexException("Unknown units \"%s\"", opts[0].c_str());
-            
+
             return true;
         },
         "Aunits", "", 1, [ & ](Args opts) -> bool
@@ -224,7 +224,7 @@ int main (int argc, char* argv[])
                 Aunits = aUnit_rad;
             else
                 HexException("Unknown units \"%s\"", opts[0].c_str());
-            
+
             return true;
         },
         "pws", "", 1, [ & ](Args opts) -> bool
@@ -244,7 +244,7 @@ int main (int argc, char* argv[])
                     return true;
                 }
             }
-            
+
             // try to find it in the variable dependencies
             for (ScatteringQuantity * var : *ScatteringQuantity::RTS_Table)
             {
@@ -256,7 +256,7 @@ int main (int argc, char* argv[])
                     if (iter->first == arg)
                         this_arg_is_needed = true;
                 }
-                
+
                 // if this parameter has been found, process it furher
                 if (this_arg_is_needed)
                 {
@@ -266,65 +266,65 @@ int main (int argc, char* argv[])
                         std::cerr << "ERROR: The option --" << arg << " requires a parameter!" << std::endl;
                         return false;
                     }
-                    
+
                     // insert into scattering data list
                     sdata[arg] = std::string(opts[0]);
                     return true;
                 }
             }
-            
+
             return false;
         }
     );
-    
+
     // is the requested filename is available?
     std::ifstream f (dbname.c_str());
     bool exists = f.good();
     f.close();
-    
+
     if (create_new and exists)
     {
         std::cerr << "The file \"" << dbname << "\" already exists. Please eiher delete it or use another name for the new database." << std::endl;
         std::exit(EXIT_FAILURE);
     }
-    
+
     if (not create_new and not exists)
     {
         std::cerr << "The file \"" << dbname << "\" does not exist. Please create a new database first or use existing one." << std::endl;
         std::exit(EXIT_FAILURE);
     }
-    
+
     // open the database, if it is going to be used
     if (create_new or doimport or doupdate or dooptimize or not dumpfile.empty() or not vars.empty())
         hex_initialize(dbname.c_str());
-    
+
     // create new database if asked to
     if (create_new)
         hex_new();
-    
+
     // import SQL data
     if (doimport)
     {
         for (std::string const & sqlfile : sqlfiles)
             hex_import(sqlfile.c_str());
     }
-    
+
     // update
     if (doupdate)
         hex_update();
-    
+
     // vacuum
     if (dooptimize)
         hex_optimize();
-    
+
     // dump contents of "tmat" table
     if (not dumpfile.empty())
         hex_dump(dumpfile.c_str());
-    
+
     // is there anything more to do?
     if (vars.empty())
         return 0;
-    
+
     // retrieve all requested data
     return hex_run (vars, sdata);
 }

@@ -56,7 +56,7 @@ namespace geom
 template <int dim> class ndCube
 {
     public:
-        
+
         // throw a compile-time error if the class is used with an unsupported template parameter
         static_assert
         (
@@ -68,21 +68,21 @@ template <int dim> class ndCube
             dim <= 8,
             "Dimension of the n-cube has to be at most 8."
         );
-        
+
         //
         // Constructors & destructor
         //
-        
+
         ndCube () : lvl_(0), history_(nullptr) {}
-        
+
         ndCube (ndCube<dim> const & cube) : ndCube(cube.lvl_, cube.history_) {}
-        
+
         ndCube (ndCube<dim> && cube) : ndCube()
         {
             std::swap(lvl_, cube.lvl_);
             std::swap(history_, cube.history_);
         }
-        
+
         ndCube (int lvl, char const * history) : lvl_(lvl), history_(nullptr)
         {
             if (lvl > 0)
@@ -91,17 +91,17 @@ template <int dim> class ndCube
                 std::memcpy(history_, history, lvl_ * sizeof(char));
             }
         }
-        
+
         ~ndCube ()
         {
             if (history_ != nullptr)
                 delete [] history_;
         }
-        
+
         //
         // Assignment operator
         //
-        
+
         ndCube<dim> & operator= (ndCube<dim> const & cube)
         {
             // delete current data
@@ -110,7 +110,7 @@ template <int dim> class ndCube
                 assert(history_ != cube.history_);
                 delete [] history_;
             }
-            
+
             if (cube.lvl_ == 0)
             {
                 // assignment of empty structure
@@ -124,14 +124,14 @@ template <int dim> class ndCube
                 history_ = new char [lvl_];
                 std::memcpy(history_, cube.history_, lvl_);
             }
-            
+
             return *this;
         }
-        
+
         //
         // Subdivision
         //
-        
+
         /**
          * @brief Subdivision of the cube.
          * 
@@ -141,34 +141,34 @@ template <int dim> class ndCube
         std::vector<ndCube<dim>> subdivide () const
         {
             std::vector<ndCube<dim>> subcubes;
-            
+
             // new subdivision history for sub-cubes
             std::vector<char> new_history(lvl_ + 1);
-            
+
             // copy the current subdivision history and append a new element for new subdivision
             if (lvl_ > 0)
                 std::memcpy(new_history.data(), history_, lvl_ * sizeof(char));
-            
+
             // the last subdivision info
             char & subhistory = *(new_history.data() + lvl_);
-            
+
             // for all vertices (there is a sub-cube adjacent to each of them)
             for (int i = 0; i < nVertex(); i++)
             {
                 // get subdivision history of this sub-cube
                 subhistory = i;
-                
+
                 // add sub-cube
                 subcubes.push_back(ndCube<dim>(lvl_ + 1, new_history.data()));
             }
-            
+
             return subcubes;
         }
-        
+
         //
         // Getters
         //
-        
+
         /// Coordinates of the origin of the cube.
         std::vector<double> const origin () const
         {
@@ -178,7 +178,7 @@ template <int dim> class ndCube
             {
                 // update edge length for this subdivision level
                 edge_length *= 0.5;
-                
+
                 // for all coordinates
                 for (int j = 0; j < dim; j++)
                 {
@@ -189,19 +189,19 @@ template <int dim> class ndCube
             }
             return coords;
         }
-        
+
         /// Length of edge of the cube.
         double edge () const { return std::pow(0.5, lvl_); }
-        
+
         /// Volume of the hypercube.
         double volume () const { return std::pow(0.5, dim * lvl_); }
-        
+
         /// Subdivision level.
         int level () const { return lvl_; }
-        
+
         /// Subdivision history.
         char const * history () const { return history_; }
-        
+
         /// Coordinates of the centre of the cube.
         std::vector<double> centre () const
         {
@@ -210,17 +210,17 @@ template <int dim> class ndCube
                 coord += 0.5 * edge();
             return coords;
         }
-        
+
         /// Number of vertices for 'dim'-dimensional cube.
         static int nVertex () { return special::pow2(dim); }
-        
+
     private:
-        
+
         /**
          * @brief Subdivision level.
          */
         char lvl_;
-        
+
         /**
          * @brief Subdivision history.
          * 

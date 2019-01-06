@@ -98,12 +98,12 @@ namespace matops
         HDFFile hdf (filename, HDFFile::overwrite);
         return hdf.valid() and hdf.write("size", &N, 1) and hdf.write("data", data, N);
     }
-    
+
     // explicit instantiation of 'save' for needed types
     template bool save<int> (int const * data, std::size_t N, std::string filename);
     template bool save<double> (double const * data, std::size_t N, std::string filename);
     template bool save<Complex> (Complex const * data, std::size_t N, std::string filename);
-    
+
     // definition of 'load' template
     template <class T> bool load (T * data, std::size_t N, std::string filename)
     {
@@ -111,7 +111,7 @@ namespace matops
         std::size_t M;
         return hdf.valid() and hdf.read("size", &M, 1) and M == N and hdf.read("data", data, N);
     }
-    
+
     // explicit instantiation of 'load' for needed types
     template bool load<int> (int * data, std::size_t N, std::string filename);
     template bool load<double> (double * data, std::size_t N, std::string filename);
@@ -128,29 +128,29 @@ namespace matops
         for (std::size_t i = 0; i < N; i++)
             z[i] = x[i] + y[i];
     }
-    
+
     // explicit instantiation of 'sum' for needed types
     template void sum<double> (std::size_t N, double const * restrict x, double const * restrict y, double * restrict z);
     template void sum<Complex> (std::size_t N, Complex const * restrict x, Complex const * restrict y, Complex * restrict z);
-    
+
     // definition of 'subtract' template
     template <class T> void subtract (std::size_t N, T const * restrict x, T const * restrict y, T * restrict z)
     {
         for (std::size_t i = 0; i < N; i++)
             z[i] = x[i] - y[i];
     }
-    
+
     // explicit instantiation of 'subtract' for needed types
     template void subtract<double> (std::size_t N, double const * restrict x, double const * restrict y, double * restrict z);
     template void subtract<Complex> (std::size_t N, Complex const * restrict x, Complex const * restrict y, Complex * restrict z);
-    
+
     // definition of 'flip_sign' template
     template <class T> void flip_sign (std::size_t N, T * restrict x)
     {
         for (std::size_t i = 0; i < N; i++)
             x[i] = -x[i];
     }
-    
+
     // explicit instantiation of 'flip_sign' for needed types
     template void flip_sign<double> (std::size_t N, double * restrict x);
     template void flip_sign<Complex> (std::size_t N, Complex * restrict x);
@@ -164,7 +164,7 @@ namespace matops
     {
         HexException("Unsupported type.");
     }
-    
+
     template<> void dense_mul_vector<double> (std::size_t M, std::size_t N, double const * restrict A, double const * restrict v, double * restrict w)
     {
         char trans = 'N';
@@ -172,7 +172,7 @@ namespace matops
         double alpha = 1, beta = 0;
         dgemv_(&trans, &m, &n, &alpha, const_cast<double*>(A), &lda, const_cast<double*>(v), &incX, &beta, w, &incY);
     }
-    
+
     template<> void dense_mul_vector<Complex> (std::size_t M, std::size_t N, Complex const * restrict A, Complex const * restrict v, Complex * restrict w)
     {
         char trans = 'N';
@@ -190,28 +190,28 @@ namespace matops
     {
         HexException("Unsupported type.");
     }
-    
+
     template<> void dense_invert<double> (std::size_t N, double * A, int * pivots, double * work)
     {
         int n = N, lda = N, lwork = N * N, info;
-        
+
         dgetrf_(&n, &n, A, &lda, pivots, &info);
         if (info != 0)
             HexException("DGETRF failed with error code %d.", info);
-        
+
         dgetri_(&n, A, &lda, pivots, work, &lwork, &info);
         if (info != 0)
             HexException("DGETRI failed with error code %d.", info);
     }
-    
+
     template<> void dense_invert<Complex> (std::size_t N, Complex * A, int * pivots, Complex * work)
     {
         int n = N, lda = N, lwork = N * N, info;
-        
+
         zgetrf_(&n, &n, A, &lda, pivots, &info);
         if (info != 0)
             HexException("ZGETRF failed with error code %d.", info);
-        
+
         zgetri_(&n, A, &lda, pivots, work, &lwork, &info);
         if (info != 0)
             HexException("ZGETRI failed with error code %d.", info);
@@ -238,7 +238,7 @@ namespace matops
             }
         }
     }
-    
+
     template void dense_add_blockband<double> (std::size_t Nblocks, std::size_t N, std::size_t Ndiag, double * restrict D, double const * restrict B);
     template void dense_add_blockband<Complex> (std::size_t Nblocks, std::size_t N, std::size_t Ndiag, Complex * restrict D, Complex const * restrict B);
 }
@@ -252,7 +252,7 @@ namespace matops
     {
         // erase output
         std::memset(C, 0, Nblocks * M * Nblocks * N * sizeof(T));
-        
+
         // for all block combinations
         for (std::size_t m = 0; m < Nblocks; m++)
         for (std::size_t k = 0; k < Nblocks; k++)
@@ -265,7 +265,7 @@ namespace matops
                 C[((n * N + t) * Nblocks + m) * M + r] += D[((k * K + s) * Nblocks + m) * M + r] * B[(((k * Nblocks + n) * K) + s) * (2 * Ndiag + 1) + t + Ndiag - s];
         }
     }
-    
+
     template void dense_mul_blockband<double> (std::size_t Nblocks, std::size_t M, std::size_t K, std::size_t N, std::size_t Ndiag, double const * D, double const * B, double * C);
     template void dense_mul_blockband<Complex> (std::size_t Nblocks, std::size_t M, std::size_t K, std::size_t N, std::size_t Ndiag, Complex const * D, Complex const * B, Complex * C);
 }
@@ -278,7 +278,7 @@ namespace matops
     {
         // erase output vector
         std::memset(w, 0, Nblocks * M * sizeof(T));
-        
+
         // for all blocks
         for (std::size_t m = 0; m < Nblocks; m++)
         for (std::size_t n = 0; n < Nblocks; n++)
@@ -289,17 +289,17 @@ namespace matops
                 w[m * M + irow] += A[((m * Nblocks + n) * M + irow) * (2*Ndiag + 1) + (icol + Ndiag - irow)] * v[n * N + icol];
         }
     }
-    
+
     template void blockband_mul_vector<double> (std::size_t Nblocks, std::size_t M, std::size_t N, std::size_t Ndiag, double const * restrict A, double const * restrict v, double * restrict w);
     template void blockband_mul_vector<Complex> (std::size_t Nblocks, std::size_t M, std::size_t N, std::size_t Ndiag, Complex const * restrict A, Complex const * restrict v, Complex * restrict w);
-    
+
     template <class T> void blockband_mul_dense (std::size_t Nblocks, std::size_t M, std::size_t K, std::size_t N, std::size_t Ndiag, T const * restrict A, T const * restrict D, T * restrict B)
     {
         // multiply all columns independently
         for (std::size_t dcol = 0; dcol < Nblocks * N; dcol++)
             blockband_mul_vector(Nblocks, M, K, Ndiag, A, D + dcol * Nblocks * K, B + dcol * Nblocks * M);
     }
-    
+
     template void blockband_mul_dense<double> (std::size_t Nblocks, std::size_t M, std::size_t K, std::size_t N, std::size_t Ndiag, double const * restrict A, double const * restrict D, double * restrict B);
     template void blockband_mul_dense<Complex> (std::size_t Nblocks, std::size_t M, std::size_t K, std::size_t N, std::size_t Ndiag, Complex const * restrict A, Complex const * restrict D, Complex * restrict B);
 }

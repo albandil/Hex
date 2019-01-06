@@ -40,7 +40,7 @@
 class GaussLegendreData
 {
     public:
-        
+
         /**
          * @brief Retrieve Gauss-Legendre data.
          * 
@@ -50,16 +50,16 @@ class GaussLegendreData
          * @param vw     On return, the corresponding Gauss-Legendre weights.
          */
         static void gauss_nodes_and_weights (int points, const Real*& vx, const Real*& vw);
-        
+
         /**
          * @brief Precalculate nodes and weights so that the retrieval is fast and thread-safe.
          * 
          * Uses the GSL routine \c gsl_integration_glfixed_table_alloc.
          */
         static void precompute_nodes_and_weights (int points);
-    
+
     private:
-        
+
         // precomputed nodes and weights, common to all instances
         static std::vector<std::pair<Real*,Real*>> data_;
 };
@@ -79,7 +79,7 @@ class GaussLegendreData
 class GaussLegendre : public GaussLegendreData
 {
     public:
-        
+
         /**
          * @brief Get Gauss-Legendre quadrature points and weights in interval.
          * 
@@ -88,7 +88,7 @@ class GaussLegendre : public GaussLegendreData
          * 
          */
         void scaled_nodes_and_weights (int points, Complex x1, Complex x2, Complex* xs, Complex* ws) const;
-        
+
         /**
          * @brief Gauss-Legendre integrator
          * 
@@ -125,22 +125,22 @@ class GaussLegendre : public GaussLegendreData
             {
                 HexException("[quad] Error: boundaries not for this iknot!");
             }
-            
+
             // get evaluation points and weights
             std::vector<Complex> xs(points), ws(points), fs(points);
             scaled_nodes_and_weights(points, x1, x2, xs.data(), ws.data());
-            
+
             // evaluate the function
             f(points, xs.data(), fs.data(), data...);
-            
+
             // sum the results
             Complex result = 0.;
             for (int ipt = 0; ipt < points; ipt++)
                 result += ws[ipt] * fs[ipt];
-            
+
             return result;
         }
-        
+
         /**
          * @brief Gauss-Legendre integrator.
          * 
@@ -165,19 +165,19 @@ class GaussLegendre : public GaussLegendreData
             {
                 HexException("[quad] Error: boundaries not for this iknot!");
             }
-            
+
             // get evaluation points and weights
             std::vector<Complex> xs(points), ws(points), fs(points);
             scaled_nodes_and_weights(points, x1, x2, xs.data(), ws.data());
-            
+
             // evaluate the function
             (ptr->*f)(points, xs.data(), fs.data(), data...);
-            
+
             // sum the results
             Complex result = 0.;
             for (int ipt = 0; ipt < points; ipt++)
                 result += ws[ipt] * fs[ipt];
-            
+
             return result;
         }
 };

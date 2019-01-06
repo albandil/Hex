@@ -54,54 +54,54 @@
 template <typename Functor> class GaussKronrod : public special::RadialFunction<double>
 {
     private:
-        
+
         /// Integrated function.
         Functor Integrand;
-        
+
         /// Result of the last integration.
         double Result;
-        
+
         /// Estimation of the absolute error of the last integration.
         double AbsErr;
-        
+
         /// Whether the last integration succeeded.
         bool Ok;
-        
+
         /// Absolute tolerance of the integrator.
         double EpsAbs;
-        
+
         /// Relative tolerance of the integrator.
         double EpsRel;
-        
+
         /// Limit on subdivision.
         std::size_t Limit;
-        
+
         /// Integration workspace pointer.
         gsl_integration_workspace * Workspace;
-        
+
         /// Status information.
         std::string Status;
-        
+
     public:
-        
+
         // constructor
         GaussKronrod (Functor f, std::size_t limit = 1000)
             : Integrand(f), Result(special::constant::Nan), AbsErr(special::constant::Nan),
               Ok(false), EpsAbs(0.), EpsRel(1e-5), Limit(limit),
               Workspace(gsl_integration_workspace_alloc(Limit)) {}
-        
+
         // destructor
         ~GaussKronrod()
         {
             gsl_integration_workspace_free(Workspace);
         }
-        
+
         // evaluate the integrand
         inline double operator() (double x) const
         {
             return Integrand(x);
         }
-        
+
         /**
          * @brief Evaluates radial function supplied in a pointer.
          * 
@@ -113,7 +113,7 @@ template <typename Functor> class GaussKronrod : public special::RadialFunction<
             RadialFunction<double> const & f = (* static_cast<RadialFunction<double> const *>(ptr_radf));
             return f(x);
         }
-        
+
         /** @brief Compute the integral.
          *
          * Performs the integration on a given interval. Uses specialized routines
@@ -131,7 +131,7 @@ template <typename Functor> class GaussKronrod : public special::RadialFunction<
             // reset
             Result = AbsErr = special::constant::Nan;
             Ok = true;
-            
+
             // skip empty intervals
             if (a == b)
             {
@@ -140,7 +140,7 @@ template <typename Functor> class GaussKronrod : public special::RadialFunction<
                 Status = "";
                 return Ok;
             }
-            
+
             // 
             if (std::isnan(a) or std::isnan(b))
             {
@@ -149,7 +149,7 @@ template <typename Functor> class GaussKronrod : public special::RadialFunction<
                 Status = "Some of the bounds is not finite.";
                 return false;
             }
-            
+
             // check order of bounds
             if (a > b)
             {
@@ -157,16 +157,16 @@ template <typename Functor> class GaussKronrod : public special::RadialFunction<
                 Result = -Result;
                 return Ok;
             }
-            
+
             // setup integrand
             gsl_function F;
             F.function = &GaussKronrod::eval;
             F.params = this;
-            
+
             // setup integrator
             int err = GSL_SUCCESS, err1 = GSL_SUCCESS, err2 = GSL_SUCCESS;
             double Result1, Result2, AbsErr1, AbsErr2;
-            
+
             // use correct integrator
             if (std::isfinite(a) and std::isfinite(b))          /* -∞ < a < b < +∞ */
             {
@@ -211,7 +211,7 @@ template <typename Functor> class GaussKronrod : public special::RadialFunction<
                     Workspace,
                     &Result1, &AbsErr1
                 );
-                
+
                 err2 = gsl_integration_qagil
                 (
                     &F, b,
@@ -219,29 +219,29 @@ template <typename Functor> class GaussKronrod : public special::RadialFunction<
                     Workspace,
                     &Result2, &AbsErr2
                 );
-                
+
                 Result = Result1 + Result2;
                 AbsErr = AbsErr1 + AbsErr2;
-                
+
                 Status = (err1 != GSL_SUCCESS or err2 != GSL_SUCCESS ? std::string(gsl_strerror(err1)) + std::string(" & ") + std::string(gsl_strerror(err2)) : std::string());
             }
-            
+
             Ok = (err == GSL_SUCCESS and err1 == GSL_SUCCESS and err2 == GSL_SUCCESS);
             return Ok;
         }
-        
+
         //
         // getters & setters
         //
-        
+
         bool ok() const { return Ok; }
         double result() const { return Result; }
         double error() const { return AbsErr; }
         std::string const & status() const { return Status; }
-        
+
         void setEpsAbs (double epsabs) { EpsAbs = epsabs; }
         void setEpsRel (double epsrel) { EpsRel = epsrel; }
-        
+
         double epsabs () const { return EpsAbs; }
         double epsrel () const { return EpsRel; }
 };

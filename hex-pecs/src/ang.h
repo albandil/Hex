@@ -43,45 +43,45 @@
 class AngularBasis
 {
     public:
-        
+
         AngularBasis (InputFile const & inp);
-        
+
         /// Get particular state.
         std::pair<unsigned,unsigned> const & state (unsigned ill) const { return states_[ill]; }
-        
+
         /// Angular integrals.
         double f (unsigned lambda, unsigned ill, unsigned illp) const;
         double f (unsigned lambda, unsigned l1, unsigned l2, unsigned l1p, unsigned l2p) const;
-        
+
         /// Get index of a specific angular momentum state.
         unsigned index (unsigned l1, unsigned l2) const;
-        
+
         /// Highest multipole.
         unsigned maxlambda () const { return maxlambda_; }
-        
+
         /// Larges angular momentum.
         unsigned maxell () const { return maxell_; }
-        
+
         /// Number of angular momentum states.
         std::size_t size () const { return states_.size(); }
-        
+
     private:
-        
+
         // Quantum numbers.
         unsigned L_, S_, Pi_, nL_;
-        
+
         // Highest multipole.
         unsigned maxlambda_;
-        
+
         // Largest angular momentum.
         unsigned maxell_;
-        
+
         // List of coupled angular states.
         std::vector<std::pair<unsigned,unsigned>> states_;
-        
+
         // Angular integrals.
         rArray f_;
-        
+
 };
 
 #endif

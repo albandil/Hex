@@ -20,20 +20,20 @@ int main (int argc, char * argv[])
     int nL = std::atoi(argv[3]);
 
     int maxlambda = 2 * nL + L + Pi;
-    
+
     // coupled angular momentum pairs
     std::vector<std::pair<int,int>> coupled_states;
-   
+
     std::cout << "Setting up the coupled angular states..." << std::endl;
- 
+
     // for given L, Π and levels list all available (ℓ₁ℓ₂) pairs
     for (int ell = 0; ell <= nL; ell++)
     {
         std::cout << "\t-> [" << ell << "] ";
-        
+
         // get sum of the angular momenta for this angular level
         int sum = 2 * ell + L + Pi;
-        
+
         // for all angular momentum pairs that do compose L
         for (int l1 = ell; l1 <= sum - ell; l1++)
         {
@@ -42,9 +42,9 @@ int main (int argc, char * argv[])
         }
         std::cout << std::endl;
     }
-    
+
     std::cout << std::endl;
-    
+
     for (int lambda = 0; lambda <= maxlambda; lambda++)
     {
         int n = 0;
@@ -64,9 +64,9 @@ int main (int argc, char * argv[])
             }
             std::cout << std::endl;
         }
-        
+
         std::cout << "-> Used in " << n << " matrix super-blocks." << std::endl << std::endl;
     }
-    
+
     return 0;
 }

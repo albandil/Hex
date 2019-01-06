@@ -54,35 +54,35 @@
 template <class T> class DenseMatrixView
 {
     public:
-        
+
         // default constructor
         DenseMatrixView () : rows_(0), cols_(0), data_()
         {
             // do nothing
         }
-        
+
         // size constructor
         DenseMatrixView (std::size_t rows, std::size_t cols) : rows_(rows), cols_(cols), data_()
         {
             // do nothing
         }
-        
+
         // view constructor
         DenseMatrixView (std::size_t rows, std::size_t cols, const ArrayView<T> data) : rows_(rows), cols_(cols), data_(data)
         {
             // check that the sizes match
             assert(data.size() == rows * cols);
         }
-        
+
         // get elements array (read-write access)
         ArrayView<T> data () { return data_; }
-        
+
         // get elements array (read-only access)
         const ArrayView<T> data () const { return data_; }
-        
+
         // throw away all data
         void drop () { rows_ = cols_ = 0; }
-        
+
         // use new data
         virtual void update (std::size_t rows, std::size_t cols, const ArrayView<T> elems)
         {
@@ -90,48 +90,48 @@ template <class T> class DenseMatrixView
             cols_ = cols;
             data_.reset(rows * cols, elems.data());
         }
-        
+
         // get element
         virtual T & operator () (std::size_t i, std::size_t j) = 0;
         virtual T operator () (std::size_t i, std::size_t j) const = 0;
-        
+
         // get number of elements
         std::size_t size () const { return rows_ * cols_; }
-        
+
         // get number of columns
         int cols () const { return cols_; }
-        
+
         // get number of rows
         int rows () const { return rows_; }
-        
+
         // get pointer to the beginning of the elements array (read-write access)
         T * begin () { return data_.begin(); }
-        
+
         // get pointer to the beginning of the elements array (read-only access)
         T const * begin () const { return data_.begin(); }
-        
+
         // layout (row- or column- major)
         virtual char layout () const
         {
             HexException("General DenseMatrix has undefined layout type.");
             return 0;
         }
-        
+
         // leading dimension
         virtual std::size_t ld () const
         {
             HexException("General DenseMatrix has undefined leading dimension.");
             return 0;
         }
-        
+
     protected:
-        
+
         /// Row count.
         int rows_;
-        
+
         /// Column count.
         int cols_;
-        
+
         /// Matrix elements, consecutive rows joined to one array.
         ArrayView<T> data_;
 };
@@ -149,47 +149,47 @@ template <class T> class DenseMatrixView
 template <class T> class DenseMatrix : public DenseMatrixView<T>
 {
     public:
-        
+
         enum Layouts
         {
             RowMajorLayout = 'T',
             ColumnMajorLayout = 'N'
         };
-        
+
         // default constructor
         DenseMatrix () : DenseMatrixView<T>(), storage_()
         {
             // does nothing
         }
-        
+
         // size constructor
         DenseMatrix (std::size_t rows, std::size_t cols) : DenseMatrixView<T>(rows, cols), storage_(rows * cols)
         {
             // let the view point to the storage
             DenseMatrixView<T>::data_.reset(rows * cols, storage_.data());
         }
-        
+
         DenseMatrix (std::size_t rows, std::size_t cols, const ArrayView<T> data) : DenseMatrixView<T>(rows, cols), storage_(data)
         {
             // check that the sizes match
             assert(data.size() == rows * cols);
-            
+
             // let the view point to the storage
             DenseMatrixView<T>::data_.reset(rows * cols, storage_.data());
         }
-        
+
         // get matrix elements array (read-write access)
         ArrayView<T> data ()
         {
             return DenseMatrixView<T>::data();
         }
-        
+
         // get matrix elements array (read-only access)
         const ArrayView<T> data () const
         {
             return DenseMatrixView<T>::data();
         }
-        
+
         // use new data
         virtual void update (std::size_t rows, std::size_t cols, const ArrayView<T> elems)
         {
@@ -197,7 +197,7 @@ template <class T> class DenseMatrix : public DenseMatrixView<T>
             storage_ = elems;
             DenseMatrixView<T>::update(rows, cols, storage_);
         }
-        
+
         // use new data
         virtual void update (std::size_t rows, std::size_t cols, NumberArray<T> && elems)
         {
@@ -205,48 +205,48 @@ template <class T> class DenseMatrix : public DenseMatrixView<T>
             storage_ = std::move(elems);
             DenseMatrixView<T>::update(rows, cols, storage_);
         }
-        
+
         // throw away all data
         void drop ()
         {
             DenseMatrixView<T>::drop();
             storage_.drop();
         }
-        
+
         // retrieve size of the matrix (number of elements)
         std::size_t size () const
         {
             return DenseMatrixView<T>::rows() * DenseMatrixView<T>::cols();
         }
-        
+
         // get number of columns
         int cols () const { return DenseMatrixView<T>::cols_; }
-        
+
         // get number of rows
         int rows () const { return DenseMatrixView<T>::rows_; }
-        
+
         // get pointer to the beginning of the elements array (read-write access)
         T * begin () { return DenseMatrixView<T>::data_.begin(); }
-        
+
         // get pointer to the beginning of the elements array (read-only access)
         T const * begin () const { return DenseMatrixView<T>::data_.begin(); }
-        
+
         // layout (row- or column- major)
         virtual char layout () const
         {
             HexException("General DenseMatrix has undefined layout type.");
             return 0;
         }
-        
+
         // leading dimension
         virtual std::size_t ld () const
         {
             HexException("General DenseMatrix has undefined leading dimension.");
             return 0;
         }
-        
+
     protected:
-        
+
         /// Matrix elements, consecutive rows joined to one array.
         NumberArray<T> storage_;
 };
@@ -261,7 +261,7 @@ template <class T> class DenseMatrix : public DenseMatrixView<T>
 template <class Type, class Base> class ColMatrix : public Base
 {
     public:
-        
+
         // constructor
         ColMatrix ()
             : Base(), ld_(0) {}
@@ -275,7 +275,7 @@ template <class Type, class Base> class ColMatrix : public Base
             : Base(m.rows(), m.cols(), m.data()), ld_(m.ld()) { }
         explicit ColMatrix (RowMatrix<Type> const & m)
             : Base(m.rows(), m.cols(), m.data()), ld_(m.rows()) { reorder_(); }
-        
+
         /**
          * @brief Assignment operator.
          */
@@ -285,7 +285,7 @@ template <class Type, class Base> class ColMatrix : public Base
             ld_   = A.ld_;
             return *this;
         }
-        
+
         /**
          * @brief Move assignment.
          */
@@ -295,7 +295,7 @@ template <class Type, class Base> class ColMatrix : public Base
             ld_   = A.ld_;
             return *this;
         }
-        
+
         /**
          * @brief Populator.
          * 
@@ -306,13 +306,13 @@ template <class Type, class Base> class ColMatrix : public Base
         {
             // pointer to data
             Type * p = this->begin();
-            
+
             // fill the matrix
             for (int icol = 0; icol < this->cols(); icol++)
             for (int irow = 0; irow < this->rows(); irow++)
                 *(p + icol * ld_ + irow) = f(irow,icol);
         }
-        
+
         /**
          * @brief Matrix transpose.
          * 
@@ -323,7 +323,7 @@ template <class Type, class Base> class ColMatrix : public Base
         {
             return RowMatrix<Type> (this->cols(), this->rows(), this->data(), ld_);
         }
-        
+
         /**
          * @brief Matrix hermitian conjugate.
          * 
@@ -334,7 +334,7 @@ template <class Type, class Base> class ColMatrix : public Base
         {
             return RowMatrix<Type> (this->cols(), this->rows(), NumberArray<Type>(this->data()).conj(), ld_);
         }
-        
+
         /**
          * @brief Matrix column.
          *
@@ -350,16 +350,16 @@ template <class Type, class Base> class ColMatrix : public Base
             return ArrayView<Type> (this->data(), i * ld_, this->rows());
         }
         //@}
-        
+
         /// Element access.
         //@{
         virtual Type operator() (std::size_t i, std::size_t j) const { return col(j)[i]; }
         virtual Type & operator() (std::size_t i, std::size_t j) { return col(j)[i]; }
         //@}
-        
+
         /// Inversion.
         void invert (ColMatrix<Type> & inv) const;
-        
+
         /// Diagonalization.
         void diagonalize
         (
@@ -367,7 +367,7 @@ template <class Type, class Base> class ColMatrix : public Base
             ColMatrix<Type> * eigvecL = nullptr,
             ColMatrix<Type> * eigvecR = nullptr
         ) const;
-        
+
         /// Generalized diagonalization (non-orthonormal overlap matrix).
         void diagonalize_g
         (
@@ -376,25 +376,25 @@ template <class Type, class Base> class ColMatrix : public Base
             ColMatrix<Type> * eigvecL = nullptr,
             ColMatrix<Type> * eigvecR = nullptr
         ) const;
-        
+
         /// Storage layout.
         virtual char layout () const { return DenseMatrix<Type>::ColumnMajorLayout; }
-        
+
         /// Leading dimension.
         virtual std::size_t ld () const { return ld_; }
-        
+
         void write (std::ostream & out, std::string const & pre = "", std::string const & pos = "") const
         {
             // data pointer
             Type const * ptr = this->data().begin();
-            
+
             for (int irow = 0; irow < this->rows(); irow++)
             {
                 out << pre;
                 for (int icol = 0; icol < this->cols(); icol++)
                 {
                     Type x = *(ptr + icol * ld_ + irow);
-                    
+
                     if (x == std::abs(x))
                     {
                         // positive entry
@@ -406,23 +406,23 @@ template <class Type, class Base> class ColMatrix : public Base
                         out << x << " ";
                     }
                 }
-                
+
                 out << pos << "\n";
             }
         }
-    
+
     private:
-        
+
         /// Change "data" from row-oriented to column-oriented.
         void reorder_ ()
         {
             std::size_t nRows = this->rows();
             std::size_t nCols = this->cols();
-            
+
             if (nRows == nCols)
             {
                 // square matrices are fast to transpose, only swap upper/lower elements
-                
+
                 for (std::size_t irow = 0; irow < nRows; irow++)
                 for (std::size_t icol = irow + 1; icol < nCols; icol++)
                     std::swap(this->data_[irow * nCols + icol], this->data_[icol * nRows + irow]);
@@ -430,17 +430,17 @@ template <class Type, class Base> class ColMatrix : public Base
             else
             {
                 // non-square matrix transposition needs intermediate storage
-                
+
                 NumberArray<Type> new_data (nRows * nCols);
-                
+
                 for (std::size_t icol = 0; icol < nCols; icol++)
                 for (std::size_t irow = 0; irow < nRows; irow++)
                     new_data[icol * nRows + irow] = this->data_[irow * nCols + icol];
-                
+
                 this->data_ = std::move(new_data);
             }
         }
-        
+
         /// Leading dimension.
         std::size_t ld_;
 };
@@ -454,7 +454,7 @@ template <class Type, class Base> class ColMatrix : public Base
 template <class Type, class Base> class RowMatrix : public Base
 {
     public:
-        
+
         // constructor
         RowMatrix ()
             : Base(), ld_(0) {}
@@ -468,7 +468,7 @@ template <class Type, class Base> class RowMatrix : public Base
             : Base(m.rows(), m.cols(), m.data()), ld_(m.ld()) { }
         explicit RowMatrix (ColMatrix<Type> const & m)
             : Base(m.rows(), m.cols(), m.data()), ld_(m.cols()) { reorder_(); }
-        
+
         /**
          * @brief Assignment operator.
          */
@@ -478,7 +478,7 @@ template <class Type, class Base> class RowMatrix : public Base
             ld_  = A.ld_;
             return *this;
         }
-        
+
         /**
          * @brief Move assignment.
          */
@@ -488,7 +488,7 @@ template <class Type, class Base> class RowMatrix : public Base
             ld_  = A.ld_;
             return *this;
         }
-        
+
         /**
          * @brief Populator.
          * 
@@ -502,13 +502,13 @@ template <class Type, class Base> class RowMatrix : public Base
         {
             // pointer to data
             Type * p = this->begin();
-            
+
             // fill the matrix
             for (int irow = 0; irow < this->rows(); irow++)
             for (int icol = 0; icol < this->cols(); icol++)
                 *(p + irow * ld_ + icol) = f(irow,icol);
         }
-        
+
         /**
          * @brief Transformator.
          * 
@@ -522,13 +522,13 @@ template <class Type, class Base> class RowMatrix : public Base
         {
             // pointer to data
             Type * p = this->begin();
-            
+
             // transform the matrix
             for (int irow = 0; irow < this->rows(); irow++)
             for (int icol = 0; icol < this->cols(); icol++)
                 f(irow,icol,*(p + irow * ld_ + icol));
         }
-        
+
         /**
          * @brief Matrix transpose.
          * 
@@ -539,7 +539,7 @@ template <class Type, class Base> class RowMatrix : public Base
         {
             return ColMatrix<Type> (this->cols(), this->rows(), this->data(), ld_);
         }
-        
+
         /**
          * @brief Matrix row.
          * 
@@ -555,13 +555,13 @@ template <class Type, class Base> class RowMatrix : public Base
             return ArrayView<Type> (this->data(), i * ld_, this->cols());
         }
         //@}
-        
+
         /// Element access.
         //@{
         virtual Type operator() (std::size_t i, std::size_t j) const { return row(i)[j]; }
         virtual Type & operator() (std::size_t i, std::size_t j) { return row(i)[j]; }
         //@}
-        
+
         /**
          * @brief Bilinear form.
          * 
@@ -574,56 +574,56 @@ template <class Type, class Base> class RowMatrix : public Base
         {
             // return value
             Type sum = 0;
-            
+
             // pointer to matrix elements
             Type const * restrict pA = this->data().data();
-            
+
             // pointers to vector elements
             Type const * const restrict pu = u.data();
             Type const * const restrict pv = v.data();
-            
+
             // for all elements
             for (int i = 0; i < this->rows(); i++)
             for (int j = 0; j < this->cols(); j++)
                 sum += pu[i] * (*(pA + i * ld_ + j)) * pv[j];
-            
+
             return sum;
         }
-        
+
         /// Storage layout.
         virtual char layout () const { return DenseMatrix<Type>::RowMajorLayout; }
-        
+
         /// Leading dimension.
         virtual std::size_t ld () const { return ld_; }
-        
+
         /// Identity matrix.
         static RowMatrix<Type> Eye (int size)
         {
             RowMatrix<Type> M (size, size);
-            
+
             for (std::size_t i = 0; i < size; i++)
                 M.data()[i * size + i] = Type(1);
-            
+
             return M;
         }
-        
+
         // arithmetic operators
         RowMatrix<Type> const & operator += (DenseMatrix<Type> const & A)
         {
             assert(this->rows() == A.rows());
             assert(this->cols() == A.cols());
-            
+
             this->data_ += A.data();
-            
+
             return *this;
         }
         RowMatrix<Type> const & operator -= (DenseMatrix<Type> const & A)
         {
             assert(this->rows() == A.rows());
             assert(this->cols() == A.cols());
-            
+
             this->data_ -= A.data();
-            
+
             return *this;
         }
         RowMatrix<Type> const & operator *= (Type x)
@@ -631,7 +631,7 @@ template <class Type, class Base> class RowMatrix : public Base
             this->data_ *= x;
             return *this;
         }
-        
+
         /**
          * @brief Output to file.
          * 
@@ -655,14 +655,14 @@ template <class Type, class Base> class RowMatrix : public Base
         {
             // data pointer
             Type const * ptr = this->data().begin();
-            
+
             for (int irow = 0; irow < this->rows(); irow++)
             {
                 out << pre;
                 for (int icol = 0; icol < this->cols(); icol++)
                 {
                     Type x = *(ptr + irow * ld_ + icol);
-                    
+
                     if (x == std::abs(x))
                     {
                         // positive entry
@@ -674,11 +674,11 @@ template <class Type, class Base> class RowMatrix : public Base
                         out << x << " ";
                     }
                 }
-                
+
                 out << pos << "\n";
             }
         }
-        
+
 #ifdef WITH_PNG
         /**
          * @brief Plot to PNG file.
@@ -694,7 +694,7 @@ template <class Type, class Base> class RowMatrix : public Base
         {
             // create empty gray-scale 1-bit image
             png::image<png::gray_pixel_16> image (this->cols_, this->rows_);
-            
+
             // skip empty matrix
             if (this->data_.size() > 0)
             {
@@ -706,7 +706,7 @@ template <class Type, class Base> class RowMatrix : public Base
                     if (absx < min) min = absx;
                     if (absx > max) max = absx;
                 }
-                
+
                 // for all elements
                 for (int y = 0; y < this->rows(); y++)
                 {
@@ -717,27 +717,27 @@ template <class Type, class Base> class RowMatrix : public Base
                     }
                 }
             }
-            
+
             // save image
             image.write_stream(out);
         }
 #endif
-        
+
     private:
-        
+
         /// Leading dimension.
         std::size_t ld_;
-        
+
         /// Change "data" from column-oriented to row-oriented.
         void reorder_ ()
         {
             std::size_t nRows = this->rows();
             std::size_t nCols = this->cols();
-            
+
             if (nRows == nCols)
             {
                 // square matrices are fast to transpose, only swap upper/lower elements
-                
+
                 for (std::size_t irow = 0; irow < nRows; irow++)
                 for (std::size_t icol = irow + 1; icol < nCols; icol++)
                     std::swap(this->data_[irow * nCols + icol], this->data_[icol * nRows + irow]);
@@ -745,13 +745,13 @@ template <class Type, class Base> class RowMatrix : public Base
             else
             {
                 // non-square matrix transposition needs intermediate storage
-                
+
                 NumberArray<Type> new_data (nRows * nCols);
-                
+
                 for (std::size_t irow = 0; irow < nRows; irow++)
                 for (std::size_t icol = 0; icol < nCols; icol++)
                     new_data[irow * nCols + icol] = this->data_[icol * nRows + irow];
-                
+
                 this->data_ = std::move(new_data);
             }
         }
@@ -826,16 +826,16 @@ cArray kron_dot (RowMatrix<Complex,Base1> const & A, RowMatrix<Complex,Base2> co
     // allocate output array and a temporary array
     cArray w (A.rows() * B.rows());
     cArray z (A.rows() * B.cols());
-    
+
     // reshape vectors
     RowMatrixView<Complex> V (A.cols(), B.cols(), v);
     RowMatrixView<Complex> W (A.rows(), B.rows(), w);
     RowMatrixView<Complex> Z (A.rows(), B.cols(), z);
-    
+
     // calculate the contraction
     blas::gemm(1., A, V, 0., Z);
     blas::gemm(1., Z, B.T(), 0., W);
-    
+
     // return result
     return w;
 }
@@ -855,16 +855,16 @@ cArray kron_dot (ColMatrix<Complex,Base1> const & A, ColMatrix<Complex,Base2> co
     // allocate output array and a temporary array
     cArray w (A.rows() * B.rows());
     cArray z (A.rows() * B.cols());
-    
+
     // reshape vectors
     RowMatrixView<Complex> V (A.cols(), B.cols(), v);
     RowMatrixView<Complex> W (A.rows(), B.rows(), w);
     RowMatrixView<Complex> Z (A.rows(), B.cols(), z);
-    
+
     // calculate the contraction
     blas::gemm(1., A, V, 0., Z);
     blas::gemm(1., Z, B.T(), 0., W);
-    
+
     // return result
     return w;
 }
@@ -914,10 +914,10 @@ template <class Type>
 void transpose (ArrayView<Type> A, std::size_t ldA0, std::size_t ldA)
 {
     assert(A.size() == ldA * ldA0);
-    
+
     // backup the original matrix
     NumberArray<Type> A0 = A;
-    
+
     // fill transposed elements
     for (std::size_t i = 0; i < ldA0; i++)
     for (std::size_t j = 0; j < ldA; j++)
@@ -943,7 +943,7 @@ void transpose (const ArrayView<Type> A, ArrayView<Type> B, std::size_t N1, std:
 {
     assert(A.size() == N1 * N2);
     assert(B.size() == N1 * N2);
-    
+
     // fill transposed elements
     for (std::size_t i = 0; i < N1; i++)
     for (std::size_t j = 0; j < N2; j++)
@@ -970,7 +970,7 @@ void transpose (const ArrayView<Type> A, ArrayView<Type> B, std::size_t N1, std:
 {
     assert(A.size() == N1 * N2 * N3);
     assert(B.size() == N1 * N2 * N3);
-    
+
     // fill transposed elements
     for (std::size_t i = 0; i < N1; i++)
     for (std::size_t j = 0; j < N2; j++)

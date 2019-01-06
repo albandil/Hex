@@ -71,7 +71,7 @@
 class CommandLine
 {
     public:
-        
+
         /**
          * @brief Stages of the computations.
          *
@@ -95,7 +95,7 @@ class CommandLine
             /// Extract the T-matrices.
             StgExtract = 0x04
         } HexEcsStg;
-        
+
         // constructor
         CommandLine (int argc, char* argv[])
             : writegrid(false), zipdata(), parallel(false), preconditioner("ILU"),
@@ -118,221 +118,221 @@ class CommandLine
             #pragma omp master
             nthreads = omp_get_num_threads();
 #endif
-            
+
             // get command line options
             parse(argc, argv);
-            
+
             // run the whole sequence if nothing specified
             if (itinerary == StgNone)
                 itinerary = StgRadial | StgSolve | StgExtract;
         }
-        
+
         /// Read options from command line.
         void parse (int argc, char* argv[]);
-        
+
         //
         // public attributes
         //
-        
+
         /// Alternative name for the input file. Default is "hex.inp".
         std::ifstream inputfile;
-        
+
         // Write grid layout to a VTK file.
         bool writegrid;
-        
+
         /// A B-spline expansion of a solution to "zip". See \ref Bspline::zip .
         struct s_zipdata
         {
             // default constructor
             s_zipdata () : file(), Xmin(-1), Ymin(-1), Xmax(-1), Ymax(-1), nX(-1), nY(-1) {}
-            
+
             std::string file;
             Real Xmin, Ymin, Xmax, Ymax;
             int nX, nY;
         }
         zipdata;
-        
+
         /// Whether to use MPI.
         bool parallel;
-        
+
         /// Preconditioner to use.
         std::string preconditioner;
-        
+
         /// Drop tolerance for the ILU preconditioner.
         Real droptol;
-        
+
         /// Which parts of the computation to run.
         int itinerary;
-        
+
         /// Whether to keep precomputed data only on disk and spare RAM.
         bool outofcore;
-        
+
         /// Whether to continue out-of-core computation from last computed solution (needs corresponding ooc files).
         bool cont;
-        
+
         /// Whether to load full matrix from scratch disk at once when calculating dot product (and not by parts).
         bool wholematrix;
-        
+
         /// Whether to keep radial integrals in memory.
         bool cache_all_radint;
         bool cache_own_radint;
-        
+
         /// Tolerance for terminating iterative solution.
         Real itertol;
-        
+
         /// Tolerance for terminating block preconditioner.
         Real prec_itertol;
-        
+
         /// Whether to use OpenMP parallelization to run preconditioner for several blocks simultaneously.
         bool parallel_precondition;
-        
+
         /// Keep large data in RAM instead of copying to the OpenCL compute device.
         bool gpu_large_data;
-        
+
         /// Whether to avoid explicitly calculating big matrices and only apply them on the fly.
         bool lightweight_simple, lightweight_full, lightweight_radial_cache;
-        
+
         /// Whether to compute only a subset of radial integrals in shared scratch architecture.
         bool shared_scratch;
-        
+
         /// Whether to use diagonal blocks as present in the scratch directory. (For debugging purposes only.)
         bool reuse_dia_blocks;
-        
+
         /// Use simplified radial integral matrix for nested KPA iterations (experimental).
         bool kpa_simple_rad;
-        
+
         /// Index of OpenCL platform to use.
         unsigned ocl_platform;
-        
+
         /// Index of OpenCL device to use.
         unsigned ocl_device;
-        
+
         /// LU-factorizer.
         std::string factorizer;
-        
+
         /// Size of the local MPI communicator, used for distributed SuperLU.
         int groupsize;
-        
+
         /// Allow parallel factorization.
         int parallel_factorization;
-        
+
         /// Allow parallel extraction.
         int parallel_extraction;
-        
+
         /// Maximal number of ILU iterations for hybrid preconditioner.
         int ilu_max_iter;
-        
+
         /// Maximal number of sub-preconditioner iterations.
         int max_sub_iter;
-        
+
         /// Stop with error message when sub-preconditioner fails to converge.
         bool fail_on_sub_iter;
-        
+
         /// Whether to use previous-energy solution as an initial guess.
         bool carry_initial_guess;
-        
+
         /// Do the sparse matrix multiplication on the OpenCL device (memory intensive!).
         bool gpu_multiply;
-        
+
         /// Whether to radially extrapolate the extracted T-matrix.
         bool extract_extrapolate;
-        
+
         /// Extraction radius.
         Real extract_rho;
-        
+
         /// Radial distance where to start radial averaging/extrapolation of the T-matrix.
         Real extract_rho_begin;
-        
+
         /// Extraction averaging/extrapolation sample count.
         int extract_samples;
-        
+
         /// Load also existing solutions and check that they are within tolerance.
         bool refine_solution;
-        
+
         /// Map solution between different B-spline bases.
         std::vector<std::string> map_solution;
-        
+
         /// Target mapping basis.
         std::string map_solution_target;
-        
+
         /// Apply SSOR coupling.
         Real ssor;
-        
+
         /// Keep calculated LU also for next energy.
         bool noluupdate;
-        
+
         /// Maximal multipole considered by the coupled preconditioner.
         int coupling_limit;
-        
+
         /// Couple all blocks when using coupled preconditioner, or just open channels.
         bool couple_all;
-        
+
         /// MUMPS out of core
         bool mumps_outofcore;
-        
+
         /// MUMPS diagnostic information
         int mumps_verbose;
-        
+
         /// MUMPS memory relaxation factor (%)
         double mumps_relax;
-        
+
         /// Whether to use drop tolerance for KPA preconditioner.
         Real kpa_drop;
-        
+
         /// Write intermediate solutions.
         bool write_intermediate_solutions;
-        
+
         /// Use faster Bessel function evaluation routine (not the Steed/Barnett) when calculating RHS.
         bool fast_bessel;
-        
+
         /// Additional levels to be solved by ILU preconditioner when using HYB preconditioner.
         int hyb_additional_levels;
-        
+
         /// Depth of the geometric multigrid.
         int multigrid_depth;
-        
+
         /// What preconditioner to use for solution of the coarse problem.
         int multigrid_coarse_prec;
-        
+
         /// Domain decomposition panels.
         int dom_x_panels, dom_y_panels;
-        
+
         /// Domain preconditioner.
         std::string dom_preconditioner;
-        
+
         /// Domain decomposition sweeps.
         int dom_sweeps;
-        
+
         /// Scratch directory for out-of-core data.
         std::string scratch;
-        
+
         /// Use analytic eigenstates instead of those obtained by diagonalization.
         bool analytic_eigenstates;
-        
+
         /// Calculate T-matrices after every iteration.
         bool runtime_postprocess;
-        
+
         /// Verbosity of the sub-preconditioner.
         bool sub_prec_verbose;
-        
+
         /// Solve for multiple initial states at once.
         bool multi_rhs;
-        
+
         /// Raise SIGFPE on invalid numerical result.
         bool fpe;
-        
+
         /// Use virtual memory for MUMPS factors.
         bool mumps_virtual_memory;
-        
+
         /// Nnmber of OpenMP threads.
         int nthreads;
-        
+
         /// Write checkpoints for recovery of the solver.
         bool checkpoints;
-        
+
         /// Monitor K-matrix convergence and stop the linear solver when reached.
         double autostop_tolerance;
-        
+
         /// Delete old run-time post-processing directories.
         int purge;
 };
@@ -367,88 +367,88 @@ class CommandLine
 class InputFile
 {
     public:
-        
+
         // constructor
         InputFile (std::ifstream & inputfile)
         {
             // read inputfile
             read(inputfile);
-            
+
             // maximal angular momentum (the same for both parities)
             maxell = levels + L;
         }
-        
+
         // read data from file
         void read (std::ifstream & inputfile);
-        
+
         //
         // public attributes
         //
-        
+
             // B-spline order
             int order;
-            
+
             // initial atomic principal quantum number
             int ni;
-            
+
             // total angular momentum
             int L;
-            
+
             // total parity
             int Pi;
-            
+
             // 'nL', the limit on number of coupled angular states;
             // there will be 'nL * (L + 1 - Pi)' coupled angular state pairs
             int levels;
-            
+
             // upper limit on the smaller of the one-electron angular momenta
             int limit;
-            
+
             // maximal one-electron orbital quantum number
             int maxell;
-            
+
             // total spins to calculate
             iArray Spin;
-            
+
             // ECS rotation angle
             Real ecstheta;
-            
+
             // weak magnetic field in atomic units (involved only perturbatively)
             Real B;
-            
+
             // maximal energy (Ry) of states included in the asymptotic (outer) region
             Real channel_max_E;
-            
+
             // real B-spline knots
             rArray rknots;
-            
+
             // real B-spline knot projectile extention
             rArray rknots_ext;
-            
+
             // complex-to-become knots (after rotation)
             rArray cknots;
-            
+
             // total energies for which to solve the system
             rArray Etot;
-            
+
             // maximal total energy
             Real max_Etot;
-            
+
             // maximal energy of a target bound state
             Real max_Ebound;
-            
+
             // initial and final atomic states
             std::vector<std::tuple<int,int,int>> instates, outstates;
-            
+
             // atom charge (must be positive integer)
             Real Za;
-            
+
             // projectile charge (only sign)
             Real Zp;
-            
+
             // whether to calculate just the inner problem (decided from the knot sequence)
             bool inner_only;
-            
+
             // keep only l1 <= l2; this is useful for large total angular momenta for reduction of the angular basis
             bool exchange;
 };
@@ -463,9 +463,9 @@ class InputFile
 class SolutionIO
 {
     public:
-        
+
         SolutionIO () {}
-        
+
         SolutionIO
         (
             int L, int S, int Pi,
@@ -488,15 +488,15 @@ class SolutionIO
                 // check consistency of the parameters
                 if (ang.size() != chann.size())
                     HexException("Incompatible size of angular momentum pairs list and channel count list.");
-                
+
                 // use the supplied channel counts
                 chann_ = chann;
             }
         }
-        
+
         /// All blocks flag.
         static const int All = -1;
-        
+
         /// Get name of the solution file.
         std::string name (int ill = SolutionIO::All) const
         {
@@ -505,7 +505,7 @@ class SolutionIO
             else
                 return format("%s-%g-%d-%d-%d-%d-%d-%d-(%d,%d).hdf", prefix_.c_str(), E_ + 1, L_, S_, Pi_, ni_, li_, mi_, ang_[ill].first, ang_[ill].second);
         }
-        
+
         /// Check that the file exists.
         bool check (int ill, std::size_t & total_size) const
         {
@@ -515,7 +515,7 @@ class SolutionIO
                 HDFFile fsingle (name(ill), HDFFile::readonly);
                 return fsingle.valid() ? fsingle.size("array")/2 : 0;
             }
-            
+
             // look for all solution segment files
             std::vector<std::size_t> size (ang_.size());
             for (unsigned illp = 0; illp < ang_.size(); illp++)
@@ -523,10 +523,10 @@ class SolutionIO
                 HDFFile fsingle (name(illp), HDFFile::readonly);
                 size[illp] = (fsingle.valid() ? fsingle.size("array")/2 : 0);
             }
-            
+
             // calculate total size
             total_size = std::accumulate(size.begin(), size.end(), 0);
-            
+
             // check that all blocks existed
             return std::find(size.begin(), size.end(), 0) == size.end();
         }
@@ -535,7 +535,7 @@ class SolutionIO
             std::size_t total_size = 0;
             return check(ill, total_size);
         }
-        
+
         /**
          * @brief Load the solution from disk.
          * 
@@ -549,32 +549,32 @@ class SolutionIO
             // check that the requested files are present
             if (not check(ill))
                 return false;
-            
+
             // select segments
             iArray segments_to_load = { ill };
             if (ill == SolutionIO::All)
                 segments_to_load = linspace<int>(0, solution.size() - 1, solution.size());
-            
+
             // for all blocks to load
             for (int i : segments_to_load)
             {
                 //
                 // Either read from the whole monolithic solution file ...
                 //
-                
+
                     HDFFile hdf (name(), HDFFile::readonly);
                     if (hdf.valid())
                     {
                         // get segment size
                         std::size_t segsize = hdf.size("array") / ang_.size();
-                        
+
                         // allocate memory
                         solution[i].resize(segsize);
-                        
+
                         // read data from the file
                         if (not hdf.read("array", solution[i].data(), segsize, i * segsize))
                             return false;
-                        
+
                         // dump to disk
                         if (not solution.inmemory())
                         {
@@ -582,24 +582,24 @@ class SolutionIO
                             solution[i].drop();
                         }
                     }
-                
+
                 //
                 // ... or read from a solution segment.
                 //
-                
+
                     else
                     {
                         // simply load the requested solution segment file
                         if (not solution[i].hdfload(name(i)))
                             return false;
-                        
+
                         // dump to disk
                         if (not solution.inmemory())
                         {
                             solution.hdfsave(i);
                             solution[i].drop();
                         }
-                        
+
                         // read numbers of channels
                         HDFFile hdf (name(i), HDFFile::readonly);
                         if (hdf.valid())
@@ -609,10 +609,10 @@ class SolutionIO
                         }
                     }
             }
-            
+
             return true;
         }
-        
+
         /**
          * @brief Write solution to disk.
          * 
@@ -627,36 +627,36 @@ class SolutionIO
             iArray segments_to_save = { ill };
             if (ill == SolutionIO::All)
                 segments_to_save = linspace<int>(0, solution.size() - 1, solution.size());
-            
+
             // for all segments
             for (int iseg : segments_to_save)
             {
                 // load data
                 if (not solution.inmemory())
                     const_cast<BlockArray<Complex>&>(solution).hdfload(iseg);
-                
+
                 // write data
                 if (not save_segment(solution[iseg], iseg))
                     return false;
-                
+
                 // unload data
                 if (not solution.inmemory())
                     const_cast<BlockArray<Complex>&>(solution)[iseg].drop();
             }
-            
+
             // success
             return true;
         }
-        
+
         bool save_segment (const cArrayView solution, int ill) const
         {
             // open file
             HDFFile hdf (name(ill), HDFFile::overwrite);
-            
+
             // check file status
             if (not hdf.valid())
                 return false;
-            
+
             // write data
             bool success = true;
             success = (success and hdf.write("L",  &L_,  1));
@@ -673,11 +673,11 @@ class SolutionIO
             success = (success and hdf.write("array", solution.data(), solution.size()));
             return success;
         }
-        
+
         std::vector<std::pair<int,int>> const & channels () const { return chann_; }
-    
+
     private:
-        
+
         int L_, S_, Pi_, ni_, li_, mi_;
         Real E_;
         std::vector<std::pair<int,int>> ang_, chann_;

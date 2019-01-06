@@ -109,39 +109,39 @@ bool CollisionStrength::run (std::map<std::string,std::string> const & sdata)
 {
     // manage units
     double efactor = change_units(Eunits, eUnit_Ry);
-    
+
     // scattering event parameters
     int ni = Conv<int>(sdata, "ni", name());
     int li = Conv<int>(sdata, "li", name());
     int nf = Conv<int>(sdata, "nf", name());
     int lf = Conv<int>(sdata, "lf", name());
-    
+
     // initial magnetic quantum number
     int mi0= 0; bool all_mi = false;
     if (sdata.find("mi") == sdata.end() or sdata.at("mi") == "*")
         all_mi = true;
     else
         mi0= Conv<int>(sdata, "mi", name());
-    
+
     // final magnetic quantum number
     int mf0= 0; bool all_mf = false;
     if (sdata.find("mf") == sdata.end() or sdata.at("mf") == "*")
         all_mf = true;
     else
         mf0= Conv<int>(sdata, "mf", name());
-    
+
     // use mi >= 0; if mi < 0, flip both signs
     int mi = (mi0 < 0 ? -mi0 : mi0);
     int mf = (mi0 < 0 ? -mf0 : mf0);
-    
+
     // check if we have the optional pw list
     iArray pws;
     if (sdata.find("pws") != sdata.end())
         pws = Conv<iArray>(sdata, "pws", name());
-    
+
     // energies and cross sections
     rArray energies;
-    
+
     // get energy / energies
     try
     {
@@ -153,31 +153,31 @@ bool CollisionStrength::run (std::map<std::string,std::string> const & sdata)
         // are there more energies specified using the STDIN ?
         energies = readStandardInput<double>();
     }
-    
+
     // energies in Rydbergs
     rArray scaled_energies = energies * efactor;
-    
+
     // complete cross section array
     rArray ccs (energies.size()), sum_ccs (energies.size());
-    
+
     // resize arrays if all energies are requested
     if (energies[0] < 0)
     {
         int N;
-        
+
         // get number of energies
         hex_complete_cross_section(ni, li, mi, nf, lf, mf, energies.size(), energies.data(), nullptr, &N, pws.size(), pws.empty() ? nullptr : pws.data());
-        
+
         // resize
         scaled_energies.resize(N);
         ccs.resize(N);
         if (N > 0)
             scaled_energies[0] = -1;
-        
+
         // get list of energies
         hex_complete_cross_section(ni, li, mi, nf, lf, mf, scaled_energies.size(), scaled_energies.data(), nullptr, &N, pws.size(), pws.empty() ? nullptr : pws.data());
     }
-    
+
     // retrieve requested energies
     if (scaled_energies.size() > 0)
     {
@@ -192,12 +192,12 @@ bool CollisionStrength::run (std::map<std::string,std::string> const & sdata)
             ccs.fill(0);
         }
         ccs = sum_ccs;
-        
+
         // average initial state
         if (all_mi)
             ccs /= (2. * li + 1.);
     }
-    
+
     // write header
     std::cout << logo("#") <<
         "# Collision strengths in " << unit_name(Lunits) << " for\n" <<
@@ -216,10 +216,10 @@ bool CollisionStrength::run (std::map<std::string,std::string> const & sdata)
     table.setAlignment(OutputTable::left);
     table.write("# E        ", "Omega    ");
     table.write("# ---------", "---------");
-    
+
     if (scaled_energies.size() == 0)
         std::cout << "#\n# The database contains no relevant data." << std::endl;
-    
+
     // write data
     for (std::size_t i = 0; i < scaled_energies.size(); i++)
     {
@@ -229,6 +229,6 @@ bool CollisionStrength::run (std::map<std::string,std::string> const & sdata)
             std::isfinite(ccs[i]) ? scaled_energies[i] * ccs[i] : 0.
         );
     }
-    
+
     return true;
 }

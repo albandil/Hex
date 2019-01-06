@@ -62,11 +62,11 @@
 class PreconditionerBase
 {
     public:
-        
+
         //
         // Run-time selection mechanism (object factory).
         //
-        
+
             baseClassRunTimeSelectionDefinitions
             (
                 PreconditionerBase,
@@ -81,30 +81,30 @@ class PreconditionerBase
                     Bspline const & bspline_panel_y
                 )
             )
-        
+
         //
         // Class member functions.
         //
-        
+
             /**
              * @brief Dummy default constructor needed by the run-time selection.
              */
             PreconditionerBase () : verbose_(true) {}
-            
+
             /**
              * @brief Virtual destructor.
              * 
              * To be overridden in derived classes.
              */
             virtual ~PreconditionerBase () {}
-            
+
             /**
              * @brief Description of the preconditioner.
              * 
              * Simple documentation of the preconditioner.
              */
             virtual std::string description () const { return ""; }
-            
+
             /**
              * @brief Initialize the preconditioner.
              * 
@@ -113,7 +113,7 @@ class PreconditionerBase
              * It may use only SMP environment.
              */
             virtual void setup () {}
-            
+
             /**
              * @brief Update the preconditioner for the next energy.
              * 
@@ -121,7 +121,7 @@ class PreconditionerBase
              * It may use the MPI environment. The energy is in Ry.
              */
             virtual void update (Real E) {}
-            
+
             /**
              * @brief Get the number of allowed bound states.
              * 
@@ -138,7 +138,7 @@ class PreconditionerBase
             {
                 return std::make_pair(0,0);
             }
-            
+
             /**
              * @brief Clean up memory etc.
              * 
@@ -147,12 +147,12 @@ class PreconditionerBase
              * a new call to @ref setup.
              */
             virtual void finish () {}
-            
+
             /**
              * @brief Calculate the right-hand side.
              */
             virtual void rhs (BlockArray<Complex> & chi, int ie, int instate) const {}
-            
+
             /**
              * @brief Multiply by the matrix equation.
              * 
@@ -165,7 +165,7 @@ class PreconditionerBase
                 BlockArray<Complex> & q,
                 MatrixSelection::Selection tri = MatrixSelection::BlockBoth | MatrixSelection::Both
             ) const {}
-            
+
             /**
              * @brief Precondition the equation.
              * 
@@ -177,16 +177,16 @@ class PreconditionerBase
              * It may use the MPI environment.
              */
             virtual void precondition (BlockArray<Complex> const & r, BlockArray<Complex> & z) const {}
-            
+
             /**
              * @brief Set verbosity level.
              * 
              * Determine whether the preconditioner will produce a text output.
              */
             virtual void verbose (bool b) { verbose_ = b; }
-            
+
     protected:
-        
+
         bool verbose_;
 };
 

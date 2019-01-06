@@ -42,10 +42,10 @@ namespace geom
 class vec3d
 {
     public:
-        
+
         /// Components.
         double x, y, z;
-        
+
         /// Dot product.
         inline static double dot (vec3d const & u, vec3d const & v)
           { return u.x*v.x + u.y*v.y + u.z*v.z; }
@@ -53,11 +53,11 @@ class vec3d
         /// Cross product.
         inline static vec3d cross (vec3d const & u, vec3d const & v)
           { return vec3d({ u.y * v.z - u.z * v.y, u.z * v.x - u.x * v.z, u.x * v.y - u.y * v.x}); }
-        
+
         /// Vector length.
         inline static double norm (vec3d const & v)
           { return std::sqrt(v.x*v.x + v.y*v.y + v.z*v.z); }
-        
+
         /// Return normal vector.
         inline static vec3d normalize (vec3d const & v)
           { double n = norm(v); return vec3d ({ n * v.x, n * v.y, n * v.z }); }

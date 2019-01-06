@@ -39,7 +39,7 @@ extern "C"
 
 /**
    @brief Initialize the environment.
-   
+
    The function will open existing database with path specified in "dbname".
    If the database does not exist, a new empty database will be created.
    Also, all registered variables will be given chance to initialize by
@@ -51,10 +51,10 @@ extern "C"
    statements. For example the variable IntegralCrossSection registeres
    two functions: the simple square root and a more complicated numerical
    integrator that uses ClenshawCurtis quadrature.
-   
+
    The function "initialize" also disables journalling to speed up insertion
    of data.
-   
+
    @param dbname Zero-terminated character string.
 */
 void hex_initialize_ (const char* dbname);
@@ -62,7 +62,7 @@ void hex_initialize (const char* dbname);
 
 /**
    @brief Create new database.
-   
+
    This will create the necessary table structure in a new empty database.
    It is necessary to call @ref initialize first, so that the databse file
    is created and opened. The tables are created by the call to
@@ -77,18 +77,18 @@ void hex_new ();
 
 /**
    @brief Import SQL batch file.
-   
+
    The effect of this function should be equivalent to direct use of sqlite3
    program:
    @code
        sqlite3 hex.db < batchfile.sql
    @endcode
-   
+
    The function uses one line at a time and splits the lines into statements
    on semicolons. For this reason it does not allow multi-line statements.
    The statements produced by computational modules have always one statement
    per line.
-   
+
    @param sqlname Zero-terminated character string.
 */
 void hex_import_ (const char* sqlname);
@@ -96,7 +96,7 @@ void hex_import (const char* sqlname);
 
 /**
    @brief Update integral and complete cross section.
-   
+
    This function is used after import of T-matrices. All variables will be
    given chance to update themselves using the function
    @code
@@ -112,7 +112,7 @@ void hex_update ();
 
 /**
    @brief Optimize the SQLite database file.
-   
+
    Reduces the occupied space using the VACUUM statement.
 */
 void hex_optimize_ ();
@@ -120,7 +120,7 @@ void hex_optimize ();
 
 /**
    @brief Dump contents of the T-matrix table.
-   
+
    The output can be used to construct an equivalent table.
    The corresponding code is
    @code
@@ -133,7 +133,7 @@ void hex_dump (const char* dumpname);
 
 /**
    @brief Scattering anplitude (Fortran).
-   
+
    Fortran prototype equivalent to
    @code{.f90}
    subroutine scattering_amplitude (ni,li,mi,nf,lf,mf,S,E,N,angles,result)
@@ -144,7 +144,7 @@ void hex_dump (const char* dumpname);
      double precision, dimension(N)   :: angles
      double precision, dimension(2*N) :: result
    @endcode
-   
+
    @param ni Initial atomic principal quantum number.
    @param li Initial atomic orbital quantum number.
    @param mi Initial atomic magnetic quantum number.
@@ -171,9 +171,9 @@ void hex_scattering_amplitude_
 
 /**
    @brief Scattering anplitude (C).
-   
+
    C prototype.
-   
+
    @param ni Initial atomic principal quantum number.
    @param li Initial atomic orbital quantum number.
    @param mi Initial atomic magnetic quantum number.
@@ -200,7 +200,7 @@ void hex_scattering_amplitude
 
 /**
    @brief Scattering anplitude for non-aligned impact direction (Fortran).
-   
+
    This function will evaluate the scattering amplitude when the projectile is coming in a
    direction different from the quantization axis, i.e. when
    @f[
@@ -214,7 +214,7 @@ void hex_scattering_amplitude
        T_{n_f l_f m_f \leftarrow n_i l_i m_i} = \sum_{m_i' m_f'}
        D_{m_i' m_i}^{l_i} D_{m_f' m_f}^{l_f \ast} T_{n_f l_f m_f' \leftarrow n_i l_i m_i'} \,.
    @f]
-   
+
    Fortran prototype equivalent to
    @code{.f90}
    subroutine scattering_amplitude (ni,li,mi,nf,lf,mf,S,E,N,angles,result)
@@ -225,7 +225,7 @@ void hex_scattering_amplitude
      double precision, dimension(N)   :: angles
      double precision, dimension(2*N) :: result
    @endcode
-   
+
    @param ni Initial atomic principal quantum number.
    @param li Initial atomic orbital quantum number.
    @param mi Initial atomic magnetic quantum number.
@@ -252,11 +252,11 @@ void hex_scattering_amplitude_dir_
 
 /**
    @brief Scattering anplitude for non-aligned impact direction (C).
-   
+
    C prototype.
-   
+
    See @ref hex_scattering_amplitude_dir_ for theory.
-   
+
    @param ni Initial atomic principal quantum number.
    @param li Initial atomic orbital quantum number.
    @param mi Initial atomic magnetic quantum number.
@@ -283,7 +283,7 @@ void hex_scattering_amplitude_dir
 
 /**
    @brief Differential cross section (Fortran).
-   
+
    Fortran prototype equivalent to
    @code{.f90}
    subroutine hex_differential_cross_section (ni,li,mi,nf,lf,mf,S,E,N,angles,dcs)
@@ -294,7 +294,7 @@ void hex_scattering_amplitude_dir
      double precision, dimension(N)   :: angles
      double precision, dimension(2*N) :: dcs
    @endcode
-   
+
    @param ni Initial atomic principal quantum number.
    @param li Initial atomic orbital quantum number.
    @param mi Initial atomic magnetic quantum number.
@@ -319,9 +319,9 @@ void hex_differential_cross_section_
 
 /**
    @brief Differential cross section (C).
-   
+
    C prototype.
-   
+
    @param ni Initial atomic principal quantum number.
    @param li Initial atomic orbital quantum number.
    @param mi Initial atomic magnetic quantum number.
@@ -346,7 +346,7 @@ void hex_differential_cross_section
 
 /**
    @brief Complete cross section (Fortran).
-   
+
    Fortran prototype equivalent to
    @code{.f90}
    subroutine complete_cross_section (ni,li,mi,nf,lf,mf,N,energies,ccs,Nall)
@@ -357,7 +357,7 @@ void hex_differential_cross_section
      double precision, dimension(2*N) :: ccs
      integer, intent(out) :: Nall
    @endcode
-   
+
    @param ni Initial atomic principal quantum number.
    @param li Initial atomic orbital quantum number.
    @param mi Initial atomic magnetic quantum number.
@@ -382,9 +382,9 @@ void hex_complete_cross_section_
 
 /**
    @brief Complete cross section (C).
-   
+
    C prototype.
-   
+
    @param ni Initial atomic principal quantum number.
    @param li Initial atomic orbital quantum number.
    @param mi Initial atomic magnetic quantum number.

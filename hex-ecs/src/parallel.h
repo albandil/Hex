@@ -56,7 +56,7 @@
 class Parallel
 {
     public:
-        
+
         /**
          * @brief Constructor.
          * 
@@ -80,7 +80,7 @@ class Parallel
                 // initialize MPI compatible with threaded PT-Scotch
                 int req_flag = MPI_THREAD_MULTIPLE, prov_flag;
                 MPI_Init_thread(argc, argv, req_flag, &prov_flag);
-                
+
                 // check thread support
                 if (prov_flag != MPI_THREAD_MULTIPLE)
                 {
@@ -91,7 +91,7 @@ class Parallel
                 // initialize MPI compatible with OpenMP
                 int req_flag = MPI_THREAD_SERIALIZED, prov_flag;
                 MPI_Init_thread(argc, argv, req_flag, &prov_flag);
-                
+
                 // check thread support
                 if (prov_flag != MPI_THREAD_SERIALIZED)
                 {
@@ -102,17 +102,17 @@ class Parallel
                 // get number of processes and ID of this process
                 MPI_Comm_size(MPI_COMM_WORLD, &Nproc_);
                 MPI_Comm_rank(MPI_COMM_WORLD, &iproc_);
-                
+
                 // check parameter compatibility
                 if (Nproc_ % groupsize_ != 0)
                     HexException("Number of processes (currently %d) must be integer mutiple of groupsize (currently %d).", Nproc_, groupsize_);
-                
+
                 // calculate number of groups
                 Ngroup_ = Nproc_ / groupsize_;
-                
+
                 // calculate group rank
                 igroup_ = iproc_ / groupsize_;
-                
+
                 // prepare group communicators
                 for (int i = 0; i < Ngroup_; i++)
                 {
@@ -125,12 +125,12 @@ class Parallel
                         igroupproc(),
                         &newcomm
                     );
-                    
+
                     // store this communicator
                     if (igroup_ == i)
                         groupcomm_ = newcomm;
                 }
-                
+
                 // construct also set of groups' master processes
                 MPI_Comm_split
                 (
@@ -144,7 +144,7 @@ class Parallel
             active_ = false;
 #endif // WITH_MPI
         }
-        
+
         ~Parallel ()
         {
 #ifdef WITH_MPI
@@ -152,11 +152,11 @@ class Parallel
                 MPI_Finalize();
 #endif
         }
-        
+
         //
         // getters
         //
-        
+
         /**
          * @brief Returns true if this process is the master process.
          * 
@@ -167,7 +167,7 @@ class Parallel
         {
             return iproc_ == 0;
         }
-        
+
         /**
          * @brief Returns true if this process is the master process within a group.
          * 
@@ -178,7 +178,7 @@ class Parallel
         {
             return iproc_ % groupsize_ == 0;
         }
-        
+
         /**
          * @brief Returns true if the work item is assigned to this process.
          * 
@@ -192,7 +192,7 @@ class Parallel
         {
             return i % Nproc_ == iproc_;
         }
-        
+
         /**
          * @brief Returns true if the work item is assigned to this process' group.
          * 
@@ -206,28 +206,28 @@ class Parallel
         {
             return i % Ngroup_ == igroup_;
         }
-        
+
         /// Returns true if the MPI is active.
         bool active () const { return active_; }
-        
+
         /// Returns the rank of the communicator (process is).
         int iproc () const { return iproc_; }
-        
+
         /// Returns the rank of process group.
         int igroup () const { return igroup_; }
-        
+
         /// Returns index of rank within the group.
         int igroupproc () const { return iproc_ % groupsize_; }
-        
+
         /// Returns the size of the communicator (process count).
         int Nproc () const { return Nproc_; }
-        
+
         /// Returns the number of groups.
         int Ngroup () const { return Ngroup_; }
-        
+
         /// Return group size.
         int groupsize () const { return groupsize_; }
-        
+
         /**
          * @brief Broadcast array from owner to everyone.
          */
@@ -248,7 +248,7 @@ class Parallel
             }
 #endif
         }
-        
+
         /**
          * @brief Broadcast array from owner to everyone.
          */
@@ -260,10 +260,10 @@ class Parallel
                 // owner : broadcast size
                 int size = data.size();
                 MPI_Bcast(&size, 1, MPI_INT, owner, MPI_COMM_WORLD);
-                
+
                 // all : resize data array
                 data.resize(size);
-                
+
                 // owner : broadcast data
                 MPI_Bcast
                 (
@@ -276,7 +276,7 @@ class Parallel
             }
 #endif
         }
-        
+
         /**
          * @brief Broadcast array from owner to everyone in the group.
          */
@@ -297,7 +297,7 @@ class Parallel
             }
 #endif
         }
-        
+
         /**
          * @brief Synchronize across processes by composition.
          * 
@@ -332,7 +332,7 @@ class Parallel
             }
 #endif
         }
-        
+
         template <class T> void sync_m (T * array, std::size_t chunksize, std::size_t Nchunk) const
         {
 #ifdef WITH_MPI
@@ -352,7 +352,7 @@ class Parallel
             }
 #endif
         }
-        
+
         /**
          * @brief Sum arrays to node.
          */
@@ -374,7 +374,7 @@ class Parallel
             }
 #endif
         }
-        
+
         /**
          * @brief Synchronize across processes by summing.
          * 
@@ -401,7 +401,7 @@ class Parallel
             }
 #endif
         }
-        
+
         /**
          * @brief Synchronize across group's processes by summing.
          * 
@@ -428,7 +428,7 @@ class Parallel
             }
 #endif
         }
-        
+
         /**
          * @brief Sum array within group to a given process.
          */
@@ -450,7 +450,7 @@ class Parallel
             }
 #endif
         }
-        
+
         /**
          * @brief Sum array from all group masters to one of the group masters.
          */
@@ -472,7 +472,7 @@ class Parallel
             }
 #endif
         }
-        
+
         /**
          * @brief Wait for completion of all running tasks.
          * 
@@ -485,7 +485,7 @@ class Parallel
                 MPI_Barrier(MPI_COMM_WORLD);
 #endif
         }
-        
+
         void wait_g () const
         {
 #ifdef WITH_MPI
@@ -493,7 +493,7 @@ class Parallel
                 MPI_Barrier(groupcomm_);
 #endif
         }
-        
+
         void* groupcomm () const
         {
 #ifdef WITH_MPI
@@ -502,27 +502,27 @@ class Parallel
 #endif
             return (void*)MPI_Comm(0);
         }
-        
+
     private:
-        
+
         // whether the MPI is on
         bool active_;
-        
+
         // global communicator rank
         int iproc_;
-        
+
         // global communicator size
         int Nproc_;
-        
+
         // group index
         int igroup_;
-        
+
         // group count
         int Ngroup_;
 #ifdef WITH_MPI
         // MPI group communicator
         MPI_Comm groupcomm_;
-        
+
         // MPI master group communicator
         MPI_Comm mastergroup_;
 #endif

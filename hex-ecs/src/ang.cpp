@@ -37,37 +37,37 @@ AngularBasis::AngularBasis (InputFile const & inp)
     : L_(inp.L), S_(0), Pi_(inp.Pi), maxell_(inp.maxell)
 {
     std::cout << "Setting up the coupled angular states..." << std::endl;
-    
+
     // for given L, Π and levels list all available (ℓ₁ℓ₂) pairs
     int maxl1 = 0, maxl2 = 0;
     for (int ell = 0; ell <= inp.levels; ell++)
     {
         std::cout << "\t- [" << ell << "] ";
-        
+
         // get sum of the angular momenta for this angular level
         int sum = 2 * ell + inp.L + inp.Pi;
-        
+
         // for all angular momentum pairs that do compose L
         for (int l1 = ell; l1 <= sum - ell; l1++)
         {
             int l2 = sum - l1;
-            
+
             if ((l1 <= l2 or inp.exchange) and std::abs(l1 - l2) <= inp.L and inp.L <= l1 + l2 and (inp.limit < 0 or std::min(l1, l2) <= inp.limit))
             {
                 std::cout << "(" << l1 << "," << l2 << ") ";
-                
+
                 maxl1 = std::max(maxl1, l1);
                 maxl2 = std::max(maxl2, l2);
-                
+
                 states_.push_back(std::make_pair(l1, l2));
             }
         }
         std::cout << std::endl;
     }
-    
+
     // get maximal angular momentum transfer
     maxlambda_ = 2 * std::min(maxl1, maxl2);
-    
+
     // precompute angular integrals
     std::cout << "\t- calculating angular integrals ... " << std::flush;
     for (int lambda = 0; lambda <= maxlambda_; lambda++)
@@ -86,7 +86,7 @@ AngularBasis::AngularBasis (InputFile const & inp)
                 L_
             )
         );
-        
+
         if (not std::isfinite(f_.back()))
         {
             HexException

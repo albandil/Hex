@@ -134,18 +134,18 @@ void hex_complete_cross_section_
 )
 {
     CompleteCrossSection * CCS = dynamic_cast<CompleteCrossSection*>(get_quantity("ccs"));
-    
+
     double E, sigma;
     rArray E_arr, sigma_arr;
-    
+
     // use mi >= 0; if mi < 0, flip both signs
     int mi = ((*pmi) < 0 ? -(*pmi) : (*pmi));
     int mf = ((*pmi) < 0 ? -(*pmf) : (*pmf));
-    
+
     // if there is nothing to compute, return
     if (*N == 0)
         return;
-    
+
     // compose the list of wanted partial waves
     std::string pwlimit;
     if (npws != nullptr and pws != nullptr)
@@ -157,7 +157,7 @@ void hex_complete_cross_section_
         pwlimit.back() = ')';
         pwlimit = " AND ell IN " + pwlimit;
     }
-    
+
     // get number of all energies
     if (*energies < 0 and n != nullptr)
     {
@@ -173,11 +173,11 @@ void hex_complete_cross_section_
             sqlitepp::use(*ni), sqlitepp::use(*li), sqlitepp::use(mi),
             sqlitepp::use(*nf), sqlitepp::use(*lf), sqlitepp::use(mf);
         st.exec();
-        
+
         // if a reallocation is needed, return
         if (*N != *n)
             return;
-        
+
         // fill the available energies
         if (*N >= *n)
         {
@@ -197,12 +197,12 @@ void hex_complete_cross_section_
             for (int i = 0; i < *N and st.exec(); i++)
                 *(energies + i) = E;
         }
-        
+
         // if no space for cross section has been given, return
         if (ccs == nullptr)
             return;
     }
-    
+
     // get number of partial waves stored in the database
     int max_available_ell;
     sqlitepp::statement ell_st (CCS->session());
@@ -213,7 +213,7 @@ void hex_complete_cross_section_
         sqlitepp::use(*ni), sqlitepp::use(*li), sqlitepp::use(mi),
         sqlitepp::use(*nf), sqlitepp::use(*lf), sqlitepp::use(mf);
     ell_st.exec();
-    
+
     // retrieve cross sections for all requested (and available) partial waves
     rArrays E_data, sigma_data;
     for (int ell = 0; ell <= max_available_ell; ell++)
@@ -227,11 +227,11 @@ void hex_complete_cross_section_
             sqlitepp::into(E), sqlitepp::into(sigma),
             sqlitepp::use(*ni), sqlitepp::use(*li), sqlitepp::use(mi),
             sqlitepp::use(*nf), sqlitepp::use(*lf), sqlitepp::use(mf), sqlitepp::use(ell);
-        
+
         // prepare storage
         E_data.push_back(rArray());
         sigma_data.push_back(rArray());
-        
+
         // retrieve data (if requested)
         if (pws == nullptr or std::find(pws, pws + *npws, ell) != pws + *npws)
         {
@@ -242,21 +242,21 @@ void hex_complete_cross_section_
             }
         }
     }
-    
+
     // merge energies of all datasets
     E_arr = join(E_data);
     std::sort(E_arr.begin(), E_arr.end());
     double* ptr = std::unique(E_arr.begin(), E_arr.end());
     E_arr.resize(ptr - E_arr.begin());
-    
+
     // terminate if no data
     if (E_arr.empty())
         return;
-    
+
     //
     // interpolate
     //
-    
+
     // negative energy indicates output of all available cross sections
     if (*energies < 0.)
     {
@@ -277,7 +277,7 @@ void hex_complete_cross_section_
             rArrayView(*N,ccs) += interpolate_real(E_data[ell], E_data[ell] * sigma_data[ell], rArrayView(*N,energies), gsl_interp_akima) / rArrayView(*N,energies);
         }
     }
-    
+
     // erase data for energies below threshold
     for (int i = 0; i < *N; i++)
     {
@@ -293,39 +293,39 @@ bool CompleteCrossSection::run (std::map<std::string,std::string> const & sdata)
     // manage units
     double efactor = change_units(Eunits, eUnit_Ry);
     double lfactor = change_units(lUnit_au, Lunits);
-    
+
     // scattering event parameters
     int ni = Conv<int>(sdata, "ni", name());
     int li = Conv<int>(sdata, "li", name());
     int nf = Conv<int>(sdata, "nf", name());
     int lf = Conv<int>(sdata, "lf", name());
-    
+
     // initial magnetic quantum number
     int mi0= 0; bool all_mi = false;
     if (sdata.find("mi") == sdata.end() or sdata.at("mi") == "*")
         all_mi = true;
     else
         mi0= Conv<int>(sdata, "mi", name());
-    
+
     // final magnetic quantum number
     int mf0= 0; bool all_mf = false;
     if (sdata.find("mf") == sdata.end() or sdata.at("mf") == "*")
         all_mf = true;
     else
         mf0= Conv<int>(sdata, "mf", name());
-    
+
     // use mi >= 0; if mi < 0, flip both signs
     int mi = (mi0 < 0 ? -mi0 : mi0);
     int mf = (mi0 < 0 ? -mf0 : mf0);
-    
+
     // check if we have the optional pw list
     iArray pws;
     if (sdata.find("pws") != sdata.end())
         pws = Conv<iArray>(sdata, "pws", name());
-    
+
     // energies and cross sections
     rArray energies;
-    
+
     // get energy / energies
     try
     {
@@ -337,31 +337,31 @@ bool CompleteCrossSection::run (std::map<std::string,std::string> const & sdata)
         // are there more energies specified using the STDIN ?
         energies = readStandardInput<double>();
     }
-    
+
     // energies in Rydbergs
     rArray scaled_energies = energies * efactor;
-    
+
     // complete cross section array
     rArray ccs (energies.size()), sum_ccs (energies.size());
-    
+
     // resize arrays if all energies are requested
     if (energies[0] < 0)
     {
         int N;
-        
+
         // get number of energies
         hex_complete_cross_section(ni, li, mi, nf, lf, mf, energies.size(), energies.data(), nullptr, &N, pws.size(), pws.empty() ? nullptr : pws.data());
-        
+
         // resize
         scaled_energies.resize(N);
         ccs.resize(N);
         if (N > 0)
             scaled_energies[0] = -1;
-        
+
         // get list of energies
         hex_complete_cross_section(ni, li, mi, nf, lf, mf, scaled_energies.size(), scaled_energies.data(), nullptr, &N, pws.size(), pws.empty() ? nullptr : pws.data());
     }
-    
+
     // retrieve requested energies
     if (scaled_energies.size() > 0)
     {
@@ -376,12 +376,12 @@ bool CompleteCrossSection::run (std::map<std::string,std::string> const & sdata)
             ccs.fill(0);
         }
         ccs = sum_ccs;
-        
+
         // average initial state
         if (all_mi)
             ccs /= (2. * li + 1.);
     }
-    
+
     // write header
     std::cout << logo("#") <<
         "# Complete cross section in " << unit_name(Lunits) << " for\n" <<
@@ -400,13 +400,13 @@ bool CompleteCrossSection::run (std::map<std::string,std::string> const & sdata)
     table.setAlignment(OutputTable::left);
     table.write("# E        ", "sigma    ");
     table.write("# ---------", "---------");
-    
+
     if (scaled_energies.size() == 0)
         std::cout << "#\n# The database contains no relevant data." << std::endl;
-    
+
     // write data
     for (std::size_t i = 0; i < scaled_energies.size(); i++)
         table.write(scaled_energies[i]/efactor, (std::isfinite(ccs[i]) ? ccs[i] * lfactor * lfactor : 0.));
-    
+
     return true;
 }

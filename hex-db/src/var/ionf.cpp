@@ -113,7 +113,7 @@ bool IonizationF::createTable ()
             "cheb BLOB, "
             "PRIMARY KEY (ni,li,mi,L,S,Ei,l1,l2)"
         ")";
-    
+
     try
     {
         st.exec();
@@ -124,7 +124,7 @@ bool IonizationF::createTable ()
         std::cerr << "       code = " << e.code() << " (\"" << e.what() << "\")" << std::endl;
         return false;
     }
-    
+
     return ScatteringQuantity::createTable();
 }
 
@@ -140,7 +140,7 @@ bool IonizationF::run (std::map<std::string,std::string> const & sdata)
     // manage units
     double efactor = change_units(Eunits, eUnit_Ry);
     double lfactor = change_units(lUnit_au, Lunits);
-    
+
     // atomic and projectile data
     int ni = Conv<int>(sdata, "ni", name());
     int li = Conv<int>(sdata, "li", name());
@@ -150,10 +150,10 @@ bool IonizationF::run (std::map<std::string,std::string> const & sdata)
     int l1 = Conv<int>(sdata, "l1", name());
     int l2 = Conv<int>(sdata, "l2", name());
     double Ei = Conv<double>(sdata, "Ei", name()) * efactor;
-    
+
     if (mi < 0)
         mi = -mi;
-    
+
     // read energy sharing (in user units)
     rArray Eshare;
     try
@@ -164,11 +164,11 @@ bool IonizationF::run (std::map<std::string,std::string> const & sdata)
     {
         Eshare = readStandardInput<double>();
     }
-    
+
     // energy and encoded Chebyshev approximation
     double E;
     std::string blob;
-    
+
     // create query statement
     sqlitepp::statement st (session());
     st << "SELECT Ei, QUOTE(cheb) FROM 'ionf' "
@@ -184,7 +184,7 @@ bool IonizationF::run (std::map<std::string,std::string> const & sdata)
        sqlitepp::use(ni), sqlitepp::use(li), sqlitepp::use(mi),
        sqlitepp::use(L), sqlitepp::use(S),
        sqlitepp::use(l1), sqlitepp::use(l2);
-    
+
     // get Chebyshev expansions
     rArray E_arr;
     cArray cb;
@@ -193,10 +193,10 @@ bool IonizationF::run (std::map<std::string,std::string> const & sdata)
     {
         // save energy
         E_arr.push_back(E);
-        
+
         // decode Chebyshev expansion from hexadecimal format
         cb.fromBlob(blob);
-        
+
         // save Chebyshev expansion
         cheb_arr.push_back
         (
@@ -208,11 +208,11 @@ bool IonizationF::run (std::map<std::string,std::string> const & sdata)
             )
         );
     }
-    
+
     // terminate if no data
     if (E_arr.empty())
         return true;
-    
+
     // for all energy shares
     cArray f_out(Eshare.size());
     for (std::size_t i = 0; i < Eshare.size(); i++)
@@ -222,16 +222,16 @@ bool IonizationF::run (std::map<std::string,std::string> const & sdata)
         //   2) (k₁)² / (k₂)² = Eshare / (1 - Eshare)
         rArray k1 = sqrt((E_arr - 1./(ni*ni)) * Eshare[i]);
         rArray k2 = sqrt((E_arr - 1./(ni*ni)) * (1 - Eshare[i]));
-        
+
         // for all impact energies evaluate the radial part
         cArray f0(E_arr.size());
         for (std::size_t ie = 0; ie < E_arr.size(); ie++)
             f0[ie] = cheb_arr[ie].clenshaw(k1[ie], cheb_arr[ie].tail(1e-8)) / gsl_sf_pow_int(k1[ie] * k2[ie], 2);
-        
+
         // interpolate
         f_out[i] = interpolate(E_arr, f0, { Ei })[0];
     }
-    
+
     // write out
     std::cout << logo("#") <<
         "# Ionization amplitudes (radial part) in " << unit_name(Lunits) << " for\n" <<
@@ -246,7 +246,7 @@ bool IonizationF::run (std::map<std::string,std::string> const & sdata)
     table.setAlignment(OutputTable::left);
     table.write("# Eshare   ", "Re f     ", "Im f     ");
     table.write("# ---------", "---------", "---------");
-    
+
     for (std::size_t i = 0; i < Eshare.size(); i++)
     {
         table.write
@@ -256,6 +256,6 @@ bool IonizationF::run (std::map<std::string,std::string> const & sdata)
             f_out[i].imag()*lfactor
         );
     }
-    
+
     return true;
 }

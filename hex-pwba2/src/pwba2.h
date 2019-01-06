@@ -36,7 +36,7 @@
 
 namespace PWBA2
 {
-    
+
     cArrays PartialWave_direct
     (
         rArray grid,
@@ -47,7 +47,7 @@ namespace PWBA2
         bool integrate_allowed, bool integrate_forbidden,
         bool verbose
     );
-    
+
     cArrays FullTMatrix_direct
     (
         rArray grid,
@@ -57,7 +57,7 @@ namespace PWBA2
         bool integrate_allowed, bool integrate_forbidden,
         bool verbose
     );
-    
+
 } /* namespace PWBA2 */
 
 #endif

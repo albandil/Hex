@@ -134,42 +134,42 @@ int main (int argc, char* argv[])
 {
     // set proper locale
     std::setlocale(LC_ALL, "en_GB.utf8");
-    
+
     // print program logo
     std::cout << logo(" ") << std::endl;
     std::cout << "=== Plane wave second Born approximation ===" << std::endl << std::endl;
-    
+
     // disable fatal GSL errors
     gsl_set_error_handler_off();
-    
+
     // disable buffering of the standard output (-> immediate logging)
     setvbuf(stdout, nullptr, _IONBF, 0);
-    
+
     // input file
     std::ifstream inputfile;
-    
+
     // computation mode
     bool partial_wave = false, direct_integrate = false;
-    
+
     // verbosity level
     bool verbose = false;
-    
+
     // parse command line
     ParseCommandLine
     (
         argc, argv,
-        
+
         "example", "e", 0, [&](Args optargs) -> bool
             {
                 std::cout << "Writing sample input file to \"example.inp\"." << std::endl << std::endl;
-                
+
                 // produce sample input file
                 std::ofstream out("example.inp");
                 if (not out.good())
                     throw exception ("Error: Cannot write to \"example.inp\".");
-                
+
                 out << sample_input;
-                    
+
                 out.close();
                 std::exit(EXIT_SUCCESS);
             },
@@ -206,13 +206,13 @@ int main (int argc, char* argv[])
                 verbose = true;
                 return true;
             },
-        
+
         [](std::string opt, Args optargs) -> bool
             {
                 HexException("Unknown option \"%s\".", opt.c_str());
             }
     );
-    
+
     // check mode
     if (direct_integrate and partial_wave)
     {
@@ -225,7 +225,7 @@ int main (int argc, char* argv[])
         std::cout << help_text << std::endl;
         std::exit(EXIT_SUCCESS);
     }
-    
+
     // check input file
     if (not inputfile.is_open())
     {
@@ -242,18 +242,18 @@ int main (int argc, char* argv[])
             std::exit(EXIT_FAILURE);
         }
     }
-    
+
     // grid parameters
     int N;
     double Rmax;
-    
+
     // quantum numbers
     int Pi, L, maxNn, nL;
     int Ni, Li, Nf, Lf;
     double Ei, Enmax;
     bool integrate_allowed;
     bool integrate_forbidden;
-    
+
     // parse input file
     parse_input_file
     (
@@ -264,12 +264,12 @@ int main (int argc, char* argv[])
         maxNn, nL, Enmax,
         integrate_allowed, integrate_forbidden
     );
-    
+
     // compute other variables from input
     double ki = std::sqrt(Ei);
     double Etot = ki*ki - 1./(Ni*Ni);
     rArray grid = linspace(0., Rmax, N + 1);
-    
+
     // echo input data
     if (partial_wave)
     {
@@ -305,7 +305,7 @@ int main (int argc, char* argv[])
         std::cout << "\t- maximal intermediate angular momentum sum (- L): nL = " << nL << std::endl;
         std::cout << "\t- integrate continuum states: " << (integrate_allowed ? "yes" : "no") << std::endl;
     }
-    
+
     if (partial_wave)
     {
         // write all intermediate states' angular momenta pairs
@@ -321,20 +321,20 @@ int main (int argc, char* argv[])
         }
     }
     std::cout << std::endl;
-    
+
     // final energy
     double ef = ki*ki - 1./(Ni*Ni) + 1./(Nf*Nf);
-    
+
     // check energy
     if (ef < 0)
     {
         std::cout << "Excitation from Ni = " << Ni << " to Nf = " << Nf << " is not possible at given energy.";
         return EXIT_FAILURE;
     }
-    
+
     // final momentum
     double kf = std::sqrt(ef);
-    
+
     // check grid spacing
     if (partial_wave)
     {
@@ -344,28 +344,28 @@ int main (int argc, char* argv[])
             std::cout << "Warning: Grid is not sufficiently fine!" << std::endl;
         std::cout << std::endl;
     }
-    
+
     // write thread information
 #ifdef _OPENMP
     # pragma omp parallel
     # pragma omp master
     std::cout << "Using " << omp_get_num_threads() << " OpenMP threads for the calculation." << std::endl << std::endl;
 #endif
-    
+
     Timer t;
-    
+
     // outgoing electron partial T-matrices
     cArrays Tdir =
         partial_wave ?
         PWBA2::PartialWave_direct(grid, L, Pi, Ni, Li, ki, Nf, Lf, kf, nL, maxNn, Enmax, integrate_allowed, integrate_forbidden, verbose) :
         PWBA2::FullTMatrix_direct(grid, Ni, Li, ki, Nf, Lf, kf, maxNn, nL, Enmax, integrate_allowed, integrate_forbidden, verbose);
-    
+
     std::cout << "Tdir = " << Tdir << std::endl;
     std::cout << "Tdir sums = " << sums(Tdir) << std::endl;
     std::cout << "Partial cross sections = " << sqrabs(sums(Tdir)) / (16 * special::constant::pi * special::constant::pi) << std::endl;
     std::cout << std::endl;
-    
+
     std::cout << "Finished in " << t.nice_time() << std::endl;
-    
+
     return EXIT_SUCCESS;
 }

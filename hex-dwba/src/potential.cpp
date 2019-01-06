@@ -74,18 +74,18 @@ double DistortingPotential::operator () (double x) const
     // skip empty potential
     if (n_ == 0 and k_ == 0)
         return 0.;
-    
+
     // disallow distorsion by free states
     if (k_ != 0)
         throw exception ("Distorting potential not implemented for k != 0.");
-    
+
     // stop if not enough precomputed coefficients
     if (n_ >= (int)Ucoeffs.size())
         throw exception ("Distorting potential not implemented for n = %d > %d.", n_, Ucoeffs.size() - 1);
-    
+
     // get correct polynomial coefficients
     rArray const & coeffs = Ucoeffs[n_];
-    
+
     // evaluate (P(x) - 1/x) * exp(-2*x/n)
     double eval = 0;
     for (double factor : coeffs)
@@ -98,7 +98,7 @@ double DistortingPotential::plusMonopole (double x) const
     // in origin return true asymptotic
     if (x == 0.)
         return getConstant();
-    
+
     // otherwise compute
     return 1./x + (*this)(x);
 }
@@ -108,15 +108,15 @@ double DistortingPotential::getConstant () const
     // skip empty potential
     if (n_ == 0 and k_ == 0)
         return 0.;
-    
+
     // disallow distorsion by free states
     if (k_ != 0)
         throw exception ("Distorting potential not implemented for k != 0.");
-    
+
     // stop if not enough precomputed coefficients
     if (n_ >= (int)Ucoeffs.size())
         throw exception ("Distorting potential not implemented for n = %d > %d.", n_, Ucoeffs.size() - 1);
-    
+
     // return the x -> 0 limiting value withou the monopole term
     return Ucoeffs[n_].back();
 }
@@ -126,34 +126,34 @@ double DistortingPotential::getFarRadius () const
     // if the rmax has been overriden, use the supplied value
     if (rmax_ > 0.)
         return rmax_;
-    
+
     //
     // otherwise compute rmax using hunt & bisect run
     //
-    
+
     // determine from parameters of the potential
     #define U_THRESHOLD    1e-100
     #define U_MAX_ITERS    1000
-    
+
     // hunt for low value
     double far = 1., far_value;
     while ((far_value = fabs((*this)(far *= 2))) > U_THRESHOLD)
         /* continue hunting */;
-    
+
     // bisect for exact value
     double near = 1.;
     for (int i = 0; i < U_MAX_ITERS and near != far; i++)
     {
         double middle = (near + far) * 0.5;
         double middle_val = fabs((*this)(middle));
-        
+
         if (U_THRESHOLD > middle_val)
             far = middle;
-            
+
         if (middle_val > U_THRESHOLD)
             near = middle;
     }
-    
+
     return (near + far) * 0.5;
 }
 
@@ -162,11 +162,11 @@ void DistortingPotential::toFile (const char* filename) const
     // generate evaluation grid
     rArray grid = linspace(0., getFarRadius(), 1000);
     rArray vals(grid.size());
-    
+
     // evaluate
     for (int i = 0; i < (int)grid.size(); i++)
         vals[i] = (*this)(grid[i]);
-    
+
     // write to text file
     write_array(grid, vals, filename);
 }

@@ -67,11 +67,11 @@
  */
 template <class IdxT, class DataT> class CsrMatrix
 {
-    
+
 public:
-    
+
     // Constructors
-    
+
     CsrMatrix ()
         : m_(0), n_(0), name_() {}
     CsrMatrix (std::size_t m, std::size_t n)
@@ -82,10 +82,10 @@ public:
         : m_(m), n_(n), p_(p), i_(i), x_(x), name_() {}
     CsrMatrix (std::size_t m, std::size_t n, NumberArray<IdxT> && p, NumberArray<IdxT> && i, NumberArray<DataT> && x)
         : m_(m), n_(n), p_(std::move(p)), i_(std::move(i)), x_(std::move(x)), name_() {}
-    
+
     /// Destructor
     ~CsrMatrix () {}
-    
+
     /// Clear data.
     void drop ()
     {
@@ -94,7 +94,7 @@ public:
         i_.drop();
         x_.drop();
     }
-    
+
     /**
      * Ordinary matrix-vector product, \f$ A\cdot b \f$.
      * @param b Vector to multiply with.
@@ -103,67 +103,67 @@ public:
     {
         // create output array
         NumberArray<DataT> c(m_);
-        
+
         for (IdxT irow = 0; irow < m_; irow++)
         {
             IdxT idx1 = p_[irow];
             IdxT idx2 = p_[irow+1];
-            
+
             // for all nonzero elements in this row
             for (IdxT idx = idx1; idx < idx2; idx++)
             {
                 // get column number
                 IdxT icol = i_[idx];
-                
+
                 // store product
                 c[irow] += x_[idx] * b[icol];
             }
         }
-        
+
         return c;
     }
-    
+
     /// Get number of structurally non-zero elements.
     std::size_t size () const { return i_.size(); }
-    
+
     /// Get row count.
     std::size_t rows () const { return m_; }
-    
+
     /// Get column count.
     std::size_t cols () const { return n_; }
-    
+
     /// Get row pointers.
     NumberArray<IdxT> const & p () const { return p_; }
     NumberArray<IdxT> & p () { return p_; }
-    
+
     /// Get column indices.
     NumberArray<IdxT> const & i () const { return i_; }
     NumberArray<IdxT> & i () { return i_; }
-    
+
     /// Get data array.
     NumberArray<DataT> const & x () const { return x_; }
     NumberArray<DataT> & x () { return x_; }
-    
+
     /// Return absolute value of the (in absolute value) largest element.
     double norm () const
     {
         std::size_t N = i_.size();
         double res = 0.;
-        
+
         // return the abs(largest element)
         for (std::size_t i = 0; i < N; i++)
         {
             // compute the absolute value
             double val = std::abs(x_[i]);
-            
+
             // update the winner
             if (val > res)
                 res = val;
         }
-        
+
         return res;
     }
-    
+
     /**
      * Write the matrix data to a file.
      * 
@@ -182,7 +182,7 @@ public:
         {
             IdxT idx1 = p_[irow];
             IdxT idx2 = p_[irow + 1];
-            
+
             for (IdxT idx = idx1; idx < idx2; idx++)
             {
                 out << irow << '\t' << i_[idx];
@@ -193,7 +193,7 @@ public:
         }
         out.close();
     }
-    
+
 #ifdef WITH_PNG
     /**
      * PNG row data generator for use in \ref plot function.
@@ -205,41 +205,41 @@ public:
         typedef png::generator<png::gray_pixel_1,PngGenerator> base_t;
         typedef png::packed_pixel_row<png::gray_pixel_1> row;
         typedef png::row_traits<row> row_traits;
-        
+
         public:
-            
+
             PngGenerator (CsrMatrix<IdxT,DataT> const * mat, double threshold)
                 : base_t(mat->cols(), mat->rows()), M_(mat), buff_(mat->cols()), threshold_(threshold)
             {
                 // do nothing
             }
-            
+
             ~PngGenerator ()
             {
                 // do nothing
             }
-            
+
             png::byte * get_next_row (std::size_t irow)
             {
                 // get column indices
                 IdxT idx_min = M_->p_[irow];
                 IdxT idx_max = M_->p_[irow + 1];
-                
+
                 // clear memory
                 for (std::size_t icol = 0; icol < M_->cols(); icol++)
                     buff_[icol] = 1;
-                
+
                 // for all nonzero columns
                 for (IdxT idx = idx_min; idx < idx_max; idx++)
                     if (std::abs(M_->x_[idx]) > threshold_)
                         buff_[M_->i_[idx]] = 0;
-                
+
                 // pass the buffer
                 return reinterpret_cast<png::byte*>(row_traits::get_data(buff_));
             }
-            
+
         private:
-            
+
             CsrMatrix<IdxT,DataT> const * M_;
             row buff_;
             double threshold_;
@@ -256,17 +256,17 @@ public:
 #ifdef WITH_PNG
         // create output file
         std::ofstream out (filename, std::ios_base::out | std::ios_base::binary);
-        
+
         // create PNG data generator
         PngGenerator png (this, threshold);
-        
+
         // write PNG file
         png.write(out);
 #else
         HexException("The program was not built with PNG++ library (use -DWITH_PNG).");
 #endif // WITH_PNG
     }
-    
+
     /**
      * @brief Link to a disk file.
      * 
@@ -275,12 +275,12 @@ public:
      */
     void hdflink (std::string name) { name_ = name; }
     void unlink () { name_.clear(); }
-    
+
     /**
      * Get linked HDF name.
      */
     std::string hdfname () const { return name_; }
-    
+
     /**
      * Save matrix to HDF file.
      */
@@ -289,17 +289,17 @@ public:
     bool hdfsave (std::string name) const
     {
         HDFFile hdf(name, HDFFile::overwrite);
-        
+
         // write dimensions
         hdf.write("m", &m_, 1);
         hdf.write("n", &n_, 1);
-        
+
         // write indices
         if (not p_.empty())
             hdf.write("p", &(p_[0]), p_.size());
         if (not i_.empty())
             hdf.write("i", &(i_[0]), i_.size());
-        
+
         // write data
         if (not x_.empty())
         {
@@ -310,11 +310,11 @@ public:
                 x_.size() * typeinfo<DataT>::ncmpt
             );
         }
-        
+
         return true;
     }
     //@}
-    
+
     /**
      * Load matrix from HDF file.
      */
@@ -324,17 +324,17 @@ public:
     {
         HDFFile hdf(name, HDFFile::readonly);
         if (not hdf.valid()) return false;
-        
+
         // read dimensions
         if (not hdf.read("m", &m_, 1)) return false;
         if (not hdf.read("n", &n_, 1)) return false;
-        
+
         // read indices
         if (p_.resize(hdf.size("p")) and not hdf.read("p", &(p_[0]), p_.size()))
             return false;
         if (i_.resize(hdf.size("i")) and not hdf.read("i", &(i_[0]), i_.size()))
             return false;
-        
+
         // read data
         if
         (
@@ -347,11 +347,11 @@ public:
             )
         )
             return false;
-        
+
         return true;
     }
     //@}
-    
+
     /**
      * Element-wise access (const).
      * If a non-existing element is referenced, zero is returned.
@@ -361,17 +361,17 @@ public:
         // get all column indices, which have nonzero element in row "i"
         IdxT idx1 = p_[i];
         IdxT idx2 = p_[i + 1];
-        
+
         // find the correct column ("j")
         auto it = std::lower_bound(i_.begin() + idx1, i_.begin() + idx2, j);
 
         if (it == i_.end() or *it != j)
             return 0.;
-        
+
         // return the value
         return x_[it - i_.begin()];
     }
-    
+
     /**
      * Multiplication by a number.
      */
@@ -382,7 +382,7 @@ public:
             x_[i] *= r;
         return *this;
     }
-    
+
     /**
      * Addition of another CSR matrix.
      * The matrices MUST HAVE THE SAME SPARSE STRUCTURE, as no indices are
@@ -391,18 +391,18 @@ public:
     CsrMatrix<IdxT,DataT> & operator &= (CsrMatrix<IdxT,DataT> const & B)
     {
         std::size_t N = i_.size();
-        
+
         // check at least dimensions and non-zero element count
         assert(m_ == B.m_);
         assert(n_ == B.n_);
         assert(N == B.i_.size());
-        
+
         for (std::size_t i = 0; i < N; i++)
             x_[i] += B.x_[i];
-        
+
         return *this;
     }
-    
+
     /**
      * Subtraction of another CSR matrix.
      * The matrices MUST HAVE THE SAME SPARSE STRUCTURE, as no indices are
@@ -411,17 +411,17 @@ public:
     CsrMatrix<IdxT,DataT> & operator ^= (CsrMatrix<IdxT,DataT> const & B)
     {
         std::size_t N = i_.size();
-        
+
         assert(m_ == B.m_);
         assert(n_ == B.n_);
         assert(N == B.i_.size());
-        
+
         for (std::size_t i = 0; i < N; i++)
             x_[i] -= B.x_[i];
-        
+
         return *this;
     }
-    
+
     /**
      * Sets fill-in elements so that the storage structure of this matrix
      * will be identical to that of the other CSR matrix. We can the use
@@ -433,43 +433,43 @@ public:
         // check dimensions
         assert(m_ == B.m_);
         assert(n_ == B.n_);
-        
+
         // prepare zero matrix with the same storage pattern the matrix B has
         CsrMatrix<IdxT,DataT> A = B;
         std::memset(A.x_.data(), 0, A.x_.size() * sizeof(DataT));
-        
+
         // copy all nonzero elements of "this" matrix
         for (IdxT row = 0; row < m_; row++)
         {
             IdxT idx1 = A.p_[row];
             IdxT idx2 = A.p_[row+1];
-            
+
             for (std::size_t idx = idx1; idx < idx2; idx++)
             {
                 IdxT col = A.i_[idx];
                 A.x_[idx] = (*this)(row,col);
             }
         }
-        
+
         // return temporary matrix
         return A;
     }
-    
+
     /**
      * Return dense array with diagonal elements of the matrix.
      */
     NumberArray<DataT> diag () const
     {
         NumberArray<DataT> D (std::min(m_, n_));
-        
+
         for (int irow = 0; irow < m_; irow++)
         for (int idx = p_[irow]; idx < p_[irow+1]; idx++)
         if (i_[idx] == irow)
             D[irow] = x_[idx];
-        
+
         return D;
     }
-    
+
     /**
      * Convert to COO format.
      */
@@ -477,13 +477,13 @@ public:
     {
         if (p().empty() or i().empty() or x().empty())
             return CooMatrix<IdxT,DataT>();
-        
+
         IdxT nz = p().back();
-        
+
         NumberArray<IdxT>  I; I.reserve(nz);
         NumberArray<IdxT>  J; J.reserve(nz);
         NumberArray<DataT> V; V.reserve(nz);
-        
+
         for (IdxT irow = 0; irow < (IdxT)rows(); irow++)
         for (IdxT idx = p()[irow]; idx < p()[irow + 1]; idx++)
         {
@@ -491,7 +491,7 @@ public:
             J.push_back(i()[idx]);
             V.push_back(x()[idx]);
         }
-        
+
         return CooMatrix<IdxT,DataT>
         (
             rows(),
@@ -501,7 +501,7 @@ public:
             std::move(V)
         );
     }
-    
+
     /**
      * Convert to dense matrix.
      */
@@ -512,19 +512,19 @@ public:
         {
             IdxT rptr_begin = p_[irow];
             IdxT rptr_end = p_[irow + 1];
-            
+
             for (IdxT idx = rptr_begin; idx < rptr_end; idx++)
             {
                 IdxT icol = i_[idx];
                 Complex x = x_[idx];
-                
+
                 M(irow, icol) = x;
             }
         }
-        
+
         return M;
     }
-    
+
     /**
      * @brief Upper triangular solve.
      * 
@@ -541,48 +541,48 @@ public:
         IdxT N = b.size();
         assert(m_ == N);
         assert(n_ == N);
-        
+
         // create output array
         NumberArray<DataT> x (N);
-        
+
         // loop over rows
         for (IdxT i = 0; i < N; i++)
         {
             IdxT row = N - 1 - i;
             DataT accum = 0.;
-            
+
             // get relevant columns of the sparse matrix
             IdxT idx1 = p_[row];
             IdxT idx2 = p_[row + 1];
-            
+
             // diagonal element of the matrix
             DataT a = 0.;
-            
+
             // loop over the columns
             for (IdxT idx = idx1; idx < idx2; idx++)
             {
                 // which column is this?
                 IdxT col = i_[idx];
-                
+
                 // diagonal element will be useful in a moment, store it
                 if (col == row)
                     a = x_[idx] / omega;
-                
+
                 // backsubstitute
                 else if (col > row)
                     accum += x_[idx] * x[col];
             }
-            
+
             // triangular matrix, in order to be regular, needs nonzero diagonal elements
             assert(a != 0.);
-            
+
             // compute and store the new root
             x[row] = (b[row] - accum) / a;
         }
 
         return x;
     }
-    
+
     /**
      * @brief Lower triangular solve.
      * 
@@ -599,47 +599,47 @@ public:
         IdxT N = b.size();
         assert(m_ == N);
         assert(n_ == N);
-        
+
         // create output array
         NumberArray<DataT> x (N);
-        
+
         // loop over rows
         for (IdxT row = 0; row < N; row++)
         {
             DataT accum = 0.;
-            
+
             // get relevant columns of the sparse matrix
             IdxT idx1 = p_[row];
             IdxT idx2 = p_[row + 1];
-            
+
             // diagonal element of the matrix
             DataT a = 0.;
-            
+
             // loop over the columns
             for (IdxT idx = idx1; idx < idx2; idx++)
             {
                 // which column is this?
                 IdxT col = i_[idx];
-                
+
                 // diagonal element will be useful in a moment, store it
                 if (col == row)
                     a = x_[idx] / omega;
-                
+
                 // backsubstitute
                 else if (col < row)
                     accum += x_[idx] * x[col];
             }
-            
+
             // triangular matrix, in order to be regular, needs nonzero diagonal elements
             assert(a != 0.);
-            
+
             // compute and store the new root
             x[row] = (b[row] - accum) / a;
         }
-        
+
         return x;
     }
-    
+
     /**
      * Applies a user transformation on <b>nonzero</b> matrix elements.
      * @param f A functor compatible with following declaration:
@@ -651,39 +651,39 @@ public:
     {
         // create output matrix
         CsrMatrix A = *this;
-        
+
         // loop over rows
         for (size_t row = 0; row < rows(); row++)
         {
             // get relevant columns
             size_t idx1 = p_[row];
             size_t idx2 = p_[row + 1];
-            
+
             // loop over columns
             for (size_t idx = idx1; idx < idx2; idx++)
             {
                 // which column is this?
                 size_t col = i_[idx];
-                
+
                 // transform the output matrix
                 A.x_[idx] = f(row, col, x_[idx]);
             }
         }
-        
+
         return A;
     }
-    
+
 private:
-    
+
     // dimensions
     IdxT m_;
     IdxT n_;
-    
+
     // representation
     NumberArray<IdxT> p_;
     NumberArray<IdxT> i_;
     NumberArray<DataT> x_;
-    
+
     // linked HDF file
     std::string name_;
 };
@@ -746,22 +746,22 @@ NumberArray<DataT> kron_dot (CsrMatrix<IdxT,DataT> const & A, CsrMatrix<IdxT,Dat
     // dimensions
     std::size_t rA = A.rows(), rB = B.rows();
     std::size_t cA = A.cols(), cB = B.cols();
-    
+
     // check input size
     assert(u.size() == cA * cB);
-    
+
     // V[col] = B U[col]
     NumberArray<DataT> V (rB * cA);
     for (std::size_t i = 0; i < cA; i++)
         ArrayView<DataT>(V, i * rB, rB) = B.dot(ArrayView<DataT>(u, i * cB, cB));
     transpose(V, rB, cA);
-    
+
     // W = A V
     NumberArray<DataT> W (rA * rB);
     for (std::size_t i = 0; i < rB; i++)
         ArrayView<DataT>(W, i * rA, rA) = A.dot(ArrayView<DataT>(u, i * cA, cA));
     transpose(W, rA, rB);
-    
+
     return W;
 }
 

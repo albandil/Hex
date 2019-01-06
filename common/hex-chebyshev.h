@@ -59,10 +59,10 @@
 template <typename Tin, typename Tout> class Chebyshev
 {
 public:
-    
+
     Chebyshev () : N(0), C(), xt(0.), m(0.) {}
     Chebyshev (Chebyshev const & cb) : N(cb.N), C(cb.C), xt(cb.xt), m(cb.m) {}
-    
+
     /**
      * @brief Constructor.
      * 
@@ -75,7 +75,7 @@ public:
     {
         generate(f, n, a, b);
     }
-    
+
     /**
      * @brief Constructor from reference to array.
      * 
@@ -88,11 +88,11 @@ public:
         N  = array.size();
         xt = 0.5 * (b + a);
         m  = 0.5 * (b - a);
-        
+
         // copy coefficients
         C = array;
     }
-    
+
     /**
      * @brief Compute the transformation.
      * 
@@ -108,7 +108,7 @@ public:
      */
     template <class Functor>
     void generate (Functor const & f, int n, Tin a, Tin b);
-    
+
     /**
      * Return full approximation value.
      */
@@ -116,7 +116,7 @@ public:
     {
         Tout ret = 0.5 * C[0];
         const double xp = scale(x);
-        
+
         for (int k = 1; k < N; k++)
         {
             double Tk_x = std::cos(k * std::acos(xp));
@@ -124,7 +124,7 @@ public:
         }
         return ret;
     }
-    
+
     /**
      * @brief Evaluate expansion.
      * 
@@ -136,20 +136,20 @@ public:
         Tout d_j = 0, d_jp1 = 0, d_jp2 = 0;
         const Real one_x = scale(x);
         const Real two_x = 2 * one_x; // due to linearity of 'scale'
-        
+
         for (int j = m - 1; j >= 1; j--)
         {
             d_j   = two_x * d_jp1 - d_jp2 + C[j];
-            
+
             d_jp2 = d_jp1;
             d_jp1 = d_j;
         }
-        
+
         d_j = one_x * d_jp1 - d_jp2 + 0.5_r * C[0];
-        
+
         return d_j;
     }
-    
+
     /**
      * @brief Get significant number of coefficients.
      * 
@@ -169,19 +169,19 @@ public:
     {
         Real sum = std::abs(0.5_r * C[0]);
         Real abs_Ck;
-        
+
         for (int k = 1; k < N; k++)
         {
             abs_Ck = std::abs(C[k]);
             sum += abs_Ck;
-            
+
             if (abs_Ck <= eps * sum)
                 return k + 1;
         }
-        
+
         return N;
     }
-    
+
     /**
      * @brief Evaluate expansion.
      * 
@@ -192,27 +192,27 @@ public:
     {
         Tout ret = 0.5 * C[0];
         double xp = scale(x);
-        
+
         int k;
         for (k = 1; k < N; k++)
         {
             double Tk_x = std::cos(k * std::acos(xp));
             Tout delta = C[k] * Tk_x;
             ret += delta;
-            
+
             if (std::abs(delta) <= eps * std::abs(ret))
             {
                 k++;
                 break;
             }
         }
-        
+
         if (n != 0)
             *n = k;
-        
+
         return ret;
     }
-    
+
     /**
      * Integration types.
      */
@@ -223,7 +223,7 @@ public:
         Integ_High
     }
     Integration;
-    
+
     /**
      * @brief Get expansion of integral of the approximated function.
      * 
@@ -249,14 +249,14 @@ public:
         ret.xt = xt;
         ret.m  = m;
         ret.N  = N;
-        
+
         ret.C.resize(ret.N);
         ret.C[0] = 0;
         ret.C[N-1] = ret.m * C[N-2] / (2.*(N-2.));
-        
+
         for (int i = 1; i < N - 1; i++)
             ret.C[i] = ret.m * (C[i-1] - C[i+1]) / (2.*i);
-        
+
         // transform coefficients to get a definite integral, if requested
         switch (itype)
         {
@@ -285,13 +285,13 @@ public:
                 break;
             }
         }
-        
+
         // take into account the normalization (F = c_0/2 + ...)
         ret.C[0] *= 2.;
-        
+
         return ret;
     }
-    
+
     /**
      * @brief Chebyshev node in interval.
      * 
@@ -305,7 +305,7 @@ public:
     {
         return x1 + 0.5 * (1. + std::cos(special::constant::pi * (k + 0.5) / N)) * (x2 - x1);
     }
-    
+
     /**
      * @brief Convert to string.
      * 
@@ -314,7 +314,7 @@ public:
     std::string str () const
     {
         std::ostringstream out;
-        
+
         out << "[";
         if (N > 0)
         {
@@ -323,16 +323,16 @@ public:
             out << C[N-1];
         }
         out << "]" << std::endl;
-        
+
         return out.str();
     }
-    
+
     /// Return reference to the coefficient array.
     NumberArray<Tout> const & coeffs () const
     {
         return C;
     }
-    
+
     /**
      * @brief Chebyshev node from (0,1).
      * 
@@ -342,30 +342,30 @@ public:
     {
         return std::cos(special::constant::pi * (k + 0.5) / N);
     }
-    
+
 private:
-    
+
     /// map interval (xt-m,xt+m) to (-1,1)
     inline double scale (Tin x) const
     {
         return (x - xt) / m;
     }
-    
+
     /// map interval (-1,1) to (xt-m,xt+m)
     inline Tin unscale (double x) const
     {
         return (xt + m*x);
     }
-    
+
     /// coefficient number
     int N;
-    
+
     /// Chebyshev coefficients
     NumberArray<Tout> C;
-    
+
     /// approximation interval center
     Tin xt;
-    
+
     /// approximation interval half-width
     Tin m;
 };
@@ -384,10 +384,10 @@ void Chebyshev<double,double>::generate (Functor const & f, int n, double a, dou
     xt = 0.5 * (b + a);
     m  = 0.5 * (b - a);
     C.resize(N);
-    
+
     // input array
     std::vector<double> fvals (N);
-    
+
     // evaluate nodes and function
     double pi_over_N = special::constant::pi / N;
     # pragma omp parallel for firstprivate(pi_over_N)
@@ -396,10 +396,10 @@ void Chebyshev<double,double>::generate (Functor const & f, int n, double a, dou
         double xk = std::cos(pi_over_N * (k + 0.5));
         fvals[k] = f(unscale(xk));
     }
-    
+
     // execute the transform
     gsl_fft_real_radix2_transform(fvals.data(), 1, N);
-    
+
     // normalize
     for (int i = 0; i < N; i++)
         C[i] = fvals[i] / N;
@@ -415,10 +415,10 @@ void Chebyshev<double,Complex>::generate (Functor const & f, int n, double a, do
     xt = 0.5 * (b + a);
     m  = 0.5 * (b - a);
     C.resize(N);
-    
+
     // input array
     cArray fvals(4*N);
-    
+
     // evaluate nodes and function
     double pi_over_N = special::constant::pi / N;
     # pragma omp parallel for firstprivate(pi_over_N)
@@ -427,10 +427,10 @@ void Chebyshev<double,Complex>::generate (Functor const & f, int n, double a, do
         double xk = std::cos(pi_over_N * (k + 0.5));
         fvals[2*k+1] = fvals[4*N-(2*k+1)] = f(unscale(xk));
     }
-    
+
     // execute the transform
     gsl_fft_complex_radix2_forward(reinterpret_cast<double*>(fvals.data()), 1, 4 * N);
-    
+
     // copy normalized coefficients
     C = fvals / Real(N);
 }

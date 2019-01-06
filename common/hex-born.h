@@ -114,7 +114,7 @@ void pwba
         GiNaC::symbol const & rp, GiNaC::symbol const & rm,
         GiNaC::realsymbol const & rz
     );
-    
+
     /**
      * @brief Hydrogen function.
      * 
@@ -167,7 +167,7 @@ void pwba
         int n1, int l1, int m1,
         int n2, int l2, int m2
     );
-    
+
     /**
      * @brief Evaluator of the @f( W_b @f) integral.
      * 

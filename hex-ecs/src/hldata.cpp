@@ -49,23 +49,23 @@ bool HlData::hdfload (const char* file)
     HDFFile hdf ((file == nullptr ? filename.c_str() : file), HDFFile::readonly);
     if (not hdf.valid())
         return false;
-    
+
     // read size
     std::size_t size;
     if (not hdf.read("n", &size, 1))
         return false;
-    
+
     // allocate memory (if needed)
     if (Cl.rows() != (int)size or Cl.cols() != (int)size)
     {
         Cl.drop();
         Cl = std::move(ColMatrix<Complex>(size,size));
     }
-    
+
     // read eigenvectors
     if (not hdf.read("Cl", Cl.data().data(), size * size))
         return false;
-    
+
     // read eigenvalues
     Dl.resize(size);
     if (not hdf.read("Dl", Dl.data(), size))
@@ -73,7 +73,7 @@ bool HlData::hdfload (const char* file)
         std::cout << "Failed to read Dl from " << hdf.name() << ": " << hdf.error() << std::endl;
         return false;
     }
-    
+
     return true;
 }
 
@@ -83,20 +83,20 @@ bool HlData::hdfsave (const char* file) const
     HDFFile hdf ((file == nullptr ? filename.c_str() : file), HDFFile::overwrite);
     if (not hdf.valid())
         return false;
-    
+
     // write size
     std::size_t size = Dl.size();
     if (not hdf.write("n", &size, 1))
         return false;
-    
+
     // write eigenstates
     if (not hdf.write("Cl", Cl.data().data(), size * size))
         return false;
-    
+
     // write eigenvalues
     if (not hdf.write("Dl", Dl.data(), size))
         return false;
-    
+
     return true;
 }
 
@@ -110,39 +110,39 @@ cArray HlData::readPseudoState (unsigned l, unsigned ichan) const
     HDFFile datafile (filename, HDFFile::readonly);
     if (not datafile.valid())
         HexException("File %s with the one-electron eigenstates was not found. Run the solver again to regenerate it.", filename.c_str());
-    
+
     // get rank of the hamiltonian
     std::size_t n;
     if (not datafile.read("n", &n, 1))
         HexException("File %s does not contain the requested dataset \"n\".", filename.c_str());
     if (ichan >= n)
         HexException("File %s contains only %d (<= %d) channels.", filename.c_str(), n, ichan);
-    
+
     // read the eigenenergies
     cArray energies (n);
     if (not datafile.read("Dl", &energies[0], n))
         HexException("File %s does not contain the requested dataset \"Dl\".", filename.c_str());
-    
+
     // sort energies
     iArray indices (n);
     std::iota(indices.begin(), indices.end(), 0);
     std::sort(indices.begin(), indices.end(), [&](int i, int j){ return energies[i].real() < energies[j].real(); });
-    
+
     // read the right eigenstate
     cArray data (n);
     if (not datafile.read("Cl", &data[0], n, indices[ichan] * n))
         HexException("Failed to read the pseudostate l = %d, ichan = %d from the dataset \"Cl\" in file %s.", l, ichan, filename.c_str());
-    
+
     // Adjust the overall sign of the eigenvector so that the result is compatible with the
     // sign convention of GSL's function gsl_sf_hydrogenicR (used in previous versions of hex-ecs).
     // That is, the radial function should increase from origin to positive values, then turn back
     // and (potentially) dive through zero.
-    
+
     if (data.front().real() < 0.0_r)
     {
         for (Complex & z : data)
             z = -z;
     }
-    
+
     return data;
 }

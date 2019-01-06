@@ -63,7 +63,7 @@
 #else
     typedef double Real;
 #endif
-    
+
 // shorthand for std::complex<Real>
 typedef std::complex<Real> Complex;
 
@@ -157,16 +157,16 @@ template<> class typeinfo<int>
     public:
         /// Component data type.
         typedef int cmpttype;
-        
+
         /// Component count.
         static const std::size_t ncmpt = 1;
-        
+
         /// Component getter.
         static cmpttype cmpt (std::size_t i, int x) { assert(i < ncmpt); return x; }
-        
+
         /// HDF data type identification.
         static HDFDataType hdfcmpttype () { return DataInt32; }
-        
+
 #ifdef WITH_MPI
         /// MPI data type of a component.
         static MPI_Datatype mpicmpttype () { return MPI_INT; }
@@ -179,16 +179,16 @@ template<> class typeinfo<std::int64_t>
     public:
         /// Component data type.
         typedef std::int64_t cmpttype;
-        
+
         /// Component count.
         static const std::size_t ncmpt = 1;
-        
+
         /// Component getter.
         static cmpttype cmpt (std::size_t i, int x) { assert(i < ncmpt); return x; }
-        
+
         /// HDF data type identification.
         static HDFDataType hdfcmpttype () { return DataInt64; }
-        
+
 #ifdef WITH_MPI
         /// MPI data type of a component.
         static MPI_Datatype mpicmpttype () { return MPI_INT64_T; }
@@ -201,16 +201,16 @@ template<> class typeinfo<unsigned>
     public:
         /// Component data type.
         typedef unsigned cmpttype;
-        
+
         /// Component count.
         static const std::size_t ncmpt = 1;
-        
+
         /// Component getter.
         static cmpttype cmpt (std::size_t i, int x) { assert(i < ncmpt); return x; }
-        
+
         /// HDF data type identification.
         static HDFDataType hdfcmpttype () { return DataUInt32; }
-        
+
 #ifdef WITH_MPI
         /// MPI data type of a component.
         static MPI_Datatype mpicmpttype () { return MPI_UNSIGNED; }
@@ -223,16 +223,16 @@ template<> class typeinfo<std::uint64_t>
     public:
         /// Component data type.
         typedef std::uint64_t cmpttype;
-        
+
         /// Component count.
         static const std::size_t ncmpt = 1;
-        
+
         /// Component getter.
         static cmpttype cmpt (std::size_t i, int x) { assert(i < ncmpt); return x; }
-        
+
         /// HDF data type identification.
         static HDFDataType hdfcmpttype () { return DataUInt64; }
-        
+
 #ifdef WITH_MPI
         /// MPI data type of a component.
         static MPI_Datatype mpicmpttype () { return MPI_UINT64_T; }
@@ -245,19 +245,19 @@ template<> class typeinfo<float>
     public:
         /// Component data type.
         typedef float cmpttype;
-        
+
         /// Integer type as large as this data type.
         typedef int inttype;
-        
+
         /// Component count.
         static const std::size_t ncmpt = 1;
-        
+
         /// Component getter.
         static cmpttype cmpt (std::size_t i, float x) { assert(i < ncmpt); return x; }
-        
+
         /// HDF data type identification.
         static HDFDataType hdfcmpttype () { return DataFloat32; }
-        
+
 #ifdef WITH_MPI
         /// MPI data type of a component.
         static MPI_Datatype mpicmpttype () { return MPI_FLOAT; }
@@ -270,19 +270,19 @@ template<> class typeinfo<double>
     public:
         /// Component data type.
         typedef double cmpttype;
-        
+
         /// Integer type as large as this data type.
         typedef std::int64_t inttype;
-        
+
         /// Component count.
         static const std::size_t ncmpt = 1;
-        
+
         /// Component getter.
         static cmpttype cmpt (std::size_t i, double x) { assert(i < ncmpt); return x; }
-        
+
         /// HDF data type identification.
         static HDFDataType hdfcmpttype () { return DataDouble64; }
-        
+
 #ifdef WITH_MPI
         /// MPI data type of a component.
         static MPI_Datatype mpicmpttype () { return MPI_DOUBLE; }
@@ -295,16 +295,16 @@ template<> class typeinfo<long double>
     public:
         /// Component data type.
         typedef long double cmpttype;
-        
+
         /// Component count.
         static const std::size_t ncmpt = 1;
-        
+
         /// Component getter.
         static cmpttype cmpt (std::size_t i, double x) { assert(i < ncmpt); return x; }
-        
+
         /// HDF data type identification.
         static HDFDataType hdfcmpttype () { return DataDouble80; }
-        
+
 #ifdef WITH_MPI
         /// MPI data type of a component.
         static MPI_Datatype mpicmpttype () { return MPI_LONG_DOUBLE; }
@@ -317,16 +317,16 @@ template<class T> class typeinfo<std::complex<T>>
     public:
         /// Component data type.
         typedef T cmpttype;
-        
+
         /// Component count.
         static const std::size_t ncmpt = 2;
-        
+
         /// Component getter.
         static cmpttype cmpt (std::size_t i, std::complex<T> x) { assert(i < ncmpt); return (i == 0 ? x.real() : x.imag()); }
-        
+
         /// HDF data type identification.
         static HDFDataType hdfcmpttype () { return typeinfo<T>::hdfcmpttype(); }
-        
+
 #ifdef WITH_MPI
         /// MPI data type of a component.
         static MPI_Datatype mpicmpttype () { return typeinfo<T>::mpicmpttype(); }

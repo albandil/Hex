@@ -46,9 +46,9 @@ HState;
 class CommandLine
 {
     public:
-        
+
         CommandLine (int argc, char* argv[]);
-        
+
         bool forward_grid, forward_states, backward;
         std::string inputfile;
 };
@@ -56,9 +56,9 @@ class CommandLine
 class InputFile
 {
     public:
-        
+
         InputFile (CommandLine const & cmd);
-        
+
         int L, S, Pi, nL;
         double ecstheta, Etot, Z;
         rArray rgrid, cgrid;

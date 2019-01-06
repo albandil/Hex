@@ -109,17 +109,17 @@ bool StokesParameters::run (std::map<std::string,std::string> const & sdata)
     // manage units
     double efactor = change_units(Eunits, eUnit_Ry);
     double afactor = change_units(Aunits, aUnit_rad);
-    
+
     // atomic and projectile data
     int ni = Conv<int>(sdata, "ni", name());
     int nf = Conv<int>(sdata, "nf", name());
     double Ei = Conv<double>(sdata, "Ei", name()) * efactor;
     double ki = sqrt(Ei);
     double kf = sqrt(Ei - 1./(ni*ni) + 1./(nf*nf));
-    
+
     // angles
     rArray angles;
-    
+
     // get angle / angles
     try
     {
@@ -131,7 +131,7 @@ bool StokesParameters::run (std::map<std::string,std::string> const & sdata)
         // are there more angles specified using the STDIN ?
         angles = readStandardInput<double>();
     }
-    
+
     // Should return the following:
     //    P₁ = 2λ - 1
     //    P₂ = -2√2 R
@@ -150,9 +150,9 @@ bool StokesParameters::run (std::map<std::string,std::string> const & sdata)
     //    dσ/dΩ ... is the DCS summed over mf
     //    <.> ... stands for averaging over spin states, i.e.
     //        <a> = [ a(S=0) + 3a(S=1) ] / 4
-    
+
     rArray scaled_angles = angles * afactor;
-    
+
     // compute scattering amplitudes
     cArray f0_singlet(angles.size()), f0_triplet(angles.size());
     cArray f1_singlet(angles.size()), f1_triplet(angles.size());
@@ -160,7 +160,7 @@ bool StokesParameters::run (std::map<std::string,std::string> const & sdata)
     hex_scattering_amplitude(ni,0,0, nf,1,0, 1, 1,&Ei, angles.size(), scaled_angles.data(), reinterpret_cast<double*>(f0_triplet.data()), nullptr);
     hex_scattering_amplitude(ni,0,0, nf,1,1, 0, 1,&Ei, angles.size(), scaled_angles.data(), reinterpret_cast<double*>(f1_singlet.data()), nullptr);
     hex_scattering_amplitude(ni,0,0, nf,1,1, 1, 1,&Ei, angles.size(), scaled_angles.data(), reinterpret_cast<double*>(f1_triplet.data()), nullptr);
-    
+
     // compute differential cross sections
     rArray dcs_p0s(angles.size()), dcs_pps(angles.size()), dcs_pms(angles.size());
     rArray dcs_p0t(angles.size()), dcs_ppt(angles.size()), dcs_pmt(angles.size());
@@ -171,12 +171,12 @@ bool StokesParameters::run (std::map<std::string,std::string> const & sdata)
     hex_differential_cross_section(ni,0,0, nf,1, 1, 1, 1,&Ei, angles.size(), scaled_angles.data(), dcs_ppt.data(), nullptr);
     hex_differential_cross_section(ni,0,0, nf,1,-1, 1, 1,&Ei, angles.size(), scaled_angles.data(), dcs_pmt.data(), nullptr);
     rArray dcs = dcs_p0s + dcs_pps + dcs_pms + dcs_p0t + dcs_ppt + dcs_pmt;
-    
+
     // compute basic parameters
     rArray lambda = (0.25 * abs(f0_singlet*f0_singlet) + 0.75 * abs(f0_triplet*f0_triplet)) / dcs * (kf/ki);
     rArray R = realpart(0.25 * f1_singlet*f0_singlet.conj() + 0.75 * f1_triplet*f0_triplet.conj()) / dcs * (kf/ki);
     rArray I = imagpart(0.25 * f1_singlet*f0_singlet.conj() + 0.75 * f1_triplet*f0_triplet.conj()) / dcs * (kf/ki);
-    
+
     // compute derived parameters
     rArray P1 = 2. * lambda - 1.;
     rArray P2 = 2 * special::constant::sqrt_two * R;
@@ -184,7 +184,7 @@ bool StokesParameters::run (std::map<std::string,std::string> const & sdata)
     rArray Pl = hypot(P1, P2);
     rArray gamma = 0.5 * atan2(P2, P1);
     rArray Pplus = hypot(Pl, P3);
-    
+
     // write out
     std::cout << logo("#") <<
         "# Stokes parameters for\n"
@@ -198,7 +198,7 @@ bool StokesParameters::run (std::map<std::string,std::string> const & sdata)
     table.setAlignment(OutputTable::left);
     table.write("# angle    ", "lambda   ", "R        ", "I        ", "P1       ", "P2       ", "P3       ", "Pl       ", "gamma    ", "P+       ");
     table.write("# ---------", "---------", "---------", "---------", "---------", "---------", "---------", "---------", "---------", "---------");
-    
+
     for (std::size_t i = 0; i < angles.size(); i++)
     {
         table.write
@@ -209,6 +209,6 @@ bool StokesParameters::run (std::map<std::string,std::string> const & sdata)
             Pl[i], gamma[i] / afactor, Pplus[i]
         );
     }
-    
+
     return true;
 }

@@ -132,7 +132,7 @@ bool SpinFlipCrossSection::run (std::map<std::string,std::string> const & sdata)
     // manage units
     double efactor = change_units(Eunits, eUnit_Ry);
     double lfactor = change_units(lUnit_au, Lunits);
-    
+
     // scattering event parameters
     int ni = Conv<int>(sdata, "ni", name());
     int li = Conv<int>(sdata, "li", name());
@@ -140,14 +140,14 @@ bool SpinFlipCrossSection::run (std::map<std::string,std::string> const & sdata)
     int nf = Conv<int>(sdata, "nf", name());
     int lf = Conv<int>(sdata, "lf", name());
     int mf0= Conv<int>(sdata, "mf", name());
-    
+
     // use mi >= 0; if mi < 0, flip both signs
     int mi = (mi0 < 0 ? -mi0 : mi0);
     int mf = (mi0 < 0 ? -mf0 : mf0);
-    
+
     // energies and cross sections
     rArray energies;
-    
+
     // get energy / energies
     try
     {
@@ -159,10 +159,10 @@ bool SpinFlipCrossSection::run (std::map<std::string,std::string> const & sdata)
         // are there more energies specified using the STDIN ?
         energies = readStandardInput<double>();
     }
-    
+
     // energies in Rydbergs
     rArray scaled_energies = energies * efactor;
-    
+
     // get available energies if requested
     if (not scaled_energies.empty() and scaled_energies.front() == -1)
     {
@@ -185,10 +185,10 @@ bool SpinFlipCrossSection::run (std::map<std::string,std::string> const & sdata)
             scaled_energies.push_back(E);
         }
     }
-    
+
     // results
     rArray spflip (scaled_energies.size()), spflip_ex (scaled_energies.size());
-    
+
     // This function will be called by "hex_tmat_pw_transform" for every partial wave
     //    -  "ell" is the angular momentum of the partial wave
     //    -  "converged" indicates whether the partial wave expansion is converged (0 = not yet, 1 = yes, 2 = convergence failed)
@@ -207,16 +207,16 @@ bool SpinFlipCrossSection::run (std::map<std::string,std::string> const & sdata)
         if (converged[0][j] == 0 and converged[1][j] == 0)
         {
             double contrib = 0.25 * sqrabs(tmatrices[1][j] - tmatrices[0][j]);
-            
+
             // update scattering amplitude
             if (complete[0][j] and complete[1][j])
                 spflip[j] += contrib;
-            
+
             // update the extrapolated scattering amplitude
             spflip_ex[j] += contrib;
         }
     };
-    
+
     // call the T-matrix retrieval driver
     hex_tmat_pw_transform
     (
@@ -225,15 +225,15 @@ bool SpinFlipCrossSection::run (std::map<std::string,std::string> const & sdata)
         true,
         fun
     );
-    
+
     // momenta
     rArray ki = sqrt(scaled_energies);
     rArray kf = sqrt(scaled_energies - 1.0 / (ni * ni) + 1.0 / (nf * nf));
-    
+
     // add prefactor
     spflip *= kf / ki / 157.9136704174297; // 16pi^2
     spflip_ex *= kf / ki / 157.9136704174297;
-    
+
     // write out
     std::cout << logo("#") <<
         "# Spin flip cross section in " << unit_name(Lunits) << " for \n" <<
@@ -254,6 +254,6 @@ bool SpinFlipCrossSection::run (std::map<std::string,std::string> const & sdata)
             spflip_ex[i] * lfactor * lfactor
         );
     }
-    
+
     return true;
 }

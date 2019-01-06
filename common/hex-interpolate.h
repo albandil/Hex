@@ -49,41 +49,41 @@
 template <typename T> NumberArray<T> interpolate (rArray const & x0, NumberArray<T> const & y0, rArray const & x)
 {
     assert(x0.size() == y0.size());
-    
+
     // return 0 if the array to interpolate is empty
     if (x0.size() == 0)
         return NumberArray<T>(x.size(), T(0));
-    
+
     // return the source element if the array to interpolate contains just the one element
     if (x0.size() == 1)
         return NumberArray<T>(x.size(), y0[0]);
-    
+
     // output array
     NumberArray<T> y(x.size());
-    
+
     for (size_t i = 0; i < x.size(); i++)
     {
         // right guardian
         rArray::const_iterator right = std::upper_bound(x0.begin(), x0.end(), x[i]);
-        
+
         if (right == x0.end() or right == x0.begin())
         {
             y[i] = T(0);
             continue;
         }
-        
+
         // neighbours
         double x0_left = *(right - 1);
         double x0_right = *right;
         T y0_left = y0[right - 1 - x0.begin()];
         T y0_right = y0[right - x0.begin()];
-        
+
         // compute linear average
         y[i] = (y0_left * (x0_right - x[i]) + y0_right * (x[i] - x0_left)) / (x0_right - x0_left);
     }
-    
+
     // FIXME implement better schemes
-    
+
     return y;
 }
 
@@ -120,15 +120,15 @@ template <typename T> NumberArray<T> interpolate (rArray const & x0, NumberArray
 inline rArray interpolate_real (const rArrayView x0, const rArrayView y0, const rArrayView x, const gsl_interp_type * interpolation)
 {
     assert(x0.size() == y0.size());
-    
+
     // return 0 if the array to interpolate is empty
     if (x0.size() == 0)
         return rArray(x.size(), 0.);
-    
+
     // return the source element if the array to interpolate contains just the one element
     if (x0.size() == 1)
         return rArray(x.size(), y0[0]);
-    
+
     // setup the interpolator (fallback to linear interpolation if lacking points)
     if (x0.size() >= gsl_interp_type_min_size(interpolation) or
         x0.size() >= gsl_interp_type_min_size(interpolation = gsl_interp_linear))
@@ -136,7 +136,7 @@ inline rArray interpolate_real (const rArrayView x0, const rArrayView y0, const 
         gsl_interp *itp = gsl_interp_alloc (interpolation, x0.size());
         gsl_interp_init (itp, x0.data(), y0.data(), x0.size());
         gsl_interp_accel *accel = gsl_interp_accel_alloc ();
-        
+
         // interpolate
         rArray y (x.size());
         for (size_t i = 0; i < x.size(); i++)
@@ -144,20 +144,20 @@ inline rArray interpolate_real (const rArrayView x0, const rArrayView y0, const 
             // extrapolate left by copying the value
             if (x[i] < x0.front())
                 y[i] = y0.front();
-            
+
             // do not extrapolate right
             else if (x0.back() < x[i])
                 y[i] = 0.;
-            
+
             // otherwise interopolate
             else
                 y[i] = gsl_interp_eval (itp, x0.data(), y0.data(), x[i], accel);
         }
-        
+
         // release memory
         gsl_interp_accel_free (accel);
         gsl_interp_free (itp);
-        
+
         return y;
     }
     else

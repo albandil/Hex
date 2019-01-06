@@ -43,13 +43,13 @@ std::string get_extension (std::string filename)
     // skip empty filenames
     if (filename.size() == 0)
         return filename;
-    
+
     // find last dot
     std::size_t n = filename.size() - 1;
     for (; n > 0; n--)
         if (filename[n] == '.')
             break;
-    
+
     // return substring beyond the last dot
     return filename.substr(n + 1, std::string::npos);
 }
@@ -63,7 +63,7 @@ int convert_hdf_to_h5 (std::string srcfile, std::string dstfile)
         std::cerr << "Cannot open file \"" << srcfile << "\"" << std::endl;
         return EXIT_FAILURE;
     }
-    
+
     // open destination file for writing
     H5File h5f (dstfile.c_str(), H5File::overwrite);
     if (not h5f.valid())
@@ -71,7 +71,7 @@ int convert_hdf_to_h5 (std::string srcfile, std::string dstfile)
         std::cerr << "Cannot open file \"" << dstfile << "\"" << std::endl;
         return EXIT_FAILURE;
     }
-    
+
     // for all datasets
     for (HDFFile::DatasetInfo const & di : hdf.datasets())
     {
@@ -82,7 +82,7 @@ int convert_hdf_to_h5 (std::string srcfile, std::string dstfile)
             std::cerr << "Failed to read dataset \"" << di.name << "\": " << hdf.error() << std::endl;
             return EXIT_FAILURE;
         }
-        
+
         // write array with correct data type
         switch (di.datatype)
         {
@@ -111,11 +111,11 @@ int convert_hdf_to_h5 (std::string srcfile, std::string dstfile)
                 std::cerr << "Unknown data type of byte size " << (di.datatype % 0x100) << " (" << (di.datatype % 0x100) * 8 << " bits)." << std::endl;
                 break;
         };
-        
+
         // release buffer
         delete [] buffer;
     }
-    
+
     return EXIT_SUCCESS;
 }
 
@@ -127,10 +127,10 @@ herr_t write_dataset_h5_to_hdf (hid_t id, const char * name, const H5L_info_t * 
         std::cerr << "Failed to determine type of object \"" << name << "\"" << std::endl;
         return -1;
     }
-    
+
     if (infobuf.type == H5O_TYPE_DATASET)
         ((std::vector<std::string>*)data)->push_back(name);
-    
+
     return 0;
 }
 
@@ -143,7 +143,7 @@ int convert_h5_to_hdf (std::string srcfile, std::string dstfile)
         std::cerr << "Cannot open file \"" << srcfile << "\"" << std::endl;
         return EXIT_FAILURE;
     }
-    
+
     // open destination file for writing
     HDFFile hdf (dstfile.c_str(), HDFFile::overwrite);
     if (not hdf.valid())
@@ -151,7 +151,7 @@ int convert_h5_to_hdf (std::string srcfile, std::string dstfile)
         std::cerr << "Cannot open file \"" << dstfile << "\"" << std::endl;
         return EXIT_FAILURE;
     }
-    
+
     // get all datasets
     std::vector<std::string> datasets;
     if (H5Literate(h5f.file(), H5_INDEX_NAME, H5_ITER_NATIVE, nullptr, &write_dataset_h5_to_hdf, &datasets) < 0)
@@ -159,16 +159,16 @@ int convert_h5_to_hdf (std::string srcfile, std::string dstfile)
         std::cerr << "Iteration ofer datasets failed." << std::endl;
         return EXIT_FAILURE;
     }
-    
+
     // copy all datasets
     for (std::string const & dataset : datasets)
     {
         hid_t dset = H5Dopen(h5f.file(), dataset.c_str(), H5P_DEFAULT);
         hid_t dtyp = H5Dget_type(dset);
         hid_t dspc = H5Dget_space(dset);
-        
+
         hssize_t nElem = H5Sget_simple_extent_npoints(dspc);
-        
+
         if (H5Tequal(dtyp, H5T_NATIVE_INT) > 0)
         {
             iArray arr(nElem);
@@ -191,12 +191,12 @@ int convert_h5_to_hdf (std::string srcfile, std::string dstfile)
         {
             std::cerr << "Unknown data type of dataset \"" << dataset << "\"" << std::endl;
         }
-        
+
         H5Sclose(dspc);
         H5Tclose(dtyp);
         H5Dclose(dset);
     }
-    
+
     return EXIT_SUCCESS;
 }
 
@@ -218,24 +218,24 @@ int main (int argc, char *argv[])
         std::cout << std::endl;
         return argc == 1 ? EXIT_FAILURE : EXIT_SUCCESS;
     }
-    
+
     // source file name
     std::string srcfile(argv[1]);
     std::string srcext = get_extension(srcfile);
-    
+
     // destination file name
     std::string dstfile(argv[2]);
     std::string dstext = get_extension(dstfile);
-    
+
     // mute HDF library
     H5Eset_auto2(0, 0, nullptr);
-    
+
     // pick the conversion direction
     if (srcext == std::string("hdf") and dstext == std::string("h5"))
         return convert_hdf_to_h5(srcfile, dstfile);
     if (srcext == std::string("h5") and dstext == std::string("hdf"))
         return convert_h5_to_hdf(srcfile, dstfile);
-    
+
     std::cout << "The files' format is the same." << std::endl;
     return EXIT_FAILURE;
 }

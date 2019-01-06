@@ -66,13 +66,13 @@
 class KPACGPreconditioner : public virtual CGPreconditioner
 {
     public:
-        
+
         // run-time selection mechanism
         preconditionerRunTimeSelectionDefinitions(KPACGPreconditioner, "KPA")
-        
+
         // default constructor needed by the RTS mechanism
         KPACGPreconditioner () {}
-        
+
         // constructor
         KPACGPreconditioner
         (
@@ -99,17 +99,17 @@ class KPACGPreconditioner : public virtual CGPreconditioner
             omp_init_lock(&lck_);
 #endif
         }
-        
+
         virtual ~KPACGPreconditioner ()
         {
 #ifdef _OPENMP
             omp_destroy_lock(&lck_);
 #endif
         }
-        
+
         // preconditioner description
         virtual std::string description () const;
-        
+
         // reuse parent definitions
         using CGPreconditioner::update;
         using CGPreconditioner::rhs;
@@ -117,30 +117,30 @@ class KPACGPreconditioner : public virtual CGPreconditioner
         using CGPreconditioner::precondition;
         using CGPreconditioner::CG_mmul;
         using CGPreconditioner::CG_constrain;
-        
+
         // declare own definitions
         virtual void setup ();
         virtual void finish ();
-        
+
         // inner CG callback (needed by parent)
         virtual void CG_init (int iblock) const;
         virtual void CG_prec (int iblock, const cArrayView r, cArrayView z) const;
         virtual void CG_exit (int iblock) const;
-        
+
     protected:
-        
+
         // internal concurrent access lock
         void lock_kpa_access () const;
         void unlock_kpa_access () const;
-        
+
         // preconditioner data
         mutable iArray refcount_atom_, refcount_proj_;
-        
+
         // memory access lock
 #ifdef _OPENMP
         mutable omp_lock_t lck_;
 #endif
-        
+
         // workspace
         mutable cArrays workspace_;
 };

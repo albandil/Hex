@@ -93,17 +93,17 @@ public:
     DistortingPotential(double k, double rmax = 0.) : n_(0), k_(k), rmax_(rmax) {}
     DistortingPotential(DistortingPotential const & U) : n_(U.n_), k_(U.k_), rmax_(U.rmax_) {}
     // @}
-    
+
     /**
      * @brief Assignment
      */
     DistortingPotential operator= (DistortingPotential const& V);
-    
+
     /**
      * @brief Comparison
      */
     bool operator== (DistortingPotential const & V) const;
-    
+
     /**
      * @brief Evaluate the distorting potential.
      * 
@@ -116,7 +116,7 @@ public:
      * @param x Coordinate where to evaluate.
      */
     double operator() (double x) const;
-    
+
     /**
      * @brief Classical turning point.
      * 
@@ -124,7 +124,7 @@ public:
      * it has no physical meaning in DistortingPotential.
      */
     double getTurningPoint () const { return 0.; }
-    
+
     /**
      * @brief Near-zero asymptotic behaviour.
      * @param x Evaluation radius.
@@ -134,7 +134,7 @@ public:
      * @f]
      */
     std::pair<double,int> getZeroAsymptotic (double x) const { return std::make_pair(-1,-1); }
-    
+
     /**
      * @brief Add multipole field potential to the distorting potential.
      * 
@@ -145,7 +145,7 @@ public:
      * The function handles correctly the input @f$ r = 0 @f$.
      */
     double plusMonopole(double x) const;
-    
+
     /**
      * @brief Return the zero limit.
      * 
@@ -155,7 +155,7 @@ public:
      * @f]
      */
     double getConstant() const;
-    
+
     /**
      * @brief Return largest evaluated coordinate.
      * 
@@ -163,11 +163,11 @@ public:
      * orbital ought to be small here.
      */
     double getFarRadius() const;
-    
+
     void toFile(const char * filename) const;
     int n() const { return n_; }
     double k() const { return k_; }
-    
+
 private:
     int n_;        // principal quantum number of distorting state
     double k_;     // wavenumber of distorting state

@@ -140,10 +140,10 @@ void hex_differential_cross_section_
 )
 {
     rArrayView E (*nEnergies, energies);
-    
+
     rArray ki = sqrt(E);
     rArray kf = sqrt(E - 1./((*ni)*(*ni)) + 1./((*nf)*(*nf)));
-    
+
     // get scattering amplitudes
     cArray amplitudes ((*nEnergies) * (*nAngles));
     cArray xamplitudes ((*nEnergies) * (*nAngles));
@@ -157,20 +157,20 @@ void hex_differential_cross_section_
         reinterpret_cast<double*>(amplitudes.data()),
         extra ? reinterpret_cast<double*>(xamplitudes.data()) : nullptr
     );
-    
+
     for (int ie = 0; ie < (*nEnergies); ie++)
     {
         for (int ia = 0; ia < (*nAngles); ia++)
         {
             // calculate differential cross section
             dcs[ie * (*nAngles) + ia] = sqrabs(amplitudes[ie * (*nAngles) + ia]) * (kf[ie]/ki[ie] * 0.25 * (2 * (*S) + 1));
-            
+
             // calculate extrapolated cross section
             if (extra)
                 extra[ie * (*nAngles) + ia] = sqrabs(xamplitudes[ie * (*nAngles) + ia]) * (kf[ie]/ki[ie] * 0.25 * (2 * (*S) + 1));
         }
     }
-    
+
 }
 
 bool DifferentialCrossSection::run (std::map<std::string,std::string> const & sdata)
@@ -179,7 +179,7 @@ bool DifferentialCrossSection::run (std::map<std::string,std::string> const & sd
     double efactor = change_units(Eunits, eUnit_Ry);
     double lfactor = change_units(lUnit_au, Lunits);
     double afactor = change_units(Aunits, aUnit_rad);
-    
+
     // scattering event parameters
     int ni = Conv<int>(sdata, "ni", name());
     int li = Conv<int>(sdata, "li", name());
@@ -189,14 +189,14 @@ bool DifferentialCrossSection::run (std::map<std::string,std::string> const & sd
     int mf0= Conv<int>(sdata, "mf", name());
     int  S = Conv<int>(sdata, "S", name());
     double E = Conv<double>(sdata, "Ei", name()) * efactor;
-    
+
     // use mi >= 0; if mi < 0, flip both signs
     int mi = (mi0 < 0 ? -mi0 : mi0);
     int mf = (mi0 < 0 ? -mf0 : mf0);
-    
+
     // angles
     rArray angles;
-    
+
     // get angle / angles
     try
     {
@@ -208,11 +208,11 @@ bool DifferentialCrossSection::run (std::map<std::string,std::string> const & sd
         // are there more angles specified using the STDIN ?
         angles = readStandardInput<double>();
     }
-    
+
     // compute cross section
     rArray scaled_angles = angles * afactor, dcs (angles.size()), dcs_ex (angles.size());
     hex_differential_cross_section(ni,li,mi, nf,lf,mf, S, 1, &E, angles.size(), scaled_angles.data(), dcs.data(), dcs_ex.data());
-    
+
     // write out
     std::cout << logo("#") <<
         "# Differential cross section in " << unit_name(Lunits) << " for \n" <<
@@ -234,6 +234,6 @@ bool DifferentialCrossSection::run (std::map<std::string,std::string> const & sd
             dcs_ex[i] * lfactor * lfactor
         );
     }
-    
+
     return true;
 }

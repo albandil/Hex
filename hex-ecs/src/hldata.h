@@ -50,34 +50,34 @@
 class HlData
 {
     public:
-        
+
         /// Link the structure to a disk file.
         void hdflink (const char * file);
-        
+
         /// Check that the file exists and can be opened for reading.
         bool hdfcheck (const char * file = nullptr) const;
-        
+
         /// Try to load data from a disk file.
         bool hdfload (const char * file = nullptr);
-        
+
         /// Save data to disk.
         bool hdfsave (const char * file = nullptr) const;
-        
+
         /// Read a pseudo bound state.
         cArray readPseudoState (unsigned l, unsigned ichan) const;
-        
+
         /// Release memory.
         void drop ();
-        
+
         /// One-electron hamiltonian generalized eigenvectors.
         /// Normalized so that Cl' S Cl = 1, where S is the B-spline basis
         /// overlap matrix.
         ColMatrix<Complex> Cl;
-        
+
         /// One-electron hamiltonian generalized eigenvalues.
         /// Defined by Cl' Hl Cl = Dl, where Hl is the one-electron hamiltonian.
         cArray Dl;
-        
+
         /// Filename.
         std::string filename;
 };

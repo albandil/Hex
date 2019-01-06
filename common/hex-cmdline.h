@@ -60,23 +60,23 @@ template <class DefaultCallback> bool HandleSwitch
     // check bounds
     if (i >= argc)
         return false;
-    
+
     // option name
     std::string optname = argv[i];
-    
+
     // collect all parameters
     int next_i = i + 1;
     std::vector<std::string> optargs;
     while (next_i < argc and argv[next_i][0] != '-')
         optargs.push_back(argv[next_i++]);
-    
+
     // remove leading dashes from the optname
     while (optname[0] == '-')
         optname.erase(optname.begin());
-    
+
     // option argument
     std::string optarg = "";
-    
+
     // split option name at equation sign (if present)
     auto iter = std::find (optname.begin(), optname.end(), '=');
     if (iter != optname.end())
@@ -84,14 +84,14 @@ template <class DefaultCallback> bool HandleSwitch
         optarg = optname.substr(iter-optname.begin()+1);
         optname = optname.substr(0, iter-optname.begin());
     }
-    
+
     // add first optarg, if present
     if (optarg.size() > 0)
         optargs.insert(optargs.begin(), optarg);
-    
+
     // move on to the next option
     i = next_i;
-    
+
     // handle this (unknown) switch
     return callback(optname, optargs);
 }
@@ -129,23 +129,23 @@ template <class Callback, class ...Params> bool HandleSwitch
     // check bounds
     if (i >= argc)
         return false;
-    
+
     // option name
     std::string optname = argv[i];
-    
+
     // collect all parameters
     int next_i = i + 1;
     std::vector<std::string> optargs;
     while (next_i < argc and argv[next_i][0] != '-')
         optargs.push_back(argv[next_i++]);
-    
+
     // remove leading dashes from the optname
     while (optname[0] == '-')
         optname.erase(optname.begin());
-    
+
     // option argument
     std::string optarg = "";
-    
+
     // split option name at equation sign (if present)
     auto iter = std::find(optname.begin(), optname.end(), '=');
     if (iter != optname.end())
@@ -153,25 +153,25 @@ template <class Callback, class ...Params> bool HandleSwitch
         optarg = optname.substr(iter-optname.begin()+1);
         optname = optname.substr(0, iter-optname.begin());
     }
-    
+
     // add first optarg, if present
     if (optarg.size() > 0)
         optargs.insert(optargs.begin(), optarg);
-    
+
     // check that argv[i] is equal to the current optname
     if (optname == longoptname or optname == shortoptname)
     {
         // check number of parameters
         if (noptarg != -1 and noptarg != (int)optargs.size())
             HexException("The option --%s accepts %d parameters (given %d).", optname.c_str(), noptarg, optargs.size());
-        
+
         // move on to the next option
         i = next_i;
-        
+
         // pass the parameters to the callback function
         return callback(optargs);
     }
-    
+
     // try to match the switch in the next pass
     return HandleSwitch (i, argc, argv, params...);
 }
@@ -226,7 +226,7 @@ template <class ...Params> void ParseCommandLine
 )
 {
     int i = 1; // start by handling the first program argument
-    
+
     while
     (
         HandleSwitch (i, argc, argv, params...)

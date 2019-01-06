@@ -78,7 +78,7 @@
 class LUft_MUMPS : public LUft
 {
     public:
-        
+
         typedef struct
         {
             MUMPS_INT out_of_core;
@@ -86,75 +86,75 @@ class LUft_MUMPS : public LUft
             MUMPS_INT comm;
         }
         Data;
-        
+
         // run-time selection mechanism
         factorizerRunTimeSelectionDefinitions(LUft_MUMPS, "mumps")
-        
+
         /// Default constructor.
         LUft_MUMPS ();
-        
+
         /// Destructor.
         virtual ~LUft_MUMPS ();
-        
+
         // Disable bitwise copy
         LUft_MUMPS const & operator= (LUft_MUMPS const &) = delete;
-        
+
         /// Factorize.
         virtual void factorize (CsrMatrix<LU_int_t,Complex> const & matrix);
-        
+
         /// Validity indicator.
         virtual bool valid () const
         {
             return mmin(I.size(), J.size(), A.size()) > 0;
         }
-        
+
         /// Return LU byte size.
         virtual std::size_t size () const;
-        
+
         /// Condition number.
         virtual Real cond () const
         {
             #define RINFO(x) rinfo[x-1]
             return settings.RINFO(11);
         }
-        
+
         /// Solve equations.
         virtual void solve (const cArrayView b, cArrayView x, int eqs) const;
-        
+
         /// Save large data to disk.
         virtual void save (std::string name) const;
-        
+
         /// Load large data from disk.
         virtual void load (std::string name, bool throw_on_io_failure = true);
-        
+
         /// Release memory.
         virtual void drop ()
         {
             I.drop();
             J.drop();
             A.drop();
-            
+
             if (workspace_ != nullptr)
             {
                 vMemAllocator<MUMPS_COMPLEX>::free(workspace_);
-                
+
                 workspace_ = nullptr;
                 workspace_size_ = 0;
             }
         }
-        
+
     private:
-        
+
         // Internal data of the library.
         mutable MUMPS_STRUC_C settings;
-        
+
         // rank
         MUMPS_INT n_;
-        
+
         // data arrays
         NumberArray<MUMPS_INT> I, J;
         NumberArray<Complex> A;
-        
+
         // additional workspace
         MUMPS_COMPLEX* workspace_;
         std::size_t workspace_size_;

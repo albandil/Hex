@@ -60,77 +60,77 @@
 class LUft_SUPERLU : public LUft
 {
     public:
-    
+
         // run-time selection mechanism
         factorizerRunTimeSelectionDefinitions(LUft_SUPERLU, "superlu")
-        
+
         /// Default constructor.
         LUft_SUPERLU ();
-        
+
         /// Destructor.
         virtual ~LUft_SUPERLU () { drop(); }
-        
+
         // Disable bitwise copy
         LUft_SUPERLU const & operator= (LUft_SUPERLU const &) = delete;
-        
+
         /// Factorize.
         virtual void factorize (CsrMatrix<LU_int_t,Complex> const & matrix);
-        
+
         /// Validity indicator.
         virtual bool valid () const;
-        
+
         /// Return LU byte size.
         virtual std::size_t size () const { return size_; }
-        
+
         /// Solve equations.
         virtual void solve (const cArrayView b, cArrayView x, int eqs) const;
-        
+
         /// Save factorization data to disk.
         virtual void save (std::string name) const;
-        
+
         /// Load factorization data from disk.
         virtual void load (std::string name, bool throw_on_io_failure = true);
-        
+
         /// Release memory.
         virtual void drop ();
-        
+
     private:
-        
+
         /// Matrix that has been factorized.
         NumberArray<int_t> P_;
         NumberArray<int_t> I_;
         cArray X_;
-        
+
         /// Row permutations.
         iArray perm_c_;
-        
+
         /// Column permutations.
         iArray perm_r_;
-        
+
         /// Elimitation tree.
         iArray etree_;
-        
+
         /// Equilibration done.
         char equed_;
-        
+
         /// Row scale factors.
         rArray R_;
-        
+
         /// Column scale factors.
         rArray C_;
-        
+
         /// L-factor.
         SuperMatrix L_;
-        
+
         /// U-factor.
         SuperMatrix U_;
-        
+
         /// Reusable information.
         GlobalLU_t Glu_;
-        
+
         /// Memory size.
         std::size_t size_;
-        
+
         /// Drop tolerance.
         Real droptol_;
 };

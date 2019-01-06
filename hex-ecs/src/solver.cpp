@@ -90,7 +90,7 @@ void Solver::choose_preconditioner ()
         bspline_full_,  // x axis full basis
         bspline_full_   // y axis full basis
     );
-    
+
     // check success
     if (prec_ == nullptr)
         HexException("Preconditioner %s not implemented.", cmd_.preconditioner.c_str());
@@ -103,7 +103,7 @@ void Solver::setup_preconditioner ()
         std::cout << "Skipped computation of radial integrals." << std::endl;
         return;
     }
-    
+
     // setup the preconditioner (compute radial integrals etc.)
     prec_->setup();
 }
@@ -115,17 +115,17 @@ void Solver::solve ()
         std::cout << "Skipped solution of the equation." << std::endl;
         return;
     }
-    
+
     // shorthands
     std::size_t Nspline_inner = bspline_inner_.Nspline();
     std::size_t Nspline_full  = bspline_full_ .Nspline();
     std::size_t Nspline_outer = Nspline_full - Nspline_inner;
-    
+
     // print Hamiltonian size as a number with thousands separator (apostroph used)
     std::cout.imbue(std::locale(std::locale::classic(), new MyNumPunct));
     std::cout << "Inner region hamiltonian size: " << Nspline_inner * Nspline_inner * ang_.states().size() << std::endl;
     std::cout.imbue(std::locale::classic());
-    
+
     // wrap member functions to lambda-functions for use in the CG solver
     auto apply_preconditioner = [&](BlockArray<Complex> const & r, BlockArray<Complex> & z) { this->apply_preconditioner_(r,z); };
     auto matrix_multiply      = [&](BlockArray<Complex> const & p, BlockArray<Complex> & q) { this->matrix_multiply_(p,q); };
@@ -137,10 +137,10 @@ void Solver::solve ()
     auto checkpoint_array     = [&](BlockArray<Complex> const & x) { return this->checkpoint_array_(x); };
     auto recover_array        = [&](BlockArray<Complex> & x) { return this->recover_array_(x); };
     auto constrain            = [&](BlockArray<Complex> & r) { return this->constrain_(r); };
-    
+
     E_ = special::constant::Nan;
     int iterations_done = 0, computations_done = 0;
-    
+
     for (iE_ = 0; iE_ < (int)inp_.Etot.size(); iE_++)
     {
         // print progress information
@@ -148,7 +148,7 @@ void Solver::solve ()
                   << int(std::trunc(iE_ * 100. / inp_.Etot.size() + 0.5)) << " % finished, typically "
                   << (computations_done == 0 ? 0 : iterations_done / computations_done)
                   << " CG iterations per energy)" << std::endl;
-        
+
         // get asymptotical bound states for each of the angular momentum pairs
         channels_.resize(ang_.states().size());
         bstates_.clear();
@@ -156,13 +156,13 @@ void Solver::solve ()
         {
             int l1 = ang_.states()[ill].first;
             int l2 = ang_.states()[ill].second;
-            
+
             // get number of bound states for each particle at this energy
             channels_[ill] = prec_->bstates(std::max(inp_.Etot[iE_], inp_.channel_max_E), l1, l2);
-            
+
             // the number of scattering channels
             std::swap(channels_[ill].first, channels_[ill].second);
-            
+
             // store all principal quantum numbers for given l1 or l2
             bstates_.push_back
             (
@@ -173,17 +173,17 @@ void Solver::solve ()
                 )
             );
         }
-        
+
         // calculate size of the hamiltonian
         std::size_t Hsize = Nspline_inner * Nspline_inner * ang_.states().size();
         for (std::pair<iArray,iArray> const & p : bstates_)
             Hsize += (p.first.size() + p.second.size()) * Nspline_outer;
-        
+
         // print system information
         std::cout.imbue(std::locale(std::locale::classic(), new MyNumPunct));
         std::cout << "\tFull hamiltonian / solution size: " << Hsize << std::endl;
         std::cout.imbue(std::locale::classic());
-        
+
         // we may have already computed all solutions for this energy... is it so?
         std::vector<int> work[2];
         for (unsigned instate = 0; instate < inp_.instates.size(); instate++)
@@ -193,7 +193,7 @@ void Solver::solve ()
             int ni = std::get<0>(inp_.instates[instate]);
             int li = std::get<1>(inp_.instates[instate]);
             int mi = std::get<2>(inp_.instates[instate]);
-            
+
             // skip energy-forbidden states
             if (inp_.Etot[iE_] <= -1./(ni*ni))
             {
@@ -201,19 +201,19 @@ void Solver::solve ()
                           << ") : not allowed by total E." << std::endl;;
                 continue;
             }
-            
+
             // check if the right hand side will be zero for this instate
             bool allowed = false;
             for (unsigned ill = 0; ill < ang_.states().size(); ill++) if (ang_.states()[ill].first == li)
             {
                 // get partia wave
                 int l = ang_.states()[ill].second;
-                
+
                 // does this combination have valid 'mi' for this partial wave?
                 if (special::ClebschGordan(li,mi,l,0,inp_.L,mi) != 0)
                     allowed = true;
             }
-            
+
             // skip angular forbidden states
             if (not allowed)
             {
@@ -221,41 +221,41 @@ void Solver::solve ()
                           << ") : not allowed by total L, Pi and nL." << std::endl;
                 continue;
             }
-            
+
             // check if there is some precomputed solution on the disk
             SolutionIO reader (inp_.L, Spin, inp_.Pi, ni, li, mi, inp_.Etot[iE_], ang_.states(), channels_);
             std::size_t size = 0;
             reader.check(SolutionIO::All, size);
-            
+
             // sum partial sizes in distributed case
             if (not cmd_.shared_scratch)
             {
                 par_.mastersum(&size, 1, 0);
                 par_.bcast(0, &size, 1);
             }
-            
+
             // solution has the expected size
             if (size == Hsize and not cmd_.refine_solution)
             {
                 std::cout << "\tSolution for initial state " << Hydrogen::stateName(ni,li,mi) << " (S = " << Spin << ") found." << std::endl;
                 continue;
             }
-            
+
             // add work
             work[Spin].push_back(instate);
         }
-        
+
         // skip this energy if nothing to compute
         if (work[0].empty() and work[1].empty())
         {
             std::cout << "\tAll solutions for Etot[" << iE_ << "] = " << inp_.Etot[iE_] << " loaded." << std::endl;
             continue;
         }
-        
+
         // update the preconditioner, if this is the first energy to compute or it changed from previous iteration
         if (not (E_ == 0.5 * inp_.Etot[iE_]))
             prec_->update(E_ = 0.5 * inp_.Etot[iE_]);
-        
+
         // for all initial states
         for (int Spin : inp_.Spin)
         for (int instate : work[Spin])
@@ -263,31 +263,31 @@ void Solver::solve ()
         {
             ang_.S() = Spin;
             instates_ = cmd_.multi_rhs ? work[Spin] : iArray{instate};
-            
+
             // prepare solution vector
             BlockArray<Complex> psi (new_array(ang_.states().size(),"cg-x"));
-            
+
             // create right hand side (unless we are continuing an OOC calculation, where it can be just read)
             BlockArray<Complex> chi (ang_.states().size(), !cmd_.outofcore, "cg-b");
             if (not cmd_.outofcore or not cmd_.cont)
             {
                 // right-hand side for a single initial state
                 cBlockArray chiseg (chi.size(), !cmd_.outofcore, "cg-chi");
-                
+
                 // reset right-hand side
                 for (unsigned ill = 0; ill < ang_.states().size(); ill++) if (par_.isMyGroupWork(ill))
                 {
                     chi[ill].resize(psi.size(ill));
-                    
+
                     if (not chi.inmemory())
                     {
                         if (not cmd_.shared_scratch or par_.IamGroupMaster())
                             chi.hdfsave(ill);
-                        
+
                         chi.drop(ill);
                     }
                 }
-                
+
                 // calculate right-hand sides
                 for (unsigned i = 0; i < instates_.size(); i++)
                 {
@@ -299,7 +299,7 @@ void Solver::solve ()
                         std::get<2>(inp_.instates[instates_[i]])
                     );
                     std::cout << " and total spin S = " << Spin << " ... " << std::flush;
-                    
+
                     // use the preconditioner setup routine
                     Timer t;
                     prec_->rhs(chiseg, iE_, instates_[i]);
@@ -308,21 +308,21 @@ void Solver::solve ()
                     {
                         if (not chi.inmemory()) { chi.hdfload(ill); }
                         if (not chiseg.inmemory()) { chiseg.hdfload(ill); }
-                        
+
                         cArrayView
                         (
                             chi[ill],
                             chi[ill].size() * i / instates_.size(),
                             chi[ill].size()     / instates_.size()
                         ) = chiseg[ill];
-                        
+
                         if (not chi.inmemory()) { if (not cmd_.shared_scratch or par_.IamGroupMaster()) chi.hdfsave(ill); chi.drop(ill); }
                         if (not chiseg.inmemory()) { chiseg.drop(ill); }
                     }
                     std::cout << "done after " << t.nice_time() << std::endl;
                 }
             }
-            
+
             // compute and check norm of the right hand side vector
             bnorm_ = compute_norm(chi);
             progress_ = 0;
@@ -340,10 +340,10 @@ void Solver::solve ()
                 computations_done++;
                 continue;
             }
-            
+
             // load / reset solver state
             if (cmd_.cont /*or cmd_.refine_solution*/) CG_.recover(); else CG_.reset();
-            
+
             // load initial guess
             /*if (not cmd_.cont and ie > 0 and cmd_.carry_initial_guess)
             {
@@ -360,7 +360,7 @@ void Solver::solve ()
                         inp_.Etot[ie-1],
                         ang_.states()
                     ).load(prevsol);
-                    
+
                     // overwrite the appropriate segments
                     for (unsigned iblock = 0; iblock < psi.size(); iblock++)
                     {
@@ -374,7 +374,7 @@ void Solver::solve ()
                 prev_sol_reader.load(psi);
                 TODO
             }*/
-            
+
             // set up the linear system solver
             Timer t;
             progress_ = 0;
@@ -393,25 +393,25 @@ void Solver::solve ()
             CG_.checkpoint_array     = checkpoint_array;
             CG_.recover_array        = recover_array;
             CG_.constrain            = constrain;
-            
+
             // register SIGINT hook
             std::signal(SIGINT, siginthook);
-            
+
             // execute the solver
             unsigned iterations = CG_.solve(chi, psi, cmd_.itertol, 0, max_iter);
-            
+
             // unregister SIGINT hook
             std::signal(SIGINT, SIG_DFL);
-            
+
             if (iterations >= max_iter)
                 std::cout << "\tConvergence too slow... The saved solution will be probably non-converged." << std::endl;
             else
                 std::cout << "\tSolution converged after " << t.nice_time() << "." << std::endl;
-            
+
             // update progress
             iterations_done += iterations;
             computations_done++;
-            
+
             // save solution to disk (if valid)
             if (std::isfinite(compute_norm(psi)))
             for (unsigned ill = 0; ill < ang_.states().size(); ill++)
@@ -420,7 +420,7 @@ void Solver::solve ()
                 // read solution from disk, if not available
                 if (not psi.inmemory())
                     psi.hdfload(ill);
-                
+
                 // for all initial states that have been solved
                 for (unsigned i = 0; i < instates_.size(); i++)
                 {
@@ -433,7 +433,7 @@ void Solver::solve ()
                         std::get<2>(inp_.instates[instates_[i]]),
                         2 * E_, ang_.states(), channels_
                     );
-                    
+
                     // extract part of the solution that corresponds to the i-th initial state
                     cBlockArray psiseg (psi.size());
                     psiseg[ill] = psi[ill].slice
@@ -441,29 +441,29 @@ void Solver::solve ()
                         psi[ill].size() *  i      / instates_.size(),
                         psi[ill].size() * (i + 1) / instates_.size()
                     );
-                    
+
                     // write the solution to disk
                     if (not writer.save(psiseg, ill))
                         HexException("Failed to save solution to disk - the data are lost!");
-                    
+
                 }
-                
+
                 // releasae solution from memory if not needed
                 if (not psi.inmemory())
                     psi[ill].drop();
             }
-            
+
             // reset some one-solution command line flags
             cmd_.reuse_dia_blocks = false;
             cmd_.cont = false;
-            
+
         } // end of For Spin, instate
-        
+
     } // end of For ie = 0, ..., inp.Ei.size() - 1
-    
+
     // wait for completition of all processes before next step
     par_.wait();
-    
+
     std::cout << std::endl << "All solutions computed." << std::endl;
     if (computations_done > 0)
         std::cout << "\t(typically " << iterations_done / computations_done << " CG iterations per solution)" << std::endl;
@@ -479,7 +479,7 @@ void Solver::apply_preconditioner_ (BlockArray<Complex> const & r, BlockArray<Co
         boinc_begin_critical_section();
         CG_.dump();
         boinc_end_critical_section();
-        
+
         // notify the scheduler
         boinc_checkpoint_completed();
     }
@@ -489,7 +489,7 @@ void Solver::apply_preconditioner_ (BlockArray<Complex> const & r, BlockArray<Co
     {
         // extended (checkpoint) dump
         CG_.dump();
-        
+
         // exit, user wants to go home already
         std::cout << "\n\tCheckpoint written, terminating on user request." << std::endl << std::endl;
         std::exit(0);
@@ -499,7 +499,7 @@ void Solver::apply_preconditioner_ (BlockArray<Complex> const & r, BlockArray<Co
         // simple dump (no extra checkpoint)
         CG_.dump();
     }
-    
+
     // MPI-distributed preconditioning
     prec_->precondition(r, z);
 }
@@ -514,33 +514,33 @@ Complex Solver::scalar_product_ (BlockArray<Complex> const & x, BlockArray<Compl
 {
     // compute scalar product
     Complex prod = 0;
-    
+
     // make sure no process is playing with the data
     par_.wait();
-    
+
     // for all segments owned by current process' group
     for (std::size_t i = 0; i < x.size(); i++) if (par_.isMyGroupWork(i))
     {
         // load segments, if needed
         if (not x.inmemory()) const_cast<BlockArray<Complex>&>(x).hdfload(i);
         if (not y.inmemory()) const_cast<BlockArray<Complex>&>(y).hdfload(i);
-        
+
         // choose a chunk for this member of the group
         std::size_t jmin = x[i].size() * (par_.igroupproc()    ) / par_.groupsize();
         std::size_t jmax = x[i].size() * (par_.igroupproc() + 1) / par_.groupsize();
-        
+
         // update the scalar product
         for (std::size_t j = jmin; j < x[i].size() and j < jmax; j++)
             prod += x[i][j] * y[i][j];
-        
+
         // release memory
         if (not x.inmemory()) const_cast<BlockArray<Complex>&>(x)[i].drop();
         if (not y.inmemory()) const_cast<BlockArray<Complex>&>(y)[i].drop();
     }
-    
+
     // collect products from other nodes
     par_.syncsum(&prod, 1);
-    
+
     // return global scalar product
     return prod;
 }
@@ -553,34 +553,34 @@ Real Solver::compute_norm_ (BlockArray<Complex> const & r) const
         autostop_ = false;
         return 0;
     }
-    
+
     // compute norm
     Real rnorm2 = 0;
-    
+
     // make sure no process is playing with the data
     par_.wait();
-    
+
     // compute node-local norm of 'r'
     for (std::size_t i = 0; i < r.size(); i++) if (par_.isMyGroupWork(i))
     {
         // load segment, if needed
         if (not r.inmemory()) const_cast<BlockArray<Complex>&>(r).hdfload(i);
-        
+
         // choose a chunk for this member of the group
         std::size_t jmin = r[i].size() * (par_.igroupproc()    ) / par_.groupsize();
         std::size_t jmax = r[i].size() * (par_.igroupproc() + 1) / par_.groupsize();
-        
+
         // update the square norm
         for (std::size_t j = jmin; j < r[i].size() and j < jmax; j++)
             rnorm2 += sqrabs(r[i][j]);
-        
+
         // release memory
         if (not r.inmemory()) const_cast<BlockArray<Complex>&>(r)[i].drop();
     }
-    
+
     // collect norms from other nodes
     par_.syncsum(&rnorm2, 1);
-    
+
     // return global norm
     return std::sqrt(rnorm2);
 }
@@ -589,33 +589,33 @@ void Solver::axby_operation_ (Complex a, BlockArray<Complex> & x, Complex b, Blo
 {
     // make sure no process is playing with the data
     par_.wait();
-    
+
     // only references blocks that are local to this MPI node
     for (std::size_t i = 0; i < x.size(); i++) if (par_.isMyGroupWork(i))
     {
         // load segments, if needed
         if (not x.inmemory()) x.hdfload(i);
         if (not y.inmemory()) const_cast<BlockArray<Complex>&>(y).hdfload(i);
-        
+
         // choose a chunk for this member of the group
         std::size_t jmin = x[i].size() * (par_.igroupproc()    ) / par_.groupsize();
         std::size_t jmax = x[i].size() * (par_.igroupproc() + 1) / par_.groupsize();
-        
+
         // update the linear combination
         for (std::size_t j = jmin; j < jmax and j < x[i].size(); j++)
             x[i][j] = a * x[i][j] + b * y[i][j];
-        
+
         // synchronize across the group
         for (int inode = 0; inode < par_.groupsize(); inode++)
         {
             std::size_t jmin = x[i].size() * (inode    ) / par_.groupsize();
             std::size_t jmax = x[i].size() * (inode + 1) / par_.groupsize();
-            
+
             jmax = std::min(x[i].size(), jmax);
-            
+
             par_.bcast_g(par_.igroup(), inode, x[i].data() + jmin, jmax - jmin);
         }
-        
+
         // release memory (groupmaster optionally saves the data to disk)
         if (not x.inmemory()) { if (par_.IamGroupMaster()) x.hdfsave(i); x[i].drop(); }
         if (not y.inmemory()) const_cast<BlockArray<Complex>&>(y)[i].drop();
@@ -627,15 +627,15 @@ BlockArray<Complex> Solver::new_array_ (std::size_t N, std::string name) const
     // just a quick check: N must be equal to the number of blocks
     if (N != ang_.states().size())
         HexException("Runtime error: Wrong number of angular blocks: %d != %d.", N, ang_.states().size());
-    
+
     // create a new block array and initialize blocks local to this MPI node
     BlockArray<Complex> array (N, !cmd_.outofcore, name);
-    
+
     // sizes
     std::size_t Nspline_inner = bspline_inner_.Nspline();
     std::size_t Nspline_full = bspline_full_.Nspline();
     std::size_t Nspline_outer = Nspline_full - Nspline_inner;
-    
+
     // initialize all blocks ('resize' automatically zeroes added elements)
     for (std::size_t i = 0; i < N; i++) if (par_.isMyGroupWork(i))
     {
@@ -643,17 +643,17 @@ BlockArray<Complex> Solver::new_array_ (std::size_t N, std::string name) const
         std::size_t size = Nspline_inner * Nspline_inner;
         if (not inp_.inner_only)
             size += (bstates_[i].first.size() + bstates_[i].second.size()) * Nspline_outer;
-        
+
         // allocate memory
         array[i].resize(instates_.size() * size);
-        
+
         // take care of out-of-core mode
         if (not array.inmemory())
         {
             // save to disk if we are not continuing an older calculation
             if (not cmd_.cont)
                 array.hdfsave(i);
-            
+
             // release memory
             array[i].drop();
         }
@@ -663,17 +663,17 @@ BlockArray<Complex> Solver::new_array_ (std::size_t N, std::string name) const
             array.hdfload(i);
         }
     }
-    
+
     return array;
 }
 
 void Solver::process_solution_ (unsigned iteration, BlockArray<Complex> const & x) const
 {
     static cArray Tmats;
-    
+
     std::string dir = format("iter-%d", iteration);
     std::string pdir = format("iter-%d", iteration - cmd_.purge);
-    
+
     if (cmd_.write_intermediate_solutions)
     {
         // create new directory for the current wave function data
@@ -683,7 +683,7 @@ void Solver::process_solution_ (unsigned iteration, BlockArray<Complex> const & 
 #else
         create_directory(dir);
 #endif
-        
+
         // for all initial states that have been solved
         for (unsigned i = 0; i < instates_.size(); i++)
         {
@@ -697,7 +697,7 @@ void Solver::process_solution_ (unsigned iteration, BlockArray<Complex> const & 
                     x[ill].size() * (i + 1) / instates_.size()
                 );
             }
-            
+
             // write the solution
             SolutionIO
             (
@@ -709,7 +709,7 @@ void Solver::process_solution_ (unsigned iteration, BlockArray<Complex> const & 
             ).save(X);
         }
     }
-    
+
     if (cmd_.runtime_postprocess)
     {
         // only does the post-processing (FIXME)
@@ -721,24 +721,24 @@ void Solver::process_solution_ (unsigned iteration, BlockArray<Complex> const & 
             ampl.extract(dir);
             ampl.writeSQL_files(dir);
             ampl.writeICS_files(dir);
-            
+
             // get extracted T-matrices
             cArray newTmats = filter_Tmat_data_(ampl.T_matrices());
-            
+
             // check convergence (compare both ways)
             if (iteration > 1 and cmd_.autostop_tolerance > 0)
                 autostop_ = check_convergence_(Tmats, newTmats);
-            
+
             // remember the extracted data
             Tmats = newTmats;
         }
-        
+
         // communicate the autostop status
         par_.bcast(0, &autostop_, 1);
         if (autostop_)
             std::cout << "\n\tT-matrices converged within " << cmd_.autostop_tolerance << ", stopping calculation.";
     }
-    
+
     if (cmd_.write_intermediate_solutions)
     {
         // erase old directory
@@ -797,7 +797,7 @@ void Solver::finish ()
 cArray Solver::filter_Tmat_data_ (Amplitudes::TmatArray const & T) const
 {
     cArray data;
-    
+
     // only keep transitions starting with the state(s) currently being solved
     for (Amplitudes::TmatArray::const_iterator I = T.begin(); I != T.end(); I++)
     {
@@ -822,14 +822,14 @@ cArray Solver::filter_Tmat_data_ (Amplitudes::TmatArray const & T) const
             {
                 // get singlet or triplet data, depending on the current spin
                 cArray const & curr = (ang_.S() == 0 ? T_ell.first : T_ell.second);
-                
+
                 // get the T-matrix for the current energy
                 if (iE_ < (int)curr.size())
                     data.push_back(curr[iE_]);
             }
         }
     }
-    
+
     return data;
 }
 
@@ -838,21 +838,21 @@ bool Solver::check_convergence_ (cArray const & T1, cArray const & T2) const
     // the amount of data from different iterations must be the same
     if (T1.size() != T2.size())
         return false;
-    
+
     // compare T-matrices
     for (std::size_t i = 0; i < T1.size(); i++)
     {
         // they may be totally identical (most likely both zero)
         if (T1[i] == T2[i])
             continue;
-        
+
         // otherwise, compare squared magnitude (partial cross section)
         double A1 = sqrabs(T1[i]);
         double A2 = sqrabs(T2[i]);
         double A_reldiff = 2.0_r * std::abs(A1 - A2) / (A1 + A2);
         if (not std::isfinite(A_reldiff) or A_reldiff > cmd_.autostop_tolerance)
             return false;
-        
+
         // and then compare phase factors
         double D1 = std::atan2(T1[i].real(), T1[i].imag());
         double D2 = std::atan2(T2[i].real(), T2[i].imag());
@@ -860,7 +860,7 @@ bool Solver::check_convergence_ (cArray const & T1, cArray const & T2) const
         if (not std::isfinite(D_reldiff) or D_reldiff > cmd_.autostop_tolerance)
             return false;
     }
-    
+
     // converged!
     return true;
 }

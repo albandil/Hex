@@ -111,7 +111,7 @@ bool TMatrix::createTable ()
             "Im_T_ell DOUBLE PRECISION, "
             "PRIMARY KEY (ni,li,mi,nf,lf,mf,L,S,Ei,ell)"
         ")";
-    
+
     try
     {
         st.exec();
@@ -122,7 +122,7 @@ bool TMatrix::createTable ()
         std::cerr << "       code = " << e.code() << " (\"" << e.what() << "\")" << std::endl;
         return false;
     }
-    
+
     return ScatteringQuantity::createTable();
 }
 
@@ -152,15 +152,15 @@ void hex_tmat_pw_transform
     double Ei, ReT, ImT;
     cArrays tmatrices_prev(2), tmatrices_prev_prev(2);
     rArrays tmatrices_sum = { rArray(nEnergies, 0.0), rArray(nEnergies, 0.0) };
-    
+
     ScatteringQuantity * TMat = get_quantity("tmat");
-    
+
     // indicator of partial waves convergence (0 = not yet converged, 1 = converged, 2 = convergence not possible)
     iArrays status;
     status.resize(2);
     status[0].resize(nEnergies);
     status[1].resize(nEnergies);
-    
+
     // determine highest partial wave
     int max_ell;
     sqlitepp::statement st0 (TMat->session());
@@ -175,13 +175,13 @@ void hex_tmat_pw_transform
         sqlitepp::use(ni), sqlitepp::use(li),  sqlitepp::use(mi),
         sqlitepp::use(nf), sqlitepp::use(lf),  sqlitepp::use(mf);
     st0.exec();
-    
+
     // loop over all partial waves (or until convergence)
     for (int ell = std::abs(mi - mf); ell <= max_ell or extra; ell++)
     {
         cArrays tmatrices = { cArray(nEnergies, 0.0_z), cArray(nEnergies, 0.0_z) };
         iArrays complete  = { iArray(nEnergies, true),  iArray(nEnergies, true)  };
-        
+
         // check if all energies converged
         if
         (
@@ -194,27 +194,27 @@ void hex_tmat_pw_transform
         {
             break;
         }
-        
+
         // for both spins
         for (int S = 0; S < 2; S++)
         {
             //
             // read existing data from the database
             //
-            
+
                 // for all total angular momenta contributing to this partial wave
                 for (int L = std::abs(lf - ell); L <= lf + ell; L++)
                 {
                     // skip forbidden contributions
                     if (special::ClebschGordan(ell, mi - mf, lf, mf, L, mi) == 0)
                         continue;
-                    
+
                     // skip odd parity outcome in case of initial S-state
                     if (li == 0 and (L + lf + ell) % 2 == 1)
                         continue;
-                    
+
                     rArray energies_db, reT_db, imT_db;
-                    
+
                     // prepare selection statement
                     sqlitepp::statement st1 (TMat->session());
                     st1 << "SELECT Ei, Re_T_ell, Im_T_ell FROM '" + TMat->name() + "' "
@@ -232,7 +232,7 @@ void hex_tmat_pw_transform
                         sqlitepp::use(ni),  sqlitepp::use(li),   sqlitepp::use(mi),
                         sqlitepp::use(nf),  sqlitepp::use(lf),   sqlitepp::use(mf),
                         sqlitepp::use( L),  sqlitepp::use(S),    sqlitepp::use(ell);
-                    
+
                     // store the data produced by the statement
                     while (st1.exec())
                     {
@@ -240,11 +240,11 @@ void hex_tmat_pw_transform
                         reT_db.push_back(ReT * std::sqrt(Ei));
                         imT_db.push_back(ImT * std::sqrt(Ei));
                     }
-                    
+
                     // default to Akima spline interpolation, but fall back to linear if not enough points
                     gsl_interp_type const * interp = gsl_interp_akima;
                     bool enoughPoints = gsl_interp_type_min_size(interp) <= energies_db.size() or gsl_interp_type_min_size(interp = gsl_interp_linear) <= energies_db.size();
-                    
+
                     // create interpolators
                     gsl_interp* spline_Re = enoughPoints ? gsl_interp_alloc(interp, energies_db.size()) : nullptr;
                     gsl_interp* spline_Im = enoughPoints ? gsl_interp_alloc(interp, energies_db.size()) : nullptr;
@@ -252,7 +252,7 @@ void hex_tmat_pw_transform
                     if (spline_Im) gsl_interp_init(spline_Im, energies_db.data(), imT_db.data(), energies_db.size());
                     gsl_interp_accel* accel_Re = spline_Re ? gsl_interp_accel_alloc() : nullptr;
                     gsl_interp_accel* accel_Im = spline_Im ? gsl_interp_accel_alloc() : nullptr;
-                    
+
                     // interpolate retrieved data at requested energies
                     for (int i = 0; i < nEnergies; i++) if (status[S][i] == 0)
                     {
@@ -265,19 +265,19 @@ void hex_tmat_pw_transform
                         {
                             int err_re = gsl_interp_eval_e(spline_Re, energies_db.data(), reT_db.data(), energies[i], accel_Re, &ReT);
                             int err_im = gsl_interp_eval_e(spline_Im, energies_db.data(), imT_db.data(), energies[i], accel_Im, &ImT);
-                            
+
                             if (err_re != GSL_SUCCESS)
                             {
                                 std::cout << "Warning: Failed to interpolate real data for transition (" << ni << "," << li << "," << mi << ") -> (" << nf << "," << lf << "," << mf << "), "
                                     "L = " << L << ", ell = " << ell << ", Ei = " << energies[i] << " (" << gsl_strerror(err_re) << ")" << std::endl;
                             }
-                            
+
                             if (err_im != GSL_SUCCESS)
                             {
                                 std::cout << "Warning: Failed to interpolate imag data for transition (" << ni << "," << li << "," << mi << ") -> (" << nf << "," << lf << "," << mf << "), "
                                     "L = " << L << ", ell = " << ell << ", Ei = " << energies[i] << " (" << gsl_strerror(err_re) << ")" << std::endl;
                             }
-                            
+
                             tmatrices[S][i] += Complex(ReT, ImT) / std::sqrt(energies[i]);
                         }
                         else
@@ -286,18 +286,18 @@ void hex_tmat_pw_transform
                             complete[S][i] = false;
                         }
                     }
-                    
+
                     // delete interpolators
                     if (accel_Re) gsl_interp_accel_free(accel_Re);
                     if (accel_Im) gsl_interp_accel_free(accel_Im);
                     if (spline_Re) gsl_interp_free(spline_Re);
                     if (spline_Im) gsl_interp_free(spline_Im);
                 }
-            
+
             //
             // extrapolate incomplete data
             //
-            
+
                 for (int i = 0; i < nEnergies; i++) if (not complete[S][i] and status[S][i] == 0)
                 {
                     // only extrapolate if this is at least the third contributing partial wave and the last three are decreasing
@@ -321,13 +321,13 @@ void hex_tmat_pw_transform
                                 tmatrices_prev[S][i].imag() * std::pow((ell - 1.0) / ell, 1.5)
                             );
                         }
-                        
+
                         // dipole transitions converge fast, no need to extrapolate
                         else if (std::abs(li - lf) == 1)
                         {
                             // nothing
                         }
-                        
+
                         // other transitions need simple geometric extrapolation
                         else
                         {
@@ -336,10 +336,10 @@ void hex_tmat_pw_transform
                             double extra_im = tmatrices_prev[S][i].imag() * tmatrices_prev[S][i].imag() / tmatrices_prev_prev[S][i].imag();
                             tmatrices[S][i] = Complex(extra_re, extra_im);
                         }
-                        
+
                         // update sum of (magnitudes of) the partial T-matrices
                         tmatrices_sum[S][i] += std::abs(tmatrices[S][i]);
-                        
+
                         // check convergence
                         if (std::abs(tmatrices[S][i]) < 1e-5 * std::abs(tmatrices_sum[S][i]))
                             status[S][i] = 1;
@@ -349,18 +349,18 @@ void hex_tmat_pw_transform
                         status[S][i] = 2; // extrapolation not possible - too few data
                     }
                 }
-                
-                
+
+
         }
-        
+
         // update previous-partial-wave T-matrices
         tmatrices_prev_prev = tmatrices_prev;
         tmatrices_prev = tmatrices;
-        
+
         // pass the partial T-matrices to the caller
         callback(ell, status, complete, tmatrices);
     }
-    
+
 }
 
 // --------------------------------------------------------------------------------- //
@@ -370,7 +370,7 @@ bool TMatrix::run (std::map<std::string,std::string> const & sdata)
     // manage units
     double efactor = change_units(Eunits, eUnit_Ry);
     double lfactor = change_units(lUnit_au, Lunits);
-    
+
     // atomic and projectile data
     int ni = Conv<int>(sdata, "ni", name());
     int li = Conv<int>(sdata, "li", name());
@@ -380,14 +380,14 @@ bool TMatrix::run (std::map<std::string,std::string> const & sdata)
     int mf0= Conv<int>(sdata, "mf", name());
     int  S = Conv<int>(sdata, "S",  name());
     int ell= Conv<int>(sdata, "ell",name());
-    
+
     // use mi >= 0; if mi < 0, flip both signs
     int mi = (mi0 < 0 ? -mi0 : mi0);
     int mf = (mi0 < 0 ? -mf0 : mf0);
-    
+
     // energies
     rArray energies;
-    
+
     // get energy / energies
     try
     {
@@ -399,10 +399,10 @@ bool TMatrix::run (std::map<std::string,std::string> const & sdata)
         // are there more energies specified using the STDIN ?
         energies = readStandardInput<double>();
     }
-    
+
     // energy and real and imarinary part of the T-matrix
     double E, Re_T_ell, Im_T_ell;
-    
+
     // create query statement
     sqlitepp::statement st (session());
     st << "SELECT Ei, SUM(Re_T_ell), SUM(Im_T_ell) FROM 'tmat' "
@@ -421,7 +421,7 @@ bool TMatrix::run (std::map<std::string,std::string> const & sdata)
        sqlitepp::use(ni), sqlitepp::use(li), sqlitepp::use(mi),
        sqlitepp::use(nf), sqlitepp::use(lf), sqlitepp::use(mf),
        sqlitepp::use(S), sqlitepp::use(ell);
-    
+
     // get T-matrices
     rArray E_arr;
     cArray T_arr;
@@ -430,14 +430,14 @@ bool TMatrix::run (std::map<std::string,std::string> const & sdata)
         E_arr.push_back(E);
         T_arr.push_back(Complex(Re_T_ell,Im_T_ell));
     }
-    
+
     // terminate if no data
     if (E_arr.empty())
     {
         std::cout << "No data fot this selection." << std::endl;
         return true;
     }
-    
+
     // get T-matrices
     cArray T_out;
     if (energies.size() > 0 and energies[0] < 0)
@@ -451,7 +451,7 @@ bool TMatrix::run (std::map<std::string,std::string> const & sdata)
         // interpolate
         T_out = interpolate(E_arr, T_arr, energies * efactor);
     }
-    
+
     // write out
     std::cout << logo("#") <<
         "# T-matrices in " << unit_name(Lunits) << " for\n" <<
@@ -474,6 +474,6 @@ bool TMatrix::run (std::map<std::string,std::string> const & sdata)
             T_out[i].imag() * lfactor
         );
     }
-    
+
     return true;
 }

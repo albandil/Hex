@@ -82,7 +82,7 @@ ILUCGPreconditioner::~ILUCGPreconditioner ()
 #ifdef _OPENMP
     omp_destroy_lock(&lu_lock_);
 #endif
-    
+
 #ifdef WITH_SUPERLU_DIST
     if (cmd_->factorizer == "superlu_dist")
         superlu_gridexit(&grid_);
@@ -95,28 +95,28 @@ void ILUCGPreconditioner::reset_lu ()
     {
         // prepare initial (empty) factorization data
         lu_[iblock].reset(LUft::Choose(cmd_->factorizer));
-        
+
         // feedback to the user
         if (iblock == 0 and cmd_->factorizer == "any")
             std::cout << "\tUsing factorizer \"" << lu_[iblock]->name() << "\" (use --lu <factorizer> to change this)" << std::endl;
-        
+
         // associate existing disk files
         lu_[iblock]->link(format("lu-E%+g-%d-%4x-%4x.bin", E_, iblock, rad_panel().bspline_x().hash(), rad_panel().bspline_y().hash()));
     }
-    
+
 #ifdef WITH_SUPERLU_DIST
     // create process grid for SuperLU-dist
     if (cmd_->factorizer == "superlu_dist")
     {
         int_t nprow = std::sqrt(par_->groupsize());
         int_t npcol = par_->groupsize() / nprow;
-        
+
         while (nprow * npcol != par_->groupsize())
         {
             nprow--;
             npcol = par_->groupsize() / nprow;
         }
-        
+
         superlu_gridinit((MPI_Comm)par_->groupcomm(), nprow, npcol, &grid_);
     }
 #endif // WITH_SUPERLU_DIST
@@ -126,7 +126,7 @@ void ILUCGPreconditioner::setup ()
 {
     // setup parent
     CGPreconditioner::setup();
-    
+
     // prepare data structures for LU factorizations
     reset_lu();
 }
@@ -137,7 +137,7 @@ void ILUCGPreconditioner::update (Real E)
     if (E != E_ and not cmd_->noluupdate)
     {
         CGPreconditioner::update(E);
-        
+
         // release outdated LU factorizations
         reset_lu();
     }
@@ -151,11 +151,11 @@ void ILUCGPreconditioner::CG_init (int iblock) const
 {
     // update parent
     CGPreconditioner::CG_init(iblock);
-    
+
     // load data from linked disk files
     if (not lu_[iblock]->valid())
         lu_[iblock]->silent_load();
-    
+
     // check that the factorization is loaded
     if (not lu_[iblock]->valid())
     {
@@ -164,13 +164,13 @@ void ILUCGPreconditioner::CG_init (int iblock) const
         if (not cmd_->parallel_factorization)
             omp_set_lock(&lu_lock_);
 #endif
-        
+
         // start timer
         Timer timer;
-        
+
         // create the CSR block that will be factorized
         CsrMatrix<LU_int_t,Complex> csr = calc_full_block(iblock, iblock).tocsr();
-        
+
         // set up factorization data
         lu_[iblock]->rdata("drop_tolerance") = cmd_->droptol;
         lu_[iblock]->idata("groupsize") = cmd_->groupsize;
@@ -199,10 +199,10 @@ void ILUCGPreconditioner::CG_init (int iblock) const
     #endif
         }
 #endif
-        
+
         // factorize the block and store it
         lu_[iblock]->factorize(csr);
-        
+
         // print time and memory info for this block (one thread at a time)
         # pragma omp critical
         {
@@ -228,11 +228,11 @@ void ILUCGPreconditioner::CG_init (int iblock) const
                 );
             }
         }
-        
+
         // save the diagonal block's factorization
         lu_[iblock]->link(format("lu-E%+g-%d-%4x-%4x.bin", E_, iblock, rad_panel().bspline_x().hash(), rad_panel().bspline_y().hash()));
         lu_[iblock]->save();
-        
+
 #ifdef _OPENMP
         // release lock
         if (not cmd_->parallel_factorization)
@@ -247,13 +247,13 @@ void ILUCGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z)
     if (cmd_->factorizer == "mumps")
         omp_set_lock(&lu_lock_);
 #endif
-    
+
     // number of right-hand sides
     std::size_t Nini = r.size() / block_rank_[iblock];
-    
+
     // precondition by LU
     lu_[iblock]->solve(r, z, Nini);
-    
+
     if (cmd_->factorizer == "mumps")
     {
 #ifdef _OPENMP
@@ -269,16 +269,16 @@ void ILUCGPreconditioner::CG_exit (int iblock) const
     if (cmd_->factorizer == "mumps")
         omp_set_lock(&lu_lock_);
 #endif
-    
+
     // release memory
     if (cmd_->outofcore)
         lu_[iblock]->drop();
-    
+
 #ifdef _OPENMP
     if (cmd_->factorizer == "mumps")
         omp_unset_lock(&lu_lock_);
 #endif
-    
+
     // exit parent
     CGPreconditioner::CG_exit(iblock);
 }
@@ -289,14 +289,14 @@ void ILUCGPreconditioner::finish ()
     if (cmd_->factorizer == "mumps")
         omp_set_lock(&lu_lock_);
 #endif
-    
+
     lu_.resize(0);
-    
+
 #ifdef _OPENMP
     if (cmd_->factorizer == "mumps")
         omp_unset_lock(&lu_lock_);
 #endif
-    
+
     CGPreconditioner::finish();
 }
 

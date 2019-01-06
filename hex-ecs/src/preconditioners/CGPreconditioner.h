@@ -48,13 +48,13 @@
 class CGPreconditioner : public NoPreconditioner
 {
     public:
-        
+
         // run-time selection mechanism
         preconditionerRunTimeSelectionDefinitions(CGPreconditioner, "cg")
-        
+
         // default constructor needed by the RTS mechanism
         CGPreconditioner () {}
-        
+
         // constructor
         CGPreconditioner
         (
@@ -78,40 +78,40 @@ class CGPreconditioner : public NoPreconditioner
         {
             // nothing to do
         }
-        
+
         // description of the preconditioner
         virtual std::string description () const;
-        
+
         // reuse parent definitions
         using NoPreconditioner::setup;
         using NoPreconditioner::update;
         using NoPreconditioner::rhs;
         using NoPreconditioner::multiply;
-        
+
         // declare own definitions
         virtual void precondition (BlockArray<Complex> const & r, BlockArray<Complex> & z) const;
         virtual void finish ();
-        
+
         // solve diagonal block
         virtual int solve_block (int ill, const cArrayView r, cArrayView z) const;
-        
+
         // inner CG driver
         virtual void CG_init (int iblock) const;
         virtual void CG_mmul (int iblock, const cArrayView p, cArrayView q) const;
         virtual void CG_prec (int iblock, const cArrayView r, cArrayView z) const;
         virtual void CG_exit (int iblock) const;
-        
+
         // inner CG callback routines
         virtual Real CG_compute_norm (const cArrayView a) const;
         virtual Complex CG_scalar_product (const cArrayView a, const cArrayView b) const;
         virtual void CG_axby_operation (Complex a, cArrayView x, Complex b, const cArrayView y) const;
         virtual void CG_constrain (cArrayView r) const;
-    
+
     protected:
-        
+
         // last iterations
         mutable iArray n_;
-        
+
         // timing
         mutable std::size_t us_axby_, us_mmul_, us_norm_, us_prec_, us_spro_;
 };

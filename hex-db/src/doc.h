@@ -37,84 +37,84 @@
   @author Jakub Benda, MFF UK, jakub.benda&at;seznam.cz
   @date 10. 2. 2017
   @section db Hex-db
-  
+
   Hex-db is the interface program that can be used to access data precomputed
   by the computational modules. Also, its built-in algorithms can, on demand,
   compute various derived scattering quantities. The full list of available
   variables is given in the section @ref theory.
-  
+
   @subsection install Installation
-  
+
   The whole package is written in C++11, which is supported by most of the
   up-to-date compilers. The following have been tested:
-  
+
   - GCC 6.3.0
   - LLVM/clang 3.9.1
   - Intel C++ Composer XE 17.0
-  
+
   There are several external libraries that are being used for some partial tasks.
   Here is the list of the libraries with versions that were used:
- 
+
   - GSL 2.1<br/>
            Obtainable from http://www.gnu.org/software/gsl/<br/>
            Used for special functions and some others.
   - SQLite 3.15.0<br/>
            Obtainable from http://www.sqlite.org/download.html<br/>
            Used for access to the database files.
- 
+
   Some or all of the libraries may be present in precompiled form in the repositories
   of the Linux distribution used.
- 
+
   @subsubsection installLinux Build and run
-  
+
   Once the needed libraries are present in the system include and library paths,
   all that is necessary to build the program is running "make" from this directory.
- 
+
   <pre>
   make
   </pre>
- 
+
   This should create an executable "hex-db" in the subdirectory "bin/". One can
   then create an empty database by the command
- 
+
   <pre>
   bin/hex-db --new
   </pre>
- 
+
   The tables present in the new database can be listed using "sqlite3" program,
- 
+
   <pre>
   sqlite3 hex.db .tables    # prints "ics ionf tmat"
   </pre>
- 
+
   The SQL statements used to create the tables can be retrieved similarly,
- 
+
   <pre>
   sqlite3 hex.db .schema
   </pre>
- 
+
   As soon as there are some data to import, one will run
- 
+
   <pre>
   bin/hex-db --import &lt;SQL_batch_file&gt; --update
   </pre>
- 
+
   If the external libraries are installed in non-standard locations, one needs to
   edit the Makefile accordingly.
-  
+
   @subsubsection installWindows Building on Windows
- 
+
   The program has been successfully tested on Windows 10 (and most probably will work
   exactly the same in older versions). The compilation has been done in the
   Code::Blocks IDE (the project file *.cbp is included with
   the source code). It is necessary to install a full-featured MinGW-w64 compiler, though;
   the compiler bundled with Code::Blocks lacks all necessary features.
- 
+
   -# Download MinGW-w64 installer from SourceForge (tested 6.3.0 x86_64 posix seh).
   -# Download and install latest Code::Blocks (tested version was 16.01), configure to use MinGW-w64 binaries.
-  
+
   @subsection theory Theory
-  
+
   The computational modules of the package <b>Hex</b> (e.g. <b>hex-dwba</b>,
   <b>hex-pwba2</b> or <b>hex-ecs</b>) produce output in the form
   of radial part of the T-matrix. The full T-matrix for transition
@@ -127,7 +127,7 @@
   where the radial part depends on theory. It will be much different for exterior
   complex scaling and for Born approximation. This utility code (and associated
   standalone interface library) can then be used to produce following information:
- 
+
   - the scattering amplitude
     @f[
         f_{i \rightarrow f}^{S} = -\frac{1}{2\pi} T_{i \rightarrow f}^{S} =
@@ -170,7 +170,7 @@
         \frac{\mathrm{d}\varsigma_{i \rightarrow f}}{\mathrm{d}\Omega} = \frac{1}{4}
         \frac{k_f}{k_i} |f_{i \rightarrow f}^1 - f_{i \rightarrow f}^0|^2 \,.
     @f]
-  
+
   Ultimately, all these variables are computed from the partial wave expansion of the T-matrix.
   This series can converge very slow, particularly in the case of large energies. One can use the
   Born subtraction method to overcome this difficulty. Assuming that for some large total angular
@@ -184,9 +184,9 @@
   The angle-dependent full Born T-matrix @f$ T_{\mathrm{Born}} @f$ is stored in the form of %Chebyshev
   expansion. The Born partial T-matrices @f$ T_{\mathrm{Born},\ell} @f$ are stored along the exact
   partial T-matrices @f$ T_\ell @f$.
-  
+
   @subsection database The database
-  
+
   The file "hex.db" contains SQL database in the form of several tables. The most low-level
   data (the T-matrices) are stored in the table "tmat" that has the following columns:
   <center><table>
@@ -207,7 +207,7 @@
   However, there are more tables (currently also "bornf" for angle-dependent Born T-matrices,
   "ics" for integral cross section, "ccs" for complete cross section, and "ionf" for radial part
   of the ionization amplitude).
-  
+
   The initial database file can be created by the shell command
   <pre>
   hex-db --new
@@ -248,9 +248,9 @@
   which will print real and imaginary parts of H(1s) @f$ \rightarrow @f$ H(1s)
   T-matrices for energies between @f$ E = 0.75 @f$&nbsp;Ry and @f$ E = 0.88 @f$&nbsp;Ry into
   the file "output.txt".
-  
+
   @subsection usage Usage
-  
+
   Apart from direct program access (when the sources were linked to a custom code),
   one can use a CLI (command line interface) which has the following switches:
   <center><table>
@@ -270,9 +270,9 @@
   <tr><td></td> <td><code>\--&lt;variable&gt;</code></td> <td>Scattering variable to compute (scatamp, dcs, ics, ccs, tcs, asy, ...).</td></tr>
   <tr><td></td> <td><code>\--&lt;Q-number&gt;</code></td> <td>Quantum number specification (ni,li,mi,nf,lf,mf,L,S,Ei,...).</td></tr>
   </table></center>
-  
+
   <br/>
-  
+
   <center><table>
   <tr><th>Quantity</th><th>Compulsory quantum numbers</th> <th>STDIN contains*</th></tr>
   <tr><td>Scattering amplitude</td> <td>@f$ n_i, l_i, m_i, n_f, l_f, m_f, S, E_i @f$</td> <td>angles [deg]</td></tr>
@@ -284,40 +284,40 @@
   <tr><td>Collision strength</td> <td>@f$ n_i, l_i, m_i, n_f, l_f, m_f, ell @f$</td> <td>energies [Ry]</td></tr>
   <tr><td>Total cross section</td> <td>@f$ n_i, l_i, m_i @f$</td> <td>energies [Ry]</td></tr>
   </table></center>
-  
+
   \*) Standard input should contain values of angles or energies separated by white characters (spaces, newlines etc.).
       The list ends with EOF (Ctrl+D if manually entering data; inserted automatically when using standard "seq" invocation).
-  
+
   <br/>
-  
+
   For every STDIN entry the program will respond with one number computed (and interpolated if necessary) 
   from the database. If there are no relevant data in database, the result will be zero. If the available
   energy interval doesn't contain some of the required energies, appropriate error message will be printed.
   Here are some examples of usage:
-  
+
   <pre>
   \# scattering amplitude
   seq 0.01 0.01 3.14    | hex-db --database="hex.db" --scatamp    --ni=1 --li=0 --mi=0 --nf=3 --lf=0 --mf=0 --S=0
-  
+
   \# differential cross section
   seq 0.01 0.01 3.14    | hex-db --database="hex.db" --dcs        --ni=1 --li=0 --mi=0 --nf=3 --lf=0 --mf=0 --S=0
-  
+
   \# total cross section
   seq 0.650 0.001 0.850 | hex-db --database="hex.db" --tcs        --ni=1 --li=0 --mi=0
   </pre>
-  
+
   You may need to set the LC_NUMERIC environment variable to en_US.utf8 (or en_GB.utf8 or any other
   localitation that uses decimal point instead of decimal comma). An alternative is the workaround with sed.
-  
+
   <pre>
   \# [Czech locale] avoid commas by changing locale
   export LC_ALL=C
   seq 0.01 0.01 3.14    | hex-db --database="hex.db" --scatamp    --ni=1 --li=0 --mi=0 --nf=3 --lf=0 --mf=0 --S=0
-   
+
   \# [Czech locale] avoid commas by substitution
   seq 0.01 0.01 3.14 | sed -e "s/,/\./g" | hex-db --database="hex.db" --scatamp    --ni=1 --li=0 --mi=0 --nf=3 --lf=0 --mf=0 --S=0
   </pre>
-  
+
  */
 
 #endif /* HEX_DB_DOC */

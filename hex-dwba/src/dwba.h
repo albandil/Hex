@@ -78,7 +78,7 @@ void dwba
  */
 namespace DWBA1
 {
-    
+
 /**
  * Computes the one-electron part of direct T-matrix,
  * \f[
@@ -95,7 +95,7 @@ Complex computeDirect1e
     DistortingPotential const& U,
     int l, double k
 );
-    
+
 /**
  * Computes the two-electron part of the direct T-matrix,
  * \f[
@@ -126,7 +126,7 @@ Complex computeDirect2e
     int Nf, int Lf, double kf, int lf,
     int Ni, int Li, double ki, int li
 );
-    
+
 /**
  * Computes the one-electron part of exchange T-matrix,
  * \f[

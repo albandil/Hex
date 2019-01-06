@@ -53,13 +53,13 @@ Complex RadialIntegrals::computeRtri
     //    xmin <= x <= xmax
     //    ymin <= y <= x
     // Assume that all coordinates are real.
-    
+
     // number of quadrature points
     int points = std::max(2, bspline().order() + lambda + 1);
-    
+
     // allocate workspace at once
     cArray workspace (8 * points);
-    
+
     // get workspace pointers for individual data chunks
     Complex * xs  = &workspace[0] + points * 0;
     Complex * wxs = &workspace[0] + points * 1;
@@ -69,41 +69,41 @@ Complex RadialIntegrals::computeRtri
     Complex * wys = &workspace[0] + points * 5;
     Complex * Bym = &workspace[0] + points * 6;
     Complex * Byn = &workspace[0] + points * 7;
-    
+
     // restrict the x-integration interval to a subset, where y < x is possible
     xmin = std::max(xmin, ymin);
-    
+
     // x evaluation points and evaluated B-splines
     gx.scaled_nodes_and_weights(points, xmin, xmax, xs, wxs);
     bsplinex.B(k, ixknot, points, xs, Bxk);
     bsplinex.B(l, ixknot, points, xs, Bxl);
-    
+
     // resulting integral
     Complex result = 0;
-    
+
     // for all x points
     for (int ixpoint = 0; ixpoint < points; ixpoint++)
     {
         Real x = xs[ixpoint].real();
         Real ytop = std::min(x, ymax);
-        
+
         // get y evaluation points satisfying ymin < y < top
         gy.scaled_nodes_and_weights(points, ymin, ytop, ys, wys);
         bspliney.B(m, iyknot, points, ys, Bym);
         bspliney.B(n, iyknot, points, ys, Byn);
-        
+
         // for all y points
         for (int iypoint = 0; iypoint < points; iypoint++)
         {
             // evalute the potential
             Real y = ys[iypoint].real();
             Complex V = special::pow_int(y / x, lambda) / x;
-            
+
             // evalutate the integral
             result += Bxk[ixpoint] * Bxl[ixpoint] * Bym[iypoint] * Byn[iypoint] * wxs[ixpoint] * wys[iypoint] * V;
         }
     }
-    
+
     // done
     return result;
 }
@@ -113,9 +113,9 @@ void RadialIntegrals::coupledR (int lambda)
     std::size_t order    = bspline_x_.order();
     std::size_t Nxspline = bspline_x_.Nspline();
     std::size_t Nyspline = bspline_y_.Nspline();
-    
+
     CooMatrix<LU_int_t,Complex> ucR (Nxspline * (order + 1), Nyspline * (order + 1));
-    
+
     # pragma omp parallel for collapse (2)
     for (std::size_t a = 0; a < Nxspline; a++)
     for (std::size_t b = 0; b < Nyspline; b++)
@@ -128,29 +128,29 @@ void RadialIntegrals::coupledR (int lambda)
             Real tb1 = bspline_y_.unrotate(bspline_y_.t(b));
             Real tc1 = bspline_x_.unrotate(bspline_x_.t(c));
             Real td1 = bspline_y_.unrotate(bspline_y_.t(d));
-            
+
             // trailing knots of the B-splines
             Real ta2 = bspline_x_.unrotate(bspline_x_.t(a + order + 1));
             Real tb2 = bspline_y_.unrotate(bspline_y_.t(b + order + 1));
             Real tc2 = bspline_x_.unrotate(bspline_x_.t(c + order + 1));
             Real td2 = bspline_y_.unrotate(bspline_y_.t(d + order + 1));
-            
+
             // get bounding knots of pair overlap
             Real t_xmin = special::clamp(std::max(ta1,tc1), rxmin_, rxmax_);
             Real t_xmax = special::clamp(std::min(ta2,tc2), rxmin_, rxmax_);
             Real t_ymin = special::clamp(std::max(tb1,td1), rymin_, rymax_);
             Real t_ymax = special::clamp(std::min(tb2,td2), rymin_, rymax_);
-            
+
             // get bounding knots of four-overlap
             Real t_min = std::max(t_xmin, t_ymin);
             Real t_max = std::min(t_xmax, t_ymax);
-            
+
             // is the integral coupled?
             if (t_min < t_max)
             {
                 // resulting integral
                 Complex R = 0;
-                
+
                 // integrate per cell
                 for (unsigned ix = std::max(a,c); ix <= std::min(a,c) + order; ix++)
                 for (unsigned iy = std::max(b,d); iy <= std::min(b,d) + order; iy++)
@@ -160,37 +160,37 @@ void RadialIntegrals::coupledR (int lambda)
                     Complex ty1 = bspline_y_.t(iy    );  Real ry1 = ty1.real();
                     Complex tx2 = bspline_x_.t(ix + 1);  Real rx2 = tx2.real();
                     Complex ty2 = bspline_y_.t(iy + 1);  Real ry2 = ty2.real();
-                    
+
                     // skip zero-length intervals
                     if (rx1 == rx2 or ry1 == ry2)
                         continue;
-                    
+
                     // restrict effective radius to potential truncation bounds
                     Real ex1 = special::clamp(rx1, bspline_x_.R1(), bspline_x_.R2());
                     Real ey1 = special::clamp(ry1, bspline_y_.R1(), bspline_y_.R2());
                     Real ex2 = special::clamp(rx2, bspline_x_.R1(), bspline_x_.R2());
                     Real ey2 = special::clamp(ry2, bspline_y_.R1(), bspline_y_.R2());
-                    
+
                     // shorthands for per-knot reduced integral moments
                     Complex const * const restrict Mi_L_ac    = Mitr_L_x(lambda).data()    + (a * (2*order+1) + c - (a-order)) * (order+1);
                     Complex const * const restrict Mi_mLm1_ac = Mitr_mLm1_x(lambda).data() + (a * (2*order+1) + c - (a-order)) * (order+1);
                     Complex const * const restrict Mi_L_bd    = Mitr_L_y(lambda).data()    + (b * (2*order+1) + d - (b-order)) * (order+1);
                     Complex const * const restrict Mi_mLm1_bd = Mitr_mLm1_y(lambda).data() + (b * (2*order+1) + d - (b-order)) * (order+1);
-                    
+
                     // interval fully decoupled (x < y) ...?
                     if (ex2 <= ey1)
                     {
                         Real scale = special::pow_int(ex2 / ey2, lambda) / ey2;
                         R += Mi_L_ac[ix - a] * Mi_mLm1_bd[iy - b] * scale;
                     }
-                    
+
                     // inteval fully decoupled (y < x) ...?
                     else if (ey2 <= ex1)
                     {
                         Real scale = special::pow_int(ey2 / ex2, lambda) / ex2;
                         R += Mi_L_bd[iy - b] * Mi_mLm1_ac[ix - a] * scale;
                     }
-                    
+
                     // interval partially coupled (x ~ y) -> split to triangles
                     else
                     {
@@ -199,14 +199,14 @@ void RadialIntegrals::coupledR (int lambda)
                         R += tri1 + tri2;
                     }
                 }
-                
+
                 // add the calculated coupled integral
                 # pragma omp critical
                 ucR.add(a * (order + 1) + (c - a), b * (order + 1) + (d - b), R);
             }
         }
     }
-    
+
     R_coupled_[lambda] = ucR.tocsr();
 }
 
@@ -214,43 +214,43 @@ Complex RadialIntegrals::computeR (int lambda, int a, int b, int c, int d) const
 {
     // shorthands
     int order = bspline_x_.order();
-    
+
     // leading knots of the B-splines
     Real ta1 = bspline_x_.unrotate(bspline_x_.t(a));
     Real tb1 = bspline_y_.unrotate(bspline_y_.t(b));
     Real tc1 = bspline_x_.unrotate(bspline_x_.t(c));
     Real td1 = bspline_y_.unrotate(bspline_y_.t(d));
-    
+
     // trailing knots of the B-splines
     Real ta2 = bspline_x_.unrotate(bspline_x_.t(a + order + 1));
     Real tb2 = bspline_y_.unrotate(bspline_y_.t(b + order + 1));
     Real tc2 = bspline_x_.unrotate(bspline_x_.t(c + order + 1));
     Real td2 = bspline_y_.unrotate(bspline_y_.t(d + order + 1));
-    
+
     // return clean zero if there are no pair overlaps
     if (std::max(ta1,tc1) >= std::min(ta2,tc2) or std::max(tb1,td1) >= std::min(tb2,td2))
         return 0.;
-    
+
     // effective boundaries
     Real t_xmin = special::clamp(std::max(ta1,tc1), rxmin_, rxmax_);
     Real t_xmax = special::clamp(std::min(ta2,tc2), rxmin_, rxmax_);
     Real t_ymin = special::clamp(std::max(tb1,td1), rymin_, rymax_);
     Real t_ymax = special::clamp(std::min(tb2,td2), rymin_, rymax_);
-    
+
     // decoupled y < x
     if (t_ymax <= t_xmin)
     {
         Real scale = special::pow_int(t_ymax / t_xmax, lambda) / t_xmax;
         return scale * Mtr_mLm1_x_[lambda](a,c) * Mtr_L_y_[lambda](b,d);
     }
-    
+
     // decoupled x < y
     if (t_xmax <= t_ymin)
     {
         Real scale = special::pow_int(t_xmax / t_ymax, lambda) / t_ymax;
         return scale * Mtr_L_x_[lambda](a,c) * Mtr_mLm1_y_[lambda](b,d);
     }
-    
+
     // coupled
     return R_coupled_[lambda]
     (

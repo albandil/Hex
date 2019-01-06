@@ -111,19 +111,19 @@ bool TotalCrossSection::run (std::map<std::string,std::string> const & sdata)
     // manage units
     double efactor = change_units(Eunits, eUnit_Ry);
     double lfactor = change_units(lUnit_au, Lunits);
-    
+
     // scattering event parameters
     int ni = Conv<int>(sdata, "ni", name());
     int li = Conv<int>(sdata, "li", name());
     int mi = Conv<int>(sdata, "mi", name());
-    
+
     if (mi < 0)
         mi = -mi;
-    
+
     // energies and cross sections
     double E;
     rArray energies, sigma_arr;
-    
+
     // get energy / energies
     try
     {
@@ -135,7 +135,7 @@ bool TotalCrossSection::run (std::map<std::string,std::string> const & sdata)
         // are there more energies specified using the STDIN ?
         energies = readStandardInput<double>();
     }
-    
+
     // get all impact energies
     if (not energies.empty() and energies.front() == -1)
     {
@@ -148,7 +148,7 @@ bool TotalCrossSection::run (std::map<std::string,std::string> const & sdata)
             energies.push_back(E);
         }
     }
-    
+
     // get all final states
     iArray nfs, lfs, mfs;
     int Nf = 0, nf, lf, mf;
@@ -163,14 +163,14 @@ bool TotalCrossSection::run (std::map<std::string,std::string> const & sdata)
         mfs.push_back(mf);
         Nf++;
     }
-    
+
     // sum integral cross sections for all transitions
     if (not energies.empty())
     {
         rArray cs (energies.size());
-        
+
         sigma_arr.resize(energies.size());
-        
+
         for (int i = 0; i < Nf; i++)
         {
             hex_complete_cross_section
@@ -180,18 +180,18 @@ bool TotalCrossSection::run (std::map<std::string,std::string> const & sdata)
                 energies.size(), &energies[0], &cs[0],
                 nullptr, -1, nullptr
             );
-            
+
             sigma_arr += cs;
         }
     }
-    
+
     // calculate total cross section from the optical theorem
     cArray singlet (energies.size()), triplet (energies.size());
     double zero = 0;
     hex_scattering_amplitude(ni, li, mi, ni, li, mi, 0, energies.size(), &energies[0], 1, &zero, reinterpret_cast<double*>(&singlet[0]), nullptr);
     hex_scattering_amplitude(ni, li, mi, ni, li, mi, 1, energies.size(), &energies[0], 1, &zero, reinterpret_cast<double*>(&triplet[0]), nullptr);
     rArray csopt = -4 * special::constant::pi * (0.25 * imagpart(singlet) + 0.75 * imagpart(triplet)) / sqrt(energies);
-    
+
     // write header
     std::cout << logo("#") <<
         "# Total cross section in " << unit_name(Lunits) << " for\n"
@@ -203,14 +203,14 @@ bool TotalCrossSection::run (std::map<std::string,std::string> const & sdata)
     table.setAlignment(OutputTable::left);
     table.write("# E        ", "sigma (sum)", "sigma (opt)");
     table.write("# ---------", "-----------", "-----------");
-    
+
     // terminate if no data
     if (energies.empty())
     {
         std::cout << "No data for this transition." << std::endl;
         return true;
     }
-    
+
     // output corrected cross section
     for (std::size_t i = 0; i < energies.size(); i++)
     {
@@ -221,6 +221,6 @@ bool TotalCrossSection::run (std::map<std::string,std::string> const & sdata)
             csopt[i] * lfactor * lfactor
         );
     }
-    
+
     return true;
 }

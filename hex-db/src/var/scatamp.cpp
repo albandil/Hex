@@ -168,20 +168,20 @@ void hex_scattering_amplitude_
     {
         extras.reset((*nEnergies) * (*nAngles), reinterpret_cast<Complex*>(extra));
     }
-    
+
     // calculate cosines of the scattering angles
     rArray cos_angles (*nAngles);
     for (int i = 0; i < (*nAngles); i++)
     {
         cos_angles[i] = std::cos(angles[i]);
     }
-    
+
     // is the transition a dipole one?
     bool dipole = (std::abs((*li) - (*lf)) == 1);
-    
+
     // Born partial T-matrices
     std::vector<cArrays> TB (*nEnergies);
-    
+
     // This function will be called by "hex_tmat_pw_transform" for every partial wave
     //    -  "ell" is the angular momentum of the partial wave
     //    -  "converged" indicates whether the partial wave expansion is converged (0 = not yet, 1 = yes, 2 = convergence failed)
@@ -196,7 +196,7 @@ void hex_scattering_amplitude_
     )
     {
         cArray tmatborn (*nEnergies, 0.);
-        
+
 #ifdef WITH_GINAC
         // for dipole transitions do the no-exchange Born subtraction
         if (dipole)
@@ -207,24 +207,24 @@ void hex_scattering_amplitude_
                 // impact and scattered momentum
                 double ki = std::sqrt(energies[ie]);
                 double kf = std::sqrt(energies[ie] - 1./((*ni)*(*ni)) + 1./((*nf)*(*nf)));
-                
+
                 // no correction for forbidden channels
                 if (not std::isfinite(ki) or not std::isfinite(kf))
                     continue;
-                
+
                 // for all missing total angular momenta
                 for (int L = (int)TB[ie].size(); L <= ell + (*lf); L++)
                 {
                     // Born T-matrices for this energy
                     cArrays Tdir, Texc;
-                    
+
                     // calculate the T-matrices (only direct part, no exchange)
                     pwba(*ni, *li, ki, *nf, *lf, kf, L, Tdir, Texc, true, false);
-                    
+
                     // store only a subset of calculated T-matrices for the requested Mi-Mf transition
                     TB[ie].push_back( Tdir[((*mi) + (*li))*(2*(*lf) + 1) + (*mf) + (*lf)] );
                 }
-                
+
                 // sum Born T-matrices for current partial wave
                 for (int L = std::abs((*lf) - ell); L <= (*lf) + ell; L++)
                 {
@@ -232,36 +232,36 @@ void hex_scattering_amplitude_
                     tmatborn[ie] += -TB[ie][L][ell - std::abs((*lf) - L)];
                 }
             }
-            
+
         }
 #endif
-        
+
         // for all angles
         for (int i = 0; i < (*nAngles); i++)
         {
             // evaluate the spherical harmonics
             double Y = gsl_sf_legendre_sphPlm(ell, std::abs((*mi) - (*mf)), cos_angles[i]);
-            
+
             // all energies
             for (int j = 0; j < (*nEnergies); j++) if (converged[*S][j] == 0)
             {
                 Complex fdata = -tmatrices[*S][j] * Y / special::constant::two_pi;
                 Complex fborn = -tmatborn[j]      * Y / special::constant::two_pi;
-                
+
                 Complex contrib = fdata - fborn;
-                
+
                 // update scattering amplitude
                 if (complete[*S][j])
                     results[j * (*nAngles) + i] += contrib;
-                
+
                 // update the extrapolated scattering amplitude
                 if (extra)
                     extras[j * (*nAngles) + i] += contrib;
-                
+
             }
         }
     };
-    
+
     // call the T-matrix retrieval driver
     hex_tmat_pw_transform
     (
@@ -274,7 +274,7 @@ void hex_scattering_amplitude_
 #endif
         fun
     );
-    
+
 #ifdef WITH_GINAC
     // finalize the Born subtraction
     if (dipole)
@@ -282,34 +282,34 @@ void hex_scattering_amplitude_
         // symbolical calculation of the Born amplitude (uses GiNaC library)
         // - elements of the returned array correspond to individual terms of the result
         std::map<std::tuple<int,int,int,int,int>,Complex> wb = Wb_symb_in(*nf,*lf,*mf,*ni,*li,*mi);
-        
+
         // combined exponential decay factor of the initial and final orbitals
         double nu = 1./(*ni) + 1./(*nf);
-        
+
         // evaluate the symbolical result for all energies
         for (int j = 0; j < (*nEnergies); j++)
         {
             // impact and scattered momentum
             double ki = std::sqrt(energies[j]);
             double kf = std::sqrt(energies[j] - 1./((*ni)*(*ni)) + 1./((*nf)*(*nf)));
-            
+
             // no correction for forbidden channels
             if (not std::isfinite(ki) or not std::isfinite(kf))
                 continue;
-            
+
             // evaluate the symbolical result for all angles
             for (int i = 0; i < (*nAngles); i++)
             {
                 double sint = std::sin(angles[i]);
                 double cost = std::cos(angles[i]);
-                
+
                 geom::vec3d vki = { 0., 0., ki };
                 geom::vec3d vkf = { kf * sint, 0., kf * cost };
                 geom::vec3d vq = vkf - vki;
-                
+
                 // TODO: think about the sign
                 Complex fborn = eval_Wb(wb,nu,vq) / special::constant::two_pi;
-                
+
                 results[j * (*nAngles) + i] += fborn;
             }
         }
@@ -325,7 +325,7 @@ bool ScatteringAmplitude::run (std::map<std::string,std::string> const & sdata)
     double efactor = change_units(Eunits, eUnit_Ry);
     double lfactor = change_units(lUnit_au, Lunits);
     double afactor = change_units(Aunits, aUnit_rad);
-    
+
     // scattering event parameters
     int ni = Conv<int>(sdata, "ni", name());
     int li = Conv<int>(sdata, "li", name());
@@ -335,14 +335,14 @@ bool ScatteringAmplitude::run (std::map<std::string,std::string> const & sdata)
     int mf0= Conv<int>(sdata, "mf", name());
     int  S = Conv<int>(sdata, "S", name());
     double E = Conv<double>(sdata, "Ei", name()) * efactor;
-    
+
     // use mi >= 0; if mi < 0, flip both signs
     int mi = (mi0 < 0 ? -mi0 : mi0);
     int mf = (mi0 < 0 ? -mf0 : mf0);
-    
+
     // angles
     rArray angles;
-    
+
     // get angle / angles
     try
     {
@@ -354,7 +354,7 @@ bool ScatteringAmplitude::run (std::map<std::string,std::string> const & sdata)
         // are there more angles specified using the STDIN ?
         angles = readStandardInput<double>();
     }
-    
+
     // the scattering amplitudes
     rArray scaled_angles = angles * afactor;
     cArray amplitudes(angles.size());
@@ -369,7 +369,7 @@ bool ScatteringAmplitude::run (std::map<std::string,std::string> const & sdata)
         reinterpret_cast<double*>(amplitudes.data()),
         reinterpret_cast<double*>(extra.data())
     );
-    
+
     // write out
     std::cout << logo("#") <<
         "# Scattering amplitudes in " << unit_name(Lunits) << " for\n"
@@ -383,7 +383,7 @@ bool ScatteringAmplitude::run (std::map<std::string,std::string> const & sdata)
     table.setAlignment(OutputTable::left);
     table.write("# angle    ", "Re f     ", "Im f     ", "Re f [ex]", "Im f [ex]");
     table.write("# ---------", "---------", "---------", "---------", "---------");
-    
+
     for (std::size_t i = 0; i < angles.size(); i++)
     {
         table.write
@@ -395,6 +395,6 @@ bool ScatteringAmplitude::run (std::map<std::string,std::string> const & sdata)
             extra[i].imag() * lfactor
         );
     }
-    
+
     return true;
 }

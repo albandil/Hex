@@ -63,26 +63,26 @@ template <class IdxT> NumberArray<IdxT> cuthill_mckee
 {
     // number of rows
     IdxT n = P.size() - 1;
-    
+
     // result sequence
     NumberArray<IdxT> R;
     R.reserve(n);
-    
+
     // adjacency set
     NumberArray<IdxT> A;
     A.reserve(n);
-    
+
     // number of non-zeros (in upper triangle)
     NumberArray<IdxT> O (n);
     for (IdxT irow = 0; irow < n; irow++)
         O[irow] = P[irow + 1] - P[irow];
-    
+
     // flags indicating that the row has been already used
     NumberArray<bool> used (n, false);
-    
+
     // number of elements in R whose adjacents were already added
     IdxT adjdone = 0;
-    
+
     // while some rows are undecided
     while ((IdxT)R.size() != n)
     {
@@ -96,28 +96,28 @@ template <class IdxT> NumberArray<IdxT> cuthill_mckee
                 deg = O[i];
             }
         }
-        
+
         // add the row as a new seed
         R.push_back(pos);
         used[pos] = true;
-        
+
         // while some rows are undecided
         while ((IdxT)R.size() != n)
         {
             // check that we added some elements in the previous pass
             if (adjdone == (IdxT)R.size())
                 break;
-            
+
             // construct an adjacency set of R
             A.resize(0);
             for (IdxT iadj = adjdone; iadj < (IdxT)R.size(); iadj++)
             {
                 IdxT irow = R[iadj];
-                
+
                 for (IdxT idx = P[irow]; idx < P[irow + 1]; idx++)
                 {
                     IdxT icol = I[idx];
-                    
+
                     if (icol > irow and not used[icol])
                     {
                         A.push_back(icol);
@@ -125,22 +125,22 @@ template <class IdxT> NumberArray<IdxT> cuthill_mckee
                     }
                 }
             }
-            
+
             // sort the adjacency sequence by non-zeros
             std::sort(A.begin(), A.end(), [&O](IdxT i, IdxT j) { return O[i] < O[j]; });
-            
+
             // append the adjacency sequence to the result set
             adjdone = R.size();
             R.append(A);
         }
     }
-    
+
     return R;
 }
 
 LUft_LAPACK::LUft_LAPACK () : LUft()
 {
-    
+
 }
 
 void LUft_LAPACK::drop ()
@@ -152,7 +152,7 @@ void LUft_LAPACK::drop ()
 
 LUft_LAPACK::~LUft_LAPACK ()
 {
-    
+
 }
 
 void LUft_LAPACK::factorize (CsrMatrix<LU_int_t,Complex> const & matrix)
@@ -160,11 +160,11 @@ void LUft_LAPACK::factorize (CsrMatrix<LU_int_t,Complex> const & matrix)
     // reorder the matrix to make the bandwidth as small as possible
     //R_ = cuthill_mckee(matrix.p(), matrix.i());
     R_.resize(matrix.rows());
-    
+
     // reverse the order to minimize fill-in
     //std::reverse(R_.begin(), R_.end());
     std::iota(R_.begin(), R_.end(), 0);
-    
+
     // determine bandwidth
     k_ = 0;
     for (blas::Int irow = 0; irow < (blas::Int)matrix.p().size() - 1; irow++)
@@ -176,13 +176,13 @@ void LUft_LAPACK::factorize (CsrMatrix<LU_int_t,Complex> const & matrix)
                 k_ = std::max<blas::Int>(k_, std::abs(R_[irow] - R_[icol]));
         }
     }
-    
+
     // allocate pivot array and the working matrix
     n_ = matrix.rows();
     ipiv_.resize(n_);
     LU_.resize((3*k_ + 1ULL) * n_);
     LU_.fill(0);
-    
+
     // populate the input matrix
     ColMatrixView<Complex> LU (3*k_ + 1ULL, n_, LU_);
     for (blas::Int irow = 0; irow < (blas::Int)matrix.p().size() - 1; irow++)
@@ -194,10 +194,10 @@ void LUft_LAPACK::factorize (CsrMatrix<LU_int_t,Complex> const & matrix)
                 LU(2ULL*k_ + R_[irow] - R_[icol], R_[icol]) = matrix.x()[idx];
         }
     }
-    
+
     // factorize the symmetric banded matrix
     blas::Int info = blas::sbtrf(n_, k_, LU_, ipiv_);
-    
+
     // check success indicator
     if (info < 0)
         HexException("LAPACK: The argument %d has illegal value.", -info);
@@ -209,22 +209,22 @@ void LUft_LAPACK::solve (const cArrayView b, cArrayView x, int eqs) const
 {
     // number of equation in a set
     std::size_t neq = b.size() / eqs;
-    
+
     // work array
     cArray xp (x.size());
-    
+
     // reorder all righ-hand sides
     for (int s = 0; s < eqs; s++)
     for (std::size_t i = 0; i < neq; i++)
         xp[s * neq + i] = b[s * neq + R_[i]];
-    
+
     // solve the reordered system
     blas::Int info = blas::sbtrs(n_, k_, LU_, ipiv_, xp);
-    
+
     // check success indicator
     if (info < 0)
         HexException("LAPACK: The argument %d has illegal value.", -info);
-    
+
     // reorder all solutions
     for (int s = 0; s < eqs; s++)
     for (std::size_t i = 0; i < neq; i++)
@@ -246,7 +246,7 @@ void LUft_LAPACK::save (std::string name) const
 void LUft_LAPACK::load (std::string name, bool throw_on_io_failure)
 {
     // TODO
-    
+
     if (throw_on_io_failure)
         HexException("Failed to load LAPACK LU decomposition from disk.");
 }

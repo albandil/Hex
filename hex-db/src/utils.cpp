@@ -42,21 +42,21 @@ double change_units (eUnit A, eUnit B)
     // no change
     if (A == B)
         return 1.;
-    
+
     double ufactor = 1.;
-    
+
     // transform to Rydbergs
     if (A == eUnit_au)
         ufactor *= 2.;
     if (A == eUnit_eV)
         ufactor *= 1./13.605692;
-    
+
     // tranform from Rydbergs
     if (B == eUnit_au)
         ufactor *= 0.5;
     if (B == eUnit_eV)
         ufactor *= 13.605692;
-    
+
     return ufactor;
 }
 
@@ -65,17 +65,17 @@ double change_units (lUnit A, lUnit B)
     // no change
     if (A == B)
         return 1.;
-    
+
     double ufactor = 1.;
-    
+
     // transform to a.u.
     if (A == lUnit_cgs)
         ufactor *= 1./5.29177211e-9;
-    
+
     // tranform from a.u.
     if (B == lUnit_cgs)
         ufactor *= 5.29177211e-9;
-    
+
     return ufactor;
 }
 
@@ -84,17 +84,17 @@ double change_units (aUnit A, aUnit B)
     // no change
     if (A == B)
         return 1.;
-    
+
     double ufactor = 1.;
-    
+
     // transform to radians
     if (A == aUnit_deg)
         ufactor *= special::constant::pi / 180;
-    
+
     // transform from radians
     if (B == aUnit_deg)
         ufactor *= 180 / special::constant::pi;
-    
+
     return ufactor;
 }
 

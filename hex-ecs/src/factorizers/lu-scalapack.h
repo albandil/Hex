@@ -52,37 +52,37 @@
 class LUft_SCALAPACK : public LUft
 {
     public:
-    
+
         // run-time selection mechanism
         factorizerRunTimeSelectionDefinitions(LUft_SCALAPACK, "scalapack")
-        
+
         /// Default constructor.
         LUft_SCALAPACK ();
-        
+
         /// Destructor.
         virtual ~LUft_SCALAPACK();
-        
+
         // Disable bitwise copy
         LUft_SCALAPACK const & operator= (LUft_SCALAPACK const &) = delete;
-        
+
         /// Factorize.
         virtual void factorize (CsrMatrix<LU_int_t,Complex> const & matrix);
-        
+
         /// Validity indicator.
         virtual bool valid () const { return size() != 0; }
-        
+
         /// Return LU byte size.
         virtual std::size_t size () const;
-        
+
         /// Solve equations.
         virtual void solve (const cArrayView b, cArrayView x, int eqs) const;
-        
+
         /// Save to disk.
         virtual void save (std::string name) const;
-        
+
         /// Load from disk.
         virtual void load (std::string name, bool throw_on_io_failure = true);
-        
+
         /// Release memory.
         virtual void drop ();
 };

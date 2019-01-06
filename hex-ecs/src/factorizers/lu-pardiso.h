@@ -123,53 +123,53 @@ extern "C" void pardiso
 class LUft_Pardiso : public LUft
 {
     public:
-    
+
         // run-time selection mechanism
         factorizerRunTimeSelectionDefinitions(LUft_Pardiso, "pardiso")
-        
+
         /// Default constructor.
         LUft_Pardiso ();
-        
+
         /// Destructor.
         virtual ~LUft_Pardiso();
-        
+
         // Disable bitwise copy
         LUft_Pardiso const & operator= (LUft_Pardiso const &) = delete;
-        
+
         /// Factorize.
         virtual void factorize (CsrMatrix<LU_int_t,Complex> const & matrix);
-        
+
         /// Validity indicator.
         virtual bool valid () const { return size() != 0; }
-        
+
         /// Return LU byte size.
         virtual std::size_t size () const;
-        
+
         /// Solve equations.
         virtual void solve (const cArrayView b, cArrayView x, int eqs) const;
-        
+
         /// Save to disk.
         virtual void save (std::string name) const;
-        
+
         /// Load from disk.
         virtual void load (std::string name, bool throw_on_io_failure = true);
-        
+
         /// Release memory.
         virtual void drop ();
-    
+
     private:
-        
+
         /// Inspect the returned success indicator.
         void pardisoerror (int error) const;
-        
+
         /// Matrix that has been factorized.
         NumberArray<int> P_;
         NumberArray<int> I_;
         NumberArray<std::complex<double>> X_;
-        
+
         /// Permutation.
         NumberArray<int> perm_;
-        
+
         /// Internal data of Pardiso.
         void* pt_[64];
         int iparm_[64];

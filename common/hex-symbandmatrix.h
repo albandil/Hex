@@ -56,9 +56,9 @@
 class MatrixSelection
 {
     public:
-        
+
         typedef int Selection;
-        
+
         static const Selection None        = 0; // = 0b0000
         static const Selection StrictLower = 1; // = 0b0001
         static const Selection StrictUpper = 2; // = 0b0010
@@ -115,10 +115,10 @@ public:
 
     /// Empty constructor.
     SymBandMatrix () : n_(0), d_(0), elems_(0), name_() {}
-    
+
     /// Size constructor.
     SymBandMatrix (std::size_t n);
-    
+
     /**
      * @brief Data constructor.
      * 
@@ -126,7 +126,7 @@ public:
      * @param d Number of main and upper diagonals.
      */
     SymBandMatrix (std::size_t n, std::size_t d) : n_(n), d_(d), elems_(n * d), name_() {}
-    
+
     /**
      * @brief Data constructor.
      * 
@@ -141,20 +141,20 @@ public:
      * @param v Row-padded (main- and upper-) diagonal elements.
      */
     SymBandMatrix (std::size_t n, std::size_t d, const ArrayView<DataT> v) : n_(n), d_(d), elems_(v), name_() {}
-    
+
     /// Copy constructor.
     SymBandMatrix (SymBandMatrix const & A) : n_(A.n_), d_(A.d_), elems_(A.elems_), name_() {}
 
     /// Move constructor.
     SymBandMatrix (SymBandMatrix && A) : n_(std::move(A.n_)), d_(std::move(A.d_)), elems_(std::move(A.elems_)), name_(A.name_) {}
-    
+
     /// Constructor - HDF loader.
     SymBandMatrix (std::string filename) : name_(filename)
     {
         if (not hdfload())
             HexException("Unable to load from %s.", filename.c_str());
     }
-    
+
     /**
      * @brief Plain symmetrical populator.
      *
@@ -172,23 +172,23 @@ public:
     {
         // throw away old data
         elems_.resize(n_ * d_);
-        
+
         // evaluate the elements
         # pragma omp parallel for collapse (2) if (parallelize)
         for (std::size_t irow = 0; irow < n_; irow++)
         for (std::size_t id = 0; id < d_; id++)
         if (irow + id < n_)
             elems_[irow * d_ + id] = f(irow, irow + id);
-        
+
         return *this;
     }
-    
+
     //
     // Destructor
     //
 
     ~SymBandMatrix () {}
-    
+
     /// Free all fields, set dimensions to zero.
     void drop ()
     {
@@ -196,19 +196,19 @@ public:
         d_ = 0;
         elems_.drop();
     }
-    
+
     //
     // Getters
     //
-    
+
     DataT operator() (int i, int j) const
     {
         std::size_t irow = std::min(i,j);
         std::size_t icol = std::max(i,j);
         std::size_t idia = icol - irow;
-        
+
         assert(irow < n_ and icol < n_);
-        
+
         return idia < d_ ? elems_[irow * d_ + idia] : 0.;
     }
     DataT & operator() (int i, int j)
@@ -216,20 +216,20 @@ public:
         std::size_t irow = std::min(i,j);
         std::size_t icol = std::max(i,j);
         std::size_t idia = icol - irow;
-        
+
         assert(irow < n_ and icol < n_ and idia < d_);
-        
+
         return elems_[irow * d_ + idia];
     }
-    
+
     SymBandMatrix<DataT> operator- () const
     {
         return SymBandMatrix<DataT>(n_, d_, -elems_);
     }
-    
+
     NumberArray<DataT> const & data () const { return elems_; }
     NumberArray<DataT>       & data ()       { return elems_; }
-    
+
     /**
      * @brief Matrix dimension.
      * 
@@ -238,7 +238,7 @@ public:
      */
     std::size_t   size () const { return n_; }
     std::size_t & size ()       { return n_; }
-    
+
     /**
      * @brief Bandwidth.
      * 
@@ -247,7 +247,7 @@ public:
      */
     std::size_t bandwidth () const { return 2 * d_ - 1; }
     std::size_t halfbw () const { return d_; }
-    
+
     /**
      * @brief Check compatibility of matrices.
      * 
@@ -259,17 +259,17 @@ public:
     {
         if (n_ != B.n_)
             HexException("Unequal ranks (%d != %d).", n_, B.n_);
-        
+
         if (d_ != B.d_)
             HexException("Unequal half-bandwidths (%d != %d).", d_, B.d_);
-        
+
         return true;
     }
-    
+
     //
     // Arithmetic and other operators
     //
-    
+
     SymBandMatrix const & operator = (SymBandMatrix && A)
     {
         n_ = std::move(A.n_);
@@ -285,21 +285,21 @@ public:
         elems_ = A.elems_;
         return *this;
     }
-    
+
     SymBandMatrix const & operator += (SymBandMatrix const & B)
     {
         is_compatible(B);
         elems_ += B.elems_;
         return *this;
     }
-    
+
     SymBandMatrix const & operator -= (SymBandMatrix const & B)
     {
         is_compatible(B);
         elems_ -= B.elems_;
         return *this;
     }
-    
+
     /**
      * @brief Dot product with one or more vectors.
      *
@@ -320,7 +320,7 @@ public:
         sym_band_dot(n_, d_, elems_, 1., A, 0., B, tri);
         return B;
     }
-    
+
     /**
      * @brief Dot product with one or more vectors.
      *
@@ -336,7 +336,7 @@ public:
         DataT b,       ArrayView<DataT> B,
         MatrixSelection::Selection tri = MatrixSelection::Both
     );
-    
+
     /**
      * @brief Back-substitution (lower).
      * 
@@ -348,16 +348,16 @@ public:
     NumberArray<DataT> lowerSolve (const ArrayView<DataT> b) const
     {
         assert(b.size() == n_);
-        
+
         NumberArray<DataT> x = b;
-        
+
         for (std::size_t irow = 0; irow < n_; irow++)
         for (std::size_t icol = 0; icol < irow; icol++)
             x[irow] -= (*this)(irow,icol) * x[icol];
-        
+
         return x;
     }
-    
+
     /**
      * @brief Back-substitution (upper).
      * 
@@ -369,29 +369,29 @@ public:
     NumberArray<DataT> upperSolve (const ArrayView<DataT> b) const
     {
         assert(b.size() == n_);
-        
+
         NumberArray<DataT> x = b;
-        
+
         for (std::size_t irow = 0; irow < n_; irow++)
         for (std::size_t icol = 0; icol < irow; icol++)
             x[n_ - 1 - irow] -= (*this)(n_ - 1 - irow, n_ - 1 - icol) * x[n_ - 1 - icol];
-        
+
         return x;
     }
-    
+
     //
     // HDF interface
     //
-    
+
     /// Link matrix to a disk file.
     void hdflink (std::string name) { name_ = name; }
-    
+
     /// Return the name of the linked disk file.
     std::string hdfname () const { return name_; }
-    
+
     /// Return content of the 'name' file as a new SymBandMatrix object.
     SymBandMatrix hdfget () const { return SymBandMatrix(name_); }
-    
+
     /**
      * @brief Load from file.
      * 
@@ -407,7 +407,7 @@ public:
         HDFFile hdf(name, HDFFile::readonly);
         if (not hdf.valid())
             return false;
-        
+
         return hdfload(hdf);
     }
     bool hdfload (HDFFile & hdf, std::string prefix = "")
@@ -415,30 +415,30 @@ public:
         // check the HDF file
         if (not hdf.valid())
             return false;
-        
+
         // set prefix
         if (not prefix.empty())
             hdf.prefix = prefix;
-        
+
         // read dimension
         if (not hdf.read("n", &n_, 1))
             return false;
-        
+
         // read dimension
         if (not hdf.read("d", &d_, 1))
             return false;
-        
+
         // compressed array info
         iArray zero_blocks_re, zero_blocks_im;
         rArray elements_re, elements_im;
-        
+
         // read data from file
         if ((zero_blocks_re.resize(hdf.size("zero_blocks_re")) and not hdf.read("zero_blocks_re", &(zero_blocks_re[0]), zero_blocks_re.size())) or
             (zero_blocks_im.resize(hdf.size("zero_blocks_im")) and not hdf.read("zero_blocks_im", &(zero_blocks_im[0]), zero_blocks_im.size())) or
             (elements_re.resize(hdf.size("re")) and not hdf.read("re", &(elements_re[0]), elements_re.size())) or
             (elements_im.resize(hdf.size("im")) and not hdf.read("im", &(elements_im[0]), elements_im.size())))
             return false;
-        
+
         // decompress
         elems_ = std::move
         (
@@ -448,11 +448,11 @@ public:
                 elements_im.decompress(zero_blocks_im)
             )
         );
-        
+
         return true;
     }
     //@}
-    
+
     /**
      * @brief Save data to file.
      * 
@@ -474,19 +474,19 @@ public:
     ) const
     {
         HDFFile hdf(name, flags);
-        
+
         if (not hdf.valid())
             return false;
-        
+
         // write dimension and diagonal info
         if (not hdf.write("n", &n_, 1) or
             not hdf.write("d", &d_, 1))
             return false;
-        
+
         // compress elements array
         iArray zero_blocks_re, zero_blocks_im;
         rArray elements_re, elements_im;
-        
+
         if (docompress)
         {
             std::tie(zero_blocks_re, elements_re) = realpart(elems_).compress(consec);
@@ -497,7 +497,7 @@ public:
             elements_re = std::move(realpart(elems_));
             elements_im = std::move(imagpart(elems_));
         }
-        
+
         // write compressed elements array (if non-empty); check result
         if ((not zero_blocks_re.empty() and
             not hdf.write("zero_blocks_re", &(zero_blocks_re[0]), zero_blocks_re.size())) or
@@ -508,7 +508,7 @@ public:
         ((not elements_im.empty() and
             not hdf.write("im", &(elements_im[0]), elements_im.size()))))
             return false;
-        
+
         return true;
     }
     bool hdfsave
@@ -521,11 +521,11 @@ public:
         return hdfsave(name_, flags, docompress, consec);
     }
     //@}
-    
+
     //
     // Conversions to other formats
     //
-    
+
     /**
      * @brief Zero-pad rows.
      * 
@@ -585,40 +585,40 @@ public:
     {
         if (out.size() < (2*d_ - 1) * n_)
             HexException("Too small array supplied to SymBandMatrix::toPaddedRows (%d < %d x %d).", out.size(), 2*d_ + 1, n_);
-        
+
         // clear corners
         for (std::size_t a = 0; a < d_ - 1; a++)
         for (std::size_t b = 0; b < d_ - 1 - a; b++)
             out[a * (2*d_ - 1) + b] = out[(n_ - a - 1) * (2*d_ - 1) + (2*d_ - b - 2)] = 0;
-        
+
         // assign non-zero elements
         for (std::size_t i = 0; i < n_; i++)
         {
             // position of diagonal element in output array
             std::size_t x = d_ - 1 + i * (2*d_ - 1);
-            
+
             // diagonal element
             out[x] = elems_[i * d_];
-            
+
             // assign sub-diagonal elements
             for (std::size_t j = (i >= d_ - 1 ? i - d_ + 1 : 0); j < i; j++)
                 out[x + j - i] = elems_[j * d_ + i - j];
-            
+
             // assign super-diagonal elements
             for (std::size_t j = i + 1; j < n_ and j < i + d_; j++)
                 out[x + j - i] = elems_[i * d_ + j - i];
         }
     }
-    
+
     /// Convert matrix part to CooMatrix.
     template <class IdxT>
     CooMatrix<IdxT,DataT> tocoo (MatrixSelection::Selection triangle = MatrixSelection::Both) const
     {
         NumberArray<IdxT> I, J;
         NumberArray<DataT> V;
-        
+
         DataT const * el = elems_.data();
-        
+
         // for all elements
         for (IdxT i = 0; i < (IdxT)n_; i++)
         for (IdxT d = 0; d < (IdxT)d_; d++)
@@ -631,7 +631,7 @@ public:
                     el++;
                     continue;
                 }
-                
+
                 // add this element to COO (upper triangle)
                 if ((d != 0) and (triangle & MatrixSelection::StrictUpper))
                 {
@@ -639,7 +639,7 @@ public:
                     J.push_back(i+d);
                     V.push_back(*el);
                 }
-                
+
                 // add this element to COO (lower triangle)
                 if ((d != 0) and (triangle & MatrixSelection::StrictLower))
                 {
@@ -647,7 +647,7 @@ public:
                     J.push_back(i);
                     V.push_back(*el);
                 }
-                
+
                 // main diagonal
                 if ((d == 0) and (triangle & MatrixSelection::Diagonal))
                 {
@@ -656,21 +656,21 @@ public:
                     V.push_back(*el);
                 }
             }
-            
+
             // move on to the next element
             el++;
         }
-        
+
         return CooMatrix<IdxT,DataT> (n_, n_, I, J, V);
     }
-    
+
     /// Convert matrix part to RowMatrix.
     RowMatrix<DataT> torow (MatrixSelection::Selection triangle = MatrixSelection::Both) const
     {
         RowMatrix<DataT> M (n_, n_);
-        
+
         DataT const * el = elems_.data();
-        
+
         // for all elements
         for (std::size_t i = 0; i < n_; i++)
         for (std::size_t d = 0; d < d_; d++)
@@ -680,11 +680,11 @@ public:
                 // main diagonal
                 if ((d == 0) and (triangle & MatrixSelection::Diagonal))
                     M(i,i) = *el;
-                
+
                 // upper triangle
                 if ((d != 0) and (triangle & MatrixSelection::StrictUpper))
                     M(i,i+d) = *el;
-                
+
                 // lower triangle
                 if ((d != 0) and (triangle & MatrixSelection::StrictLower))
                     M(i+d,i) = *el;
@@ -692,24 +692,24 @@ public:
             // move on to the next elements
             el++;
         }
-        
+
         return M;
     }
-    
+
     /// Output to a text stream.
 //     friend std::ostream & operator << (std::ostream & out, SymBandMatrix<DataT> const & A);
-    
+
 private:
 
     // dimension (only square matrices allowed)
     std::size_t n_;
-    
+
     // main and upper diagonal count
     std::size_t d_;
-    
+
     // diagonals concatenated in row-oriented way (and padded, if necessary) of size n_*d_
     NumberArray<DataT> elems_;
-    
+
     // name of linked HDF file
     std::string name_;
 };
@@ -724,40 +724,40 @@ template <class DataT> NumberArray<DataT> operator | (const ArrayView<DataT> v, 
 template <class DataT> class BlockSymBandMatrix
 {
     private:
-        
+
         /// Name of HDF5 scratch disk file.
         std::string diskfile_;
-        
+
         /// Whether to keep in memory.
         bool inmemory_;
-        
+
         /// Number of blocks in a block row.
         std::size_t blockcount_;
-        
+
         /// Block structure half-bandwidth.
         std::size_t blockhalfbw_;
-        
+
         /// Size of a matrix block.
         std::size_t size_;
-        
+
         /// Half bandwidth.
         std::size_t halfbw_;
-        
+
         /// Data array.
         NumberArray<DataT> data_;
-        
+
     public:
-        
+
         //
         // Constructors.
         //
-        
+
         BlockSymBandMatrix ()
             : diskfile_(), inmemory_(true), blockcount_(0), blockhalfbw_(0), size_(0), halfbw_(0), data_()
         {
             // nothing
         }
-        
+
         /**
          * @brief Main constructor.
          * 
@@ -771,7 +771,7 @@ template <class DataT> class BlockSymBandMatrix
             if (inmemory_)
                 data_.resize(blockcount_ * size_ * blockhalfbw_ * halfbw_);
         }
-        
+
         /// Copy constructor.
         BlockSymBandMatrix (BlockSymBandMatrix const & B)
             : diskfile_(), inmemory_(true), blockcount_(B.blockcount_), blockhalfbw_(B.blockhalfbw_), size_(B.size_), halfbw_(B.halfbw_), data_(B.data_)
@@ -779,22 +779,22 @@ template <class DataT> class BlockSymBandMatrix
             if (not B.inmemory())
                 HexException("Copy constructor of BlockSymBandMatrix only implemented for in-memory matrices!");
         }
-        
+
         /// Is this object cached in memory?
         bool inmemory () const
         {
             return inmemory_;
         }
-        
+
         /// Access to the memory buffer (maay be empty if data not in memory).
         NumberArray<DataT> const & data () const { return data_; }
-        
+
         // Structure information.
         std::size_t blockcount () const { return blockcount_; }
         std::size_t blockhalfbw () const { return blockhalfbw_; }
         std::size_t size () const { return size_; }
         std::size_t halfbw () const { return halfbw_; }
-        
+
         /**
          * @brief Access block.
          * 
@@ -813,7 +813,7 @@ template <class DataT> class BlockSymBandMatrix
                 )
             );
         }
-        
+
         /**
          * @brief Access element.
          * 
@@ -827,13 +827,13 @@ template <class DataT> class BlockSymBandMatrix
         {
             return data_[((std::min(i, k) * blockhalfbw_ + std::abs(i - k)) * size_ + std::min(j, l)) * halfbw_ + std::abs(j - l)];
         }
-        
+
         /// Reduced arithmetic operators.
         BlockSymBandMatrix<DataT> & operator += (BlockSymBandMatrix<DataT> const & B)
         {
             if (blockcount_ != B.blockcount_ or blockhalfbw_ != B.blockhalfbw_ or size_ != B.size_ or halfbw_ != B.halfbw_ or data_.size() != B.data_.size())
                 HexException("The matrices supplied to operator \"+=\" have not the same structure.");
-            
+
             data_ += B.data_;
             return *this;
         }
@@ -841,7 +841,7 @@ template <class DataT> class BlockSymBandMatrix
         {
             if (blockcount_ != B.blockcount_ or blockhalfbw_ != B.blockhalfbw_ or size_ != B.size_ or halfbw_ != B.halfbw_ or data_.size() != B.data_.size())
                 HexException("The matrices supplied to operator \"-=\" have not the same structure.");
-            
+
             data_ -= B.data_;
             return *this;
         }
@@ -855,7 +855,7 @@ template <class DataT> class BlockSymBandMatrix
             data_ /= z;
             return *this;
         }
-        
+
         /// Access individual blocks.
         NumberArray<DataT> getBlock (int i) const
         {
@@ -867,28 +867,28 @@ template <class DataT> class BlockSymBandMatrix
             {
                 // open disk file
                 HDFFile hdf (diskfile_, HDFFile::readonly);
-                
+
                 // check success
                 if (not hdf.valid())
                     HexException("Cannot open file \"%s\".\nError stack:\n%s", diskfile_.c_str(), hdf.error().c_str());
-                
+
                 // create output array
                 NumberArray<DataT> data (size_ * halfbw_);
-                
+
                 // read data
                 if (not hdf.read("data", &data[0], size_ * halfbw_, i * size_ * halfbw_))
                     HexException("Cannot access block %d in file \"%s\".\nError stack:\n%s", i, diskfile_.c_str(), hdf.error().c_str());
-                
+
                 return data;
             }
         }
-        
+
         /// Access individual blocks.
         void setBlock (int i, const ArrayView<DataT> data)
         {
             if (data.size() != size_ * halfbw_)
                 HexException("Wrong dimensions: %ld != %ld.", data.size(), size_ * halfbw_);
-            
+
             if (inmemory_)
             {
                 ArrayView<DataT>(data_, i * size_ * halfbw_, size_ * halfbw_) = data;
@@ -905,25 +905,25 @@ template <class DataT> class BlockSymBandMatrix
                         phdf = new HDFFile (diskfile_, HDFFile::overwrite);
                         if (not phdf->valid())
                             HexException("Cannot open file \"%s\" for writing.\nError stack:\n%s", diskfile_.c_str(), phdf->error().c_str());
-                        
+
                         // initialize the dataset to its full length
                         if (not phdf->write("data", (Complex*)nullptr, size_ * halfbw_ * size_ * halfbw_))
                             HexException("Failed to initialize file \"%s\" (size %.1f).\n%s", diskfile_.c_str(), double(size_ * halfbw_)/std::pow(2,30), phdf->error().c_str());
                     }
-                    
+
                     // write data
                     if (not phdf->write("data", &data[0], size_ * halfbw_, i * size_ * halfbw_))
                         HexException("Cannot access block %d in file \"%s\".\nError stack:\n%s", i, diskfile_.c_str(), phdf->error().c_str());
-                    
+
                     delete phdf;
                 }
             }
         }
-        
+
         //
         // Arithmetic operators.
         //
-        
+
         /**
          * @brief Multiply (block) vector by the matrix.
          * 
@@ -940,26 +940,26 @@ template <class DataT> class BlockSymBandMatrix
             // check vector size
             if (v.size() != blockcount_ * size_)
                 HexException("[BlockSymBandMatrix::dot] Different size of matrix and vector in multiplication routine: %ld (mat) != %ld (vec).", blockcount_ * size_, v.size());
-            
+
             // check if matrix is empty
             if (halfbw_ == 0)
                 return;
-            
+
             // scale destination vector
             w *= b;
-            
+
             // parallel section start
             # pragma omp parallel if (parallelize)
             {
                 // thread-private workspace
                 NumberArray<DataT> product (size_);
-                
+
                 // open data file for reading
                 NumberArray<DataT> diskdata;
                 HDFFile * hdf = nullptr;
                 if (not inmemory_)
                     hdf = new HDFFile (diskfile_, HDFFile::readonly);
-                
+
                 // parallel processing of blocks in this diagonal
                 # pragma omp for schedule (dynamic,1)
                 for (std::size_t i = 0; i < blockcount_; i++)
@@ -968,18 +968,18 @@ template <class DataT> class BlockSymBandMatrix
                     // skip unwanted blocks
                     if (i < j and not (tri & MatrixSelection::StrictUpper)) continue;
                     if (i > j and not (tri & MatrixSelection::StrictLower)) continue;
-                    
+
                     // diagonal, skip if too far from main diagonal
                     std::size_t d = std::max(i,j) - std::min(i,j);
                     if (d >= blockhalfbw_) continue;
-                    
+
                     // block volume and offset
                     std::size_t vol = size_ * halfbw_;
                     std::size_t offset = (std::min(i,j) * blockhalfbw_ + d) * vol;
-                    
+
                     // data view of this block
                     ArrayView<DataT> view;
-                    
+
                     // select matrix block data
                     if (inmemory_)
                     {
@@ -992,11 +992,11 @@ template <class DataT> class BlockSymBandMatrix
                         diskdata.resize(vol);
                         if (not hdf->read("data", &diskdata[0], vol, offset))
                             HexException("Failed to read HDF file \"%s\".\nHDF error stack:\n%s", diskfile_.c_str(), hdf->error().c_str());
-                        
+
                         // reset view to the new data
                         view.reset(vol, diskdata.data());
                     }
-                    
+
                     // multiply-add
                     SymBandMatrix<DataT>::sym_band_dot
                     (
@@ -1006,17 +1006,17 @@ template <class DataT> class BlockSymBandMatrix
                         i == j ? tri : MatrixSelection::Both
                     );
                 }
-                
+
                 // release disk file
                 if (not inmemory_)
                     delete hdf;
             }
         }
-        
+
         //
         // Coversions to other matrix types.
         //
-        
+
         /**
          * @brief Convert to COO format.
          */
@@ -1024,20 +1024,20 @@ template <class DataT> class BlockSymBandMatrix
         {
             // number of structurally non-zero blocks (both upper and lower)
             std::size_t nblocks = blockcount_ * (2 * blockhalfbw_ - 1);
-            
+
             // number of structurally non-zero elements (the structure is recursive)
             std::size_t nelem = nblocks * size_ * (2 * halfbw_ - 1);
-            
+
             // allocate the ijv arrays
             NumberArray<IdxT> I; I.reserve(nelem);
             NumberArray<IdxT> J; J.reserve(nelem); 
             NumberArray<DataT> V; V.reserve(nelem);
-            
+
             // open data file for reading
             HDFFile * hdf = nullptr;
             if (not inmemory_)
                 hdf = new HDFFile (diskfile_, HDFFile::readonly);
-            
+
             // for all blocks
             for (std::size_t i = 0; i < blockcount_; i++)
             for (std::size_t d = 0; d < blockhalfbw_; d++)
@@ -1045,7 +1045,7 @@ template <class DataT> class BlockSymBandMatrix
             {
                 // data view of this block diagonal
                 cArrayView view;
-                
+
                 // it may be necessary to load the data from disk
                 cArray diskdata;
                 if (inmemory_)
@@ -1059,14 +1059,14 @@ template <class DataT> class BlockSymBandMatrix
                     diskdata.resize(size_ * halfbw_);
                     if (not hdf->read("data", &diskdata[0], size_ * halfbw_, (i * blockhalfbw_ + d) * size_ * halfbw_))
                         HexException("Failed to read HDF file \"%s\".\nHDF error stack:\n%s", diskfile_.c_str(), hdf->error().c_str());
-                    
+
                     // reset view to the new data
                     view.reset(size_ * halfbw_, diskdata.data());
                 }
-                
+
                 // convert the block to COO format
                 CooMatrix<IdxT,DataT> coo = SymBandMatrix<DataT>(size_, halfbw_, view).template tocoo<IdxT>();
-                
+
                 // copy all elements to whole-matrix arrays
                 for (std::size_t k = 0; k < coo.v().size(); k++)
                 {
@@ -1088,10 +1088,10 @@ template <class DataT> class BlockSymBandMatrix
                     }
                 }
             }
-            
+
             if (not inmemory_)
                 delete hdf;
-            
+
             // compose the final matrix
             return CooMatrix<IdxT,DataT>
             (
@@ -1102,28 +1102,28 @@ template <class DataT> class BlockSymBandMatrix
                 std::move(V)    // structurally nonzero matrix entries
             );
         }
-        
+
         //
         // Scratch file I/O.
         //
-        
+
         /// Get name of the scratch disk file.
         std::string   hdfname () const { return diskfile_; }
         std::string & hdfname ()       { return diskfile_; }
-        
+
         /// Release data from memory, but keep HDF link.
         void drop ()
         {
             // release memory
             data_.drop();
-            
+
             // turn off the "in memory" flag
             inmemory_ = false;
         }
-        
+
         /// Check that the scratch disk file exists.
         bool hdfcheck () const { return HDFFile(diskfile_, HDFFile::readonly).valid(); }
-        
+
         /// Reset (= create empty) HDF scratch file needed when writing individual blocks.
         bool hdfinit () const
         {
@@ -1131,51 +1131,51 @@ template <class DataT> class BlockSymBandMatrix
             HDFFile hdf (diskfile_, HDFFile::overwrite);
             if (not hdf.valid())
                 HexException("Cannot open file \"%s\" for writing.\nHDF error stack:\n%s", diskfile_.c_str(), hdf.error().c_str());
-            
+
             // initialize the dataset to its full length
             if (not hdf.write("data", (Complex*)nullptr, blockcount_ * blockhalfbw_ * size_ * halfbw_))
                 HexException("Failed to initialize file \"%s\" (size %.1f).\n%s", diskfile_.c_str(), double(size_ * halfbw_)/std::pow(2,30), hdf.error().c_str());
-            
+
             return true;
         }
-        
+
         /// Write all blocks from memory to the disk file.
         bool hdfsave () const
         {
             // open disk file
             HDFFile hdf (diskfile_, HDFFile::overwrite);
-            
+
             // check success
             if (not hdf.valid())
                 return false;
-            
+
             // save data
             if (not hdf.write("data", &data_[0], data_.size()))
                 return false;
-            
+
             return true;
         }
-        
+
         /// Load data from disk to memory.
         bool hdfload ()
         {
             // open disk file
             HDFFile hdf (diskfile_, HDFFile::readonly);
-            
+
             // check success
             if (not hdf.valid())
                 return false;
-            
+
             // allocate memory
             data_.resize(blockcount_ * size_ * blockhalfbw_ * halfbw_);
-            
+
             // read data
             if (not hdf.read("data", &data_[0], data_.size()))
                 return false;
-            
+
             // turn on the "in memory" flag
             inmemory_ = true;
-            
+
             return true;
         }
 };
@@ -1208,7 +1208,7 @@ BlockSymBandMatrix<DataT> kron
 )
 {
     BlockSymBandMatrix<DataT> C (A.size(), A.halfbw(), B.size(), B.halfbw());
-    
+
     for (std::size_t i = 0; i < A.size(); i++)
     for (std::size_t u = 0; u < A.halfbw(); u++)
     if (i + u < A.size())
@@ -1218,7 +1218,7 @@ BlockSymBandMatrix<DataT> kron
     {
         C(i,j,i+u,j+v) = A(i,i+u) * B(j,j+v);
     }
-    
+
     return C;
 }
 
@@ -1286,31 +1286,31 @@ template <class DataT> void kron_dot
 {
     std::size_t A_rows = A.size();
     std::size_t B_rows = B.size();
-    
+
     if (A_row_limit >= 0) A_rows = std::min<std::size_t>(A_row_limit, A_rows);
     if (B_row_limit >= 0) B_rows = std::min<std::size_t>(B_row_limit, B_rows);
-    
+
     w *= a;
-    
+
     # pragma omp parallel for
     for (std::size_t i = 0; i < A_rows; i++)
     {
         // iteration bounds
         std::size_t kmin = (i >= A.halfbw() ? i - A.halfbw() : 0);
         std::size_t kmax = std::min(A_rows - 1, i + A.halfbw() - 1);
-        
+
         for (std::size_t k = kmin; k <= kmax; k++)
         for (std::size_t j = 0; j < B_rows; j++)
         {
             // iteration bounds
             std::size_t lmin = (j >= B.halfbw() ? j - B.halfbw() : 0);
             std::size_t lmax = std::min(B_rows - 1, j + B.halfbw() - 1);
-            
+
             // calculate the scalar product
             DataT res = 0;
             for (std::size_t l = lmin; l <= lmax; l++)
                 res += B(j,l) * v[k * B_rows + l];
-            
+
             // save result
             w[i * B_rows + j] += b * A(i,k) * res;
         }

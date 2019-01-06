@@ -88,61 +88,61 @@
 class LUft_UMFPACK : public LUft
 {
     public:
-    
+
         // run-time selection mechanism
         factorizerRunTimeSelectionDefinitions(LUft_UMFPACK, "umfpack")
-        
+
         /// Default constructor.
         LUft_UMFPACK ();
-        
+
         /// Destructor.
         virtual ~LUft_UMFPACK () { drop(); }
-        
+
         // Disable bitwise copy
         LUft_UMFPACK const & operator= (LUft_UMFPACK const &) = delete;
-        
+
         /// Factorize.
         virtual void factorize (CsrMatrix<LU_int_t,Complex> const & matrix);
-        
+
         /// Return factorization information.
         NumberArray<double> const & info () const { return info_; }
-        
+
         /// Validity indicator.
         virtual bool valid () const;
-        
+
         /// Return LU byte size.
         virtual std::size_t size () const;
-        
+
         /// Return condition number.
         virtual Real cond () const;
-        
+
         /// Solve equations.
         virtual void solve (const cArrayView b, cArrayView x, int eqs) const;
-        
+
         /// Save factorization data to disk.
         virtual void save (std::string name) const;
-        
+
         /// Load factorization data from disk.
         virtual void load (std::string name, bool throw_on_io_failure = true);
-        
+
         /// Release memory.
         virtual void drop ();
-        
+
         /// Convert LU to CSR.
         virtual CsrMatrix<LU_int_t,Complex> get () const;
-        
+
     private:
-        
+
         /// Numeric decomposition as produced by UMFPACK.
         void * numeric_;
-        
+
         /// Matrix data, needed for solution.
         NumberArray<LU_int_t> p_;
         NumberArray<LU_int_t> i_;
         NumberArray<std::complex<double>> x_;
-        
+
     public:
-        
+
         /// Set of status flags produced by UMFPACK.
         mutable NumberArray<double> info_;
 };

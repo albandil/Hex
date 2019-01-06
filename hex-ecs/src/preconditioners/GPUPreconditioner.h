@@ -71,13 +71,13 @@
 class GPUCGPreconditioner : public virtual KPACGPreconditioner
 {
     public:
-        
+
         // run-time selection mechanism
         preconditionerRunTimeSelectionDefinitions(GPUCGPreconditioner, "GPU")
-        
+
         // default constructor needed by the RTS mechanism
         GPUCGPreconditioner ();
-        
+
         // constructor
         GPUCGPreconditioner
         (
@@ -90,44 +90,44 @@ class GPUCGPreconditioner : public virtual KPACGPreconditioner
             Bspline const & bspline_panel_x,
             Bspline const & bspline_panel_y
         );
-        
+
         // preconditioner description
         virtual std::string description () const;
-        
+
         // reuse parent definitions
         using KPACGPreconditioner::rhs;
         using KPACGPreconditioner::update;
-        
+
         // declare own definitions
         virtual void setup ();
         virtual void finish ();
         virtual void multiply (BlockArray<Complex> const & p, BlockArray<Complex> & q, MatrixSelection::Selection tri) const;
         virtual void precondition (BlockArray<Complex> const & r, BlockArray<Complex> & z) const;
-        
+
     protected:
-        
+
         // OpenCL environment
         cl_platform_id platform_;
         cl_device_id device_;
         cl_context context_;
         cl_command_queue queue_;
         cl_program program_;
-        
+
         // size of a workgroup
         std::size_t Nlocal_;
         std::size_t blocksize_;
-        
+
         // memory allocation flags
         cl_mem_flags smallRODataFlags_, smallRWDataFlags_;
         cl_mem_flags largeRODataFlags_, largeRWDataFlags_;
-        
+
         // computational kernels
         cl_kernel mmls_, mabt_, matbt_;
         cl_kernel A1el_, A2eld_, A2elc_;
         cl_kernel mms1_, mms2d_, mms2c_;
         cl_kernel mml1_, mml2d_, mml2c_;
         cl_kernel axby_, norm_, spro_, krdv_;
-        
+
         // device data connections
         mutable clArray<Complex> tmp_, tmA_;
         mutable clArray<Real> nrm_;

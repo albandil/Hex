@@ -60,13 +60,13 @@
 class HybCGPreconditioner : public ILUCGPreconditioner, public KPACGPreconditioner
 {
     public:
-        
+
         // run-time selection mechanism
         preconditionerRunTimeSelectionDefinitions(HybCGPreconditioner, "HYB")
-        
+
         // default constructor needed by the RTS mechanism
         HybCGPreconditioner () {}
-        
+
         // constructor
         HybCGPreconditioner
         (
@@ -99,26 +99,26 @@ class HybCGPreconditioner : public ILUCGPreconditioner, public KPACGPrecondition
         {
             // nothing more to do
         }
-        
+
         // preconditioner description
         virtual std::string description () const;
-        
+
         // reuse parent definitions
         using CGPreconditioner::multiply;
         using CGPreconditioner::rhs;
         using CGPreconditioner::precondition;
-        
+
         // declare own definitions
         virtual void setup ();
         virtual void update (Real E);
         virtual void finish ();
-        
+
         // inner CG callback (needed by parent)
         virtual void CG_init (int iblock) const;
         virtual void CG_prec (int iblock, const cArrayView r, cArrayView z) const;
         virtual void CG_mmul (int iblock, const cArrayView r, cArrayView z) const;
         virtual void CG_exit (int iblock) const;
-        
+
         // decide whether to use the ILU preconditioner
         bool ilu_needed (int iblock) const;
 };

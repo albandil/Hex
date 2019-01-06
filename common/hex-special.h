@@ -110,11 +110,11 @@ template <class T> T trapz (double h, NumberArray<T> const & y)
 template <class T> T trapz (NumberArray<T> const & x, NumberArray<T> const & y)
 {
     assert (x.size() == y.size());
-    
+
     T sum = 0;
     for (unsigned i = 1; i < x.size(); i++)
         sum += 0.5 * (y[i] + y[i-1]) * (x[i] - x[i-1]);
-    
+
     return sum;
 }
 
@@ -125,14 +125,14 @@ template <class T> T simpson (double h, NumberArray<T> const & y)
 {
     if (y.size() % 2 != 0)
         HexException("You need to use even number of grid points for Simpson integration.");
-    
+
     T sum1 = 0, sum2 = 0;
-    
+
     for (int i = 1; i < y.size(); i += 2)
         sum1 += y[i];
     for (int i = 2; i < y.size() - 1; i += 2)
         sum2 += y[i];
-    
+
     return h * (y.front() + 4. * sum1 + 2. * sum2 + y.back()) / 3.;
 }
 
@@ -143,7 +143,7 @@ template <class T> NumberArray<T> romberg (const ArrayView<T> y)
 {
     NumberArray<T> z = y;
     unsigned N = y.size();
-    
+
     T scale = 1;
     for (unsigned log4scale = 1; log4scale < N; log4scale++)
     {
@@ -153,7 +153,7 @@ template <class T> NumberArray<T> romberg (const ArrayView<T> y)
             z[j] = (scale * z[j] - z[j-1]) / (scale - T(1));
         }
     }
-    
+
     return z;
 }
 
@@ -190,7 +190,7 @@ inline std::uint64_t pow3 (std::uint64_t i)
         /* 3^8 */ 3*3*3*3*3*3*3*3,
         /* 3^9 */ 3*3*3*3*3*3*3*3*3
     };
-    
+
     return (i < 10 ? pow3_table[i] : (std::uint64_t)std::pow(3,i));
 }
 
@@ -204,20 +204,20 @@ inline std::uint64_t pow3 (std::uint64_t i)
 template <class T> T pow_int (T x, int n)
 {
     T value = 1.;
-    
+
     if (n < 0)
         return T(1) / pow_int(x, -n);
-    
+
     do
     {
         if(n % 2 == 1)
             value *= x;
-        
+
         n /= 2;
         x *= x;
     }
     while (n);
-    
+
     return value;
 }
 
@@ -356,7 +356,7 @@ template <class T, class OuterFunctionDerivative, class InnerFunctionDerivative>
     // no derivative : evaluate the function
     if (n == 0)
         return Df(0,Dg(0,x));
-    
+
     // first and higher derivative : use the Faa di Bruno formula
     T suma = 0, term = 0;
     for (std::vector<int> & counts : FdB_partition(n))
@@ -364,16 +364,16 @@ template <class T, class OuterFunctionDerivative, class InnerFunctionDerivative>
         // evaluate derivative of "f"
         if ((term = Df(std::accumulate(counts.begin(), counts.end(), 0),Dg(0,x))) == 0)
             continue;
-        
+
         // evaluate all derivatives of "g"
         for (int j = 1; j <= n; j++)
         {
             term *= std::pow(Dg(j,x) / gsl_sf_fact(j), counts[j-1]) / gsl_sf_fact(counts[j-1]);
-            
+
             if (term == 0)
                 break;
         }
-        
+
         // update the sum
         suma += term;
     }
@@ -599,7 +599,7 @@ Complex sphBiY (int l1, int l2, int L, int M, double theta1, double phi1, double
 template <typename T> class RadialFunction
 {
 public:
-    
+
     /// Evaluate the function.
     virtual T operator() (double x) const = 0;
 };
@@ -611,7 +611,7 @@ inline double dric_j (int n, double x)
 {
     if (n == 0)
         return cos(x);
-    
+
     return gsl_sf_bessel_jl(n,x) + (n * ric_j(n-1,x) - (n+1) * ric_j(n+1,x)) / (2*n+1);
 }
 
@@ -622,7 +622,7 @@ inline double dric_n (int n, double x)
 {
     if (n == 0)
         return sin(x);
-    
+
     return gsl_sf_bessel_yl(n,x) + (n * ric_n(n-1,x) - (n+1) * ric_n(n+1,x)) / (2*n+1);
 }
 
@@ -633,7 +633,7 @@ inline double dric_i (int n, double x)
 {
     if (n == 0)
         return cosh(x);
-    
+
     return exp(x) * (sph_i_scaled(n,x) + (n * ric_i_scaled(n-1,x) + (n+1) * ric_i_scaled(n+1,x)) / (2*n+1));
 }
 
@@ -644,7 +644,7 @@ inline double dric_k (int n, double x)
 {
     if (n == 0)
         return -exp(-x);
-    
+
     return exp(-x) * (sph_k_scaled(n,x) - (n * ric_k_scaled(n-1,x) + (n+1) * ric_k_scaled(n+1,x)) / (2*n+1));
 }
 
@@ -655,7 +655,7 @@ inline double dric_i_scaled (int n, double x)
 {
     if (n == 0)
         return exp(-2*x);
-    
+
     return sph_i_scaled(n,x) - ric_i_scaled(n,x) + (n * ric_i_scaled(n-1,x) + (n+1) * ric_i_scaled(n+1,x)) / (2*n+1);
 }
 
@@ -666,7 +666,7 @@ inline double dric_k_scaled (int n, double x)
 {
     if (n == 0)
         return 0;
-    
+
     return sph_k_scaled(n,x) + ric_k_scaled(n,x) - (n * ric_k_scaled(n-1,x) + (n+1) * ric_k_scaled(n+1,x)) / (2*n+1);
 }
 

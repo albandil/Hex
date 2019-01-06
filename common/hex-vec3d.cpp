@@ -49,40 +49,40 @@ std::istream & operator >> (std::istream & is, vec3d & v)
 {
     // read buffer
     char c;
-    
+
     // whole string
     std::string vec;
-    
+
     // read characters
     while (true)
     {
         // read white characters as well
         is >> std::noskipws >> c;
-        
+
         // throw away leading spaces
         if (vec.empty() and std::isspace(c))
             continue;
-        
+
         // check that we start with the opening parenthesis
         if (vec.empty() and c != '(')
             HexException("A specification of a vector has to start with '('!");
-        
+
         // add character to the whole string
         vec.push_back(c);
-        
+
         // exit on right parenthesis
         if (c == ')')
             break;
     }
-    
+
     // strip parentheses
     vec.erase(vec.begin());
     vec.erase(vec.end()-1);
-    
+
     // read components
     std::istringstream iss(vec);
     iss >> v.x >> v.y >> v.z;
-    
+
     return is;
 }
 

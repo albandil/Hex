@@ -70,15 +70,15 @@ void hex_initialize_ (const char* dbname)
 {
     // open database
     db.open(dbname);
-    
+
     // turn off GSL error handler
     gsl_set_error_handler_off();
-    
+
     // disable journaling
     sqlitepp::statement st (db);
     st << "PRAGMA synchronous = OFF";
     st.exec();
-    
+
     // sort quantities' classes in order of their dependencies
     std::vector<std::size_t> position (ScatteringQuantity::RTS_Table->size(), ScatteringQuantity::RTS_Table->size());
     std::size_t next_position = 0;
@@ -97,18 +97,18 @@ void hex_initialize_ (const char* dbname)
         {
             // get dependencies
             std::vector<std::string> deps = (*ScatteringQuantity::RTS_Table)[i]->dependencies();
-            
+
             // check that all dependencies are already in place
             bool depsOK = true;
             for (std::size_t j = 0; j < ScatteringQuantity::RTS_Table->size(); j++)
             {
                 if (std::find(deps.begin(), deps.end(), (*ScatteringQuantity::RTS_Table)[j]->name()) == deps.end())
                     continue;
-                
+
                 if (position[j] > next_position)
                     depsOK = false;
             }
-            
+
             // place the quantity to the next position
             if (depsOK)
             {
@@ -116,17 +116,17 @@ void hex_initialize_ (const char* dbname)
                 next_position++;
             }
         }
-        
+
         if (u++ == 100)
             HexException("Cyclical dependency between scattering quantities?");
     }
-    
+
     // create sorted vector of pointers
     std::unique_ptr<std::vector<ScatteringQuantity*>> new_quantities (new std::vector<ScatteringQuantity*>(ScatteringQuantity::RTS_Table->size()));
     for (std::size_t i = 0; i < ScatteringQuantity::RTS_Table->size(); i++)
         (*new_quantities)[position[i]] = (*ScatteringQuantity::RTS_Table)[i];
     ScatteringQuantity::RTS_Table.swap(new_quantities);
-    
+
     // initialize the quantities
     for (ScatteringQuantity * Q : *ScatteringQuantity::RTS_Table)
     {
@@ -157,14 +157,14 @@ void hex_import_ (const char* sqlname)
     std::ifstream ifs;
     if (std::string(sqlname) != std::string("-"))
         ifs.open(sqlname);
-    
+
     // get input stream
     std::istream& is = (std::string(sqlname) != std::string("-")) ? ifs : std::cin;
-    
+
     // test input stream
     if (not is.good())
         HexException("Cannot open file \"%s\".", sqlname);
-    
+
     // line numbers (current and total)
     unsigned line = 0, lines = 0;
     if (std::string(sqlname) != std::string("-"))
@@ -176,56 +176,56 @@ void hex_import_ (const char* sqlname)
             std::istreambuf_iterator<char>(),
             '\n'
         );
-        
+
         // reset file to the beginning
         is.clear();
         is.seekg(0);
     }
-    
+
     std::cout << "\rImporting data...  " << std::flush;
-    
+
     // store default precision
     std::streamsize precision = std::cout.precision();
     std::cout.precision(0);
     std::cout.setf(std::ios::fixed, std::ios::floatfield);
-    
+
     do
     {
         // query statement
         sqlitepp::statement st(db);
-        
+
         if (lines > 0)
             std::cout << "\rImporting data...  " << line * 100. / lines << " % " << std::flush;
-        
+
         // read line from input stream
         std::string cmd, cmd1;
         std::getline (is, cmd);
-        
+
         // skip empty lines
         if (cmd.size() == 0)
             continue;
-        
+
         // for all statements on this line
         do
         {
             // trim spaces
             cmd = trim(cmd);
-            
+
             // skip this line if it starts with a comment
             if (cmd.size() > 1 and cmd[0] == '-' and cmd[1] == '-')
                 break;
-            
+
             // position of semicolon
             unsigned semicolon = std::find(cmd.begin(), cmd.end(), ';') - cmd.begin();
-            
+
             // split string
             cmd1 = cmd.substr(0, semicolon);
             cmd = (semicolon == cmd.size() ? "" : cmd.substr(semicolon + 1, std::string::npos));
-            
+
             // trim spaces
             cmd1 = trim(cmd1);
             cmd = trim(cmd);
-            
+
             // try to execute the first command
             try
             {
@@ -240,12 +240,12 @@ void hex_import_ (const char* sqlname)
             }
         }
         while (cmd.size() > 0);
-        
+
         // move on to the next line
         line++;
     }
     while (not is.eof());
-    
+
     std::cout << "\rThe SQL batch file \"" << sqlname << "\" has been successfully imported." << std::endl;
     std::cout.precision(precision);
     std::cout.unsetf(std::ios::floatfield);
@@ -270,7 +270,7 @@ void hex_optimize_ ()
 {
     sqlitepp::statement st (db);
     st << "VACUUM";
-    
+
     try
     {
         st.exec();
@@ -299,12 +299,12 @@ void hex_dump_ (const char* dumpfile)
         "quote(ell) || ',' || "
         "quote(Re_T_ell) || ',' || "
         "quote(Im_T_ell) || ')' FROM 'tmat';";
-    
+
     try
     {
         // create statement
         st << dumpcmd, sqlitepp::into(dumpline);
-        
+
         // open output file
         std::ofstream outfile;
         if (dumpfile != std::string("-"))
@@ -316,7 +316,7 @@ void hex_dump_ (const char* dumpfile)
                 std::exit(EXIT_FAILURE);
             }
         }
-        
+
         // get and write data
         if (dumpfile != std::string("-"))
         {
@@ -357,14 +357,14 @@ int hex_run
             ScatteringQuantity::RTS_Table->end(),
             [&](ScatteringQuantity * q){ return q->name() == varname; }
         );
-        
+
         // get a pointer from the dictionary
         if (var == ScatteringQuantity::RTS_Table->end())
         {
             // this should never happen
             HexException("Quantity \"%s\" not available.", varname.c_str());
         }
-        
+
         // try to compute the results
         if (not (*var)->run(sdata))
         {
@@ -372,6 +372,6 @@ int hex_run
             HexException("Computation of \"%s\" failed.", varname.c_str());
         }
     }
-    
+
     return EXIT_SUCCESS;
 }

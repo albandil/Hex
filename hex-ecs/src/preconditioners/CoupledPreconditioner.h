@@ -41,13 +41,13 @@
 class CoupledPreconditioner : public virtual KPACGPreconditioner
 {
     public:
-        
+
         // run-time selection mechanism
         preconditionerRunTimeSelectionDefinitions(CoupledPreconditioner, "coupled")
-        
+
         // default constructor needed by the RTS mechanism
         CoupledPreconditioner () {}
-        
+
         // constructor
         CoupledPreconditioner
         (
@@ -78,28 +78,28 @@ class CoupledPreconditioner : public virtual KPACGPreconditioner
         {
             // nothing to do
         }
-        
+
         // preconditioner description
         virtual std::string description () const;
-        
+
         // reuse parent definitions
         using KPACGPreconditioner::setup;
         using KPACGPreconditioner::rhs;
         using KPACGPreconditioner::multiply;
-        
+
         // override segregated preconditioner routine
         virtual int solve_block (int ill, const cArrayView r, cArrayView z) const;
-        
+
         // declare own definitions
         virtual void update (Real E);
         virtual void precondition (BlockArray<Complex> const & r, BlockArray<Complex> & z) const;
         virtual void finish ();
-    
+
     protected:
-    
+
         // LU factorization.
         std::shared_ptr<LUft> lu_;
-        
+
         // Workspace used for the solution.
         mutable cArray X, Y;
 };

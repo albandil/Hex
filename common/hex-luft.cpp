@@ -72,7 +72,7 @@ std::size_t LUft_UMFPACK<LU_int_t,Complex>::size () const
 {
     if (numeric_ == nullptr)
         return 0;
-    
+
     LU_int_t lnz, unz, m, n, nz_udiag;
     LU_int_t status = UMFPACK_GET_LUNZ_F
     (
@@ -83,7 +83,7 @@ std::size_t LUft_UMFPACK<LU_int_t,Complex>::size () const
         &nz_udiag,  // ?
         numeric_    // factorization object
     );
-    
+
     return status == 0 ? (lnz + unz) * 16LL : 0LL; // Byte count
 }
 
@@ -105,7 +105,7 @@ void LUft_UMFPACK<LU_int_t,Complex>::solve (const cArrayView b, cArrayView x, in
     // check sizes
     assert(eqs * matrix_.cols() == x.size());
     assert(eqs * matrix_.cols() == b.size());
-    
+
     // solve for all RHSs
     for (int eq = 0; eq < eqs; eq++)
     {
@@ -115,24 +115,24 @@ void LUft_UMFPACK<LU_int_t,Complex>::solve (const cArrayView b, cArrayView x, in
             UMFPACK_Aat,            // matrix orientation
             matrix_.p().data(),     // row pointers
             matrix_.i().data(),     // column indices
-            
+
             // matrix elements (interleaved)
             reinterpret_cast<const Real*>(matrix_.x().data()),
             nullptr,
-            
+
             // solutions (interleaved)
             reinterpret_cast<Real*>(&x[0] + eq * matrix_.rows()),
             nullptr,
-            
+
             // right-hand side vectors (interleaved)
             reinterpret_cast<const Real*>(&b[0] + eq * matrix_.rows()),
             nullptr,
-            
+
             numeric_,   // factorization object
             nullptr,    // ?
             &info_[0]   // diagnostic information
         );
-        
+
         // check output
         if (status != UMFPACK_OK)
         {
@@ -146,12 +146,12 @@ template<>
 void LUft_UMFPACK<LU_int_t,Complex>::save (std::string name) const
 {
     matrix_.hdfsave("csr-" + name);
-    
+
     int err = UMFPACK_SAVE_NUMERIC_F(numeric_, const_cast<char*>(name.c_str()));
-    
+
     if (err == UMFPACK_ERROR_invalid_Numeric_object)
         HexException("[LUft::save] Invalid numeric object.");
-    
+
     if (err == UMFPACK_ERROR_file_IO)
         HexException("[LUft::save] Failed to save LU object \"%s\" (size = %ld).", name.c_str(), size());
 }
@@ -163,15 +163,15 @@ void LUft_UMFPACK<LU_int_t,Complex>::load (std::string name, bool throw_on_io_fa
     {
         if (throw_on_io_failure)
             HexException("[LUft::load] Failed to load the file \"csr-%s\".", name.c_str());
-        
+
         return;
     }
-    
+
     int err = UMFPACK_LOAD_NUMERIC_F(&numeric_, const_cast<char*>(name.c_str()));
-    
+
     if (err == UMFPACK_ERROR_out_of_memory)
         HexException("[LUft::load] Out of memory.");
-    
+
     if (err == UMFPACK_ERROR_file_IO and throw_on_io_failure)
         HexException("[LUft::save] Failed to load LU object \"%s\".", name.c_str());
 }
@@ -206,13 +206,13 @@ void LUft_SUPERLU<int,Complex>::solve (const cArrayView b, cArrayView x, int eqs
     //
     // Create matrix of the system.
     //
-    
+
         NRformat AStore;
         AStore.nnz    = matrix_.x().size();                         // number of non-zero elements
         AStore.nzval  = const_cast<Complex*>(matrix_.x().data());   // pointer to the array of non-zero elements
         AStore.colind = const_cast<int*>(matrix_.i().data());       // row indices
         AStore.rowptr = const_cast<int*>(matrix_.p().data());       // column pointers
-        
+
         SuperMatrix A;
         A.Stype = SLU_NR;           // storage type: compressed sparse, row-major
 #ifdef SINGLE
@@ -224,15 +224,15 @@ void LUft_SUPERLU<int,Complex>::solve (const cArrayView b, cArrayView x, int eqs
         A.nrow  = matrix_.rows();   // number of rows
         A.ncol  = matrix_.cols();   // number of columns
         A.Store = &AStore;          // data structure pointer
-    
+
     //
     // Create the right hand side.
     //
-    
+
         DNformat BStore;
         BStore.lda = matrix_.cols();                    // leading dimension
         BStore.nzval = const_cast<Complex*>(b.data());  // data pointer
-        
+
         SuperMatrix B;
         B.Stype = SLU_DN;               // storage type: Fortran dense matrix
 #ifdef SINGLE
@@ -244,15 +244,15 @@ void LUft_SUPERLU<int,Complex>::solve (const cArrayView b, cArrayView x, int eqs
         B.nrow = matrix_.cols();        // number of rows (= number of equations)
         B.ncol = eqs;                   // number of columns (= number of right hand sides)
         B.Store = &BStore;              // data structure pointer
-        
+
     //
     // Create the solution matrix.
     //
-        
+
         DNformat XStore;
         XStore.lda = matrix_.cols();    // leading dimension
         XStore.nzval = x.data();        // data pointer
-        
+
         SuperMatrix X;
         X.Stype = SLU_DN;               // storage type: Fortran dense matrix
 #ifdef SINGLE
@@ -264,11 +264,11 @@ void LUft_SUPERLU<int,Complex>::solve (const cArrayView b, cArrayView x, int eqs
         X.nrow = matrix_.cols();        // number of rows (= number of equations)
         X.ncol = eqs;                   // number of columns (= number of right hand sides)
         X.Store = &XStore;              // data structure pointer
-        
+
     //
     // Prepare SuperLU environment.
     //
-    
+
         // calculation options
         superlu_options_t options;
         set_default_options(&options);
@@ -277,24 +277,24 @@ void LUft_SUPERLU<int,Complex>::solve (const cArrayView b, cArrayView x, int eqs
         options.ILU_DropRule = DROP_BASIC;
         options.ILU_DropTol = droptol_;
         options.Fact = FACTORED;
-        
+
         // calculation diagnostic information
         SuperLUStat_t stat;
         StatInit(&stat);
-        
+
         // memory usage
         mem_usage_t mem_usage;
-    
+
     //
     // Solve the right hand sides.
     //
-        
+
         // forward nad backward errors (one element per one right hand side)
         rArray ferr(eqs), berr(eqs);
-        
+
         // reciprocal condition number, reciprocal pivot growth factor
         Real rcond, rpg;
-        
+
         // back-substitution
         int info;
 #ifdef SINGLE
@@ -326,7 +326,7 @@ void LUft_SUPERLU<int,Complex>::solve (const cArrayView b, cArrayView x, int eqs
             &stat,                          // diagnostic infomation
             &info                           // result status
         );
-    
+
     // check status
     if (info != 0)
         HexException("SuperLU/?gssvx failed with status %d.", info);
@@ -347,17 +347,17 @@ void LUft_SUPERLU_DIST<LU_int_t,Complex>::solve (const cArrayView b, cArrayView 
     //
     // Create matrix of the system.
     //
-    
+
         cArray xdata (matrix_.x());
         NumberArray<LU_int_t> idata (matrix_.i());
         NumberArray<LU_int_t> pdata (matrix_.p());
-        
+
         NCformat AStore;
         AStore.nnz    = xdata.size();                           // number of non-zero elements
         AStore.nzval  = &xdata[0];                              // pointer to the array of non-zero elements
         AStore.rowind = reinterpret_cast<int_t*>(&idata[0]);    // row indices
         AStore.colptr = reinterpret_cast<int_t*>(&pdata[0]);    // column pointers
-        
+
         SuperMatrix A;
         A.Stype = SLU_NC;           // storage type: compressed sparse, column-major (SuperLU-dist suports no other)
         A.Dtype = SLU_Z;            // data type: double complex
@@ -365,11 +365,11 @@ void LUft_SUPERLU_DIST<LU_int_t,Complex>::solve (const cArrayView b, cArrayView 
         A.nrow  = matrix_.rows();   // number of rows
         A.ncol  = matrix_.cols();   // number of columns
         A.Store = &AStore;          // data structure pointer
-    
+
     //
     // Prepare SuperLU environment.
     //
-    
+
         // calculation options
         superlu_options_t options;
         set_default_options_dist(&options);
@@ -381,21 +381,21 @@ void LUft_SUPERLU_DIST<LU_int_t,Complex>::solve (const cArrayView b, cArrayView 
         options.IterRefine = NOREFINE;
 //         options.ILU_DropRule = DROP_BASIC;
 //         options.ILU_DropTol = droptol;
-        
+
         // calculation diagnostic information
         SuperLUStat_t stat;
         PStatInit(&stat);
-    
+
     //
     // Solve the system.
     //
-        
+
         // backward error (one element per one right hand side)
         double berr[eqs];
-        
+
         // status indicator
         int info;
-        
+
         // LU factorization
         x = b;
         pzgssvx_ABglobal
@@ -412,16 +412,16 @@ void LUft_SUPERLU_DIST<LU_int_t,Complex>::solve (const cArrayView b, cArrayView 
             &stat,                                              // diagnostic information
             &info                                               // result status
         );
-        
+
         if (info > A.ncol)
             HexException("SuperLU/?gssvx: Memory allocation failure after %d bytes.", info);
         if (info > 0)
             HexException("SuperLU/?gssvx: Singular factor.");
-    
+
     //
     // Clean up.
     //
-    
+
         PStatFree(&stat);
 }
 
@@ -437,7 +437,7 @@ template<>
 LUft_MUMPS<LU_int_t,Complex>::~LUft_MUMPS ()
 {
     drop ();
-    
+
     if (settings != nullptr)
     {
         // destroy MUMPS data
@@ -453,11 +453,11 @@ std::size_t LUft_MUMPS<LU_int_t,Complex>::size () const
 {
     if (not settings)
         return 0;
-    
+
     #define INFO(x) info[x-1]
     std::size_t elems_size = (settings->INFO(9) > 0 ? settings->INFO(9) : std::size_t{1000000} * std::abs(settings->INFO(9)));
     std::size_t index_size = settings->INFO(10);
-    
+
     return sizeof(MUMPS_COMPLEX) * elems_size + sizeof(MUMPS_INT) * index_size;
 }
 
@@ -467,7 +467,7 @@ void LUft_MUMPS<LU_int_t,Complex>::solve (const cArrayView b, cArrayView x, int 
     // copy right-hand side to the solution vector
     if (x.data() != b.data())
         x = b;
-    
+
     // run the back-substitution
     settings->nrhs = 1;
     settings->lrhs = x.size();

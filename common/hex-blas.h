@@ -45,7 +45,7 @@ namespace blas
 #else
     typedef int Int;
 #endif
-    
+
     void gemm
     (
         Complex a,
@@ -54,7 +54,7 @@ namespace blas
         Complex b,
             ColMatrixView<Complex> C
     );
-    
+
     void gemm
     (
         Complex a,
@@ -63,7 +63,7 @@ namespace blas
         Complex b,
             RowMatrixView<Complex> C
     );
-    
+
     void gemv
     (
         Real a,
@@ -72,7 +72,7 @@ namespace blas
         Real b,
             rArrayView w
     );
-    
+
     void gemv
     (
         Complex a,
@@ -81,14 +81,14 @@ namespace blas
         Complex b,
             cArrayView w
     );
-    
+
     void xpby
     (
         cArrayView x,
         Complex b,
         const cArrayView y
     );
-    
+
     Int sbtrf (Int n, Int k, rArrayView ab, ArrayView<Int> ipiv);
     Int sbtrf (Int n, Int k, cArrayView ab, ArrayView<Int> ipiv);
     Int sbtrs (Int n, Int k, rArrayView ab, ArrayView<Int> ipiv, rArrayView bx);

@@ -37,7 +37,7 @@
 // OpenMP macros
 #ifdef _OPENMP
     #include <omp.h>
-    
+
     #define OMP_CREATE_LOCKS(n) \
         std::vector<omp_lock_t> omplck(n); \
         for (omp_lock_t & L : omplck) \

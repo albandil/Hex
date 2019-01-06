@@ -42,43 +42,43 @@ template <class T>
 class Romberg
 {
     private:
-        
+
         // Whether the last computation has been successful.
         bool ok_;
-        
+
         /// Reason for unsuccessful integration.
         std::string status_;
-        
+
         /// Result of the last integration.
         T result_;
-        
+
         /// Minimal level of subdivision.
         unsigned minlevel_;
-        
+
         /// Maximal level of subdivision.
         unsigned maxlevel_;
-        
+
         /// Whether to write verbose output.
         bool verbose_;
-        
+
         /// String prepended to verbose output.
         std::string verbose_pre_;
-        
+
         /// Absolute integration tolerance.
         double epsabs_;
-        
+
         /// Relative integration tolerance.
         double epsrel_;
-        
+
         /// Maximal Romberg order.
         unsigned maxromblevel_;
-        
+
     public:
-        
+
         //
         // constructors
         //
-        
+
         Romberg ()
             : ok_(false), status_(""), result_(0), minlevel_(0), maxlevel_(10),
               verbose_(false), verbose_pre_(""), epsabs_(1e-8), epsrel_(1e-6),
@@ -86,11 +86,11 @@ class Romberg
         {
             // nothing to do
         }
-        
+
         //
         // integration routine
         //
-        
+
         /**
          * @brief Integrates the function.
          * 
@@ -102,16 +102,16 @@ class Romberg
         {
             // reset result
             result_ = 0;
-            
+
             // number of intervals for this subdivision level
             unsigned Nintervals = 1;
-                
+
             // interval size for this subdivision level
             double h = b - a;
-            
+
             // trapezoidal estimates
             std::vector<T> integrals = { 0.5 * (f(b) + f(a)) * h };
-            
+
             // set up Romberg table
             std::vector<std::vector<T>> romberg(1);
             romberg[0].push_back(integrals[0]);
@@ -121,27 +121,27 @@ class Romberg
                           << std::setw(13) << std::left << h << integrals.back() << " "
                           << std::setw(13) << std::left << romberg[0][0] << std::endl;
             }
-            
+
             // for all subdivision levels
             for (unsigned level = 1; level < maxlevel_; level++)
             {
                 // update number and size of intervals
                 Nintervals *= 2;
                 h *= 0.5;
-                
+
                 // sum of evaluations for this subdivision level
                 T suma = integrals.back();
-                
+
                 // extend storage
                 romberg.push_back(std::vector<T>());
-                
+
                 // evaluate where not previously evaluated
                 for (unsigned i = 1; i < Nintervals; i += 2)
                     suma += f(i * h);
-                
+
                 // add the new sum
                 integrals.push_back(suma * h);
-                
+
                 // update Romberg table
                 romberg[level].resize(std::min(level,maxromblevel_) + 1);
                 romberg[level][0] = integrals.back();
@@ -153,7 +153,7 @@ class Romberg
                     if (verbose_) std::cout << std::setw(13) << std::left << romberg[level][icol] << " ";
                 }
                 if (verbose_) std::cout << std::endl;
-                
+
                 // compare estimates
                 double Delta = std::abs(romberg[level].back() - romberg[level-1].back());
                 if ((Delta < epsabs_ or Delta < epsrel_ * std::abs(romberg[level].back())) and level >= minlevel_)
@@ -164,35 +164,35 @@ class Romberg
                     return ok_;
                 }
             }
-            
+
             ok_ = false;
             status_ = format("Subdivision limit (%d) reached.", maxlevel_);
             result_ = romberg.back().back();
             return ok_;
         }
-        
+
         //
         // getters and setters
         //
-        
+
         double epsrel () const { return epsrel_; }
         void setEpsRel (double eps) { epsrel_ = eps; }
-        
+
         double epsabs () const { return epsabs_; }
         void setEpsAbs (double eps) { epsabs_ = eps; }
-        
+
         unsigned minLevel () const { return minlevel_; }
         void setMinLevel (unsigned level) { minlevel_ = level; }
-        
+
         unsigned maxLevel () const { return maxlevel_; }
         void setMaxLevel (unsigned level) { maxlevel_ = level; }
-        
+
         unsigned maxRombLevel () const { return maxromblevel_; }
         void setMaxRombLevel (unsigned level) { maxromblevel_ = level; }
-        
+
         bool verbose () const { return verbose_; }
         void setVerbose (double v, std::string pre = "") { verbose_ = v; verbose_pre_ = pre; }
-        
+
         bool ok () const { return ok_; }
         T result () const { return result_; }
         std::string const & status () const { return status_; }
@@ -225,43 +225,43 @@ template <class T, class Functor>
 class UnitSquareRomberg
 {
     private:
-        
+
         // function to integrate
         Functor f_;
-        
+
         // relative tolerance
         double epsrel_;
-        
+
         // absolute tolerance
         double epsabs_;
-        
+
         // minimal subdivision limit
         unsigned minlevel_;
-        
+
         // maximal subdivision limit (0 = no evaluations; overrides minlevel_)
         unsigned maxlevel_;
-        
+
         // maximal Romberg aggregation limit (0 = no Romberg)
         unsigned maxromblevel_;
-        
+
         // whether to print diagnostic information
         bool verbose_;
-        
+
         // result of the last integration
         T result_;
-        
+
         // status flag
         bool ok_;
-        
+
         // status message
         std::string status_;
-    
+
     public:
-        
+
         //
         // constructor
         //
-        
+
         UnitSquareRomberg
         (
             Functor f,
@@ -277,37 +277,37 @@ class UnitSquareRomberg
         {
             // do nothing
         }
-        
+
         //
         // getters and setters
         //
-        
+
         double epsrel () const { return epsrel_; }
         void setEpsRel (double eps) { epsrel_ = eps; }
-        
+
         double epsabs () const { return epsabs_; }
         void setEpsAbs (double eps) { epsabs_ = eps; }
-        
+
         unsigned minLevel () const { return minlevel_; }
         void setMinLevel (unsigned level) { minlevel_ = level; }
-        
+
         unsigned maxLevel () const { return maxlevel_; }
         void setMaxLevel (unsigned level) { maxlevel_ = level; }
-        
+
         unsigned maxRombLevel () const { return maxromblevel_; }
         void setMaxRombLevel (unsigned level) { maxromblevel_ = level; }
-        
+
         bool verbose () const { return verbose_; }
         void setVerbose (double v) { verbose_ = v; }
-        
+
         bool ok () const { return ok_; }
         T result () const { return result_; }
         std::string const & status () const { return status_; }
-        
+
         //
         // integration
         //
-        
+
         /**
          * @brief Integrate function.
          * 
@@ -319,40 +319,40 @@ class UnitSquareRomberg
             // successive estimates
             std::vector<T> integrals(1);
             integrals.push_back(0.);
-            
+
             // edge
             T h = 1.;
-            
+
             // number of cells per dimension
             unsigned n = 1;
-            
+
             // setup Romberg table
             std::vector<std::vector<T>> romberg(1);
             romberg[0].push_back(0.);
-            
+
             // initialize output
             if (verbose_) std::cout << std::setw(13) << std::left << 1. << romberg[0][0] << std::endl;
-            
+
             // for all subdivisions
             for (unsigned level = 1; maxlevel_ == 0 or level <= maxlevel_; level++)
             {
                 // extend storage
                 integrals.push_back(0);
                 romberg.push_back(std::vector<T>());
-                
+
                 // update geometry
                 h /= 2;
                 n *= 2;
-                
+
                 // evaluate function at all internal points
                 T suma = 0.;
                 for (unsigned ix = 1; ix < n; ix++)
                 for (unsigned iy = 1; iy < n; iy++)
                     suma += f_ (h*ix,h*iy);
-                
+
                 // store integral estimate
                 integrals.push_back(suma * h * h);
-                
+
                 // update Romberg table
                 romberg[level].resize(std::min(level,maxromblevel_) + 1);
                 romberg[level][0] = integrals.back();
@@ -364,7 +364,7 @@ class UnitSquareRomberg
                     if (verbose_) std::cout << std::setw(13) << std::left << romberg[level][icol] << " ";
                 }
                 if (verbose_) std::cout << std::endl;
-                
+
                 // compare estimates
                 double Delta = std::abs(romberg[level].back() - romberg[level-1].back());
                 if ((Delta < epsabs_ or Delta < epsrel_ * std::abs(romberg[level].back())) and level >= minlevel_)
@@ -375,13 +375,13 @@ class UnitSquareRomberg
                     return ok_;
                 }
             }
-            
+
             ok_ = false;
             status_ = format("Subdivision limit (%d) reached.", maxlevel_);
             result_ = romberg.back().back();
             return ok_;
         }
-        
+
         /**
          * @brief Integrate function.
          * 
@@ -397,37 +397,37 @@ class UnitSquareRomberg
             // successive estimates
             std::vector<T> integrals(1);
             integrals.push_back(0.);
-            
+
             // edge
             T h = 1.;
-            
+
             // number of cells per dimension
             unsigned n = 1;
-            
+
             // setup Romberg table
             std::vector<std::vector<T>> romberg(1);
             romberg[0].push_back(0.);
-            
+
             // initialize output
             if (verbose_) std::cout << std::setw(13) << std::left << 1. << romberg[0][0] << std::endl;
-            
+
             // for all subdivisions
             for (unsigned level = 1; maxlevel_ == 0 or level <= maxlevel_; level++)
             {
                 // extend storage
                 integrals.push_back(0);
                 romberg.push_back(std::vector<T>());
-                
+
                 // update geometry
                 h /= 2;
                 n *= 2;
-                
+
                 // evaluate function at all internal points (use supplied function)
                 T suma = f_ (h * linspace(1u, n-1, n-1));
-                
+
                 // store integral estimate
                 integrals.push_back(suma * h * h);
-                
+
                 // update Romberg table
                 romberg[level].resize(std::min(level,maxromblevel_) + 1);
                 romberg[level][0] = integrals.back();
@@ -439,7 +439,7 @@ class UnitSquareRomberg
                     if (verbose_) std::cout << std::setw(13) << std::left << romberg[level][icol] << " ";
                 }
                 if (verbose_) std::cout << std::endl;
-                
+
                 // compare estimates
                 double Delta = std::abs(romberg[level].back() - romberg[level-1].back());
                 if ((Delta < epsabs_ or Delta < epsrel_ * std::abs(romberg[level].back())) and level >= minlevel_)
@@ -450,7 +450,7 @@ class UnitSquareRomberg
                     return ok_;
                 }
             }
-            
+
             ok_ = false;
             status_ = format("Subdivision limit (%d) reached.", maxlevel_);
             result_ = romberg.back().back();

@@ -41,10 +41,10 @@
 class GMGPreconditioner : public NoPreconditioner
 {
     public:
-        
+
         // run-time selection mechanism
         preconditionerRunTimeSelectionDefinitions(GMGPreconditioner, "GMG")
-        
+
         // constructor
         GMGPreconditioner
         (
@@ -57,7 +57,7 @@ class GMGPreconditioner : public NoPreconditioner
             Bspline const & bspline_y_inner,
             Bspline const & bspline_y_full
         );
-        
+
         // sub-grid contructor
         GMGPreconditioner
         (
@@ -71,38 +71,38 @@ class GMGPreconditioner : public NoPreconditioner
             Bspline const & bspline_y_full,
             int level
         );
-        
+
         // destructor
         virtual ~GMGPreconditioner ();
-        
+
         // preconditioner description
         virtual std::string description () const;
-        
+
         // reuse parent definitions
         using NoPreconditioner::rhs;
         using NoPreconditioner::multiply;
         using NoPreconditioner::finish;
-        
+
         // declare own definitions
         virtual void setup ();
         virtual void update (Real E);
         virtual void precondition (BlockArray<Complex> const & r, BlockArray<Complex> & z) const;
-    
+
     private:
-        
+
         int level_;
-        
+
         Bspline const & bspline_inner_fine_;
         Bspline const & bspline_full_fine_;
-        
+
         Bspline bspline_inner_coarse_;
         Bspline bspline_full_coarse_;
-        
+
         RowMatrix<Complex> restrictor_inner_, restrictor_outer_;
         RowMatrix<Complex> prolongator_inner_, prolongator_outer_;
-        
+
         cArrays D;
-        
+
         PreconditionerBase * subgrid_;
 };
 

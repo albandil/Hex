@@ -87,14 +87,14 @@ template <class ...Params> std::string format (Params ...p)
 {
     // calculate the necessary space
     unsigned n = std::snprintf(nullptr, 0, p...);
-    
+
     // allocate the string
     std::string text;
     text.resize(n);
-    
+
     // compose the text
     std::snprintf(&text[0], n + 1, p...);
-    
+
     // return the text
     return text;
 }
@@ -120,7 +120,7 @@ template <class ...Params> [[noreturn]] void TerminateWithException (const char*
     // print error text
     std::cerr << std::endl << std::endl;
     std::cerr << "Program unsuccessfully terminated (in " << file << ":" << line << ", function \"" << func << "\")" << std::endl;
-    
+
     // POSIX terminal allows colours
 #if (_POSIX_C_SOURCE >= 200112L)
     if (isatty(fileno(stderr)))
@@ -128,10 +128,10 @@ template <class ...Params> [[noreturn]] void TerminateWithException (const char*
     else
 #endif
         std::cerr << " *** " << format(p...) << std::endl;
-    
+
     // print stack trace (if available)
     print_stack_trace();
-    
+
     // exit the program
 #ifdef WITH_BOINC
     boinc_finish_message(EXIT_FAILURE, format(p...).c_str(), true);
@@ -172,19 +172,19 @@ class MyNumPunct : public std::numpunct<char>
 class exception : public std::exception
 {
 public:
-    
+
     /// Constructor.
     template <class ...Params> exception (Params ...p)
         : message_(format(p...)) { }
-    
+
     /// Return pointer to the exception text.
     const char* what () const noexcept (true)
     {
         return message_.c_str();
     }
-    
+
 private:
-    
+
     /// Text of the exception.
     std::string message_;
 };
@@ -397,7 +397,7 @@ template <> inline int string_to (std::string str)
 {
     // convert to int
     char* tail; int val = std::strtol(str.c_str(), &tail, 10);
-    
+
     // throw or return
     if (*tail != 0x0)
         HexException("The string \"%s\" cannot be converted to integer number.", str.c_str());
@@ -416,7 +416,7 @@ template <> inline Real string_to (std::string str)
 {
     // convert to float
     char* tail; double val = std::strtod(str.c_str(), &tail);
-    
+
     // throw or return
     if (*tail != 0x0)
         HexException("The string \"%s\" cannot be converted to real number.", str.c_str());
@@ -438,7 +438,7 @@ template <class T> struct ReadItem
         none     = 0x00,
         asterisk = 0x01
     };
-    
+
     T val;
     int flags;
 };
@@ -462,17 +462,17 @@ template <class T> ReadItem<T> ReadNext (std::ifstream & f, unsigned allowed_spe
 {
     // text buffer
     std::string s;
-    
+
     // while there is something in the file
     while (not f.eof())
     {
         // read string (it won't start with white character)
         f >> s;
-        
+
         // check length (skip empty reads)
         if (s.size() == 0)
             continue;
-        
+
         // check if it is a beginning of a comment
         if (s.front() == '#')
         {
@@ -480,14 +480,14 @@ template <class T> ReadItem<T> ReadNext (std::ifstream & f, unsigned allowed_spe
             std::getline(f, s);
             continue;
         }
-        
+
         // otherwise exit the loop (a valid entry was found)
         break;
     }
-    
+
     if (s.empty())
         HexException("Failed to read entry.");
-    
+
     // check for asterisk
     if (s == "*")
     {
@@ -496,7 +496,7 @@ template <class T> ReadItem<T> ReadNext (std::ifstream & f, unsigned allowed_spe
         else
             HexException("Asterisk '*' not allowed here.");
     }
-    
+
     // convert entry to type T
     return ReadItem<T>({ string_to<T>(s.c_str()), ReadItem<T>::none });
 }
@@ -508,27 +508,27 @@ template <class T> ReadItem<T> ReadNext (std::ifstream & f, unsigned allowed_spe
  * elapsed time. The usage would be:
    @code
        Timer timer;
-   
+
        // .. block ...
-   
+
        std:cout << "Time = " << timer.seconds() << "secs.\n";
    @endcode
  */
 class Timer
 {
     public:
-        
+
         /// Constructor (with optional offset in seconds).
         Timer (int offset = 0)
             : offset_(offset), start_(std::chrono::system_clock::now()) {}
-        
+
         /// Start timer.
         void reset ()
         {
             start_ = std::chrono::system_clock::now();
             offset_ = 0;
         }
-        
+
         /// Return elapsed time in seconds.
         unsigned seconds () const
         {
@@ -536,17 +536,17 @@ class Timer
             std::chrono::seconds secs = std::chrono::duration_cast<std::chrono::seconds>(end - start_);
             return secs.count() + offset_;
         }
-        
+
         /// Return formatted time.
         std::string nice_time () const
         {
             // get elapsed time
             unsigned secs = seconds();
-            
+
             // return formatted time
             return format("%02d:%02d:%02d", secs / 3600, (secs % 3600) / 60, secs % 60);
         }
-        
+
         /// Return elapsed time in milliseconds.
         unsigned milliseconds () const
         {
@@ -554,7 +554,7 @@ class Timer
             std::chrono::milliseconds misecs = std::chrono::duration_cast<std::chrono::milliseconds>(end - start_);
             return misecs.count() + offset_ * 1000;
         }
-        
+
         /// Return elapsed time in microseconds.
         unsigned microseconds () const
         {
@@ -562,19 +562,19 @@ class Timer
             std::chrono::microseconds musecs = std::chrono::duration_cast<std::chrono::microseconds>(end - start_);
             return musecs.count() + offset_ * 1000000;
         }
-        
+
     private:
-        
+
         /// Time offset (number of seconds to be added to the time).
         unsigned offset_;
-        
+
         /// Start time.
         mutable std::chrono::system_clock::time_point start_;
 };
 
 /**
    @brief Output table.
-   
+
    This class enables table-formatted output. An example code is
    @code
    std::ofstream file ("output.txt");
@@ -595,10 +595,10 @@ class Timer
 class OutputTable
 {
     public:
-        
+
         OutputTable (std::ostream & out = std::cout)
             : width_(1, 15), alignment_(1, OutputTable::left), out_(out.rdbuf()) {}
-        
+
         typedef enum
         {
             none = 0,
@@ -606,43 +606,43 @@ class OutputTable
             center = 2, // not implemented yet
             right = 3
         } align;
-        
+
         void setStream (std::ostream & out)
         {
             out_.rdbuf(out.rdbuf());
         }
-        
+
         template <class ...Params> void setWidth (Params ...p)
         {
             // clear old widths
             width_.clear();
-            
+
             // set new widths
             append_(width_, p...);
         }
-        
+
         template <class ...Params> void setAlignment (Params ...p)
         {
             // clear old alignments
             alignment_.clear();
-            
+
             // set new alignments
             append_(alignment_, p...);
         }
-        
+
         template <int i> void write ()
         {
             out_ << std::endl;
         }
-        
+
         template <int i = 0, class T, class ...Params> void write (T item, Params ...p)
         {
             // use field width and alignment
             int width = (i < width_.size() ? width_[i] : width_.back());
             int alignment = (i < alignment_.size() ? alignment_[i] : alignment_.back());
-            
+
             out_ << std::setw(width);
-            
+
             switch (alignment)
             {
                 case none:
@@ -657,30 +657,30 @@ class OutputTable
                     out_ << std::right;
                     break;
             }
-            
+
             // buffer the item
             std::ostringstream oss;
             oss << item;
-            
+
             // write the item
             out_ << oss.str();
-            
+
             // write the rest of the items
             write<i+1>(p...);
         }
-        
+
     private:
-        
+
         std::vector<int> width_;
         std::vector<align> alignment_;
-        
+
         std::ostream out_;
-        
+
         template <class T> void append_ (std::vector<T> & v)
         {
             // do nothing
         }
-        
+
         template <class T, class ...Params> void append_ (std::vector<T> & v, T w, Params ...p)
         {
             v.push_back(w);
@@ -697,26 +697,26 @@ class OutputTable
 template <class T> class Range
 {
     public:
-        
+
         // the first element of the range
         T first;
-        
+
         // the last element of the range
         T last;
-        
+
         // constructor
         Range (std::string Lin)
         {
             // find separator ('-')
             std::string::const_iterator sep = std::find(Lin.begin(),Lin.end(),'-');
-            
+
             // check if the separator was found
             if (sep != Lin.end())
             {
                 // split the string at the separator
                 std::string strfirst = Lin.substr(0,sep-Lin.end());
                 std::string strlast  = Lin.substr(sep-Lin.begin()+1,Lin.end()-sep-1);
-                
+
                 // convert portions to the correct type
                 std::istringstream infirst(strfirst), inlast(strlast);
                 if (!(infirst >> first)) HexException("\"%s\" is not a number.", strfirst.c_str());
@@ -727,7 +727,7 @@ template <class T> class Range
                 // convert whole string to the correct type
                 std::istringstream in(Lin);
                 if (!(in >> first)) HexException("\"%s\" is not a number.", Lin.c_str());
-                
+
                 // the first and last element is the same
                 last = first;
             }
@@ -736,7 +736,7 @@ template <class T> class Range
 
 /**
    @brief Underline text.
-   
+
    This simple function will count characters in the supplied text string,
    append a new-line character and a group of '-' characters whose number
    will be equal to the length of the supplied text. It supports UTF-8, so
@@ -758,9 +758,9 @@ inline std::string underline (std::string text)
 {
     std::mbstate_t state = std::mbstate_t();
     const char * mbstr = text.data();
-    
+
     std::size_t wlen = std::mbsrtowcs(nullptr, &mbstr, 0, &state);
-    
+
     text.push_back('\n');
     for (std::size_t i = 0; i < wlen; i++)
         text.push_back('-');

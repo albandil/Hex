@@ -57,7 +57,7 @@
 class Bspline
 {
     public:
-    
+
         /**
          * @brief Constructor.
          * 
@@ -76,7 +76,7 @@ class Bspline
             rArrayView rknots,
             rArrayView cknots2
         );
-        
+
         /**
          * @brief Evaluate B-spline.
          * 
@@ -98,7 +98,7 @@ class Bspline
          * @param r       Coordinate (independent variable).
          */
         Complex bspline (int i, int iknot, int k, Complex r) const;
-        
+
         /**
          * @brief Evaluate derivative of a B-spline.
          * 
@@ -112,7 +112,7 @@ class Bspline
          * @param r       Coordinate (independent variable).
          */
         Complex dspline (int i, int iknot, int k, Complex r) const;
-        
+
         /** 
          * @brief B-spline.
          * 
@@ -127,7 +127,7 @@ class Bspline
          * For parameters description see @ref bspline.
          */
         void B (int i, int iknot, int n, const Complex* x, Complex* y) const;
-        
+
         /**
          * @brief Derivative of a B-spline.
          * 
@@ -136,7 +136,7 @@ class Bspline
          * This routine simply calls @ref dspline for every evaluation point.
          */
         void dB (int i, int iknot, int n, const Complex* x, Complex* y) const;
-        
+
         /**
          * @brief Apply the ECS transformation.
          * 
@@ -147,15 +147,15 @@ class Bspline
             // leading complex part
             if (r < R1_)
                 return R1_ + (r - R1_) * rotation_;
-            
+
             // trailing complex part
             if (r > R2_)
                 return R2_ + (r - R2_) * rotation_;
-            
+
             // real part
             return r;
         };
-        
+
         /**
          * @brief Apply the inverse ECS transformation.
          * 
@@ -166,15 +166,15 @@ class Bspline
             // leading complex part
             if (z.imag() < 0)
                 return R1_ + (z.real() - R1_) / rotation_.real();
-            
+
             // trailing complex part
             if (z.imag() > 0)
                 return R2_ + (z.real() - R2_) / rotation_.real();
-            
+
             // real part
             return z.real();
         };
-        
+
         /**
          * @brief Restrict value into a given range.
          * 
@@ -184,7 +184,7 @@ class Bspline
          * contour.
          */
         Complex clamp (Complex z, Real a, Real b) const;
-        
+
         /**
          * @brief Zip 1D expansion.
          * 
@@ -195,7 +195,7 @@ class Bspline
          * these first \c Nspline coefficients that are used in evaluation.
          */
         cArray zip (const cArrayView coeff, const rArrayView grid) const;
-        
+
         /**
          * @brief Zip 2D expansion.
          * 
@@ -208,7 +208,7 @@ class Bspline
          * these first \c Nspline**2 coefficients that are used in evaluation.
          */
         cArray zip (const cArrayView coeff, const rArrayView xgrid, const rArrayView ygrid) const;
-        
+
         /**
          * @brief Zip 2D expansion.
          * 
@@ -227,7 +227,7 @@ class Bspline
             Complex (Bspline::* evalXBSpline) (int,int,int,Complex) const = &Bspline::bspline,
             Complex (Bspline::* evalYBSpline) (int,int,int,Complex) const = &Bspline::bspline
         );
-        
+
         /**
          * @brief Zip 3D expansion.
          * 
@@ -249,7 +249,7 @@ class Bspline
             Complex (Bspline::* evalYBSpline) (int,int,int,Complex) const = &Bspline::bspline,
             Complex (Bspline::* evalZBSpline) (int,int,int,Complex) const = &Bspline::bspline
         );
-        
+
         /**
          * @brief Get knot index for coordinate.
          * 
@@ -257,7 +257,7 @@ class Bspline
          * @param x Complex coordinate.
          */
         int knot (Complex x) const;
-        
+
         /**
          * @brief Evaluate 1D B-spline expansion.
          * 
@@ -269,7 +269,7 @@ class Bspline
          * though the results are the same.
          */
         Complex eval (const cArrayView coeff, Real x) const;
-        
+
         /**
          * @brief Evaluate 2D B-spline expansion.
          * 
@@ -281,34 +281,34 @@ class Bspline
          * though the results are the same.
          */
         Complex eval (const cArrayView coeff, Real x, Real y) const;
-        
+
         // getters
-        
+
         /// B-spline knot sequence.
         cArrayView t () const { return t_; }
-        
+
         /// B-spline knot sequence.
         Complex const & t (int i) const { return t_[i]; }
-        
+
         /// Number of B-splines.
         int Nspline () const { return Nspline_; }
-        
+
         /// Number of knots.
         int Nknot () const { return Nknot_; }
-        
+
         /// Number of real knots.
         int Nreknot () const { return Nreknot_; }
-        
+
         /// B-spline order.
         int order () const { return order_; }
-        
+
         /**
          * @brief Index of knot between leading complex grid and real grid.
          * 
          * This is also the index of the first possibly purely real B-spline.
          */
         int iR1 () const { return cknots1_.empty() ? 0 : cknots1_.size() - 1; }
-        
+
         /**
          * @brief Index of knot between real grid and trailing complex grid.
          * 
@@ -316,29 +316,29 @@ class Bspline
          * The index of that B-spline is iR2 - order - 1.
          */
         int iR2 () const { return cknots2_.empty() ? t_.size() - 1 : t_.size() - cknots2_.size(); }
-        
+
         /// Beginning of the real grid.
         Real R1 () const { return R1_; }
-        
+
         /// End of the real grid.
         Real R2 () const { return R2_; }
-        
+
         /// Beginning of the grid (unrotated).
         Real Rmin () const { return Rmin_; }
-        
+
         /// End of the grid (unrotated).
         Real Rmax () const { return Rmax_; };
-        
+
         /// ECS rotation angle.
         Real ECStheta () const { return theta_; }
-        
+
         /// real knots
         rArray const & rknots () const { return rknots_; }
-        
+
         /// complex knots
         rArray const & cknots1 () const { return cknots1_; }
         rArray const & cknots2 () const { return cknots2_; }
-        
+
         /**
          * @brief Return (almost) unique identification for this B-spline object.
          * 
@@ -346,54 +346,54 @@ class Bspline
          * in the object.
          */
         std::size_t hash () const;
-        
+
     private:
-    
+
         /// real knots
         rArray rknots_;
-        
+
         /// complex knots
         rArray cknots1_, cknots2_;
-        
+
         /// knot sequence (rotated)
         cArray t_;
-        
+
         /// rotation angle (rad)
         Real theta_;
-        
+
         /// ECS rotation factor
         Complex rotation_;
-        
+
         /// beginning of the real grid
         Real R1_;
-        
+
         /// end of the real grid
         Real R2_;
-        
+
         /// beginning of the full grid
         Real Rmin_;
-        
+
         /// end of the full grid
         Real Rmax_;
-        
+
         /// knot count
         int Nknot_;
-        
+
         /// real knot count
         int Nreknot_;
-        
+
         /// B-spline count
         int Nspline_;
-        
+
         /// inter-knot interval count
         int Nintval_;
-        
+
         /// B-spline order
         int order_;
-        
+
         /// Work arrays (one per thread)
         mutable rArrays work_;
-        
+
         /// Work max size
         static const std::size_t work_size_;
 };

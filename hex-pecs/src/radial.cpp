@@ -34,18 +34,18 @@
 RadialBasis::RadialBasis (InputFile const & inp)
 {
     Complex rotation (std::cos(inp.ecstheta), std::sin(inp.ecstheta));
-    
+
     rgrid = inp.rgrid;
     cgrid = inp.cgrid * rotation;
-    
+
     std::cout << "Complex rotation" << std::endl;
     std::cout << "\tangle = " << inp.ecstheta << " (" << inp.ecstheta * 57.29578 << "°)" << std::endl;
     std::cout << "\tfactor = " << rotation << std::endl;
     std::cout << std::endl;
-    
+
     Npts = rgrid.size() + cgrid.size() - 1;
     grid.resize(Npts);
-    
+
     for (std::size_t i = 0; i < Npts; i++)
     {
         if (i < rgrid.size())
@@ -53,17 +53,17 @@ RadialBasis::RadialBasis (InputFile const & inp)
         else
             grid[i] = cgrid[i - rgrid.size() + 1] + rgrid.back();
     }
-    
+
     std::cout << "Real grid points: " << std::endl;
     for (std::string line : inp.rgrid.lines(100))
         std::cout << '\t' << line << std::endl;
     std::cout << std::endl;
-    
+
     std::cout << "Complex grid points: " << std::endl;
     for (std::string line : (inp.cgrid + inp.rgrid.back()).lines(100))
         std::cout << '\t' << line << std::endl;
     std::cout << std::endl;
-    
+
     std::cout << "Full grid points: " << std::endl;
     for (std::string line : grid.lines(100))
         std::cout << '\t' << line << std::endl;

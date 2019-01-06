@@ -47,7 +47,7 @@ bool HybCGPreconditioner::ilu_needed (int iblock) const
     // angular momenta of the electrons
     int l1 = ang_->states()[iblock].first;
     int l2 = ang_->states()[iblock].second;
-    
+
     // ILU is needed whenever there are some asymptotic channels for this angular block
     return not Xp_[0][l1].empty()
         or not Xp_[1][l2].empty();

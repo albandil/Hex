@@ -66,7 +66,7 @@ GiNaC::ex rl_Y
     (
         (2*l+1) / (4*GiNaC::Pi) * GiNaC::factorial(l+m) * GiNaC::factorial(l-m)
     ) * GiNaC::pow(-1, std::max(0,m));
-    
+
     // assemble the series
     GiNaC::ex poly;
     for (int k = std::max(0,-m); k <= (l-m)/2; k++)
@@ -74,7 +74,7 @@ GiNaC::ex rl_Y
         poly += (GiNaC::pow(-rp,k+m) * GiNaC::pow(rm,k) * GiNaC::pow(rz,l-m-2*k)) /
                 (GiNaC::pow(2,2*k+m) * GiNaC::factorial(k+m) * GiNaC::factorial(k) * GiNaC::factorial(l-m-2*k));
     }
-    
+
     // return final expression for the spherical harmonic
     return prefactor * poly;
 }
@@ -91,15 +91,15 @@ GiNaC::ex psi_nlm_poly
 {
     // construct spherical part r^l Y_lm
     GiNaC::ex Y = rl_Y(l, m, rp, rm, rz);
-    
+
     // construct radial prefactor
     GiNaC::ex N_nl = GiNaC::sqrt(GiNaC::pow(GiNaC::numeric(2,n),3)*GiNaC::factorial(n-l-1)/(2*n*GiNaC::factorial(n+l)));
-    
+
     // construct remaining radial part R_nl / (N_nl r^l)
     GiNaC::ex R_nl;
     for (int i = 0; i <= n-l-1; i++)
         R_nl += GiNaC::pow(-1,i) * GiNaC::binomial(n+l,n-l-1-i) * GiNaC::pow(2*r/n,i) / GiNaC::factorial(i);
-    
+
     // return the function
     return N_nl * R_nl * GiNaC::pow(GiNaC::numeric(2,n),l) * Y;
 }
@@ -127,52 +127,52 @@ std::map<std::tuple<int,int,int,int,int>,Complex> Wb_symb_in
     //     kz ... third component of momentum
     // Derivative with respect to any of these parameters can be used to construct
     // a different integrand.
-    
+
     //
     // Construct the product of wave functions.
     //
-    
+
     // necessary symbolic variables
     GiNaC::possymbol r("r");
     GiNaC::realsymbol rz("rz");
     GiNaC::symbol rp("rp"), rm("rm");
-    
+
     // construct the initial and final state (drop exponential factor which is handled separately)
     GiNaC::ex psif = psi_nlm_poly(n1,l1,m1,r,rp,rm,rz);
     GiNaC::ex psii = psi_nlm_poly(n2,l2,m2,r,rp,rm,rz);
-    
+
     // calculate the product of the wave functions
     GiNaC::ex poly = (psif.conjugate() * psii).expand();
-    
+
     // known rule: "rp" and "rm" are complex conjugates of each other
     GiNaC::exmap rule = {{ rp.conjugate(), rm },{ rm.conjugate(), rp }};
     poly = poly.subs(rule);
-    
+
     //
     // Translate the symbolical form to list of exponent tuples.
     //
-    
+
     // list of exponent tuples (one tuple for every term of 'poly')
     std::map<std::tuple<int,int,int,int>,Complex> terms;
-    
+
     // for all powers of r appearing in the polynomial 'poly'
     for (int inu = poly.ldegree(r); inu <= poly.degree(r); inu++)
     {
         // extract factor in front of r^inu
         GiNaC::ex nu_poly = poly.collect(r).coeff(r,inu);
-        
+
         // for all powers of r₊ appearing in the polynomial 'nu_poly'
         for (int irp = nu_poly.ldegree(rp); irp <= nu_poly.degree(rp); irp++)
         {
             // extract factor in front of ν^inu r₊^irp
             GiNaC::ex nu_rp_poly = nu_poly.coeff(rp,irp);
-            
+
             // for all powers of r- appearing in the polynomial 'nu_rp_poly'
             for (int irm = nu_rp_poly.ldegree(rm); irm <= nu_rp_poly.degree(rm); irm++)
             {
                 // extract factor in front of ν^inu r₊^irp r₋^irm
                 GiNaC::ex nu_rp_rm_poly = nu_rp_poly.coeff(rm,irm);
-                
+
                 // for all powers of r- appearing in the polynomial 'nu_rp_poly'
                 for (int irz = nu_rp_rm_poly.ldegree(rz); irz <= nu_rp_rm_poly.degree(rz); irz++)
                 {
@@ -187,37 +187,37 @@ std::map<std::tuple<int,int,int,int,int>,Complex> Wb_symb_in
             } // irm
         } // irp
     } // inu
-    
+
     //
     // Compute derivative for every term of the product.
     //
-    
+
     // resulting terms (ν²+k²)^(-n) ν^a k₊^b k₋^c kz^d
     std::map<std::tuple<int,int,int,int,int>,Complex> res;
-    
+
     // for all terms
     for (auto term : terms)
     {
         // decode exponents
         int inu, irp, irm, irz;
         std::tie(inu, irp, irm, irz) = term.first;
-        
+
         // resulting derivative for this particular term
         std::map<std::tuple<int,int,int,int,int>,Complex> rest, tmp;
         rest[std::make_tuple(1,0,0,0,0)] = term.second;
-        
+
         // (inu + 1)-times differentiate the basic integral (-∂/∂ν)
         for (int j = 0; j <= inu; j++)
         {
             // move current result to temporary storage
             std::swap(rest,tmp); rest.clear();
-            
+
             // differentiate all terms
             for (auto entry : tmp)
             {
                 // decode entry
                 int n, a, b, c, d; std::tie(n,a,b,c,d) = entry.first;
-                
+
                 // differentiate with respect to ν
                 if (a != 0)
                 {
@@ -230,19 +230,19 @@ std::map<std::tuple<int,int,int,int,int>,Complex> Wb_symb_in
                 }
             }
         }
-        
+
         // irp times differentiate the integral (2i∂/∂k₋)
         for (int j = 0; j < irp; j++)
         {
             // move current result to temporary storage
             std::swap(rest,tmp); rest.clear();
-            
+
             // differentiate all terms
             for (auto entry : tmp)
             {
                 // decode entry
                 int n, a, b, c, d; std::tie(n,a,b,c,d) = entry.first;
-                
+
                 // differentiate with respect to k₋
                 if (c != 0)
                 {
@@ -255,19 +255,19 @@ std::map<std::tuple<int,int,int,int,int>,Complex> Wb_symb_in
                 }
             }
         }
-        
+
         // irm times differentiate the integral (2i∂/∂k₊)
         for (int j = 0; j < irm; j++)
         {
             // move current result to temporary storage
             std::swap(rest,tmp); rest.clear();
-            
+
             // differentiate all terms
             for (auto entry : tmp)
             {
                 // decode entry
                 int n, a, b, c, d; std::tie(n,a,b,c,d) = entry.first;
-                
+
                 // differentiate with respect to k₊
                 if (b != 0)
                 {
@@ -280,19 +280,19 @@ std::map<std::tuple<int,int,int,int,int>,Complex> Wb_symb_in
                 }
             }
         }
-        
+
         // irz times differentiate the integral (i∂/∂kz)
         for (int j = 0; j < irz; j++)
         {
             // move current result to temporary storage
             std::swap(rest,tmp); rest.clear();
-            
+
             // differentiate all terms
             for (auto entry : tmp)
             {
                 // decode entry
                 int n, a, b, c, d; std::tie(n,a,b,c,d) = entry.first;
-                
+
                 // differentiate with respect to kz
                 if (d != 0)
                 {
@@ -305,22 +305,22 @@ std::map<std::tuple<int,int,int,int,int>,Complex> Wb_symb_in
                 }
             }
         }
-        
+
         // add all new terms to result
         for (auto t : rest)
         {
             // check if this term already exists
             auto pt = res.find(t.first);
-            
+
             // update term coefficient
             res[t.first] = t.second + (pt != res.end() ? pt->second : 0.);
         }
     }
-    
+
     // finally, correct the elastic case
     if (n1 == n2 and l1 == l2 and m1 == m2)
         res[std::make_tuple(0,0,0,0,0)] = -1;
-    
+
     return res;
 }
 #endif
@@ -332,33 +332,33 @@ Complex eval_Wb (std::map<std::tuple<int,int,int,int,int>,Complex> const & poly,
     double kxysqr = k.x*k.x + k.y*k.y, ksqr = kxysqr + k.z*k.z;
     double rho = std::sqrt(kxysqr), phi = std::atan2(k.y,k.x);
     double J = 1. / (nu*nu + ksqr);
-    
+
     // evaluate all terms J^n ν^a k₊^b k₋^c kz^d
     Complex result = 0;
     for (auto term : poly)
     {
         // extract exponents
         int n,a,b,c,d; std::tie(n,a,b,c,d) = term.first;
-        
+
         // contribution from this term
         Complex contrib = 4. * special::constant::pi * term.second * gsl_sf_pow_int(J,n);
-        
+
         // add ν^a
         if (a != 0)
             contrib *= gsl_sf_pow_int(nu,a);
-        
+
         // add k₊^b k₋^c
         if (b != 0 or c != 0)
             contrib *= gsl_sf_pow_int(rho,b+c) * Complex(std::cos((b-c)*phi),std::sin((b-c)*phi));
-        
+
         // add kz^d
         if (d != 0)
             contrib *= gsl_sf_pow_int(k.z,d);
-        
+
         // update sum
         result += contrib;
     }
-    
+
     // return result
     return result / ksqr;
 }
@@ -385,40 +385,40 @@ std::map<std::tuple<int,int,int,int,int,int,int,int,int,int>,Complex> W_symb_in
     //     qx,qy,qz ... components of momentum of the Coulomb wave
     // Derivative with respect to any of the parameters ν,kx,ky,kz can be used to construct
     // a different integrand.
-    
+
     // the basic integral
     GiNaC::possymbol r("r");
     GiNaC::realsymbol rz("rz");
     GiNaC::symbol rp("rp"), rm("rm");
-    
+
     // construct the initial and final state (drop exponential factor which is handled separately)
     GiNaC::ex psi = psi_nlm_poly(n,l,m,r, rp, rm, rz);
-    
+
     //
     // Translate the symbolical form to list of exponent tuples.
     //
-    
+
     // list of exponent tuples (one tuple for every term of 'poly')
     std::map<std::tuple<int,int,int,int>,Complex> terms;
-    
+
     // for all powers of r appearing in the polynomial 'poly'
     for (int inu = psi.ldegree(r); inu <= psi.degree(r); inu++)
     {
         // extract factor in front of r^inu
         GiNaC::ex nu_poly = psi.collect(r).coeff(r,inu);
-        
+
         // for all powers of r+ appearing in the polynomial 'nu_poly'
         for (int irp = nu_poly.ldegree(rp); irp <= nu_poly.degree(rp); irp++)
         {
             // extract factor in front of ν^inu rp^irp
             GiNaC::ex nu_rp_poly = nu_poly.coeff(rp,irp);
-            
+
             // for all powers of r- appearing in the polynomial 'nu_rp_poly'
             for (int irm = nu_rp_poly.ldegree(rm); irm <= nu_rp_poly.degree(rm); irm++)
             {
                 // extract factor in front of ν^inu rp^irp rm^irm
                 GiNaC::ex nu_rp_rm_poly = nu_rp_poly.coeff(rm,irm);
-                
+
                 // for all powers of r- appearing in the polynomial 'nu_rp_poly'
                 for (int irz = nu_rp_rm_poly.ldegree(rz); irz <= nu_rp_rm_poly.degree(rz); irz++)
                 {
@@ -433,37 +433,37 @@ std::map<std::tuple<int,int,int,int,int,int,int,int,int,int>,Complex> W_symb_in
             } // irm
         } // irp
     } // inu
-    
+
     //
     // Compute derivative for every term of the product.
     //
-    
+
     // resulting terms A^(-i/q-m) B^(-i/q-n) ν^a k₊^b k₋^c kz^d q^t q₊^u q₋^v qz^w
     std::map<std::tuple<int,int,int,int,int,int,int,int,int,int>,Complex> res;
-    
+
     // for all terms
     for (auto term : terms)
     {
         // decode exponents
         int inu, irp, irm, irz;
         std::tie(inu, irp, irm, irz) = term.first;
-        
+
         // resulting derivative for this particular term
         std::map<std::tuple<int,int,int,int,int,int,int,int,int,int>,Complex> rest, tmp;
         rest[std::make_tuple(0,1, 0,0,0,0, 0,0,0,0)] = term.second;
-        
+
         // (inu + 1)-times differentiate the basic integral (-∂/∂ν)
         for (int j = 0; j <= inu; j++)
         {
             // move current result to temporary storage
             std::swap(rest,tmp); rest.clear();
-            
+
             // differentiate all terms
             for (auto entry : tmp)
             {
                 // decode entry
                 int m,n,a,b,c,d,t,u,v,w; std::tie(m,n,a,b,c,d,t,u,v,w) = entry.first;
-                
+
                 // differentiate with respect to ν
                 if (a != 0)
                 {
@@ -499,19 +499,19 @@ std::map<std::tuple<int,int,int,int,int,int,int,int,int,int>,Complex> W_symb_in
                 }
             }
         }
-        
+
         // irp times differentiate the integral (2i∂/∂k₋)
         for (int j = 0; j < irp; j++)
         {
             // move current result to temporary storage
             std::swap(rest,tmp); rest.clear();
-            
+
             // differentiate all terms
             for (auto entry : tmp)
             {
                 // decode entry
                 int m,n,a,b,c,d,t,u,v,w; std::tie(m,n,a,b,c,d,t,u,v,w) = entry.first;
-                
+
                 // differentiate with respect to k₋
                 if (c != 0)
                 {
@@ -547,19 +547,19 @@ std::map<std::tuple<int,int,int,int,int,int,int,int,int,int>,Complex> W_symb_in
                 }
             }
         }
-        
+
         // irm times differentiate the integral (2i∂/∂k₊)
         for (int j = 0; j < irm; j++)
         {
             // move current result to temporary storage
             std::swap(rest,tmp); rest.clear();
-            
+
             // differentiate all terms
             for (auto entry : tmp)
             {
                 // decode entry
                 int m,n,a,b,c,d,t,u,v,w; std::tie(m,n,a,b,c,d,t,u,v,w) = entry.first;
-                
+
                 // differentiate with respect to k₊
                 if (b != 0)
                 {
@@ -595,19 +595,19 @@ std::map<std::tuple<int,int,int,int,int,int,int,int,int,int>,Complex> W_symb_in
                 }
             }
         }
-        
+
         // irz times differentiate the integral (i∂/∂kz)
         for (int j = 0; j < irz; j++)
         {
             // move current result to temporary storage
             std::swap(rest,tmp); rest.clear();
-            
+
             // differentiate all terms
             for (auto entry : tmp)
             {
                 // decode entry
                 int m,n,a,b,c,d,t,u,v,w; std::tie(m,n,a,b,c,d,t,u,v,w) = entry.first;
-                
+
                 // differentiate with respect to kz
                 if (d != 0)
                 {
@@ -643,18 +643,18 @@ std::map<std::tuple<int,int,int,int,int,int,int,int,int,int>,Complex> W_symb_in
                 }
             }
         }
-        
+
         // add all new terms to result
         for (auto t : rest)
         {
             // check if this term already exists
             auto pt = res.find(t.first);
-            
+
             // update term coefficient
             res[t.first] = t.second + (pt != res.end() ? pt->second : 0.);
         }
     }
-    
+
     return res;
 }
 #endif
@@ -673,62 +673,62 @@ Complex eval_W
            kxy = std::sqrt(kxysqr), /*k = std::sqrt(ksqr),*/ kphi = std::atan2(vk.y,vk.x);
     double qxysqr = vq.x*vq.x + vq.y*vq.y, qsqr = qxysqr + vq.z*vq.z,
            qxy = std::sqrt(qxysqr), q = std::sqrt(qsqr), qphi = std::atan2(vq.y,vq.x);
-    
+
     Complex A (ksqr + nu*nu - qsqr, -2*nu*q);
     double absA = std::hypot(A.real(),A.imag()), argA = std::atan2(A.imag(),A.real());
     double B = nu*nu + (vk.x+vq.x)*(vk.x+vq.x) + (vk.y+vq.y)*(vk.y+vq.y) + (vk.z+vq.z)*(vk.z+vq.z);
     double log_abs_A_B_over_q = std::log(absA / B) / q;
-    
+
     // evaluate all terms A^(-m) B^(-n) ν^a k₊^b k₋^c kz^d q^t q₊^u q₋^v qz^w
     Complex result = 0;
     for (auto term : poly)
     {
         // extract exponents
         int m,n,a,b,c,d,t,u,v,w; std::tie(m,n,a,b,c,d,t,u,v,w) = term.first;
-        
+
         // contribution from this term
         Complex contrib = term.second;
-        
+
         // add A^(-m)
         if (m != 0)
             contrib *= Complex(std::cos(m*argA),-std::sin(m*argA)) / gsl_sf_pow_int(absA,m);
-        
+
         // add B^(-n)
         if (n != 0)
             contrib *= 1./gsl_sf_pow_int(B,n);
-        
+
         // add ν^a
         if (a != 0)
             contrib *= gsl_sf_pow_int(nu,a);
-        
+
         // add k₊^b k₋^c
         if (b != 0 or c != 0)
             contrib *= Complex(std::cos((b-c)*kphi),std::sin((b-c)*kphi)) * gsl_sf_pow_int(kxy,b+c);
-        
+
         // add kz^d
         if (d != 0)
             contrib *= gsl_sf_pow_int(vk.z,d);
-        
+
         // add q^t
         if (t != 0)
             contrib *= gsl_sf_pow_int(q,t);
-        
+
         // add q₊^u q₋^v
         if (u != 0 or v != 0)
             contrib *= Complex(std::cos((u-v)*qphi),std::sin((u-v)*qphi)) * gsl_sf_pow_int(qxy,u+v);
-        
+
         // add qz^w
         if (w != 0)
             contrib *= gsl_sf_pow_int(vq.z,w);
-        
+
         // update sum
         result += contrib;
     }
-    
+
     // add missing factors
 //     result *= std::pow(A/B,Complex(0.,-1./q)) / ksqr;
     result *= Complex(std::cos(log_abs_A_B_over_q),-std::sin(log_abs_A_B_over_q)) * std::exp(argA/q) / ksqr;
-    
+
     return result;
 }
 #endif
@@ -738,54 +738,54 @@ template <class Functor, class Integrator>
 class BesselNodeIntegrator1D
 {
     private:
-        
+
         Integrator Q_;
-        
+
         double k_;
         int l_;
-        
+
         double result_;
         bool ok_;
         std::string status_;
-        
+
         double epsabs_;
         double epsrel_;
         int limit_;
-        
-    
+
+
     public:
-        
+
         BesselNodeIntegrator1D (Functor f, double k, int l)
             : Q_(f), k_(k), l_(l), result_(0), ok_(true), status_(),
               epsabs_(1e-8), epsrel_(1e-5), limit_(100)
         {
         }
-        
+
         double result () const { return result_; }
         bool ok () const { return ok_; }
         std::string const & status () const { return status_; }
-        
+
         double epsabs () const { return epsabs_; }
         void setEpsAbs (double eps) { epsabs_ = eps; }
-        
+
         double epsrel () const { return epsrel_; }
         void setEpsRel (double eps) { epsrel_ = eps; }
-        
+
         int limit () const { return limit_; }
         void setLimit (double n) { limit_ = n; }
-        
+
         bool integrate (double a, double b)
         {
             // set parcel integrator accuracy to one order more
             Q_.setEpsAbs(0.1 * epsabs_);
             Q_.setEpsRel(0.1 * epsrel_);
-            
+
             // overall integral
             double integral = 0;
-            
+
             // end of previous integration parcel
             double prevR = 0;
-            
+
             // for all integration parcels (nodes of the Bessel function)
             for (int inode = 1; inode < limit_; inode++)
             {
@@ -802,19 +802,19 @@ class BesselNodeIntegrator1D
                 }
                 double rmin = prevR;
                 double rmax = res.val / k_;
-                
+
                 // skip intervals that are below the lower limit
                 if (rmax < a)
                     continue;
-                
+
                 // skip intervals that are above the upper limit
                 if (rmin > b)
                     break;
-                
+
                 // shrink integration interval, if necessary
                 rmin = std::max (a, rmin);
                 rmax = std::min (rmax, b);
-                
+
                 // integrate and check success
                 if (not Q_.integrate(rmin,rmax))
                 {
@@ -823,16 +823,16 @@ class BesselNodeIntegrator1D
                     result_ = integral;
                     return ok_;
                 }
-                
+
                 // update result
                 integral += Q_.result();
                 prevR = rmax;
-                
+
                 // check convergence
                 if (std::abs(Q_.result()) < epsabs_ or std::abs(Q_.result()) < epsrel_ * std::abs(integral))
                     break;
             }
-            
+
             ok_ = true;
             result_ = integral;
             status_ = "";
@@ -851,22 +851,22 @@ double compute_Idir (int li, int lf, int lambda, int Ni, int Li, double ki, int 
 //         "\tNf = %d, Lf = %d, kf = %g, lf = %d\n",
 //         lambda, Ni, Li, ki, li, Nf, Lf, kf, lf
 //     );
-    
+
     if (lambda == 0)
     {
         //
         // r1 > r2
         //
-        
+
         auto integrand = [Ni,Li,Nf,Lf,li,ki,lf,kf](double r2) -> double
         {
             // inner integrand
             auto iintegrand = [Ni,Li,Nf,Lf,r2](double r1) -> double { return Hydrogen::P(Ni,Li,r1) * Hydrogen::P(Nf,Lf,r1) * (1./r1 - 1./r2); };
-            
+
             // inner integrator
             GaussKronrod<decltype(iintegrand)> Qi(iintegrand);
             Qi.setEpsAbs(0);
-            
+
             // integrate and check success
             if (not Qi.integrate(r2,special::constant::Inf))
             {
@@ -876,19 +876,19 @@ double compute_Idir (int li, int lf, int lambda, int Ni, int Li, double ki, int 
                     Ni, Li, ki, li, Nf, Lf, kf, lf, r2, Qi.status().c_str(), Qi.result()
                 );
             }
-            
+
             return Qi.result() * special::ric_j(li,ki*r2) * special::ric_j(lf,kf*r2);
         };
-        
+
         // which Bessel function oscillates slowlier ?
         int    l = (ki < kf ? li : lf);
         double k = (ki < kf ? ki : kf);
-        
+
         // outer integrator
         BesselNodeIntegrator1D<decltype(integrand),GaussKronrod<decltype(integrand)>> R(integrand, k, l);
         R.setEpsAbs(0);
         R.integrate(0,special::constant::Inf);
-        
+
 //         std::cout << "\tIdir = " << R.result() << std::endl;
         return R.result();
     }
@@ -897,31 +897,31 @@ double compute_Idir (int li, int lf, int lambda, int Ni, int Li, double ki, int 
         // compute normalization factors of the generalized Laguerre polynomials
         double Normi = std::sqrt(std::pow(2./Ni,3) * gsl_sf_fact(Ni-Li-1) / (2. * Ni * gsl_sf_fact(Ni+Li)));
         double Normf = std::sqrt(std::pow(2./Nf,3) * gsl_sf_fact(Nf-Lf-1) / (2. * Nf * gsl_sf_fact(Nf+Lf)));
-        
+
         // compute the polynomials
         symbolic::poly Lagi = symbolic::GeneralizedLaguerre (Ni-Li-1, 2*Li+1);
         symbolic::poly Lagf = symbolic::GeneralizedLaguerre (Nf-Lf-1, 2*Lf+1);
-        
+
         // multiply by the angular factor
         for (symbolic::term & pi : Lagi) pi.a += Li + 1;
         for (symbolic::term & pf : Lagf) pf.a += Lf + 1;
-        
+
         // part of the angular factor goes to normalization
         Normi *= std::pow(2./Ni,Li);
         Normf *= std::pow(2./Nf,Lf);
-        
+
         // compute the product of the polynomials
         symbolic::poly PP = Lagi * Lagf;
-        
+
         // factor in the argument of the exponential
         double c = 1./Ni + 1./Nf;
-        
+
         // outer integrand evaluated at "r"
         auto integrand = [PP,c,lambda,Normi,Normf,ki,kf,li,lf](double r) -> double
         {
             // inner integral
             double integral = 0;
-            
+
             // integrate term by term
             for (symbolic::term const & p : PP)
             {
@@ -939,7 +939,7 @@ double compute_Idir (int li, int lf, int lambda, int Ni, int Li, double ki, int 
                 double int_high = 0;
                 if (err_high != GSL_EUNDRFLW)
                     int_high = gsl_sf_pow_int(c*r,lambda) * res.val;
-                
+
                 // compute the low integral
                 int err_low = gsl_sf_gamma_inc_P_e (p.a + lambda + 1, c * r, &res);
                 double scale = gsl_sf_gamma (p.a + lambda + 1);
@@ -952,23 +952,23 @@ double compute_Idir (int li, int lf, int lambda, int Ni, int Li, double ki, int 
                     );
                 }
                 double int_low = gsl_sf_pow_int(c*r,-lambda-1) * res.val * scale;
-                
+
                 // sum both contributions
                 integral += (int_low + int_high) * symbolic::double_approx(p.kr) / gsl_sf_pow_int(c,p.a);
             }
-            
+
             return Normi * Normf * integral * special::ric_j(li,ki*r) * special::ric_j(lf,kf*r);
         };
-        
+
         // which Bessel function oscillates slowlier ?
         int    l = std::max(li, lf);
         double k = (ki == kf ? ki : std::abs(ki - kf));
-        
+
         // outer integrator
         BesselNodeIntegrator1D<decltype(integrand),GaussKronrod<decltype(integrand)>> R(integrand, k, l);
         R.integrate (0,special::constant::Inf);
 //         std::cout << "\tIdir = " << R.result() << std::endl;
-        
+
         return R.result();
     }
 }
@@ -983,13 +983,13 @@ double compute_Iexc (int li, int lf, int lambda, int Ni, int Li, double ki, int 
 //         "\tNf = %d, Lf = %d, kf = %g, lf = %d\n",
 //         lambda, Ni, Li, ki, li, Nf, Lf, kf, lf
 //     );
-    
+
     if (lambda == 0)
     {
         //
         // r1 > r2
         //
-        
+
         auto integrand = [Ni,Li,Nf,Lf,li,ki,lf,kf](double r2) -> double
         {
             // inner integrand
@@ -997,10 +997,10 @@ double compute_Iexc (int li, int lf, int lambda, int Ni, int Li, double ki, int 
             {
                 return Hydrogen::P(Ni,Li,r1) * special::ric_j(lf,kf*r1) * (1./r1 - 1./r2);
             };
-            
+
             // inner integrator
             GaussKronrod<decltype(iintegrand)> Qi(iintegrand);
-            
+
             // integrate and check success
             if (not Qi.integrate(r2,special::constant::Inf))
             {
@@ -1010,13 +1010,13 @@ double compute_Iexc (int li, int lf, int lambda, int Ni, int Li, double ki, int 
                     Ni, Li, ki, li, Nf, Lf, kf, lf, r2, Qi.status().c_str(), Qi.result()
                 );
             }
-            
+
             return Qi.result() * special::ric_j(li,ki*r2) * Hydrogen::P(Nf,Lf,r2);
         };
-        
+
         // outer integrator
         GaussKronrod<decltype(integrand)> Q(integrand);
-        
+
         // integrate and check success
         if (not Q.integrate(0.,special::constant::Inf))
         {
@@ -1026,7 +1026,7 @@ double compute_Iexc (int li, int lf, int lambda, int Ni, int Li, double ki, int 
                 Ni, Li, ki, li, Nf, Lf, kf, lf, Q.status().c_str(), Q.result()
             );
         }
-        
+
 //         std::cout << "\tIexc = " << Q.result() << std::endl;
         return Q.result();
     }
@@ -1040,10 +1040,10 @@ double compute_Iexc (int li, int lf, int lambda, int Ni, int Li, double ki, int 
             {
                 return Hydrogen::P(Ni,Li,r1) * special::ric_j(lf,kf*r1) * std::pow(r1/r2,lambda);
             };
-            
+
             // inner integrator
             BesselNodeIntegrator1D<decltype(iintegrand1),GaussKronrod<decltype(iintegrand1)>> Qi1 (iintegrand1, kf, lf);
-            
+
             // integrate and check success
             if (not Qi1.integrate(0.,r2))
             {
@@ -1053,10 +1053,10 @@ double compute_Iexc (int li, int lf, int lambda, int Ni, int Li, double ki, int 
                     lambda, Ni, Li, ki, li, Nf, Lf, kf, lf, r2, Qi1.status().c_str(), Qi1.result()
                 );
             }
-            
+
             return Qi1.result() / r2 * special::ric_j(li,ki*r2) * Hydrogen::P(Nf,Lf,r2);
         };
-        
+
         BesselNodeIntegrator1D<decltype(integrand1),GaussKronrod<decltype(integrand1)>> Q1 (integrand1, ki, li);
         if (not Q1.integrate(0.,special::constant::Inf))
         {
@@ -1066,7 +1066,7 @@ double compute_Iexc (int li, int lf, int lambda, int Ni, int Li, double ki, int 
                 lambda, Ni, Li, ki, li, Nf, Lf, kf, lf, Q1.status().c_str(), Q1.result()
             );
         }
-        
+
         // r2 < r1
         auto integrand2 = [Ni,Li,Nf,Lf,li,ki,lf,kf,lambda](double r1) -> double
         {
@@ -1075,10 +1075,10 @@ double compute_Iexc (int li, int lf, int lambda, int Ni, int Li, double ki, int 
             {
                 return Hydrogen::P(Nf,Lf,r2) * special::ric_j(li,ki*r2) * std::pow(r2/r1,lambda);
             };
-            
+
             // inner integrator
             BesselNodeIntegrator1D<decltype(iintegrand2),GaussKronrod<decltype(iintegrand2)>> Qi2 (iintegrand2, ki, li);
-            
+
             // integrate and check success
             if (not Qi2.integrate(0.,r1))
             {
@@ -1088,10 +1088,10 @@ double compute_Iexc (int li, int lf, int lambda, int Ni, int Li, double ki, int 
                     lambda, Ni, Li, ki, li, Nf, Lf, kf, lf, r1, Qi2.status().c_str(), Qi2.result()
                 );
             }
-            
+
             return Qi2.result() / r1 * special::ric_j(lf,kf*r1) * Hydrogen::P(Ni,Li,r1);
         };
-        
+
         BesselNodeIntegrator1D<decltype(integrand2),GaussKronrod<decltype(integrand2)>> Q2 (integrand2, kf, lf);
         if (not Q2.integrate(0.,special::constant::Inf))
         {
@@ -1101,7 +1101,7 @@ double compute_Iexc (int li, int lf, int lambda, int Ni, int Li, double ki, int 
                 lambda, Ni, Li, ki, li, Nf, Lf, kf, lf, Q2.status().c_str(), Q2.result()
             );
         }
-        
+
 //         std::cout << "\tIexc = " << Q1.result() + Q2.result() << std::endl;
         return Q1.result() + Q2.result();
     }
@@ -1119,7 +1119,7 @@ void pwba
     // re-allocate memory
     Tdir = cArrays((2*Li+1)*(2*Lf+1), cArray());
     Texc = cArrays((2*Li+1)*(2*Lf+1), cArray());
-    
+
     // for all outgoing partial waves
     for (int lf = std::abs(Lf - L); lf <= Lf + L; lf++)
     {
@@ -1128,69 +1128,69 @@ void pwba
             T.push_back(0.);
         for (cArray & T : Texc)
             T.push_back(0.);
-        
+
         // for all incoming partial waves
         for (int li = std::abs(Li - L); li <= Li + L; li++)
         {
             // conserve parity
             if ((lf + Lf) % 2 != (li + Li) % 2)
                 continue;
-            
+
             //
             // compute direct contribution
             //
-            
+
             // for all multipoles
             for (int lam = std::max(std::abs(Lf-Li), std::abs(lf-li)); direct and lam <= std::min(Li+Lf, lf+li); lam++)
             {
                 // compute the needed radial integrals
                 double Vdir = compute_Idir(li, lf, lam, Ni, Li, ki, Nf, Lf, kf);
-                
+
                 // compute complex prefactor
                 Complex prefactor = std::pow(4*special::constant::pi,2)/(ki*kf) * std::pow(Complex(0.,1.),li-lf) * std::sqrt((2*li+1)/(4*special::constant::pi));
-                
+
                 // for all projections of the initial/final angular momentum
                 for (int Mi = -Li; Mi <= Li; Mi++)
                 for (int Mf = -Lf; Mf <= Lf; Mf++)
                 {
                     // compute index in the array of T-matrices
                     int idx = (Mi + Li)*(2*Lf + 1) + Mf + Lf;
-                    
+
                     // compute angular integrals (Gaunt coefficients)
                     double ang = special::ClebschGordan(Lf,Mf,lf,Mi-Mf,L,Mi)
                                * special::ClebschGordan(Li,Mi,li,0,L,Mi)
                                * special::computef(lam,Lf,lf,Li,li,L);
-                    
+
                     // add the T-matrix contributions
                     Tdir[idx][lf-std::abs(Lf - L)] += prefactor * ang * Vdir;
                 }
             }
-            
+
             //
             // compute exchange contribution
             //
-            
+
             // for all multipoles
             for (int lam = std::max(std::abs(lf-Li), std::abs(Lf-li)); exchange and lam <= std::min(lf+Li, Lf+li); lam++)
             {
                 // compute the needed radial integrals
                 double Vexc = compute_Iexc (li, lf, lam, Ni, Li, ki, Nf, Lf, kf);
-                
+
                 // compute complex prefactor
                 Complex prefactor = std::pow(4*special::constant::pi,2)/(ki*kf) * std::pow(Complex(0.,1.),li-lf) * std::sqrt((2*li+1)/(4*special::constant::pi));
-                
+
                 // for all projections of the initial/final angular momentum
                 for (int Mi = -Li; Mi <= Li; Mi++)
                 for (int Mf = -Lf; Mf <= Lf; Mf++)
                 {
                     // compute index in the array of T-matrices
                     int idx = (Mi + Li)*(2*Lf + 1) + Mf + Lf;
-                    
+
                     // compute angular integrals (Gaunt coefficients)
                     double ang = special::ClebschGordan(Lf,Mf,lf,Mi-Mf,L,Mi)
                                * special::ClebschGordan(Li,Mi,li,0,L,Mi)
                                * special::computef(lam,lf,Lf,Li,li,L);
-                    
+
                     // add the T-matrix contributions
                     Texc[idx][lf-std::abs(Lf - L)] += prefactor * ang * Vexc;
                 }

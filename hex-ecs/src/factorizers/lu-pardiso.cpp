@@ -89,14 +89,14 @@ LUft_Pardiso::LUft_Pardiso () : LUft()
     std::memset(pt_,    0, sizeof(pt_));
     std::memset(iparm_, 0, sizeof(iparm_));
     std::memset(dparm_, 0, sizeof(dparm_));
-    
+
     int mtype  = 13;     // complex symmetric
     int solver = 0;     // sparse direct solver
     int error  = 0;     // success indicator
-    
+
     idata_["groupsize"] = 1;
     rdata_["drop_tolerance"] = 1e-8;
-    
+
 #ifdef WITH_MKL
     pardisoinit(pt_, &mtype, iparm_);
 #else
@@ -112,16 +112,16 @@ void LUft_Pardiso::drop ()
     int phase  = -1;    // release all internal memory for all matrices
     int msglvl = 0;     // verbosity
     int error  = 0;     // success indicator
-    
+
     int O      = 0;     // dummy integer
     double D   = 0;     // dummy double
-    
+
 #ifdef WITH_MKL
     pardiso(pt_, &maxfct, &O, &mtype, &phase, &O, &D, &O, &O, &O, &O, iparm_, &msglvl, &D, &D, &error);
 #else
     pardiso(pt_, &maxfct, &O, &mtype, &phase, &O, &D, &O, &O, &O, &O, iparm_, &msglvl, &D, &D, &error, dparm_);
 #endif
-    
+
     pardisoerror(error);
 }
 
@@ -135,26 +135,26 @@ void LUft_Pardiso::factorize (CsrMatrix<LU_int_t,Complex> const & matrix)
     //
     // Cast matrix data to the data types expected by Pardiso (32-bit Int and 8-byte Real).
     //
-    
+
         // copy row pointers
         P_.resize(matrix.p().size());
         for (std::size_t i = 0; i < P_.size(); i++)
             P_[i] = matrix.p()[i] + 1;
-        
+
         // copy column indices
         I_.resize(matrix.i().size());
         for (std::size_t i = 0; i < I_.size(); i++)
             I_[i] = matrix.i()[i] + 1;
-        
+
         // copy elements
         X_.resize(matrix.x().size());
         for (std::size_t i = 0; i < X_.size(); i++)
             X_[i] = std::complex<double>(matrix.x()[i].real(), matrix.x()[i].imag());
-    
+
     //
     // Calculate the LU factorization.
     //
-    
+
         int maxfct = 1;                 // maximal number of factorizations
         int mnum   = 1;                 // index of the matrix to factorize
         int mtype  = 13;                // complex symmetric
@@ -163,7 +163,7 @@ void LUft_Pardiso::factorize (CsrMatrix<LU_int_t,Complex> const & matrix)
         int msglvl = 0;                 // verbosity
         int error  = 0;                 // success indicator
         int nrhs   = 1;                 // number of right-hand sides
-        
+
 #ifdef WITH_PARDISO
     #ifdef _OPENMP
         IPARM(3) = omp_get_max_threads();
@@ -172,11 +172,11 @@ void LUft_Pardiso::factorize (CsrMatrix<LU_int_t,Complex> const & matrix)
     #endif
         IPARM(52) = idata_["groupsize"];
 #endif
-        
+
         perm_.resize(n);
-        
+
         DPARM(5) = rdata_["drop_tolerance"];     // ILU drop tolerance
-        
+
         pardiso
         (
             pt_,
@@ -199,7 +199,7 @@ void LUft_Pardiso::factorize (CsrMatrix<LU_int_t,Complex> const & matrix)
             , dparm_
 #endif
         );
-        
+
         pardisoerror(error);
 }
 
@@ -212,7 +212,7 @@ void LUft_Pardiso::solve (const cArrayView b, cArrayView x, int eqs) const
     int n = b.size() / eqs;
     int msglvl = 0;
     int error = 0;
-    
+
     pardiso
     (
         const_cast<void**>(pt_),
@@ -235,7 +235,7 @@ void LUft_Pardiso::solve (const cArrayView b, cArrayView x, int eqs) const
         , const_cast<double*>(dparm_)
 #endif
     );
-    
+
     pardisoerror(error);
 }
 
@@ -243,7 +243,7 @@ std::size_t LUft_Pardiso::size () const
 {
     // IPARM(18) is negative for invalid / uninitialized setups,
     // but Hex-ecs is expecting zero
-    
+
     return IPARM(18) > 0 ? IPARM(18) * std::size_t(16) : 0;
 }
 
@@ -255,7 +255,7 @@ void LUft_Pardiso::save (std::string name) const
 void LUft_Pardiso::load (std::string name, bool throw_on_io_failure)
 {
     // TODO
-    
+
     if (throw_on_io_failure)
         HexException("Failed to load Pardiso LU decomposition from disk.");
 }

@@ -87,23 +87,23 @@ CommandLine::CommandLine (int argc, char* argv[])
     forward_states = true;
     backward = true;
     inputfile = "pecs.inp";
-    
+
     // custom values
     ParseCommandLine
     (
         argc, argv,
-        
+
         "example", "e", 0, [&](std::vector<std::string> const & optargs) -> bool
             {
                 std::cout << "Writing sample input file to \"example.inp\".\n\n";
-                
+
                 // produce sample input file
                 std::ofstream out("example.inp");
                 if (out.bad())
                     HexException("Error: Cannot write to \"example.inp\"\n");
-                
+
                 out << sample_input;
-                    
+
                 out.close();
                 std::exit(EXIT_SUCCESS);
             },
@@ -142,7 +142,7 @@ CommandLine::CommandLine (int argc, char* argv[])
                 backward = false;
                 return true;
             },
-        
+
         [&] (std::string optname, std::vector<std::string> const & optargs) -> bool
         {
             HexException("Unknown switch \"%s\".", optname.c_str());
@@ -161,12 +161,12 @@ void ReadArrays (std::ifstream & inf, rArray & arr)
             double begin = ReadNext<double>(inf).val;
             double end = ReadNext<double>(inf).val;
             int samples = ReadNext<int>(inf).val;
-            
+
             if (begin > end)
                 HexException("Start of linear sequence is larger than its end (%g > %g).", begin, end);
             if (samples < 0)
                 HexException("Invalid number of samples for linear sequence: %d.", samples);
-            
+
             arr.append(linspace(begin, end, samples));
         }
         else if (type[0] == 'G')
@@ -176,14 +176,14 @@ void ReadArrays (std::ifstream & inf, rArray & arr)
             double d = ReadNext<double>(inf).val;
             double quotient = ReadNext<double>(inf).val;
             int samples = std::ceil(1 + std::log(1 + (end - begin) * (quotient - 1) / d) / std::log(quotient));
-            
+
             if (begin > end)
                 HexException("Start of geometric sequence is larger than its end (%g > %g).", begin, end);
             if (d <= 0)
                 HexException("Initial interval size must be larger than zero (given: %g).", d);
             if (quotient <= 0)
                 HexException("Quotient must be positive (given: %g).", quotient);
-            
+
             arr.append(geomspace(begin, end, samples, quotient));
         }
         else if (type[0] == 'E')
@@ -222,40 +222,40 @@ InputFile::InputFile (const CommandLine& cmd)
         linspace(2.5, 20.0, 36)
 //         linspace(0.,3.,4)
     );*/
-    
+
     std::ifstream inf (cmd.inputfile);
-    
+
     if (not inf.good())
         HexException("Failed to open file \"%s\".", cmd.inputfile.c_str());
-    
+
     ReadItem<int> idata;
-    
+
     ecstheta = ReadNext<double>(inf).val;
-    
+
     ReadArrays(inf, rgrid);
     ReadArrays(inf, cgrid);
-    
+
     //
     // load initial atomic quantum numbers
     //
-    
+
     std::cout << std::endl;
     std::cout << "Initial atomic states" << std::endl;
-    
+
     std::vector<ReadItem<int>> nis, lis, mis;
-    
+
     // load initial principal quantum numbers
     while ((idata = ReadNext<int>(inf)).val != -1)
         nis.push_back(idata);
-    
+
     // - orbital angular momentum
     for (std::size_t i = 0; i < nis.size(); i++)
         lis.push_back(ReadNext<int>(inf, ReadItem<int>::asterisk));
-    
+
     // - magnetic quantum number
     for (std::size_t i = 0; i < nis.size(); i++)
         mis.push_back(ReadNext<int>(inf, ReadItem<int>::asterisk));
-    
+
     for (unsigned i = 0; i < nis.size(); i++)
     for (int li = 0; li < nis[i].val; li++)
     for (int mi = -li; mi <= li; mi++)
@@ -263,19 +263,19 @@ InputFile::InputFile (const CommandLine& cmd)
         // skip unused orbital angular momenta
         if (lis[i].val != li and not (lis[i].flags & ReadItem<int>::asterisk))
             continue;
-        
+
         // skip unused angular momentum projections
         if (mis[i].val != mi and not (mis[i].flags & ReadItem<int>::asterisk))
             continue;
-        
+
         // skip negative projections if asterisk was used (symmetry)
         if (mi < 0 and (mis[i].flags & ReadItem<int>::asterisk))
             continue;
-        
+
         // add this initial state
         istates.push_back(HState{nis[i].val,li,mi});
     }
-    
+
     // print info
     std::cout << "\t[n l m]: ";
     for (HState const & state  : istates)
@@ -287,23 +287,23 @@ InputFile::InputFile (const CommandLine& cmd)
                   << "] ";
     }
     std::cout << std::endl;
-    
+
     //
     // load final atomic quantum numbers
     //
-    
+
     std::cout << std::endl;
     std::cout << "Final atomic states" << std::endl;
     std::vector<ReadItem<int>> nfs, lfs;
-    
+
     // - principal quantum number
     while ((idata = ReadNext<int>(inf)).val != -1)
         nfs.push_back(idata);
-    
+
     // - orbital angular momentum
     for (std::size_t i = 0; i < nfs.size(); i++)
         lfs.push_back(ReadNext<int>(inf, ReadItem<int>::asterisk));
-    
+
     // - construct final states
     for (unsigned f = 0; f < nfs.size(); f++)
     for (int lf = 0; lf <= nfs[f].val; lf++)
@@ -311,15 +311,15 @@ InputFile::InputFile (const CommandLine& cmd)
         // l=n only in ionization specification
         if (lf == nfs[f].val and nfs[f].val != 0)
             continue;
-        
+
         // skip unused orbital angular momenta
         if (lfs[f].val != lf and not (lfs[f].flags & ReadItem<int>::asterisk))
             continue;
-        
+
         // add this initial state
         fstates.push_back(HState{nfs[f].val,lf,0});
     }
-    
+
     // print info
     std::cout << "\t[n l m]: ";
     for (HState const & state : fstates)
@@ -330,46 +330,46 @@ InputFile::InputFile (const CommandLine& cmd)
                   << " *] ";
     }
     std::cout << std::endl;
-    
+
     //
     // load total quantum numbers etc.
     //
-    
+
     std::cout << std::endl;
     std::cout << "Angular momentum limits" << std::endl;
-    
+
     // total angular momentum
     L = ReadNext<int>(inf).val;
-    
+
     // spin
     S = ReadNext<int>(inf).val;
-    
+
     // parity
     Pi = ReadNext<int>(inf).val % 2;
-    
+
     // number of angular momentum pairs per total angular momentum
     nL = ReadNext<int>(inf).val;
-    
+
     std::cout << "\tL = " << L << std::endl;
     std::cout << "\tS = " << S << std::endl;
     std::cout << "\tPi = " << Pi << std::endl;
     std::cout << "\tnL = " << nL << std::endl;
-    
+
     //
     // load initial energies
     //
-    
+
     Etot = ReadNext<double>(inf).val;
-    
+
     // print info
     std::cout << std::endl << "Total projectile + atom energy [Ry]: " << Etot << std::endl;
-    
+
     //
     // load the nuclear charge
     //
-    
+
     Z = ReadNext<double>(inf).val;
-    
+
     // print info
     std::cout << std::endl << "Nuclear charge: " << Z << std::endl << std::endl;
 }

@@ -70,7 +70,7 @@ void LUft_SCALAPACK::save (std::string name) const
 void LUft_SCALAPACK::load (std::string name, bool throw_on_io_failure)
 {
     // TODO
-    
+
     if (throw_on_io_failure)
         HexException("Failed to load ScaLAPACK LU decomposition from disk.");
 }
@@ -78,7 +78,7 @@ void LUft_SCALAPACK::load (std::string name, bool throw_on_io_failure)
 std::size_t LUft_SCALAPACK::size () const
 {
     // TODO
-    
+
     return 0;
 }
 

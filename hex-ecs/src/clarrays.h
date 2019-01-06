@@ -48,24 +48,24 @@
 template <class T> class clArrayView : public ArrayView<T>
 {
     protected:
-        
+
         /// Memory handle to the data copy on the GPU.
         cl_mem cl_handle_;
-        
+
     public:
-        
+
         //
         // aliases
         //
-        
+
         typedef T DataType;
         typedef T * iterator;
         typedef T const * const_iterator;
-        
+
         //
         // basic constructors
         //
-        
+
         clArrayView ()
             : ArrayView<T>(), cl_handle_(nullptr) { }
         clArrayView (std::size_t n, T const * ptr)
@@ -83,19 +83,19 @@ template <class T> class clArrayView : public ArrayView<T>
             std::swap (ArrayView<T>::N_,     v.ArrayView<T>::N_    );
             std::swap (cl_handle_,           v.cl_handle_          );
         }
-        
+
         //
         // destructor
         //
-        
+
         virtual ~clArrayView ()
         {
         }
-        
+
         //
         // STL interface (except changes in size -- we don't want to bother with GPU reallocation)
         //
-        
+
         std::size_t size () const               { return ArrayView<T>::size();        }
         T const & operator [] (std::size_t i) const  { return ArrayView<T>::operator[](i); }
         T & operator [] (std::size_t i)              { return ArrayView<T>::operator[](i); }
@@ -109,46 +109,46 @@ template <class T> class clArrayView : public ArrayView<T>
         T & front (std::size_t i = 0)                { return ArrayView<T>::front(i);      }
         T const & back (std::size_t i = 0) const     { return ArrayView<T>::back(i);       }
         T & back (std::size_t i = 0)                 { return ArrayView<T>::back(i);       }
-        
+
         //
         // OpenCL intrinsics
         //
-        
+
         bool is_connected () const
         {
             return cl_handle_ != nullptr;
         }
-        
+
         void connect (cl_context context, cl_mem_flags flags)
         {
             // release previous allocation prior to creating a new buffer !
             if (cl_handle_ != nullptr)
                 HexException("[clArray::connect] Array is already connected!");
-            
+
             // allocate memory on GPU
             cl_handle_ = clCreateBuffer(context, flags, size() * sizeof(T), data(), nullptr);
         }
-        
+
         void disconnect ()
         {
             // release previous allocations
             if (cl_handle_ != nullptr)
                 clReleaseMemObject(cl_handle_);
-            
+
             // clear pointer
             cl_handle_ = nullptr;
         }
-        
+
         cl_int EnqueueUpload (cl_command_queue queue)
         {
             return clEnqueueWriteBuffer(queue, cl_handle_, CL_TRUE, 0, size() * sizeof(T), data(), 0, nullptr, nullptr);
         }
-        
+
         cl_int EnqueueDownload (cl_command_queue queue)
         {
             return clEnqueueReadBuffer(queue, cl_handle_, CL_TRUE, 0, size() * sizeof(T), data(), 0, nullptr, nullptr);
         }
-        
+
         cl_mem const & handle () const
         {
             return cl_handle_;
@@ -177,19 +177,19 @@ template <class T, class Alloc = PlainAllocator<T>> class clArray : public clArr
 #endif
 {
     public:
-        
+
         //
         // aliases
         //
-        
+
         typedef T DataType;
         typedef T * iterator;
         typedef T const * const_iterator;
-        
+
         //
         // basic constructors
         //
-        
+
         clArray () : clArrayView<T>()
         {
             // nothing to do
@@ -224,61 +224,61 @@ template <class T, class Alloc = PlainAllocator<T>> class clArray : public clArr
         {
             // nothing to do
         }
-        
+
         //
         // data assignment
         //
-        
+
         clArray & operator= (const ArrayView<T> v)
         {
             // realloc memory if needed
             resize(v.size());
-            
+
             // copy data
             for (std::size_t j = 0; j < size(); j++)
                 (*this)[j] = v[j];
-            
+
             return *this;
         }
-        
+
         clArray & operator= (clArray<T> && v)
         {
             std::swap(clArrayView<T>::cl_handle_, v.clArrayView<T>::cl_handle_);
             std::swap(  ArrayView<T>::N_,         v.  ArrayView<T>::N_);
             std::swap(  ArrayView<T>::array_,     v.  ArrayView<T>::array_);
-            
+
             return *this;
         }
-        
+
         void resize (std::size_t newsize)
         {
             if (newsize != size())
             {
                 if (size() != 0)
                     Alloc::free(data());
-                
+
                 ArrayView<T>::array_ = Alloc::alloc(newsize);
                 ArrayView<T>::N_ = newsize;
             }
         }
-        
+
         //
         // destructor
         //
-        
+
         virtual ~clArray ()
         {
             // free GPU memory
             disconnect();
-            
+
             // free RAM memory
             Alloc::free(data());
         }
-        
+
         //
         // STL interface (except changes in size -- we don't want to bother with GPU reallocation)
         //
-        
+
         std::size_t size () const                   { return clArrayView<T>::size();        }
         T const & operator [] (std::size_t i) const { return clArrayView<T>::operator[](i); }
         T & operator [] (std::size_t i)             { return clArrayView<T>::operator[](i); }
@@ -292,36 +292,36 @@ template <class T, class Alloc = PlainAllocator<T>> class clArray : public clArr
         T & front (std::size_t i = 0)               { return clArrayView<T>::front(i);      }
         T const & back (std::size_t i = 0) const    { return clArrayView<T>::back(i);       }
         T & back (std::size_t i = 0)                { return clArrayView<T>::back(i);       }
-        
+
         //
         // OpenCL intrinsics
         //
-        
+
         bool is_connected () const
         {
             return clArrayView<T>::is_connected();
         }
-        
+
         void connect (cl_context context, cl_mem_flags flags = CL_MEM_COPY_HOST_PTR | CL_MEM_READ_WRITE)
         {
             clArrayView<T>::connect(context, flags);
         }
-        
+
         void disconnect ()
         {
             clArrayView<T>::disconnect();
         }
-        
+
         cl_int EnqueueDownload (cl_command_queue queue)
         {
             return clArrayView<T>::EnqueueDownload(queue);
         }
-        
+
         cl_int EnqueueUpload (cl_command_queue queue)
         {
             return clArrayView<T>::EnqueueUpload(queue);
         }
-        
+
         cl_mem const & handle () const
         {
             return clArrayView<T>::handle();

@@ -55,13 +55,13 @@
 class NoPreconditioner : public PreconditionerBase
 {
     public:
-        
+
         // run-time selection mechanism
         preconditionerRunTimeSelectionDefinitions(NoPreconditioner, "none")
-        
+
         // default constructor required by RTS system
         NoPreconditioner ();
-        
+
         // constructor
         NoPreconditioner
         (
@@ -74,13 +74,13 @@ class NoPreconditioner : public PreconditionerBase
             Bspline const & bspline_panel_x,
             Bspline const & bspline_panel_y
         );
-        
+
         // destructor
         ~NoPreconditioner ();
-        
+
         // description of the preconditioner
         virtual std::string description () const;
-        
+
         // member functions
         virtual void setup ();
         virtual void update (Real E);
@@ -89,33 +89,33 @@ class NoPreconditioner : public PreconditionerBase
         virtual void rhs (BlockArray<Complex> & chi, int ienergy, int instate) const;
         virtual void multiply (BlockArray<Complex> const & p, BlockArray<Complex> & q, MatrixSelection::Selection tri = MatrixSelection::Both) const;
         virtual void precondition (BlockArray<Complex> const & r, BlockArray<Complex> & z) const;
-        
+
         // internal routines
         BlockSymBandMatrix<Complex> calc_A_block (int ill, int illp, bool twoel = true) const;
         CooMatrix<LU_int_t,Complex> calc_full_block (int ill, int illp) const;
-        
+
         // access to the radial integrals
         RadialIntegrals const & rad_inner () const { return *rad_inner_; }
         RadialIntegrals const & rad_full () const { return *rad_full_; }
         RadialIntegrals const & rad_panel () const { return *rad_panel_; }
-        
+
     protected:
-        
+
         // energy
         Real E_;
-        
+
         // command line switches
         CommandLine const * cmd_;
-        
+
         // parallel environment
         Parallel const * par_;
-        
+
         // input parameters
         InputFile const * inp_;
-        
+
         // coupled states
         AngularBasis const * ang_;
-        
+
         // Sub-blocks composing the angular blocks of the full matrix:
         //  ┏━━━━━━┯━━━━━━━┯━━━┓
         //  ┃ A    │  Cu   │Fu ┃
@@ -148,19 +148,19 @@ class NoPreconditioner : public PreconditionerBase
         std::vector<BlockSymBandMatrix<Complex>> E_blocks_;
         std::vector<CooMatrix<LU_int_t,Complex>> Fu_blocks_;
         std::vector<CooMatrix<LU_int_t,Complex>> Fl_blocks_;
-        
+
         // maximal bound state principal quantum number for given energy
         int max_n_;
-        
+
         // number of channels considered when r1 -> inf and r2 -> inf, respectively
         std::vector<std::pair<int,int>> Nchan_;
-        
+
         // rank of the angular blocks
         std::vector<std::size_t> block_rank_;
-        
+
         // radial integrals for inner, full and panel basis
         RadialIntegrals *rad_inner_, *rad_full_, *rad_panel_;
-        
+
         // Eigenstates (expansions) of the inner one-electron hamiltonian for all relevant angular momenta and their overlaps.
         // They are normalized so that
         //   1. (Xp|Xp) = 1 (xGEMM does that),
@@ -168,13 +168,13 @@ class NoPreconditioner : public PreconditionerBase
         //   3. the first component is positive (additional condition required by Hex).
         // The last condition makes the states compatible with the function gsl_sf_hydrogenicR.
         std::array<Array<cArrays>,2> Xp_, Sp_;
-        
+
         // eigen-energies (in Ry) of the pseudostates contained in Xp_ for each angular momentum
         std::array<cArrays,2> Eb_;
-        
+
         // one-electron hamiltonian data (for atomic electron and the projectile)
         mutable std::array<std::vector<HlData>,2> Hl_;
-        
+
         // occasionally useful LU decomposition of the overlap matrix
         std::shared_ptr<LUft> luS_;
 };
