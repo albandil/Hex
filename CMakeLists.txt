@@ -127,7 +127,7 @@ add_definitions(-D_LONGINT)
 
 # release requirements on IEEE conformance to enable fast math
 if("${CMAKE_BUILD_TYPE}" STREQUAL "Release")
-    set(OPTFLAGS ${OPTFLAGS} -funsafe-math-optimizations -fno-rounding-math -fno-signed-zeros)
+    set(OPTFLAGS ${OPTFLAGS} -fno-rounding-math -fno-signed-zeros)
 endif()
 
 # do not check complex overflows in FP64, where they do not occur
