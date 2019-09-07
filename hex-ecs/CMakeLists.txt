@@ -68,6 +68,10 @@ set(hex-ecs_SOURCES
 
 add_executable(hex-ecs ${hex-ecs_SOURCES})
 
+if(DISABLE_PARALLEL_PRECONDITION)
+    target_compile_definitions(-DDISABLE_PARALLEL_PRECONDITION)
+endif()
+
 target_include_directories(hex-ecs PUBLIC
     src
     ../common
