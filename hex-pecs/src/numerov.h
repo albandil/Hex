@@ -109,6 +109,7 @@ class Numerov2d
                 if (k == i) return special::pow_int(1.+a,2+l) * (a*(2.+l)*(l*l+l+v+u*h) - 6. - 9.*l + v - 3.*l*l + u*h);
                 if (k  > i) return a*a*u*h*(l+1.) + a*(l*l*l + 6.*l*l + (u*h + v + 11.)*l + v + 6.) + 9.*l + 6. - u*h - v + 3.*l*l;
             }
+            return T(0);
         }
 
         template <class T> T coef_B (int i, int k, T h, T a, unsigned l) const
@@ -133,6 +134,7 @@ class Numerov2d
                 if (k == i) return special::pow_int(1.+a,2+l) * (l*a + 2.*a + 1.);
                 if (k  > i) return special::pow_int(1.+a,2) * (l*a + a - 1.);
             }
+            return T(0);
         }
 
         InputFile const & inp_;

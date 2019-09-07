@@ -92,12 +92,14 @@ public:
     template <typename T> bool read (std::string dataset, T * buffer, std::size_t length, std::size_t offset = 0) const
     {
         HexException("Unsupported data type %s.", typeid(T).name());
+        return false;
     }
 
     /// Write data to a valid file.
     template <typename T> bool write (std::string dataset, T const * buffer, std::size_t length, std::size_t offset = 0)
     {
         HexException("Unsupported data type %s.", typeid(T).name());
+        return false;
     }
 
     /// Check that the file is valid.
