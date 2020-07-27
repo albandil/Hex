@@ -63,13 +63,13 @@ set(hex-ecs_SOURCES
     "src/preconditioners/ILUPreconditioner.cpp"
     "src/preconditioners/KPAPreconditioner.cpp"
     "src/preconditioners/NoPreconditioner.cpp"
-    "src/preconditioners/SegregatedPreconditioner.cpp"
+    #"src/preconditioners/SegregatedPreconditioner.cpp"
 )
 
 add_executable(hex-ecs ${hex-ecs_SOURCES})
 
 if(DISABLE_PARALLEL_PRECONDITION)
-    target_compile_definitions(-DDISABLE_PARALLEL_PRECONDITION)
+    target_compile_definitions(hex-ecs PRIVATE DISABLE_PARALLEL_PRECONDITION)
 endif()
 
 target_include_directories(hex-ecs PUBLIC
