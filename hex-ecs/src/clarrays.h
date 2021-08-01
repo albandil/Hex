@@ -6,7 +6,7 @@
 //                    / /   / /    \_\      / /  \ \                                 //
 //                                                                                   //
 //                                                                                   //
-//  Copyright (c) 2016, Jakub Benda, Charles University in Prague                    //
+//  Copyright (c) 2019, Jakub Benda, Charles University in Prague                    //
 //                                                                                   //
 // MIT License:                                                                      //
 //                                                                                   //
@@ -32,11 +32,20 @@
 #ifndef HEX_OPENCL
 #define HEX_OPENCL
 
+// --------------------------------------------------------------------------------- //
+
 #ifdef WITH_OPENCL
 
+// --------------------------------------------------------------------------------- //
+
+#define CL_TARGET_OPENCL_VERSION 110
 #include <CL/cl.h>
 
+// --------------------------------------------------------------------------------- //
+
 #include "hex-arrays.h"
+
+// --------------------------------------------------------------------------------- //
 
 /**
  * @brief OpenCL array wrapper.
@@ -328,6 +337,10 @@ template <class T, class Alloc = PlainAllocator<T>> class clArray : public clArr
         }
 };
 
+// --------------------------------------------------------------------------------- //
+
 #endif // WITH_OPENCL
+
+// --------------------------------------------------------------------------------- //
 
 #endif
