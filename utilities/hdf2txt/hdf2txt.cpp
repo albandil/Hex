@@ -66,12 +66,20 @@ int main (int argc, char *argv[])
         std::exit(EXIT_SUCCESS);
     }
 
+    HDFFile hdf (filename, HDFFile::readonly);
+    if (not hdf.valid())
+    {
+        HexException("Invalid filename \"%s\".", filename.c_str());
+    }
+    std::cout << "The file \"" << filename << "\" contains " << hdf.datasets().size() << " datasets:";
+    for (HDFFile::DatasetInfo const & dset : hdf.datasets())
+    {
+        std::cout << ' ' << dset.name;
+    }
+    std::cout << std::endl;
+
     if (not dataset.empty())
     {
-        HDFFile hdf (filename, HDFFile::readonly);
-        if (not hdf.valid())
-            HexException("Invalid filename \"%s\".", filename.c_str());
-
         std::vector<HDFFile::DatasetInfo>::const_iterator iter = std::find_if
         (
             hdf.datasets().begin(),

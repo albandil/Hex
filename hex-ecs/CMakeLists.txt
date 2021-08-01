@@ -63,7 +63,7 @@ set(hex-ecs_SOURCES
     "src/preconditioners/ILUPreconditioner.cpp"
     "src/preconditioners/KPAPreconditioner.cpp"
     "src/preconditioners/NoPreconditioner.cpp"
-    "src/preconditioners/SegregatedPreconditioner.cpp"
+    #"src/preconditioners/SegregatedPreconditioner.cpp"
 )
 
 add_executable(hex-ecs ${hex-ecs_SOURCES})
