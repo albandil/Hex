@@ -80,7 +80,7 @@ class CGPreconditioner : public NoPreconditioner
         }
 
         // description of the preconditioner
-        virtual std::string description () const;
+        std::string description () const override;
 
         // reuse parent definitions
         using NoPreconditioner::setup;
@@ -89,8 +89,8 @@ class CGPreconditioner : public NoPreconditioner
         using NoPreconditioner::multiply;
 
         // declare own definitions
-        virtual void precondition (BlockArray<Complex> const & r, BlockArray<Complex> & z) const;
-        virtual void finish ();
+        void precondition (BlockArray<Complex> const & r, BlockArray<Complex> & z) const override;
+        void finish () override;
 
         // solve diagonal block
         virtual int solve_block (int ill, const cArrayView r, cArrayView z) const;

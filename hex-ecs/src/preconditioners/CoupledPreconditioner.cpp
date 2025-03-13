@@ -44,12 +44,15 @@ std::string CoupledPreconditioner::description () const
     "and is likely to severely exceed your RAM.";
 }
 
-void CoupledPreconditioner::update (Real E)
+void CoupledPreconditioner::update (Real E, bool full)
 {
     if (par_->Nproc() != par_->groupsize())
         HexException("Coupled preconditioner must be executed with full MPI groupsize.");
 
-    KPACGPreconditioner::update(E);
+    KPACGPreconditioner::update(E, full);
+
+    if (not full)
+        return;
 
     // do not update if running in energy-perturbation mode
     if (lu_ != nullptr and lu_->valid() and cmd_->noluupdate)

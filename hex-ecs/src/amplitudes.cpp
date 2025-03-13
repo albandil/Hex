@@ -53,6 +53,7 @@
 // --------------------------------------------------------------------------------- //
 
 #include "amplitudes.h"
+#include "ang.h"
 #include "bspline.h"
 #include "hldata.h"
 #include "radial.h"
@@ -237,6 +238,124 @@ void Amplitudes::extract (std::string directory)
     for (auto xi : Xi_Sl1l2)
     {
         computeSigmaIon_(xi.first);
+    }
+}
+
+void Amplitudes::dipoles(std::string directory)
+{
+    par_.wait();
+
+    if (verbose_)
+        std::cout << "Extracting photoionization dipoles" << std::endl;
+
+    // WARNING
+    // Assumptions (z polarization)
+    // Li = 0; Lf = 1   => l1f = l1i -1/0/+1; l2f = l2i -1/0/+1
+    // Mi = 0; Mf = 0   => m1f = m1i; m2f = m2i
+    // Si = 0; Sf = 0
+
+    std::ifstream file("bound.inp");
+    if (not file.is_open())
+        HexException("Missing file bound.inp");
+    InputFile bound_inp(file);
+    AngularBasis bound_ang(bound_inp);
+
+    // read bound state
+    SolutionIO bound_reader(0, 0, 0, 0, 0, 0, 0., bound_ang.states(), {}, directory + "/psi");
+    BlockArray<Complex> bound_state(bound_ang.states().size(), true, "bound");
+    for (unsigned ill = 0; ill < bound_ang.states().size(); ill++)
+        bound_reader.load(bound_state, ill);
+
+    for (unsigned Spin : inp_.Spin)
+    {
+        if (verbose_)
+        {
+            if (Spin == 0)
+                std::cout << "\tSinglet" << std::endl;
+
+            if (Spin == 1)
+                std::cout << "\tTriplet" << std::endl;
+        }
+
+        for (unsigned ie = 0; ie < inp_.Etot.size(); ie++)
+        {
+            if (verbose_) std::cout << "\t\tEi = " << inp_.Etot[ie] << std::endl;
+
+            // for all initial states
+            for (auto instate  : inp_.instates)
+            {
+                // get initial quantum numbers
+                int ni = std::get<0>(instate);
+                int li = std::get<1>(instate);
+                int mi = std::get<2>(instate);
+
+                // is this solution allowed at all for the given angular basis?
+                bool allowed = false;
+
+                // -> find a valid combination of atomic and projectile angular momentum
+                for (int l = std::abs(li - inp_.L); l <= li + inp_.L; l++)
+                {
+                    // does this combination conserve parity?
+                    if ((inp_.L + li + l) % 2 != inp_.Pi)
+                        continue;
+
+                    // does this combination have valid 'mi' for this partial wave?
+                    if (special::ClebschGordan(li,mi,l,0,inp_.L,mi) != 0)
+                        allowed = true;
+                }
+
+                // skip forbidden wave functions
+                if (not allowed)
+                    continue;
+
+                // read the scattering solution
+                reader_ = SolutionIO(inp_.L, Spin, inp_.Pi, ni, li, mi, inp_.Etot[ie], ang_, {}, directory + "/psi");
+                BlockArray<Complex> solution (ang_.size(), true, "sol");
+                for (unsigned ill = 0; ill < ang_.size(); ill++)
+                    reader_.load(solution, ill);
+
+                int Nang_bound = bound_ang.states().size();
+                int Nang_free = ang_.size();
+
+                Complex dip = 0;
+
+                for (int v = 0; v < Nang_free; v++)
+                {
+                    int l1f = ang_[v].first;
+                    int l2f = ang_[v].second;
+
+                    cArray full_solution = solution[v];
+
+                    // TODO add free solution (target × projectile)
+
+                    for (int u = 0; u < Nang_bound; u++)
+                    {
+                        int l1i = bound_ang.states()[u].first;
+                        int l2i = bound_ang.states()[u].second;
+
+                        if (bound_state[u].size() != solution[v].size())
+                            HexException("Bound state and scattering states use different grids!");
+
+
+                        Complex R1 = kron_contract(bound_state[u], full_solution, rad_.Mp1(), rad_.S());
+                        Complex R2 = kron_contract(bound_state[u], full_solution, rad_.S(), rad_.Mp1());
+
+                        for (int m = -l1i; m <= l1i; m++)
+                        {
+                            Real Ci = special::ClebschGordan(l1i, m, l2i, -m, 0,      0);
+                            Real Cf = special::ClebschGordan(l1f, m, l2f, -m, inp_.L, 0);
+
+                            Real I1 = l2f == l2i ? special::Gaunt(l1f, +m, 1, 0, l1i, +m) : 0;
+                            Real I2 = l1f == l1i ? special::Gaunt(l2f, -m, 1, 0, l2i, -m) : 0;
+
+                            dip += std::sqrt(4*special::constant::pi/3) * Cf*Ci * (I1*R1 + I2*R2);
+                        }
+                    }
+                }
+
+                std::cout << "\t\t\tTransition dipole: " << dip << ", phase " << std::arg(dip) << std::endl;
+            }
+        }
     }
 }
 
@@ -741,8 +860,8 @@ Chebyshev<double,Complex> Amplitudes::fcheb (cArrayView const & PsiSc, Real kmax
 
             // evaluate Coulomb wave functions and derivatives
             double F1, F2, F1p, F2p;
-            int err1 = special::coul_F(l1,k1,r1, F1,F1p);
-            int err2 = special::coul_F(l2,k2,r2, F2,F2p);
+            int err1 = special::coul_F(1,l1,k1,r1, F1,F1p);
+            int err2 = special::coul_F(1,l2,k2,r2, F2,F2p);
             if (err1 != GSL_SUCCESS or err2 != GSL_SUCCESS)
             {
                 std::cerr << "Errors while evaluating Coulomb function:" << std::endl;

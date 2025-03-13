@@ -6,7 +6,7 @@
 //                    / /   / /    \_\      / /  \ \                                 //
 //                                                                                   //
 //                                                                                   //
-//  Copyright (c) 2016, Jakub Benda, Charles University in Prague                    //
+//  Copyright (c) 2025, Jakub Benda, Charles University in Prague                    //
 //                                                                                   //
 // MIT License:                                                                      //
 //                                                                                   //
@@ -29,100 +29,71 @@
 //                                                                                   //
 //  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
-#ifndef HEX_HYBPRECONDITIONER_H
-#define HEX_HYBPRECONDITIONER_H
+#ifndef HEX_ECS_DIAG_PRECONDITIONER_H
+#define HEX_ECS_DIAG_PRECONDITIONER_H
 
 // --------------------------------------------------------------------------------- //
 
-#include <set>
-#include <string>
-#include <vector>
-
-// --------------------------------------------------------------------------------- //
-
-#include "hex-arrays.h"
-#include "hex-matrix.h"
-
-// --------------------------------------------------------------------------------- //
-
-#include "ILUPreconditioner.h"
-#include "KPAPreconditioner.h"
+#include "NoPreconditioner.h"
 
 // --------------------------------------------------------------------------------- //
 
 /**
- * @brief Hybrid preconditioner.
- * 
- * Combination of ILU and KPA:
- * - KPA is used for angular blocks with no asymptotic channels.
- * - ILU is used for angular blocks with asymptotic channels.
+ * @brief Plain Jacobi preconditioner.
+ *
+ * Extends NoPreconditioner with diagonal (Jacobi) preconditioning.
  */
-class HybCGPreconditioner : public ILUCGPreconditioner, public KPACGPreconditioner
+class DiagPreconditioner : public NoPreconditioner
 {
     public:
 
         // run-time selection mechanism
-        preconditionerRunTimeSelectionDefinitions(HybCGPreconditioner, "HYB")
+        preconditionerRunTimeSelectionDefinitions(DiagPreconditioner, "diag")
 
         // default constructor needed by the RTS mechanism
-        HybCGPreconditioner () {}
+        DiagPreconditioner () {}
 
         // constructor
-        HybCGPreconditioner
+        DiagPreconditioner
         (
             CommandLine  const & cmd,
             InputFile    const & inp,
             Parallel     const & par,
             AngularBasis const & ang,
-            Bspline const & bspline_x_inner,
-            Bspline const & bspline_x_full,
-            Bspline const & bspline_y_inner,
-            Bspline const & bspline_y_full
-        ) : CGPreconditioner
+            Bspline const & bspline_inner,
+            Bspline const & bspline_full,
+            Bspline const & bspline_panel_x,
+            Bspline const & bspline_panel_y
+        ) : NoPreconditioner
             (
                 cmd, inp, par, ang,
-                bspline_x_inner, bspline_x_full,
-                bspline_y_inner, bspline_y_full
-            ),
-            ILUCGPreconditioner
-            (
-                cmd, inp, par, ang,
-                bspline_x_inner, bspline_x_full,
-                bspline_y_inner, bspline_y_full
-            ),
-            KPACGPreconditioner
-            (
-                cmd, inp, par, ang,
-                bspline_x_inner, bspline_x_full,
-                bspline_y_inner, bspline_y_full
+                bspline_inner,
+                bspline_full,
+                bspline_panel_x,
+                bspline_panel_y
             )
         {
-            // nothing more to do
+            // nothing to do
         }
 
-        // preconditioner description
+        // description of the preconditioner
         std::string description () const override;
 
         // reuse parent definitions
-        using CGPreconditioner::multiply;
-        using CGPreconditioner::rhs;
-        using CGPreconditioner::precondition;
+        using NoPreconditioner::rhs;
+        using NoPreconditioner::multiply;
+        using NoPreconditioner::update;
+        using NoPreconditioner::finish;
 
         // declare own definitions
         void setup () override;
-        void update (Real E, bool full = true) override;
-        void finish () override;
+        void precondition (BlockArray<Complex> const & r, BlockArray<Complex> & z) const override;
 
-        // inner CG callback (needed by parent)
-        void CG_init (int iblock) const override;
-        void CG_prec (int iblock, const cArrayView r, cArrayView z) const override;
-        void CG_mmul (int iblock, const cArrayView r, cArrayView z) const override;
-        void CG_exit (int iblock) const override;
+    protected:
 
-        // decide whether to use the ILU preconditioner
-        bool ilu_needed (int iblock) const;
+        mutable cBlockArray diagonal;
 };
 
 // --------------------------------------------------------------------------------- //
 
-#endif
+#endif // HEX_ECS_DIAG_PRECONDITIONER_H

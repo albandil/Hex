@@ -88,6 +88,13 @@ class Amplitudes
         void extract (std::string directory = ".");
 
         /**
+         * @brief Photoionization dipoles
+         *
+         * Evaluate dipole transitions from the bound state to all scattering states.
+         */
+        void dipoles(std::string directory = ".");
+
+        /**
          * @brief Write SQL batch file.
          * 
          * This routine will write out T-matrices in the form of SQL batch file

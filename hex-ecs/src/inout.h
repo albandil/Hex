@@ -140,6 +140,12 @@ class CommandLine
         // Write grid layout to a VTK file.
         bool writegrid;
 
+        /// Calculate bound state wave function of two-electron system.
+        bool bound{};
+
+        /// Evaluate dipole transition amplitudes from the bound state to all scattering states.
+        bool dipoles{};
+
         /// A B-spline expansion of a solution to "zip". See \ref Bspline::zip .
         struct s_zipdata
         {

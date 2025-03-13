@@ -66,10 +66,12 @@ RadialIntegrals::RadialIntegrals
     rymax_(bspline_y.R2()),
     D_x_  (bspline_x.Nspline(), bspline_x.order() + 1),
     S_x_  (bspline_x.Nspline(), bspline_x.order() + 1),
+    Mp1_x_(bspline_x.Nspline(), bspline_x.order() + 1),
     Mm1_x_(bspline_x.Nspline(), bspline_x.order() + 1),
     Mm2_x_(bspline_x.Nspline(), bspline_x.order() + 1),
     D_y_  (bspline_y.Nspline(), bspline_y.order() + 1),
     S_y_  (bspline_y.Nspline(), bspline_y.order() + 1),
+    Mp1_y_(bspline_y.Nspline(), bspline_y.order() + 1),
     Mm1_y_(bspline_y.Nspline(), bspline_y.order() + 1),
     Mm2_y_(bspline_y.Nspline(), bspline_y.order() + 1),
     verbose_(true),
@@ -552,11 +554,13 @@ void RadialIntegrals::setupOneElectronIntegrals (bool shared_scratch, bool IamMa
         \
         D_##AXIS##_     .hdflink(format("rad-D-%.4lx.hdf",      hash_##AXIS)); \
         S_##AXIS##_     .hdflink(format("rad-S-%.4lx.hdf",      hash_##AXIS)); \
+        Mp1_##AXIS##_   .hdflink(format("rad-Mp1-%.4lx.hdf",    hash_##AXIS)); \
         Mm1_##AXIS##_   .hdflink(format("rad-Mm1-%.4lx.hdf",    hash_##AXIS)); \
         Mm2_##AXIS##_   .hdflink(format("rad-Mm2-%.4lx.hdf",    hash_##AXIS)); \
         \
         D_##AXIS##_     .populate([=](int m, int n) -> Complex { return computeD(bspline_##AXIS##_, g_##AXIS##_,     m, n); }); \
         S_##AXIS##_     .populate([=](int m, int n) -> Complex { return computeM(bspline_##AXIS##_, g_##AXIS##_,  0, m, n, bspline_##AXIS##_.Rmin(), bspline_##AXIS##_.Rmax(), false); }); \
+        Mp1_##AXIS##_   .populate([=](int m, int n) -> Complex { return computeM(bspline_##AXIS##_, g_##AXIS##_, +1, m, n, r##AXIS##min_,            r##AXIS##max_,            false); }); \
         Mm1_##AXIS##_   .populate([=](int m, int n) -> Complex { return computeM(bspline_##AXIS##_, g_##AXIS##_, -1, m, n, r##AXIS##min_,            r##AXIS##max_,            false); }); \
         Mm2_##AXIS##_   .populate([=](int m, int n) -> Complex { return computeM(bspline_##AXIS##_, g_##AXIS##_, -2, m, n, bspline_##AXIS##_.Rmin(), bspline_##AXIS##_.Rmax(), false); }); \
         \
@@ -564,6 +568,7 @@ void RadialIntegrals::setupOneElectronIntegrals (bool shared_scratch, bool IamMa
         { \
             D_##AXIS##_     .hdfsave(); \
             S_##AXIS##_     .hdfsave(); \
+            Mp1_##AXIS##_   .hdfsave(); \
             Mm1_##AXIS##_   .hdfsave(); \
             Mm2_##AXIS##_   .hdfsave(); \
         }

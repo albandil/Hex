@@ -1268,7 +1268,7 @@ BlockSymBandMatrix<DataT> operator -
 
 /**
  * @brief Kronecker product.
- * 
+ *
  * Applies the following operation:
  * \f[
  *     \mathbf{w} = a \mathbf{w} + b (\mathsf{A} \otimes \mathsf{B}) \cdot \mathbf{v} \,.
@@ -1315,6 +1315,53 @@ template <class DataT> void kron_dot
             w[i * B_rows + j] += b * A(i,k) * res;
         }
     }
+}
+
+/**
+ * @brief Kronecker product contraction.
+ *
+ * Applies the following operation:
+ * \f[
+ *     x = \mathbf{u}^\top (\mathsf{A} \otimes \mathsf{B}) \mathbf{v} \,.
+ * \f]
+ */
+template <class DataT> DataT kron_contract
+(
+    ArrayView<DataT> const u,
+    ArrayView<DataT> const v,
+    SymBandMatrix<DataT> const& A,
+    SymBandMatrix<DataT> const& B
+)
+{
+    DataT result = 0;
+
+    std::size_t A_rows = A.size();
+    std::size_t B_rows = B.size();
+
+    for (std::size_t i = 0; i < A_rows; i++)
+    {
+        // iteration bounds
+        std::size_t kmin = (i >= A.halfbw() ? i - A.halfbw() : 0);
+        std::size_t kmax = std::min(A_rows - 1, i + A.halfbw() - 1);
+
+        for (std::size_t k = kmin; k <= kmax; k++)
+        for (std::size_t j = 0; j < B_rows; j++)
+        {
+            // iteration bounds
+            std::size_t lmin = (j >= B.halfbw() ? j - B.halfbw() : 0);
+            std::size_t lmax = std::min(B_rows - 1, j + B.halfbw() - 1);
+
+            // calculate the scalar product
+            DataT res = 0;
+            for (std::size_t l = lmin; l <= lmax; l++)
+                res += B(j,l) * v[k * B_rows + l];
+
+            // save result
+            result += u[i * B_rows + j] * A(i,k) * res;
+        }
+    }
+
+    return result;
 }
 
 // --------------------------------------------------------------------------------- //

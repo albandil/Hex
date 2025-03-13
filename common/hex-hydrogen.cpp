@@ -321,10 +321,10 @@ double F (double k, int l, double r, double sigma)
 
     // high distances => use asymptotic form
     if (r > rt)
-        return norm * special::coul_F_asy(l, k, r, (std::isfinite(sigma) ? sigma : special::coul_F_sigma(l,k)));
+        return norm * special::coul_F_asy(1, l, k, r, (std::isfinite(sigma) ? sigma : special::coul_F_sigma(1,l,k)));
 
     // low energies => use uniform WKB approximation by Michel
-    if ((err = special::coul_F_michel(l, k, r, F, Fp)) == GSL_SUCCESS)
+    if ((err = special::coul_F_michel(1, l, k, r, F, Fp)) == GSL_SUCCESS)
         return norm * F;
 
     // some other problem
@@ -337,7 +337,7 @@ double F (double k, int l, double r, double sigma)
 
 double evalFreeStatePhase (double k, int l, double sigma)
 {
-    return l * 0.5 * special::constant::pi + (std::isfinite(sigma) ? sigma : special::coul_F_sigma(l,k));
+    return l * 0.5 * special::constant::pi + (std::isfinite(sigma) ? sigma : special::coul_F_sigma(1,l,k));
 }
 
 double S (int n, int l, double r, double lambda)
@@ -386,7 +386,7 @@ double getFreeAsyTop (double k, int l, double Sigma, double eps, int max_steps, 
 double getFreeFar (double k, int l, double Sigma, double eps, int max_steps)
 {
     // precompute Coulomb shift
-    Sigma = std::isfinite(Sigma) ? Sigma : special::coul_F_sigma(l,k);
+    Sigma = std::isfinite(Sigma) ? Sigma : special::coul_F_sigma(1,l,k);
 
     //
     // hunt phase

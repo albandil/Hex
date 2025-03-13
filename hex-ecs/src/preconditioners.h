@@ -118,9 +118,13 @@ class PreconditionerBase
              * @brief Update the preconditioner for the next energy.
              * 
              * This function updates the preconditioner for another right hand side.
-             * It may use the MPI environment. The energy is in Ry.
+             * It may use the MPI environment. The energy is in Ry. If the argument
+             * `full` is set to `false`, this function will merely change the energy
+             * that is stored internally, but all precomputed matrices will remain
+             * the same. This is dangerous, so do it only if you know what you are
+             * doing!
              */
-            virtual void update (Real E) {}
+            virtual void update (Real E, bool fullUpdate = true) {}
 
             /**
              * @brief Get the number of allowed bound states.

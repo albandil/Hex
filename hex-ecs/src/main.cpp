@@ -311,15 +311,20 @@ int main (int argc, char* argv[])
 
         if (cmd.itinerary & CommandLine::StgExtract)
         {
-            // extract amplitudes
             Amplitudes ampl (bspline_inner, bspline_full, inp, par, cmd, ang.states());
+
+            // extract amplitudes
             ampl.extract();
 
-            // write T-matrices to a text file as SQL statements 
+            // write T-matrices to a text file as SQL statements
             ampl.writeSQL_files();
 
             // write integral cross sections to a text file
             ampl.writeICS_files();
+
+            // calculate transition dipoles from the bound state
+            if (cmd.dipoles)
+                ampl.dipoles();
         }
         else
         {

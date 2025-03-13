@@ -125,7 +125,7 @@ template <class T> class ArrayView
             : ArrayView() { std::swap(N_, r.N_); std::swap(array_, r.array_); }
 
         // destructor
-        ~ArrayView () {}
+        virtual ~ArrayView () {}
 
         /// Change view.
         void reset (std::size_t n, T const * ptr)
@@ -344,7 +344,7 @@ template <class T, class Alloc_> class Array : public ArrayView<T>
         }
 
         // destructor
-        ~Array ()
+        virtual ~Array ()
         {
             if (ArrayView<T>::array_ != nullptr)
             {
@@ -664,7 +664,7 @@ template <class T, class Alloc_> class NumberArray : public Array<T, Alloc_>
         }
 
         // destructor
-        ~NumberArray ()
+        virtual ~NumberArray ()
         {
             // Array<T> will do the destruction
             // ... do nothing here

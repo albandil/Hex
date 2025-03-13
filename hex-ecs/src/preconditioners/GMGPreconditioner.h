@@ -76,7 +76,7 @@ class GMGPreconditioner : public NoPreconditioner
         virtual ~GMGPreconditioner ();
 
         // preconditioner description
-        virtual std::string description () const;
+        std::string description () const override;
 
         // reuse parent definitions
         using NoPreconditioner::rhs;
@@ -84,9 +84,9 @@ class GMGPreconditioner : public NoPreconditioner
         using NoPreconditioner::finish;
 
         // declare own definitions
-        virtual void setup ();
-        virtual void update (Real E);
-        virtual void precondition (BlockArray<Complex> const & r, BlockArray<Complex> & z) const;
+        void setup () override;
+        void update (Real E, bool full = true) override;
+        void precondition (BlockArray<Complex> const & r, BlockArray<Complex> & z) const override;
 
     private:
 

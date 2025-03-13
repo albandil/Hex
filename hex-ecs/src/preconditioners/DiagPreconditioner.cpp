@@ -6,7 +6,7 @@
 //                    / /   / /    \_\      / /  \ \                                 //
 //                                                                                   //
 //                                                                                   //
-//  Copyright (c) 2016, Jakub Benda, Charles University in Prague                    //
+//  Copyright (c) 2025, Jakub Benda, Charles University in Prague                    //
 //                                                                                   //
 // MIT License:                                                                      //
 //                                                                                   //
@@ -29,100 +29,102 @@
 //                                                                                   //
 //  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
-#ifndef HEX_HYBPRECONDITIONER_H
-#define HEX_HYBPRECONDITIONER_H
-
-// --------------------------------------------------------------------------------- //
-
-#include <set>
-#include <string>
-#include <vector>
+#include <iostream>
 
 // --------------------------------------------------------------------------------- //
 
 #include "hex-arrays.h"
-#include "hex-matrix.h"
+#include "hex-blas.h"
+#include "hex-hydrogen.h"
+#include "hex-misc.h"
 
 // --------------------------------------------------------------------------------- //
 
-#include "ILUPreconditioner.h"
-#include "KPAPreconditioner.h"
+#include "gauss.h"
+#include "radial.h"
 
 // --------------------------------------------------------------------------------- //
 
-/**
- * @brief Hybrid preconditioner.
- * 
- * Combination of ILU and KPA:
- * - KPA is used for angular blocks with no asymptotic channels.
- * - ILU is used for angular blocks with asymptotic channels.
- */
-class HybCGPreconditioner : public ILUCGPreconditioner, public KPACGPreconditioner
+#include "DiagPreconditioner.h"
+
+// --------------------------------------------------------------------------------- //
+
+std::string DiagPreconditioner::description () const
 {
-    public:
+    return "Jacobi preconditioner.";
+}
 
-        // run-time selection mechanism
-        preconditionerRunTimeSelectionDefinitions(HybCGPreconditioner, "HYB")
+void DiagPreconditioner::setup ()
+{
+    NoPreconditioner::setup();
 
-        // default constructor needed by the RTS mechanism
-        HybCGPreconditioner () {}
+    if (verbose_)
+        std::cout << "Set up diag preconditioner" << std::endl << std::endl;
 
-        // constructor
-        HybCGPreconditioner
-        (
-            CommandLine  const & cmd,
-            InputFile    const & inp,
-            Parallel     const & par,
-            AngularBasis const & ang,
-            Bspline const & bspline_x_inner,
-            Bspline const & bspline_x_full,
-            Bspline const & bspline_y_inner,
-            Bspline const & bspline_y_full
-        ) : CGPreconditioner
-            (
-                cmd, inp, par, ang,
-                bspline_x_inner, bspline_x_full,
-                bspline_y_inner, bspline_y_full
-            ),
-            ILUCGPreconditioner
-            (
-                cmd, inp, par, ang,
-                bspline_x_inner, bspline_x_full,
-                bspline_y_inner, bspline_y_full
-            ),
-            KPACGPreconditioner
-            (
-                cmd, inp, par, ang,
-                bspline_x_inner, bspline_x_full,
-                bspline_y_inner, bspline_y_full
-            )
+    RadialIntegrals const& rad = rad_inner();
+
+    SymBandMatrix<Complex> const& S = rad.S();
+    SymBandMatrix<Complex> const& D = rad.D();
+    SymBandMatrix<Complex> const& Mm1 = rad.Mm1();
+    SymBandMatrix<Complex> const& Mm2 = rad.Mm2();
+
+    size_t Nspline = rad.bspline().Nspline();
+
+    diagonal = cBlockArray(ang_->states().size());
+
+    // calculate diagonal
+    for (int ill = 0; ill < ang_->states().size(); ill++)
+    {
+        int l1 = ang_->states()[ill].first;
+        int l2 = ang_->states()[ill].second;
+
+        diagonal[ill].resize(Nspline*Nspline);
+
+        for (int i = 0; i < Nspline; i++)
         {
-            // nothing more to do
+            cArrayView segment = diagonal[ill].slice(i*Nspline, (i + 1)*Nspline);
+
+            for (int j = 0; j < Nspline; j++)
+            {
+                segment[j] = 0.5_r * D(i,i) * S(j,j) - inp_->Za            * Mm1(i,i) * S(j,j) + 0.5_r * l1 * (l1 + 1) * Mm2(i,i) * S(j,j)
+                           + 0.5_r * D(j,j) * S(i,i) + inp_->Za * inp_->Zp * Mm1(j,j) * S(i,i) + 0.5_r * l2 * (l2 + 1) * Mm2(j,j) * S(i,i);
+            }
+
+            for (int lambda = 0; lambda <= ang_->maxlambda(); lambda++)
+            {
+                if (ang_->f(ill,ill,lambda) != 0)
+                {
+                    segment -= inp_->Zp * ang_->f(ill,ill,lambda) * rad.calc_R_tr_dia_block(lambda, i, i).data().slice(0, Nspline);
+                }
+            }
         }
+    }
+}
 
-        // preconditioner description
-        std::string description () const override;
+void DiagPreconditioner::precondition (BlockArray<Complex> const & r, BlockArray<Complex> & z) const
+{
+    SymBandMatrix<Complex> const& S = rad_inner().S();
 
-        // reuse parent definitions
-        using CGPreconditioner::multiply;
-        using CGPreconditioner::rhs;
-        using CGPreconditioner::precondition;
+    size_t Nspline = rad_inner().bspline().Nspline();
 
-        // declare own definitions
-        void setup () override;
-        void update (Real E, bool full = true) override;
-        void finish () override;
+    for (int ill = 0; ill < ang_->states().size(); ill++)
+    {
+        for (int i = 0; i < Nspline; i++)
+        {
+            for (int j = 0; j < Nspline; j++)
+            {
+                z[ill][i*Nspline + j] = r[ill][i*Nspline + j]/(E_*S(i,i)*S(j,j) - diagonal[ill][i*Nspline + j]);
 
-        // inner CG callback (needed by parent)
-        void CG_init (int iblock) const override;
-        void CG_prec (int iblock, const cArrayView r, cArrayView z) const override;
-        void CG_mmul (int iblock, const cArrayView r, cArrayView z) const override;
-        void CG_exit (int iblock) const override;
-
-        // decide whether to use the ILU preconditioner
-        bool ilu_needed (int iblock) const;
-};
+                if (not (z[ill][i*Nspline + j] == z[ill][i*Nspline + j]))
+                    z[ill][i*Nspline + j] = r[ill][i*Nspline + j];
+            }
+        }
+    }
+}
 
 // --------------------------------------------------------------------------------- //
 
-#endif
+addClassToParentRunTimeSelectionTable(PreconditionerBase, DiagPreconditioner)
+
+// --------------------------------------------------------------------------------- //
+

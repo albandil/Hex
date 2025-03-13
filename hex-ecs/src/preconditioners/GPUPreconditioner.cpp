@@ -263,7 +263,7 @@ void GPUCGPreconditioner::setup ()
     // create context and command queue
     context_ = clCreateContext(nullptr, 1, &device_, nullptr, nullptr, nullptr);
     //queue_ = clCreateCommandQueueWithProperties(context_, device_, nullptr, nullptr);
-    queue_ = clCreateCommandQueue(context_, device_, 0, nullptr);
+    queue_ = clCreateCommandQueueWithProperties(context_, device_, 0, nullptr);
 
     // setup compile flags
     std::ostringstream flags;

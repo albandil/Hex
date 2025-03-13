@@ -87,6 +87,7 @@ class Solver
 
         // CG scalar product function callback
         Complex scalar_product_ (BlockArray<Complex> const & x, BlockArray<Complex> const & y) const;
+        Complex scalar_product_nonortho_ (BlockArray<Complex> const & x, BlockArray<Complex> const & y) const;
 
         // CG norm function that broadcasts master's result to all nodes
         Real compute_norm_ (BlockArray<Complex> const & r) const;

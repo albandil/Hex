@@ -685,40 +685,44 @@ inline Complex dric_h_plus (int n, double x)
  *    Michel N, Uniform WKB approximation of Coulomb wave functions for arbitrary partial wave, EPL, 83 (2008) 10002.
  * 
  * The method is asymptotically valid for high energies and partial waves.
- * 
+ *
+ * @param Z Residual nuclear charge.
  * @param l Angular momentum.
  * @param k Wavenumber.
  * @param r Radial coordinate.
  * @param F Output reference for resulting value.
  * @param Fp Output reference for resulting derivative.
  */
-int coul_F_michel (int l, double k, double r, double& F, double& Fp);
+int coul_F_michel (int Z, int l, double k, double r, double& F, double& Fp);
 
 /**
  * @brief Evaluate Coulomb wave function (and its derivative).
+ * @param Z Residual nuclear charge.
  * @param l Angular momentum.
  * @param k Wavenumber.
  * @param r Radial coordinate.
  * @param F Output reference for resulting value.
  * @param Fp Output reference for resulting derivative.
  */
-int coul_F (int l, double k, double r, double & F, double & Fp);
+int coul_F (int Z, int l, double k, double r, double & F, double & Fp);
 
 /**
  * @brief Asymptotic form of the regular Coulomb wave.
+ * @param Z Residual nuclear charge.
  * @param l Angular momentum.
  * @param k Wavenumber.
  * @param r Radial coordinate.
  * @param sigma Optionally, the precomputed Coulomb phase shift.
  */
-double coul_F_asy (int l, double k, double r, double sigma = special::constant::Nan);
+double coul_F_asy (int Z, int l, double k, double r, double sigma = special::constant::Nan);
 
 /**
  * @brief Coulomb phase shift.
+ * @param Z Residual nuclear charge.
  * @param l Angular momentum.
  * @param k Wavenumber.
  */
-double coul_F_sigma (int l, double k);
+double coul_F_sigma (int Z, int l, double k);
 
 /**
  * @brief Check triangle inequality.

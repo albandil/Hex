@@ -189,6 +189,8 @@ void CommandLine::parse (int argc, char* argv[])
                     "\t                                 The '<parameters>' stands for '<filename> <Xmin> <Ymin> <Xmax> <Ymax> <Xn> <Yn>'.\n"
                     "\t--write-grid               (-g)  Write grid layout to a VTK file.\n"
                     "\t--write-intermediate-solutions   Write all intermediate solution (after every iteration of the PCOCG solver).\n"
+                    "\t--bound                          Before solving the scattering equations calculate and write the two-electron bound state wfn.\n"
+                    "\t--dipoles                        Evaluate dipole transition amplitudes from the bound state to all scattering states.\n";
                     "\t--purge <number>                 Clean intermediate solutions some steps back.\n"
                     "\t--checkpoints                    Write all run-time intermediate data needed to continue interrupted calculation.\n"
                     "\t--autostop <number>              Monitor convergence of K-matrices and stop the solver on sufficiently small change between iterations.\n"
@@ -301,6 +303,18 @@ void CommandLine::parse (int argc, char* argv[])
             {
                 // write grid to VTK
                 writegrid = true;
+                return true;
+            },
+        "bound", "", 0, [&](std::vector<std::string> const & optargs) -> bool
+            {
+                // calculate two-electron bound state wave function
+                bound = true;
+                return true;
+            },
+        "dipoles", "", 0, [&](std::vector<std::string> const & optargs) -> bool
+            {
+                // evaluate dipole transition amplitudes from the bound state to all scattering states
+                dipoles = true;
                 return true;
             },
         "zip", "z", 7, [&](std::vector<std::string> const & optargs) -> bool
@@ -1150,7 +1164,7 @@ void InputFile::read (std::ifstream & inf)
     std::cout << "\tnL = " << levels << std::endl;
     std::cout << "\tlimit = " << limit << std::endl;
 
-    Za = 1;
+    Za = +2;
     Zp = ReadNext<int>(inf).val;
 
     if (Zp == 0)

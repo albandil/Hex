@@ -502,10 +502,10 @@ Complex special::sphBiY (int l1, int l2, int L, int M, double theta1, double phi
     return YY;
 }
 
-int special::coul_F_michel (int l, double k, double r, double& F, double& Fp)
+int special::coul_F_michel (int Z, int l, double k, double r, double& F, double& Fp)
 {
     // initialize parameters
-    double eta = -1/k;
+    double eta = -Z/k;
     double rho_t = eta + std::sqrt(eta*eta + l*(l+1));
     double x = (k*r-rho_t)/rho_t;
     double a = 1 - 2*eta/rho_t;
@@ -556,14 +556,14 @@ int special::coul_F_michel (int l, double k, double r, double& F, double& Fp)
     return GSL_ERROR_SELECT_2(err, errp);
 }
 
-int special::coul_F (int l, double k, double r, double& F, double& Fp)
+int special::coul_F (int Z, int l, double k, double r, double& F, double& Fp)
 {
     if (r < 0.)
         return GSL_EDOM;
 
     gsl_sf_result f,g,fp,gp;
     double ef,eg;
-    double eta = -1/k;
+    double eta = -Z/k;
     int err;
 
     // evaluate non-S wave in origin (= zero)
@@ -596,7 +596,7 @@ int special::coul_F (int l, double k, double r, double& F, double& Fp)
 #ifndef WITH_BOINC
             fprintf(stderr, "[coul_F] GSL_ELOSS @ k = %g, r = %g, l = %d\n", k, r, l);
 #endif
-            return coul_F_michel(l, k, r, F, Fp);
+            return coul_F_michel(Z, l, k, r, F, Fp);
 
         case GSL_ERUNAWAY:
             // "Iterative method out of control."
@@ -605,7 +605,7 @@ int special::coul_F (int l, double k, double r, double& F, double& Fp)
 #ifndef WITH_BOINC
             fprintf(stderr, "[coul_F] GSL_ERUNAWAY @ k = %g, r = %g, l = %d\n", k, r, l);
 #endif
-            return coul_F(l, k, 0, F, Fp);
+            return coul_F(Z, l, k, 0, F, Fp);
     }
 
     if (std::isfinite(f.val) and std::isfinite(fp.val))
@@ -615,18 +615,18 @@ int special::coul_F (int l, double k, double r, double& F, double& Fp)
     }
     else
     {
-        err = coul_F_michel(l, k, r, F, Fp);
+        err = coul_F_michel(Z, l, k, r, F, Fp);
     }
 
     return err;
 }
 
-double special::coul_F_sigma (int l, double k)
+double special::coul_F_sigma (int Z, int l, double k)
 {
-    // return arg(gamma(Complex(l+1,-1./k)));
+    // return arg(gamma(Complex(l+1,-Z/k)));
 
     gsl_sf_result lnr, arg;
-    int err = gsl_sf_lngamma_complex_e(l+1, -1/k, &lnr, &arg);
+    int err = gsl_sf_lngamma_complex_e(l+1, -Z/k, &lnr, &arg);
 
     if (err != GSL_SUCCESS)
         HexException("Error while evaluating Coulomb phaseshift.");
@@ -634,11 +634,11 @@ double special::coul_F_sigma (int l, double k)
     return arg.val;
 }
 
-double special::coul_F_asy (int l, double k, double r, double sigma)
+double special::coul_F_asy (int Z, int l, double k, double r, double sigma)
 {
-    sigma = (std::isfinite(sigma) ? sigma : coul_F_sigma(l,k));
+    sigma = (std::isfinite(sigma) ? sigma : coul_F_sigma(Z, l,k));
 
-    return std::sin(k*r - l*special::constant::pi_half + std::log(2.*k*r)/k + sigma);
+    return std::sin(k*r - l*special::constant::pi_half + Z*std::log(2.*k*r)/k + sigma);
 }
 
 bool special::makes_triangle (int two_j1, int two_j2, int two_j3)

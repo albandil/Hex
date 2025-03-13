@@ -322,7 +322,7 @@ void NoPreconditioner::setup ()
                 for (unsigned nr = 0; nr < Nspline_inner; nr++)
                 {
                     Real E = Hl_[i][l].Dl[indices[nr]].real();
-                    Real E0 = -0.5 / ((nr + l + 1) * (nr + l + 1));
+                    Real E0 = -0.5*inp_->Za*inp_->Za / ((nr + l + 1) * (nr + l + 1));
 
                     if (E < 0 and std::abs(E0 - E) < 1e-3 * std::abs(E0))
                         max_nr = nr;
@@ -339,7 +339,7 @@ void NoPreconditioner::setup ()
             for (unsigned nr = 0; nr < Nspline_inner; nr++)
             {
                 // bound energy of the state (Ry)
-                Complex Eb = loaded ? 2.0_r * Hl_[i][l].Dl[indices[nr]] : -1.0_r / ((nr + l + 1) * (nr + l + 1));
+                Complex Eb = loaded ? 2.0_r * Hl_[i][l].Dl[indices[nr]] : -inp_->Za*inp_->Za / ((nr + l + 1) * (nr + l + 1));
 
                 // add all requested channels
                 if
@@ -603,7 +603,7 @@ CooMatrix<LU_int_t, Complex> NoPreconditioner::calc_full_block (int ill, int ill
     return coo_block;
 }
 
-void NoPreconditioner::update (Real E)
+void NoPreconditioner::update (Real E, bool full)
 {
     // shorthands
     int order = inp_->order;
@@ -635,6 +635,10 @@ void NoPreconditioner::update (Real E)
 
     // update energy
     E_ = E;
+
+    // skip the rest of the update if not required
+    if (not full)
+        return;
 
     if (verbose_) std::cout << "\tUpdate the common preconditioner base" << std::endl;
 
@@ -744,7 +748,7 @@ void NoPreconditioner::update (Real E)
                 // channel-diagonal contribution
                 if (ill == illp and m == n)
                 {
-                    subblock += (E_ + 1.0_z / (2.0_z * (l1 + m + 1.0_r) * (l1 + m + 1.0_r))) * S_outer
+                    subblock += (E_ + inp_->Za*inp_->Za / (2.0_z * (l1 + m + 1.0_r) * (l1 + m + 1.0_r))) * S_outer
                              - 0.5_z * D_outer
                              - 0.5_z * (l2 * (l2 + 1.0_r)) * Mm2_outer;
                 }
@@ -773,7 +777,7 @@ void NoPreconditioner::update (Real E)
                 // channel-diagonal contribution
                 if (ill == illp and m == n)
                 {
-                    subblock += (E_ + 1.0_z / (2.0_z * (l2 + m + 1.0_r) * (l2 + m + 1.0_r))) * S_outer
+                    subblock += (E_ + inp_->Za*inp_->Za / (2.0_z * (l2 + m + 1.0_r) * (l2 + m + 1.0_r))) * S_outer
                              - 0.5_z * D_outer
                              - 0.5_z * (l1 * (l1 + 1.0_r)) * Mm2_outer;
                 }
@@ -1045,7 +1049,20 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
             rArray ji_x (xs.size());
             # pragma omp parallel for
             for (unsigned ix = 0; ix < xs.size(); ix++)
-                ji_x[ix] = special::ric_j(l, ki * xs[ix].real()); // FIXME : Coulomb for charge (inp_->Za - 1)
+            {
+                if (inp_->Za == 1)
+                {
+                    // hydrogen atom
+                    ji_x[ix] = special::ric_j(l, ki * xs[ix].real());
+                }
+                else
+                {
+                    // hydrogen-like atom
+                    Real F, Fp;
+                    special::coul_F(inp_->Za - 1, l, ki, xs[ix].real(), F, Fp);
+                    ji_x[ix] = F;
+                }
+            }
 
             // precompute integral moments
             cArrays M_L_P (rad_full_->maxlambda() + 1), M_mLm1_P (rad_full_->maxlambda() + 1);

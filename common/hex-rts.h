@@ -77,8 +77,8 @@
     std::unique_ptr<std::vector<BASE*>> BASE::RTS_Table; \
 
 #define derivedClassRunTimeSelectionDefinitions(BASE,CTORARGS,TYPE,ARGS,NAME) \
-    virtual BASE * New CTORARGS const { return new TYPE ARGS ; } \
-    virtual std::string name () const { return NAME ; };
+    BASE * New CTORARGS const override { return new TYPE ARGS ; } \
+    std::string name () const override { return NAME ; };
 
 #define addClassToParentRunTimeSelectionTable(BASE,TYPE) \
     int add_##TYPE##_to_##BASE = BASE::Add(new TYPE());

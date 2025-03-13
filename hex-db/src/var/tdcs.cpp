@@ -232,8 +232,8 @@ bool TripleDifferentialCrossSection::run (std::map<std::string,std::string> cons
                 );
 
                 // evaluate Coulomb phaseshifts
-                double sig1 = special::coul_F_sigma(l1,k1);
-                double sig2 = special::coul_F_sigma(l2,k2);
+                double sig1 = special::coul_F_sigma(1,l1,k1);
+                double sig2 = special::coul_F_sigma(1,l2,k2);
                 Complex phase = std::pow(Complex(0.,1.),-l1-l2) * Complex(std::cos(sig1+sig2),std::sin(sig1+sig2));
 
                 // sum the contribution
