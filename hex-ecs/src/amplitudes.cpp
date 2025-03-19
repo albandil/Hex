@@ -249,7 +249,7 @@ void Amplitudes::dipoles(std::string directory)
         std::cout << "Extracting photoionization dipoles" << std::endl;
 
     // WARNING
-    // Assumptions (z polarization)
+    // Assumptions (z polarization and emission along it)
     // Li = 0; Lf = 1   => l1f = l1i -1/0/+1; l2f = l2i -1/0/+1
     // Mi = 0; Mf = 0   => m1f = m1i; m2f = m2i
     // Si = 0; Sf = 0
@@ -257,8 +257,22 @@ void Amplitudes::dipoles(std::string directory)
     std::ifstream file("bound.inp");
     if (not file.is_open())
         HexException("Missing file bound.inp");
+
     InputFile bound_inp(file);
     AngularBasis bound_ang(bound_inp);
+    Bspline bound_bspline(bound_inp.order, bound_inp.ecstheta, rArray{}, bound_inp.rknots, bound_inp.rknots.back() + bound_inp.cknots);
+    RadialIntegrals bound_rad(bound_bspline, bound_bspline, 0);
+
+    int Nbspline = bound_bspline.Nspline();
+    int Nfspline = rad_.bspline().Nspline();
+    int Nspline = std::min(Nbspline, Nfspline);
+
+    // verify that the free B-spline basis is compatible with the bound B-spline basis
+    if (bound_inp.order != rad_.bspline().order())
+        HexException("Bound state B-spline basis has different order than the free state B-spline basis");
+    for (int iknot = 0; iknot < Nspline + bound_bspline.order() + 1; iknot++)
+        if (bound_bspline.t(iknot) != rad_.bspline().t(iknot))
+            HexException("Knot %d mismatch between bound and free grid: %g vs. %g", bound_bspline.t(iknot).real(), rad_.bspline().t(iknot).real());
 
     // read bound state
     SolutionIO bound_reader(0, 0, 0, 0, 0, 0, 0., bound_ang.states(), {}, directory + "/psi");
@@ -289,6 +303,9 @@ void Amplitudes::dipoles(std::string directory)
                 int li = std::get<1>(instate);
                 int mi = std::get<2>(instate);
 
+                // impact momentum
+                Real ki = std::sqrt(inp_.Etot[ie] + 1.0_r/(ni*ni));
+
                 // is this solution allowed at all for the given angular basis?
                 bool allowed = false;
 
@@ -317,6 +334,12 @@ void Amplitudes::dipoles(std::string directory)
                 int Nang_bound = bound_ang.states().size();
                 int Nang_free = ang_.size();
 
+                // calculate B-spline overlaps
+                cArray SP  = RadialIntegrals::overlapP(rad_.bspline(), rad_.gaussleg(), inp_.Za, ni, li, 0);
+                cArray M1P = RadialIntegrals::overlapP(rad_.bspline(), rad_.gaussleg(), inp_.Za, ni, li, 1);
+                cArray SJ  = RadialIntegrals::overlapj(rad_.bspline(), rad_.gaussleg(), inp_.Za - 1, inp_.maxell, rArray{ ki }, cmd_.fast_bessel, 0);
+                cArray M1J = RadialIntegrals::overlapj(rad_.bspline(), rad_.gaussleg(), inp_.Za - 1, inp_.maxell, rArray{ ki }, cmd_.fast_bessel, 1);
+
                 Complex dip = 0;
 
                 for (int v = 0; v < Nang_free; v++)
@@ -324,29 +347,83 @@ void Amplitudes::dipoles(std::string directory)
                     int l1f = ang_[v].first;
                     int l2f = ang_[v].second;
 
-                    cArray full_solution = solution[v];
-
-                    // TODO add free solution (target × projectile)
-
                     for (int u = 0; u < Nang_bound; u++)
                     {
-                        int l1i = bound_ang.states()[u].first;
-                        int l2i = bound_ang.states()[u].second;
+                        int l1b = bound_ang.states()[u].first;
+                        int l2b = bound_ang.states()[u].second;
 
-                        if (bound_state[u].size() != solution[v].size())
-                            HexException("Bound state and scattering states use different grids!");
+                        // contribution from the incident part (bound state times Bessel function)
+                        //  - antisymmetry not needed as bound is already antisymmetric
 
-
-                        Complex R1 = kron_contract(bound_state[u], full_solution, rad_.Mp1(), rad_.S());
-                        Complex R2 = kron_contract(bound_state[u], full_solution, rad_.S(), rad_.Mp1());
-
-                        for (int m = -l1i; m <= l1i; m++)
+                        for (int l = std::max(0, l1f - 1); l <= std::min(inp_.maxell, l1f + 1); l++)
                         {
-                            Real Ci = special::ClebschGordan(l1i, m, l2i, -m, 0,      0);
-                            Real Cf = special::ClebschGordan(l1f, m, l2f, -m, inp_.L, 0);
+                            Complex prefactor = std::pow(1.0_i, l)
+                                              * 4.0_r * special::constant::pi * std::sqrt((2*l + 1)/3.0_r)
+                                              * special::cis(-special::coul_F_sigma(inp_.Za - 1, l, ki))
+                                              * special::ClebschGordan(li,mi, l,0, 0,mi) / ki;
 
-                            Real I1 = l2f == l2i ? special::Gaunt(l1f, +m, 1, 0, l1i, +m) : 0;
-                            Real I2 = l1f == l1i ? special::Gaunt(l2f, -m, 1, 0, l2i, -m) : 0;
+                            // get relevant slice of Bessel overlaps
+                            cArrayView Sj(SJ, l*Nfspline, Nfspline);
+                            cArrayView M1j(M1J, l*Nfspline, Nfspline);
+
+                            // dipole transition in the first coordinate
+                            if (l2b == l)
+                            {
+                                Real G = special::Gaunt(l1b, 0, 1, 0, li, 0);
+                                Complex R = 0;
+
+                                for (int ispline = 0; ispline < Nspline; ispline++)
+                                {
+                                    cArrayView bound_segment(bound_state[u], ispline*Nbspline, Nspline);
+                                    cArrayView Sj_trunc(Sj, 0, Nspline);
+
+                                    R += M1P[ispline] * (bound_segment | Sj_trunc);
+                                }
+
+                                dip += prefactor * G * R;
+                            }
+
+                            // dipole transition in the second coordiante
+                            if (l1b == li)
+                            {
+                                Real G = special::Gaunt(l2b, 0, 1, 0, l, 0);
+                                Complex R = 0;
+
+                                for (int ispline = 0; ispline < Nspline; ispline++)
+                                {
+                                    cArrayView bound_segment(bound_state[u], ispline*Nbspline, Nspline);
+                                    cArrayView M1j_trunc(M1j, 0, Nspline);
+
+                                    R += SP[ispline] * (bound_segment | M1j_trunc);
+                                }
+
+                                dip += prefactor * G * R;
+                            }
+                        }
+
+                        // contribution from the scattered part
+
+                        Complex R1 = 0; cArray MSpsi(Nfspline*Nfspline); kron_dot(0., MSpsi, 1., solution[v], rad_.Mp1(), rad_.S());
+                        Complex R2 = 0; cArray SMpsi(Nfspline*Nfspline); kron_dot(0., SMpsi, 1., solution[v], rad_.S(), rad_.Mp1());
+
+                        for (int ispline = 0; ispline < Nspline; ispline++)
+                        {
+                            cArrayView bound_segment(bound_state[u], ispline*Nbspline, Nspline);
+
+                            cArrayView MSpsi_segment(MSpsi, ispline*Nfspline, Nspline);
+                            cArrayView SMpsi_segment(SMpsi, ispline*Nfspline, Nspline);
+
+                            R1 += (bound_segment | MSpsi_segment);
+                            R2 += (bound_segment | SMpsi_segment);
+                        }
+
+                        for (int m = -l1b; m <= l1b; m++)
+                        {
+                            Real Ci = special::ClebschGordan(l1b, m, l2b, -m, 0,      0);   // L = 0
+                            Real Cf = special::ClebschGordan(l1f, m, l2f, -m, inp_.L, 0);   // inp_.L = 1
+
+                            Real I1 = l2f == l2b ? special::Gaunt(l1f, +m, 1, 0, l1b, +m) : 0;
+                            Real I2 = l1f == l1b ? special::Gaunt(l2f, -m, 1, 0, l2b, -m) : 0;
 
                             dip += std::sqrt(4*special::constant::pi/3) * Cf*Ci * (I1*R1 + I2*R2);
                         }

@@ -957,7 +957,7 @@ cArray RadialIntegrals::overlap
     return res;
 }
 
-cArray RadialIntegrals::overlapP (Bspline const & bspline, GaussLegendre const & g, Real Z, int n, int l)
+cArray RadialIntegrals::overlapP (Bspline const & bspline, GaussLegendre const & g, Real Z, int n, int l, int a)
 {
     // result
     cArray res (bspline.Nspline());
@@ -992,7 +992,7 @@ cArray RadialIntegrals::overlapP (Bspline const & bspline, GaussLegendre const &
                 if (gsl_sf_hydrogenicR_e(n, l, Z, x.real(), &R) == GSL_EUNDRFLW)
                     return 0.;
                 else
-                    return /* weightf(x) * */ x * Real(R.val);
+                    return /* weightf(x) * */ std::pow(x, a + 1) * Real(R.val);
             }
         );
 
@@ -1023,7 +1023,8 @@ cArray RadialIntegrals::overlapj
     int Z,
     int maxell,
     const rArrayView vk,
-    bool fast_bessel
+    bool fast_bessel,
+    int a
 )
 {
     // shorthands
@@ -1085,7 +1086,7 @@ cArray RadialIntegrals::overlapj
                     // sum with weights
                     Complex sum = 0.;
                     for (int ipoint = 0; ipoint < points; ipoint++)
-                        sum += ws[ipoint] * evalj[ipoint * (maxell + 1) + l] * evalB[(iknot - ispline) * points + ipoint];
+                        sum += ws[ipoint] * std::pow(xs[ipoint].real(), a) * evalj[ipoint * (maxell + 1) + l] * evalB[(iknot - ispline) * points + ipoint];
 
                     // store the overlap; keep the shape Nmomenta × Nspline × (maxl+1)
                     # pragma omp critical

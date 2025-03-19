@@ -957,7 +957,7 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
         luS_->solve(RadialIntegrals::overlapP(rad_inner_->bspline(), rad_inner_->gaussleg(), inp_->Za, ni, li), 1) :
         Hl_[0][li].readPseudoState(li, ni - li - 1);
 
-    // calculate B-spline overlaps of Ricatti-Bessel functions (or regular Coulomb if Za > 1)
+    // calculate B-spline expansions of Ricatti-Bessel functions (or regular Coulomb if Za > 1)
     cArray XJ = luS_->solve
     (
         RadialIntegrals::overlapj
