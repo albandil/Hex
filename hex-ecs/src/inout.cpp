@@ -128,8 +128,8 @@ const std::string sample_input =
     "# L   S   Pi  nL  limit exchange\n"
     "  0   *   0   4   -1    1\n"
     "\n"
-    "# Projectile charge (+/-1)\n"
-    "  -1\n"
+    "# Atom core (Z >= 1) and projectile charge (+/-1)\n"
+    "  1  -1\n"
     "\n"
     "# Atom + projectile total energies in Rydbergs.\n"
     "# Use any of the following options:\n"
@@ -1165,7 +1165,7 @@ void InputFile::read (std::ifstream & inf)
     std::cout << "\tnL = " << levels << std::endl;
     std::cout << "\tlimit = " << limit << std::endl;
 
-    Za = +2;
+    Za = ReadNext<int>(inf).val;
     Zp = ReadNext<int>(inf).val;
 
     if (Zp == 0)
@@ -1173,6 +1173,7 @@ void InputFile::read (std::ifstream & inf)
 
     Zp = Zp / std::abs(Zp);
 
+    std::cout << "\tZa = " << Za << std::endl;
     std::cout << "\tZp = " << Zp << std::endl;
 
     //
