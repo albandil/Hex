@@ -1015,6 +1015,7 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
             // compute energy- and angular momentum-dependent prefactor
             Complex prefactor = std::pow(1.0_i,l)
                               * std::sqrt(4.0_r * special::constant::pi * (2 * l + 1))
+                              * special::cis(-special::coul_F_sigma(inp_->Za - 1, l, ki))
                               * (Real)special::ClebschGordan(li,mi, l,0, inp_->L,mi) / ki;
 
             // skip non-contributing terms
