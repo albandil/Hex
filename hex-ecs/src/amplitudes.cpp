@@ -662,9 +662,8 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> &
         int eval_knot = bspline_full_.knot(eval_r);
 
         // evaluate j and dj at far radius for all angular momenta up to maxell
-        // FIXME : Coulomb for charge (inp_->Za - 1)
-        cArray j_R0 = special::ric_jv(inp_.maxell, kf * eval_r);
-        cArray dj_R0 = special::dric_jv(inp_.maxell, kf * eval_r) * kf;
+        cArray j_R0 = special::ric_jv(inp_.Za - 1, inp_.maxell, kf, eval_r);
+        cArray dj_R0 = special::dric_jv(inp_.Za - 1, inp_.maxell, kf, eval_r) * kf;
 
         // evaluate B-splines and their derivatives at evaluation radius
         cArray Bspline_R0 (Nspline_full), Dspline_R0 (Nspline_full);

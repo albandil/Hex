@@ -1016,7 +1016,15 @@ cArray RadialIntegrals::overlapP (Bspline const & bspline, GaussLegendre const &
     return res;
 }
 
-cArray RadialIntegrals::overlapj (Bspline const & bspline, GaussLegendre const & g, int maxell, const rArrayView vk, bool fast_bessel)
+cArray RadialIntegrals::overlapj
+(
+    Bspline const & bspline,
+    GaussLegendre const & g,
+    int Z,
+    int maxell,
+    const rArrayView vk,
+    bool fast_bessel
+)
 {
     // shorthands
     int Nenergy = vk.size();
@@ -1061,7 +1069,7 @@ cArray RadialIntegrals::overlapj (Bspline const & bspline, GaussLegendre const &
                 std::function<int(int,double,double*)> jv = (fast_bessel ? gsl_sf_bessel_jl_array : gsl_sf_bessel_jl_steed_array);
 
                 // evaluate all Riccati-Bessel functions in point
-                cArrayView(evalj, ipoint * (maxell + 1), maxell + 1) = special::ric_jv(maxell, vk[ie] * xs[ipoint].real(), jv);
+                cArrayView(evalj, ipoint * (maxell + 1), maxell + 1) = special::ric_jv(Z, maxell, vk[ie], xs[ipoint].real(), fast_bessel);
 
                 // clear all possible NaN entries (these may occur for far radii, where should be zero)
                 for (int l = 0; l <= maxell; l++) if (not Complex_finite(evalj[ipoint * (maxell + 1) + l]))

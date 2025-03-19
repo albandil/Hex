@@ -957,8 +957,20 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
         luS_->solve(RadialIntegrals::overlapP(rad_inner_->bspline(), rad_inner_->gaussleg(), inp_->Za, ni, li), 1) :
         Hl_[0][li].readPseudoState(li, ni - li - 1);
 
-    // calculate Ricatti-Bessel B-spline expansions
-    cArray XJ = luS_->solve(RadialIntegrals::overlapj(rad_inner_->bspline(), rad_inner_->gaussleg(), ang_->maxell(), rArray{ ki }, cmd_->fast_bessel), ang_->maxell() + 1);
+    // calculate B-spline overlaps of Ricatti-Bessel functions (or regular Coulomb if Za > 1)
+    cArray XJ = luS_->solve
+    (
+        RadialIntegrals::overlapj
+        (
+            rad_inner_->bspline(),
+            rad_inner_->gaussleg(),
+            inp_->Za - 1,
+            ang_->maxell(),
+            rArray{ ki },
+            cmd_->fast_bessel
+        ),
+        ang_->maxell() + 1
+    );
 
     // (anti)symmetrization
     Real Sign = ((ang_->S() + ang_->Pi()) % 2 == 0) ? 1. : -1.;
@@ -1049,20 +1061,7 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
             rArray ji_x (xs.size());
             # pragma omp parallel for
             for (unsigned ix = 0; ix < xs.size(); ix++)
-            {
-                if (inp_->Za == 1)
-                {
-                    // hydrogen atom
-                    ji_x[ix] = special::ric_j(l, ki * xs[ix].real());
-                }
-                else
-                {
-                    // hydrogen-like atom
-                    Real F, Fp;
-                    special::coul_F(inp_->Za - 1, l, ki, xs[ix].real(), F, Fp);
-                    ji_x[ix] = F;
-                }
-            }
+                ji_x[ix] = special::ric_jv(inp_->Za - 1, l, ki, xs[ix].real()).back().real();
 
             // precompute integral moments
             cArrays M_L_P (rad_full_->maxlambda() + 1), M_mLm1_P (rad_full_->maxlambda() + 1);

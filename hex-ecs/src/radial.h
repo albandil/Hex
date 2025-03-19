@@ -398,6 +398,7 @@ class RadialIntegrals
          * 
          * @param bspline B-spline basis.
          * @param g Gauss-Legendre integrator adapted to the B-spline basis.
+         * @param Z Net charge of the core (= 1 for hydrogen-like atoms).
          * @param n Principal quantum number.
          * @param l Orbital quantum number.
          */
@@ -411,8 +412,9 @@ class RadialIntegrals
         /**
          * @brief Compute j-overlaps
          * 
-         * Compute B-spline overlap integrals for Riccati-Bessel function.
+         * Compute B-spline overlap integrals for Riccati-Bessel (or regular Coulomb) function.
          * 
+         * @param Z Charge of the central monopole (0 for Riccati-Bessel functions, 1 for singly charged ions).
          * @param maxell Maximal degree of the Riccati-Bessel function.
          * @param vk Array containing linear momenta.
          * @return Array of shape [vk.size() × (maxell + 1) × Nspline] in column-major format.
@@ -421,6 +423,7 @@ class RadialIntegrals
         (
             Bspline const & bspline,
             GaussLegendre const & g,
+            int Z,
             int maxell,
             const rArrayView vk,
             bool fast_bessel = false

@@ -196,16 +196,29 @@ Complex special::cfgamma (Complex s, Complex z)
     return cf * std::pow(z,s) * std::exp(-z);
 }
 
-cArray special::ric_jv (int lmax, Complex z, std::function<int(int,double,double*)> jv)
+cArray special::ric_jv (int Z, int lmax, double k, Complex r, bool fast_bessel)
 {
     // results
     cArray eval (lmax+1);
 
+    // evaluate Coulomb functions
+    if (Z != 0)
+    {
+        rArray F(lmax + 1), expF(lmax + 1);
+
+        if (gsl_sf_coulomb_wave_sphF_array(0, lmax, -Z/k, r.real(), F.data(), expF.data()) != GSL_SUCCESS)
+            HexException("Failed to evaluate Coulomb functions using gsl_sf_coulomb_wave_sphF_array.");
+        for (int i = 0; i <= lmax; i++)
+            eval[i] = F[i] * std::exp(expF[i]);
+
+        return eval;
+    }
+
     // use library routine for pure real arguments
-    if (z.imag() == 0.)
+    if (r.imag() == 0.)
     {
         std::vector<double> ev (lmax+1);
-        int err = jv(lmax, z.real(), &ev[0]);
+        int err = (fast_bessel ? gsl_sf_bessel_jl_array : gsl_sf_bessel_jl_steed_array)(lmax, k*r.real(), &ev[0]);
 
         // check that all evaluations are finite
         bool all_finite = std::all_of
@@ -223,7 +236,7 @@ cArray special::ric_jv (int lmax, Complex z, std::function<int(int,double,double
             {
                 // evaluate function
                 gsl_sf_result res;
-                err = gsl_sf_bessel_jl_e(l, z.real(), &res);
+                err = gsl_sf_bessel_jl_e(l, k*r.real(), &res);
 
                 // check underflow
                 if (err == GSL_EUNDRFLW)
@@ -231,7 +244,7 @@ cArray special::ric_jv (int lmax, Complex z, std::function<int(int,double,double
 
                 // check success
                 else if (err != GSL_SUCCESS or not std::isfinite(res.val))
-                    HexException("Error %d while evaluating j[l≤%d](%g).", err, lmax, z.real());
+                    HexException("Error %d while evaluating j[l≤%d](%g).", err, lmax, k*r.real());
 
                 // save value
                 ev[l] = res.val;
@@ -240,21 +253,21 @@ cArray special::ric_jv (int lmax, Complex z, std::function<int(int,double,double
 
         // Bessel -> Riccati-Bessel function
         for (int i = 0; i <= lmax; i++)
-            eval[i] = z * Complex(ev[i]);
+            eval[i] = k*r * Complex(ev[i]);
 
         return eval;
     }
 
     // shorthand
-    Complex inv_z = 1.0_r / z;
+    Complex inv_z = 1.0_r / (k*r);
 
     // evaluate all angular momenta up to lmax
     for (int l = 0; l <= lmax; l++)
     {
         if (l == 0)
-            eval[l] = std::sin(z);
+            eval[l] = std::sin(k*r);
         else if (l == 1)
-            eval[l] = std::sin(z) * inv_z - std::cos(z);
+            eval[l] = std::sin(k*r) * inv_z - std::cos(k*r);
         else
             eval[l] = Complex(2.*l - 1.) * eval[l-1] * inv_z - eval[l-2];
     }
@@ -264,29 +277,32 @@ cArray special::ric_jv (int lmax, Complex z, std::function<int(int,double,double
 
 Complex special::ric_j (int l, Complex z)
 {
-    return special::ric_jv(l, z).back();
+    return special::ric_jv(0, l, 1., z).back();
 }
 
-cArray special::dric_jv (int lmax, Complex z)
+cArray special::dric_jv (int Z, int lmax, double k, Complex r)
 {
+    if (Z != 0)
+        HexException("dric_jv not implemented for nonzero Z");
+
     // evaluate first the Riccati-Bessel functions themselves
-    cArray eval = ric_jv(lmax, z);
+    cArray eval = ric_jv(Z, lmax, k, r);
 
     // results
     cArray deval(lmax+1);
 
     // shorthand
-    Complex inv_z = Complex(1.)/z;
+    Complex inv_z = Complex(1.)/(k*r);
 
     // evaluate all angular momenta up to lmax
     for (int l = 0; l <= lmax; l++)
     {
         if (l == 0)
-            deval[l] = std::cos(z);
+            deval[l] = std::cos(k*r);
         else if (l == 1)
-            deval[l] = inv_z * ( std::cos(z) - std::sin(z) * inv_z ) + std::sin(z);
+            deval[l] = inv_z * (std::cos(k*r) - std::sin(k*r) * inv_z) + std::sin(k*r);
         else
-            deval[l] = -Complex(2.*l - 1) * (eval[l-1] * inv_z - deval[l-1] ) * inv_z - deval[l-2];
+            deval[l] = -Complex(2.*l - 1) * (eval[l-1] * inv_z - deval[l-1]) * inv_z - deval[l-2];
     }
 
     return deval;
@@ -294,7 +310,7 @@ cArray special::dric_jv (int lmax, Complex z)
 
 Complex special::dric_j (int l, Complex z)
 {
-    return special::dric_jv(l, z).back();
+    return special::dric_jv(0, l, 1., z).back();
 }
 
 // Slater-type-orbital data for hydrogen
