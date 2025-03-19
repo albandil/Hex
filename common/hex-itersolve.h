@@ -582,7 +582,7 @@ class Davidson
                 matrix_multiply(x, r);  // r = (e S - A)*x
 
                 // compute and check norm
-                residual = std::abs(prev_eigval - eigval[l]) / std::abs(eigval[l]);
+                residual = realpart(scalar_product(r, r)); //std::abs(prev_eigval - eigval[l]) / std::abs(eigval[l]);
                 prev_eigval = eigval[l];
                 if (verbose)
                     std::cout << std::endl;
