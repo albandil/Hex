@@ -290,7 +290,10 @@ int main (int argc, char* argv[])
         std::cout << "\t- full basis" << std::endl;
         std::cout << "\t\t- number of splines: " << bspline_full.Nspline() << std::endl;
         std::cout << "\t\t- real knots : " << bspline_full.rknots().front() << " to " << bspline_full.rknots().back() << std::endl;
-        std::cout << "\t\t- complex knots : " << bspline_full.cknots2().front() << " to " << bspline_full.cknots2().back() << std::endl;
+        if (not bspline_full.cknots2().empty())
+        {
+            std::cout << "\t\t- complex knots : " << bspline_full.cknots2().front() << " to " << bspline_full.cknots2().back() << std::endl;
+        }
         std::cout << std::endl;
 
         // pick preconditioner according to the user preferences
