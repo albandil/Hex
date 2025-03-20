@@ -191,7 +191,7 @@ void CommandLine::parse (int argc, char* argv[])
                     "\t--write-grid               (-g)  Write grid layout to a VTK file.\n"
                     "\t--write-intermediate-solutions   Write all intermediate solution (after every iteration of the PCOCG solver).\n"
                     "\t--bound                          Before solving the scattering equations calculate and write the two-electron bound state wfn.\n"
-                    "\t--dipoles                        Evaluate dipole transition amplitudes from the bound state to all scattering states.\n";
+                    "\t--dipoles                        Evaluate dipole transition amplitudes from the bound state to all scattering states.\n"
                     "\t--purge <number>                 Clean intermediate solutions some steps back.\n"
                     "\t--checkpoints                    Write all run-time intermediate data needed to continue interrupted calculation.\n"
                     "\t--autostop <number>              Monitor convergence of K-matrices and stop the solver on sufficiently small change between iterations.\n"
