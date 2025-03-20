@@ -29,6 +29,7 @@
 //                                                                                   //
 //  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
+#include <array>
 #include <iostream>
 
 // --------------------------------------------------------------------------------- //
@@ -876,7 +877,7 @@ void NoPreconditioner::update (Real E, bool full)
 
                 if (ill == illp and m == n)
                 {
-                    elem += (E_ + 0.5_r / ((n + l1 + 1) * (n + l1 + 1))) * rad_full_->S_y()(j,l)
+                    elem += (E_ + 0.5_r * inp_->Za*inp_->Za / ((n + l1 + 1) * (n + l1 + 1))) * rad_full_->S_y()(j,l)
                          - 0.5_r * rad_full_->D_y()(j,l)
                          - 0.5_r * (l2 * (l2 + 1.0_r)) * rad_full_->Mm2_y()(j,l);
                 }
@@ -908,7 +909,7 @@ void NoPreconditioner::update (Real E, bool full)
 
                 if (ill == illp and m == n)
                 {
-                    elem += (E_ + 0.5_r / ((n + l2 + 1) * (n + l2 + 1))) * rad_full_->S_x()(i,k)
+                    elem += (E_ + 0.5_r * inp_->Za*inp_->Za / ((n + l2 + 1) * (n + l2 + 1))) * rad_full_->S_x()(i,k)
                          - 0.5_r * rad_full_->D_x()(i,k)
                          - 0.5_r * (l1 * (l1 + 1.0_r)) * rad_full_->Mm2_x()(i,k);
                 }
@@ -1281,7 +1282,7 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
                                         Real Piy = rad_inner_->bspline().eval(Xp, ry).real();
                                         Real jiy = rad_inner_->bspline().R2() == rad_full_->bspline_y().R2()
                                                  ? rad_inner_->bspline().eval(Xj, ry).real() // if only inner region - just evaluate the precomputed B-spline expansion
-                                                 : special::ric_j(l, ki * ry); // if also outer region - evaluate the wave now
+                                                 : special::ric_j(l, ki * ry); // if also outer region - evaluate the wave now (FIXME: assuming Za = 1!)
 
                                         // damp factor
                                         Real dampfactor = 1;//damp(rx, ry, distance);
@@ -1324,7 +1325,7 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
                                         Real Piy = rad_inner_->bspline().eval(Xp, ry).real();
                                         Real jiy = rad_inner_->bspline().R2() == rad_full_->bspline_y().R2()
                                                  ? rad_inner_->bspline().eval(Xj, ry).real() // if only inner region - just evaluate the precomputed B-spline expansion
-                                                 : special::ric_j(l, ki * ry); // if also outer region - evaluate the wave now
+                                                 : special::ric_j(l, ki * ry); // if also outer region - evaluate the wave now (FIXME: assuming Za = 1!)
 
                                         // damp factor
                                         Real dampfactor = 1;//damp(rx, ry, distance);
