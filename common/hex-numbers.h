@@ -35,6 +35,7 @@
 #include <cassert>
 #include <complex>
 #include <cmath>
+#include <cstdint>
 
 #undef I
 
