@@ -248,19 +248,23 @@ void Amplitudes::dipoles(std::string directory)
     if (verbose_)
         std::cout << "Extracting photoionization dipoles" << std::endl;
 
+    // find hex-ecs input file for bound state calculation
     std::ifstream file("bound.inp");
     if (not file.is_open())
         HexException("Missing file bound.inp");
 
+    // set up bound state environments
     InputFile bound_inp(file);
     AngularBasis bound_ang(bound_inp);
     Bspline bound_bspline(bound_inp.order, bound_inp.ecstheta, rArray{}, bound_inp.rknots, bound_inp.rknots.back() + bound_inp.cknots);
     RadialIntegrals bound_rad(bound_bspline, bound_bspline, 0);
 
+    // shorthands
     int Nbspline = bound_bspline.Nspline();
     int Nfspline = rad_.bspline().Nspline();
     int Nspline = std::min(Nbspline, Nfspline);
 
+    // require an S-state for bound state
     if (bound_inp.L != 0)
         HexException("Bound L must be zero.");
 
@@ -358,18 +362,19 @@ void Amplitudes::dipoles(std::string directory)
                         int l1b = bound_ang.states()[u].first;
                         int l2b = bound_ang.states()[u].second;
 
-                        // contribution from the incident part (bound state times Bessel function)
-                        //  - antisymmetry not needed as bound is already antisymmetric
+                        // contribution from partial waves of the incident part
+                        //  - incident state is bound state times Ricatti-Bessel or Coulomb function
+                        //  - antisymmetry not needed as the bound state is already antisymmetric and operator is symmetric
 
-                        for (int l = std::max(0, l1f - 1); l <= std::min(inp_.maxell, l1f + 1); l++)
+                        for (int l = 0; l <= inp_.maxell; l++)
                         {
                             Complex prefactor = std::pow(1.0_i, l)
                                               * 4.0_r * special::constant::pi * std::sqrt((2*l + 1)/3.0_r)
                                               * special::cis(-special::coul_F_sigma(inp_.Za - 1, l, ki)) / ki;
 
-                            // get relevant slice of Bessel overlaps
-                            cArrayView Sj(SJ, l*Nfspline, Nfspline);
-                            cArrayView M1j(M1J, l*Nfspline, Nfspline);
+                            // get slice of Ricatti-Bessel (or Coulomb) overlaps for partial wave l
+                            cArrayView Sj(SJ, l*Nfspline, Nspline);
+                            cArrayView M1j(M1J, l*Nfspline, Nspline);
 
                             // dipole transition in the first coordinate
                             if (l2b == l)
@@ -381,9 +386,8 @@ void Amplitudes::dipoles(std::string directory)
                                 for (int ispline = 0; ispline < Nspline; ispline++)
                                 {
                                     cArrayView bound_segment(bound_state[u], ispline*Nbspline, Nspline);
-                                    cArrayView Sj_trunc(Sj, 0, Nspline);
 
-                                    R += M1P[ispline] * (bound_segment | Sj_trunc);
+                                    R += M1P[ispline] * (bound_segment | Sj);
                                 }
 
                                 dip[1 - mi] += prefactor * C * G * R;
@@ -399,9 +403,8 @@ void Amplitudes::dipoles(std::string directory)
                                 for (int ispline = 0; ispline < Nspline; ispline++)
                                 {
                                     cArrayView bound_segment(bound_state[u], ispline*Nbspline, Nspline);
-                                    cArrayView M1j_trunc(M1j, 0, Nspline);
 
-                                    R += SP[ispline] * (bound_segment | M1j_trunc);
+                                    R += SP[ispline] * (bound_segment | M1j);
                                 }
 
                                 dip[1 - mi] += prefactor * C * G * R;
@@ -424,18 +427,16 @@ void Amplitudes::dipoles(std::string directory)
                             R2 += (bound_segment | SMpsi_segment);
                         }
 
-                        for (int mu = -1; mu <= 1; mu++)
                         for (int m = -l1b; m <= l1b; m++)
                         {
-                            Real C1 = special::ClebschGordan(l1b, m, l2b, mi + mu - m, 0, 0)
-                                    * special::ClebschGordan(l1f, m - mu, l2f, mi + mu - m, inp_.L, mi);
-                            Real C2 = special::ClebschGordan(l1b, m, l2b, mi + mu - m, 0, 0)
-                                    * special::ClebschGordan(l1f, m, l2f, mi + mu - m, inp_.L, mi);
+                            Real C0 = special::ClebschGordan(l1b, m, l2b, -m, 0, 0);
+                            Real C1 = special::ClebschGordan(l1f, m + mi, l2f, -m, inp_.L, mi);
+                            Real C2 = special::ClebschGordan(l1f, m, l2f, mi - m, inp_.L, mi);
 
-                            Real I1 = l2f == l2b ? special::Gaunt(l1f, +m, 1, 0, l1b, +m) : 0;
-                            Real I2 = l1f == l1b ? special::Gaunt(l2f, -m, 1, 0, l2b, -m) : 0;
+                            Real I1 = l2f == l2b ? special::Gaunt(l1f, mi + m, 1, -mi, l1b, +m) : 0;
+                            Real I2 = l1f == l1b ? special::Gaunt(l2f, mi - m, 1, -mi, l2b, -m) : 0;
 
-                            dip[mu] += std::sqrt(4*special::constant::pi/3) * (C1*I1*R1 + C2*I2*R2);
+                            dip[1 - mi] += std::sqrt(4*special::constant::pi/3) * C0 * (C1*I1*R1 + C2*I2*R2);
                         }
                     }
                 }
