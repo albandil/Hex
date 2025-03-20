@@ -248,12 +248,6 @@ void Amplitudes::dipoles(std::string directory)
     if (verbose_)
         std::cout << "Extracting photoionization dipoles" << std::endl;
 
-    // WARNING
-    // Assumptions (z polarization and emission along it)
-    // Li = 0; Lf = 1   => l1f = l1i -1/0/+1; l2f = l2i -1/0/+1
-    // Mi = 0; Mf = 0   => m1f = m1i; m2f = m2i
-    // Si = 0; Sf = 0
-
     std::ifstream file("bound.inp");
     if (not file.is_open())
         HexException("Missing file bound.inp");
@@ -266,6 +260,9 @@ void Amplitudes::dipoles(std::string directory)
     int Nbspline = bound_bspline.Nspline();
     int Nfspline = rad_.bspline().Nspline();
     int Nspline = std::min(Nbspline, Nfspline);
+
+    if (bound_inp.L != 0)
+        HexException("Bound L must be zero.");
 
     // verify that the free B-spline basis is compatible with the bound B-spline basis
     if (bound_inp.order != rad_.bspline().order())
@@ -291,20 +288,29 @@ void Amplitudes::dipoles(std::string directory)
                 std::cout << "\tTriplet" << std::endl;
         }
 
+        std::vector<std::ofstream> files(inp_.instates.size());
+
         for (unsigned ie = 0; ie < inp_.Etot.size(); ie++)
         {
             if (verbose_) std::cout << "\t\tEi = " << inp_.Etot[ie] << std::endl;
 
             // for all initial states
-            for (auto instate  : inp_.instates)
+            for (unsigned is = 0; is < inp_.instates.size(); is++)
             {
                 // get initial quantum numbers
-                int ni = std::get<0>(instate);
-                int li = std::get<1>(instate);
-                int mi = std::get<2>(instate);
+                int ni = std::get<0>(inp_.instates[is]);
+                int li = std::get<1>(inp_.instates[is]);
+                int mi = std::get<2>(inp_.instates[is]);
+
+                // open the output file
+                if (not files[is].is_open())
+                {
+                    files[is].open(format("d-S%d-n%d-l%d-m%d.dat", Spin, ni, li, mi));
+                    files[is] << "#Ek        Re_d-            Im_d-          Re_d0            Im_d0           Re_d+           Im_d+" << std::endl;
+                }
 
                 // impact momentum
-                Real ki = std::sqrt(inp_.Etot[ie] + 1.0_r/(ni*ni));
+                Real ki = std::sqrt(inp_.Etot[ie] + inp_.Za*inp_.Za/(ni*ni));
 
                 // is this solution allowed at all for the given angular basis?
                 bool allowed = false;
@@ -340,7 +346,7 @@ void Amplitudes::dipoles(std::string directory)
                 cArray SJ  = RadialIntegrals::overlapj(rad_.bspline(), rad_.gaussleg(), inp_.Za - 1, inp_.maxell, rArray{ ki }, cmd_.fast_bessel, 0);
                 cArray M1J = RadialIntegrals::overlapj(rad_.bspline(), rad_.gaussleg(), inp_.Za - 1, inp_.maxell, rArray{ ki }, cmd_.fast_bessel, 1);
 
-                Complex dip = 0;
+                Complex dip[3] = { 0., 0., 0. }; // -1, 0, +1 components of the transition dipole
 
                 for (int v = 0; v < Nang_free; v++)
                 {
@@ -359,8 +365,7 @@ void Amplitudes::dipoles(std::string directory)
                         {
                             Complex prefactor = std::pow(1.0_i, l)
                                               * 4.0_r * special::constant::pi * std::sqrt((2*l + 1)/3.0_r)
-                                              * special::cis(-special::coul_F_sigma(inp_.Za - 1, l, ki))
-                                              * special::ClebschGordan(li,mi, l,0, 0,mi) / ki;
+                                              * special::cis(-special::coul_F_sigma(inp_.Za - 1, l, ki)) / ki;
 
                             // get relevant slice of Bessel overlaps
                             cArrayView Sj(SJ, l*Nfspline, Nfspline);
@@ -369,7 +374,8 @@ void Amplitudes::dipoles(std::string directory)
                             // dipole transition in the first coordinate
                             if (l2b == l)
                             {
-                                Real G = special::Gaunt(l1b, 0, 1, 0, li, 0);
+                                Real C = special::ClebschGordan(l1b, 0, l2b, 0, 0, 0);
+                                Real G = special::Gaunt(li, mi, 1, -mi, l1b, 0);
                                 Complex R = 0;
 
                                 for (int ispline = 0; ispline < Nspline; ispline++)
@@ -380,13 +386,14 @@ void Amplitudes::dipoles(std::string directory)
                                     R += M1P[ispline] * (bound_segment | Sj_trunc);
                                 }
 
-                                dip += prefactor * G * R;
+                                dip[1 - mi] += prefactor * C * G * R;
                             }
 
                             // dipole transition in the second coordiante
                             if (l1b == li)
                             {
-                                Real G = special::Gaunt(l2b, 0, 1, 0, l, 0);
+                                Real C = special::ClebschGordan(l1b, mi, l2b, -mi, 0, 0);
+                                Real G = special::Gaunt(l, 0, 1, -mi, l2b, -mi);
                                 Complex R = 0;
 
                                 for (int ispline = 0; ispline < Nspline; ispline++)
@@ -397,7 +404,7 @@ void Amplitudes::dipoles(std::string directory)
                                     R += SP[ispline] * (bound_segment | M1j_trunc);
                                 }
 
-                                dip += prefactor * G * R;
+                                dip[1 - mi] += prefactor * C * G * R;
                             }
                         }
 
@@ -417,20 +424,36 @@ void Amplitudes::dipoles(std::string directory)
                             R2 += (bound_segment | SMpsi_segment);
                         }
 
+                        for (int mu = -1; mu <= 1; mu++)
                         for (int m = -l1b; m <= l1b; m++)
                         {
-                            Real Ci = special::ClebschGordan(l1b, m, l2b, -m, 0,      0);   // L = 0
-                            Real Cf = special::ClebschGordan(l1f, m, l2f, -m, inp_.L, 0);   // inp_.L = 1
+                            Real C1 = special::ClebschGordan(l1b, m, l2b, mi + mu - m, 0, 0)
+                                    * special::ClebschGordan(l1f, m - mu, l2f, mi + mu - m, inp_.L, mi);
+                            Real C2 = special::ClebschGordan(l1b, m, l2b, mi + mu - m, 0, 0)
+                                    * special::ClebschGordan(l1f, m, l2f, mi + mu - m, inp_.L, mi);
 
                             Real I1 = l2f == l2b ? special::Gaunt(l1f, +m, 1, 0, l1b, +m) : 0;
                             Real I2 = l1f == l1b ? special::Gaunt(l2f, -m, 1, 0, l2b, -m) : 0;
 
-                            dip += std::sqrt(4*special::constant::pi/3) * Cf*Ci * (I1*R1 + I2*R2);
+                            dip[mu] += std::sqrt(4*special::constant::pi/3) * (C1*I1*R1 + C2*I2*R2);
                         }
                     }
                 }
 
-                std::cout << "\t\t\tTransition dipole: " << dip << ", phase " << std::arg(dip) << std::endl;
+                // fix plane wave normalization
+                for (int i = 0; i < 3; i++)
+                    dip[i] *= std::pow(2*special::constant::pi, -1.5);
+
+                //std::cout << dip[0] << dip[1] << dip[2] << std::endl;
+
+                files[is] << format
+                (
+                    "%10.5f %15.8e %15.8e %15.8e %15.8e %15.8e %15.8e",
+                    ki*ki/2,
+                    dip[0].real(), dip[0].imag(),
+                    dip[1].real(), dip[1].imag(),
+                    dip[2].real(), dip[2].imag()
+                ) << std::endl;
             }
         }
     }

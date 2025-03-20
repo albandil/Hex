@@ -950,7 +950,7 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
     std::size_t Nspline_outer = Nspline_full - Nspline_inner;
 
     // impact momentum
-    Real ki = std::sqrt(inp_->Etot[ie] + 1.0_r/(ni*ni));
+    Real ki = std::sqrt(inp_->Etot[ie] + inp_->Za*inp_->Za/(ni*ni));
 
     // get the initial bound pseudo-state B-spline expansion
     cArray Xp = cmd_->analytic_eigenstates ?
