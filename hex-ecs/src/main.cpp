@@ -165,6 +165,10 @@ int main (int argc, char* argv[])
             std::cout << std::endl;
         }
 
+        // define OpenCL devices if not set
+        if (cmd.ocl_device < 0)
+            cmd.ocl_device = par.iproc();
+
 #ifdef _OPENMP
         omp_set_num_threads(cmd.nthreads);
 
