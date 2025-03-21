@@ -130,7 +130,7 @@ void Amplitudes::extract (std::string directory)
 
         for (unsigned ie = 0; ie < inp_.Etot.size(); ie++)
         {
-            if (verbose_) std::cout << "\t\tEi = " << inp_.Etot[ie] << std::endl;
+            if (verbose_) std::cout << "\t\tEi = " << inp_.Etot[ie] << " Ry" << std::endl;
 
             // for all initial states
             for (auto instate  : inp_.instates)
@@ -296,7 +296,7 @@ void Amplitudes::dipoles(std::string directory)
 
         for (unsigned ie = 0; ie < inp_.Etot.size(); ie++)
         {
-            if (verbose_) std::cout << "\t\tEi = " << inp_.Etot[ie] << std::endl;
+            if (verbose_) std::cout << "\t\tEi = " << inp_.Etot[ie] << " Ry" << std::endl;
 
             // for all initial states
             for (unsigned is = 0; is < inp_.instates.size(); is++)
