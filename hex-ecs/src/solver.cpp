@@ -232,7 +232,7 @@ void Solver::solve ()
                 psi.hdfload(ill);
 
             // create the solution writer
-            SolutionIO writer(ang_.L(), ang_.S(), ang_.Pi(), 0, 0, 0, 0, ang_.states(), channels_);
+            SolutionIO writer(ang_.L(), ang_.S(), ang_.Pi(), 0, 0, 0, special::constant::Nan, ang_.states(), channels_);
 
             // write the solution to disk
             if (not writer.save(psi, ill))

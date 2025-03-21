@@ -276,7 +276,7 @@ void Amplitudes::dipoles(std::string directory)
             HexException("Knot %d mismatch between bound and free grid: %g vs. %g", bound_bspline.t(iknot).real(), rad_.bspline().t(iknot).real());
 
     // read bound state
-    SolutionIO bound_reader(0, 0, 0, 0, 0, 0, 0., bound_ang.states(), {}, directory + "/psi");
+    SolutionIO bound_reader(bound_inp.L, bound_inp.Spin[0], bound_inp.Pi, 0, 0, 0, special::constant::Nan, bound_ang.states(), {}, directory + "/psi");
     BlockArray<Complex> bound_state(bound_ang.states().size(), true, "bound");
     for (unsigned ill = 0; ill < bound_ang.states().size(); ill++)
         bound_reader.load(bound_state, ill);
