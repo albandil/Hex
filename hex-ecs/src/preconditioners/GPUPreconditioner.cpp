@@ -946,18 +946,15 @@ void GPUCGPreconditioner::finish ()
     Mm1_inner_a_.disconnect();      Mm1_inner_p_.disconnect();
     Mm2_inner_a_.disconnect();      Mm2_inner_p_.disconnect();
 
-    for (int lambda = 0; lambda <= rad_panel_->maxlambda(); lambda++)
-    {
-        R_coupled_p_[lambda].disconnect();
-        R_coupled_i_[lambda].disconnect();
-        R_coupled_x_[lambda].disconnect();
+    for (auto& a : R_coupled_p_) a.disconnect();
+    for (auto& a : R_coupled_i_) a.disconnect();
+    for (auto& a : R_coupled_x_) a.disconnect();
 
-        M_L_inner_a_[lambda].disconnect();
-        M_L_inner_p_[lambda].disconnect();
+    for (auto& a : M_L_inner_a_) a.disconnect();
+    for (auto& a : M_L_inner_p_) a.disconnect();
 
-        M_mLm1_inner_a_[lambda].disconnect();
-        M_mLm1_inner_p_[lambda].disconnect();
-    }
+    for (auto& a : M_mLm1_inner_a_) a.disconnect();
+    for (auto& a : M_mLm1_inner_p_) a.disconnect();
 
     KPACGPreconditioner::finish();
 }
