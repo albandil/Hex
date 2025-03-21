@@ -338,8 +338,11 @@ void Amplitudes::dipoles(std::string directory)
                 // read the scattering solution
                 reader_ = SolutionIO(inp_.L, Spin, inp_.Pi, ni, li, mi, inp_.Etot[ie], ang_, {}, directory + "/psi");
                 BlockArray<Complex> solution (ang_.size(), true, "sol");
+                bool allOK = true;
                 for (unsigned ill = 0; ill < ang_.size(); ill++)
-                    reader_.load(solution, ill);
+                    allOK = allOK and reader_.load(solution, ill);
+                if (not allOK)
+                    continue;
 
                 int Nang_bound = bound_ang.states().size();
                 int Nang_free = ang_.size();
