@@ -198,92 +198,7 @@ void Solver::solve ()
 
         Davidson<Complex, cBlockArray, cBlockArray&> dav;
 
-        /*RadialIntegrals const& rad = dynamic_cast<NoPreconditioner*>(prec_)->rad_inner();
-
-        SymBandMatrix<Complex> const& S = rad.S();
-        SymBandMatrix<Complex> const& D = rad.D();
-        SymBandMatrix<Complex> const& Mm1 = rad.Mm1();
-        SymBandMatrix<Complex> const& Mm2 = rad.Mm2();
-
-        size_t Nspline = rad.bspline().Nspline();
-
-        // precompute diagonal of the full Hamiltonian
-        for (int ill = 0; ill < ang_.states().size(); ill++)
-        {
-            int l1 = ang_.states()[ill].first;
-            int l2 = ang_.states()[ill].second;
-
-            for (int i = 0; i < Nspline; i++)
-            {
-                cArrayView segment = diag[ill].slice(i*Nspline, (i + 1)*Nspline);
-
-                for (int j = 0; j < Nspline; j++)
-                {
-                    segment[j] = 0.5_r * D(i,i) * S(j,j) - inp_.Za           * Mm1(i,i) * S(j,j) + 0.5_r * l1 * (l1 + 1) * Mm2(i,i) * S(j,j)
-                               + 0.5_r * D(j,j) * S(i,i) + inp_.Za * inp_.Zp * Mm1(j,j) * S(i,i) + 0.5_r * l2 * (l2 + 1) * Mm2(j,j) * S(i,i);
-                }
-
-                for (int lambda = 0; lambda <= ang_.maxlambda(); lambda++)
-                {
-                    if (ang_.f(ill,ill,lambda) != 0)
-                    {
-                        segment -= inp_.Zp * ang_.f(ill,ill,lambda) * rad.calc_R_tr_dia_block(lambda, i, i).data().slice(0, Nspline);
-                    }
-                }
-            }
-        }*/
-
         dav.update_preconditioner   = update_preconditioner;
-        /*dav.apply_preconditioner    = [&](cBlockArray const& p, cBlockArray& x)
-        {
-            for (int ill = 0; ill < ang_.states().size(); ill++)
-            {
-                int l1 = ang_.states()[ill].first;
-                int l2 = ang_.states()[ill].second;
-
-                for (int i = 0; i < Nspline; i++)
-                {
-                    cArray diagonal(Nspline);
-
-                    for (int j = 0; j < Nspline; j++)
-                    {
-                        diagonal[j] = E_*S(i,i)*S(j,j)
-                            - 0.5_r * D(i,i) * S(j,j)
-                            + inp_.Za * Mm1(i,i) * S(j,j)
-                            - 0.5_r * l1 * (l1 + 1) * Mm2(i,i) * S(j,j)
-                            - 0.5_r * D(j,j) * S(i,i)
-                            - inp_.Za * inp_.Zp * Mm1(j,j) * S(i,i)
-                            - 0.5_r * l2 * (l2 + 1) * Mm2(j,j) * S(i,i);
-                    }
-
-                    for (int lambda = 0; lambda <= ang_.maxlambda(); lambda++)
-                    {
-                        if (ang_.f(ill,ill,lambda) != 0)
-                        {
-                            diagonal += inp_.Zp * ang_.f(ill,ill,lambda) * rad.calc_R_tr_dia_block(lambda, i, i).data().slice(0, Nspline);
-                        }
-                    }
-
-                    for (int j = 0; j < Nspline; j++)
-                    {
-                        x[ill][i*Nspline + j] = p[ill][i*Nspline + j]/diagonal[j];
-                    }
-                }
-            }
-        };*/
-        /*dav.apply_preconditioner    = [&](cBlockArray const& p, cBlockArray& x)
-        {
-            for (int ill = 0; ill < ang_.states().size(); ill++)
-            {
-                for (int i = 0; i < Nspline; i++)
-                {
-                    for (int j = 0; j < Nspline; j++)
-                    {
-                        x[ill][i*Nspline + j] = p[ill][i*Nspline + j]/(E_*S(i,i)*S(j,j) - diag[ill][i*Nspline + j]);
-                    }
-                }
-            }
-        };*/
         dav.apply_preconditioner    = apply_preconditioner;
         dav.matrix_multiply         = matrix_multiply;
         dav.verbose                 = true;
@@ -302,6 +217,11 @@ void Solver::solve ()
             std::cout << "\tConvergence too slow... The saved solution will be probably non-converged." << std::endl;
         else
             std::cout << "\tSolution converged after " << t.nice_time() << "." << std::endl;
+
+        // normalize to unit norm
+        Real norm = compute_norm_nonortho(psi);
+        for (auto& block : psi)
+            block /= norm;
 
         // save solution to disk
         for (unsigned ill = 0; ill < ang_.states().size(); ill++)
