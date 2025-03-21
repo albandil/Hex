@@ -300,7 +300,7 @@ void Solver::solve ()
             int mi = std::get<2>(inp_.instates[instate]);
 
             // skip energy-forbidden states
-            if (inp_.Etot[iE_] <= -1./(ni*ni))
+            if (inp_.Etot[iE_] <= -inp_.Za*inp_.Za/(ni*ni))
             {
                 std::cout << "\tSkip initial state " << Hydrogen::stateName(ni,li,mi) << " (S = " << Spin
                           << ") : not allowed by total E." << std::endl;;
