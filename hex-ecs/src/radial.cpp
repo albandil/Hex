@@ -1066,9 +1066,6 @@ cArray RadialIntegrals::overlapj
             // evaluate the Riccati-Bessel function for this knot and energy and for all angular momenta
             for (int ipoint = 0; ipoint < points; ipoint++)
             {
-                // which Bessel function evaluator to use?
-                std::function<int(int,double,double*)> jv = (fast_bessel ? gsl_sf_bessel_jl_array : gsl_sf_bessel_jl_steed_array);
-
                 // evaluate all Riccati-Bessel functions in point
                 cArrayView(evalj, ipoint * (maxell + 1), maxell + 1) = special::ric_jv(Z, maxell, vk[ie], xs[ipoint].real(), fast_bessel);
 

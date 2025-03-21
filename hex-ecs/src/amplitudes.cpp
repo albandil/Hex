@@ -350,7 +350,9 @@ void Amplitudes::dipoles(std::string directory)
                 cArray SJ  = RadialIntegrals::overlapj(rad_.bspline(), rad_.gaussleg(), inp_.Za - 1, inp_.maxell, rArray{ ki }, cmd_.fast_bessel, 0);
                 cArray M1J = RadialIntegrals::overlapj(rad_.bspline(), rad_.gaussleg(), inp_.Za - 1, inp_.maxell, rArray{ ki }, cmd_.fast_bessel, 1);
 
-                Complex dip[3] = { 0., 0., 0. }; // -1, 0, +1 components of the transition dipole
+                Complex dip_1[3] = { 0., 0., 0. }; // -1, 0, +1 components of the transition dipole
+                Complex dip_2[3] = { 0., 0., 0. }; // -1, 0, +1 components of the transition dipole
+                Complex dip_3[3] = { 0., 0., 0. }; // -1, 0, +1 components of the transition dipole
 
                 for (int v = 0; v < Nang_free; v++)
                 {
@@ -390,7 +392,7 @@ void Amplitudes::dipoles(std::string directory)
                                     R += M1P[ispline] * (bound_segment | Sj);
                                 }
 
-                                dip[1 - mi] += prefactor * C * G * R;
+                                dip_1[1 - mi] += prefactor * C * G * R;
                             }
 
                             // dipole transition in the second coordiante
@@ -407,12 +409,13 @@ void Amplitudes::dipoles(std::string directory)
                                     R += SP[ispline] * (bound_segment | M1j);
                                 }
 
-                                dip[1 - mi] += prefactor * C * G * R;
+                                dip_2[1 - mi] += prefactor * C * G * R;
                             }
                         }
 
                         // contribution from the scattered part
 
+                        // TODO: It would be more efficient to kron_dot bound state first and then multiply segments from free state
                         Complex R1 = 0; cArray MSpsi(Nfspline*Nfspline); kron_dot(0., MSpsi, 1., solution[v], rad_.Mp1(), rad_.S());
                         Complex R2 = 0; cArray SMpsi(Nfspline*Nfspline); kron_dot(0., SMpsi, 1., solution[v], rad_.S(), rad_.Mp1());
 
@@ -436,14 +439,18 @@ void Amplitudes::dipoles(std::string directory)
                             Real I1 = l2f == l2b ? special::Gaunt(l1f, mi + m, 1, -mi, l1b, +m) : 0;
                             Real I2 = l1f == l1b ? special::Gaunt(l2f, mi - m, 1, -mi, l2b, -m) : 0;
 
-                            dip[1 - mi] += std::sqrt(4*special::constant::pi/3) * C0 * (C1*I1*R1 + C2*I2*R2);
+                            dip_3[1 - mi] += std::sqrt(4*special::constant::pi/3) * C0 * (C1*I1*R1 + C2*I2*R2);
                         }
                     }
                 }
 
                 // fix plane wave normalization
                 for (int i = 0; i < 3; i++)
-                    dip[i] *= std::pow(2*special::constant::pi, -1.5);
+                {
+                    dip_1[i] *= std::pow(2*special::constant::pi, -1.5);
+                    dip_2[i] *= std::pow(2*special::constant::pi, -1.5);
+                    dip_3[i] *= std::pow(2*special::constant::pi, -1.5);
+                }
 
                 //std::cout << dip[0] << dip[1] << dip[2] << std::endl;
 
@@ -451,9 +458,9 @@ void Amplitudes::dipoles(std::string directory)
                 (
                     "%10.5f %15.8e %15.8e %15.8e %15.8e %15.8e %15.8e",
                     ki*ki/2,
-                    dip[0].real(), dip[0].imag(),
-                    dip[1].real(), dip[1].imag(),
-                    dip[2].real(), dip[2].imag()
+                    (dip_1[0] + dip_2[0] + dip_3[0]).real(), (dip_1[0] + dip_2[0] + dip_3[0]).imag(),
+                    (dip_1[1] + dip_2[1] + dip_3[1]).real(), (dip_1[1] + dip_2[1] + dip_3[1]).imag(),
+                    (dip_1[2] + dip_2[2] + dip_3[2]).real(), (dip_1[2] + dip_2[2] + dip_3[2]).imag()
                 ) << std::endl;
             }
         }
@@ -853,7 +860,7 @@ void Amplitudes::computeTmat_ (Amplitudes::Transition T)
 {
     // final projectile momenta
     // final projectile energies
-    rArray Ef = inp_.Etot + 1.0_r/(T.nf*T.nf) + (T.mf-T.mi) * inp_.B;
+    rArray Ef = inp_.Etot + inp_.Za*inp_.Za/(T.nf*T.nf) + (T.mf-T.mi) * inp_.B;
 
     // final projectile momenta
     rArray inv_kf; for (Real ef : Ef) inv_kf.push_back(ef > 0 ? 1./std::sqrt(ef) : 0.);
@@ -893,8 +900,8 @@ void Amplitudes::computeTmat_ (Amplitudes::Transition T)
 void Amplitudes::computeSigma_ (Amplitudes::Transition T)
 {
     // initial and final projectile energies
-    rArray Ei = inp_.Etot + 1.0_r/(T.ni*T.ni);
-    rArray Ef = inp_.Etot + 1.0_r/(T.nf*T.nf) + (T.mf-T.mi) * inp_.B;
+    rArray Ei = inp_.Etot + inp_.Za*inp_.Za/(T.ni*T.ni);
+    rArray Ef = inp_.Etot + inp_.Za*inp_.Za/(T.nf*T.nf) + (T.mf-T.mi) * inp_.B;
 
     // final projectile momenta
     rArray inv_ki; for (Real ei : Ei) inv_ki.push_back(ei > 0 ? 1./std::sqrt(ei) : 0.);
@@ -1112,7 +1119,7 @@ void Amplitudes::computeSigmaIon_ (Amplitudes::Transition T)
     unsigned Nenergy = inp_.Etot.size();
 
     // initial momentum
-    rArray ki = sqrt(inp_.Etot + 1.0_r/(T.ni*T.ni));
+    rArray ki = sqrt(inp_.Etot + inp_.Za*inp_.Za/(T.ni*T.ni));
 
     // allocate memory for cross sections
     if (sigma_S.find(T) == sigma_S.end())
