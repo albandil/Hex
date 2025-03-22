@@ -357,35 +357,33 @@ void Amplitudes::dipoles(std::string directory)
                 Complex dip_2[3] = { 0., 0., 0. }; // -1, 0, +1 components of the transition dipole
                 Complex dip_3[3] = { 0., 0., 0. }; // -1, 0, +1 components of the transition dipole
 
-                for (int v = 0; v < Nang_free; v++)
+                for (int u = 0; u < Nang_bound; u++)
                 {
-                    int l1f = ang_[v].first;
-                    int l2f = ang_[v].second;
+                    int l1b = bound_ang.states()[u].first;
+                    int l2b = bound_ang.states()[u].second;
 
-                    for (int u = 0; u < Nang_bound; u++)
+                    // contribution from partial waves of the incident part
+                    //  - incident state is bound state times Ricatti-Bessel or Coulomb function
+                    //  - antisymmetry not needed as the bound state is already antisymmetric and operator is symmetric
+
+                    for (int l = 0; l <= inp_.maxell; l++)
                     {
-                        int l1b = bound_ang.states()[u].first;
-                        int l2b = bound_ang.states()[u].second;
+                        Complex prefactor = std::sqrt(2) * std::pow(1.0_i, l)
+                                            * 4.0_r * special::constant::pi * std::sqrt((2*l + 1)/3.0_r)
+                                            * special::cis(-special::coul_F_sigma(inp_.Za - 1, l, ki)) / ki;
 
-                        // contribution from partial waves of the incident part
-                        //  - incident state is bound state times Ricatti-Bessel or Coulomb function
-                        //  - antisymmetry not needed as the bound state is already antisymmetric and operator is symmetric
+                        // get slice of Ricatti-Bessel (or Coulomb) overlaps for partial wave l
+                        cArrayView Sj(SJ, l*Nfspline, Nspline);
+                        cArrayView M1j(M1J, l*Nfspline, Nspline);
 
-                        for (int l = 0; l <= inp_.maxell; l++)
+                        // dipole transition in the first coordinate
+                        if (l2b == l)
                         {
-                            Complex prefactor = std::pow(1.0_i, l)
-                                              * 4.0_r * special::constant::pi * std::sqrt((2*l + 1)/3.0_r)
-                                              * special::cis(-special::coul_F_sigma(inp_.Za - 1, l, ki)) / ki;
+                            Real C = special::ClebschGordan(l1b, 0, l2b, 0, 0, 0);
+                            Real G = special::Gaunt(li, mi, 1, -mi, l1b, 0);
 
-                            // get slice of Ricatti-Bessel (or Coulomb) overlaps for partial wave l
-                            cArrayView Sj(SJ, l*Nfspline, Nspline);
-                            cArrayView M1j(M1J, l*Nfspline, Nspline);
-
-                            // dipole transition in the first coordinate
-                            if (l2b == l)
+                            if (C != 0 and G != 0)
                             {
-                                Real C = special::ClebschGordan(l1b, 0, l2b, 0, 0, 0);
-                                Real G = special::Gaunt(li, mi, 1, -mi, l1b, 0);
                                 Complex R = 0;
 
                                 for (int ispline = 0; ispline < Nspline; ispline++)
@@ -397,12 +395,16 @@ void Amplitudes::dipoles(std::string directory)
 
                                 dip_1[1 - mi] += prefactor * C * G * R;
                             }
+                        }
 
-                            // dipole transition in the second coordiante
-                            if (l1b == li)
+                        // dipole transition in the second coordiante
+                        if (l1b == li)
+                        {
+                            Real C = special::ClebschGordan(l1b, mi, l2b, -mi, 0, 0);
+                            Real G = special::Gaunt(l, 0, 1, -mi, l2b, -mi);
+
+                            if (C != 0 and G != 0)
                             {
-                                Real C = special::ClebschGordan(l1b, mi, l2b, -mi, 0, 0);
-                                Real G = special::Gaunt(l, 0, 1, -mi, l2b, -mi);
                                 Complex R = 0;
 
                                 for (int ispline = 0; ispline < Nspline; ispline++)
@@ -415,8 +417,18 @@ void Amplitudes::dipoles(std::string directory)
                                 dip_2[1 - mi] += prefactor * C * G * R;
                             }
                         }
+                    }
 
-                        // contribution from the scattered part
+                    // contribution from the scattered part
+
+                    for (int v = 0; v < Nang_free; v++)
+                    {
+                        int l1f = ang_[v].first;
+                        int l2f = ang_[v].second;
+
+                        // skip non-contributing combinations
+                        if (std::abs(l1b - l1f) > 1 or std::abs(l2b - l2f) > 1)
+                            continue;
 
                         // TODO: It would be more efficient to kron_dot bound state first and then multiply segments from free state
                         Complex R1 = 0; cArray MSpsi(Nfspline*Nfspline); kron_dot(0., MSpsi, 1., solution[v], rad_.Mp1(), rad_.S());
@@ -454,8 +466,6 @@ void Amplitudes::dipoles(std::string directory)
                     dip_2[i] *= std::pow(2*special::constant::pi, -1.5);
                     dip_3[i] *= std::pow(2*special::constant::pi, -1.5);
                 }
-
-                //std::cout << dip[0] << dip[1] << dip[2] << std::endl;
 
                 files[is] << format
                 (
