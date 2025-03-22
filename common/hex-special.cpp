@@ -206,10 +206,10 @@ cArray special::ric_jv (int Z, int lmax, double k, Complex r, bool fast_bessel)
     {
         rArray F(lmax + 1), expF(lmax + 1);
 
-        if (gsl_sf_coulomb_wave_sphF_array(0, lmax, -Z/k, r.real(), F.data(), expF.data()) != GSL_SUCCESS)
+        if (gsl_sf_coulomb_wave_sphF_array(0, lmax, -Z/k, k*r.real(), F.data(), expF.data()) != GSL_SUCCESS)
             HexException("Failed to evaluate Coulomb functions using gsl_sf_coulomb_wave_sphF_array.");
         for (int i = 0; i <= lmax; i++)
-            eval[i] = F[i] * std::exp(expF[i]);
+            eval[i] = k*r.real() * F[i] * std::exp(expF[i]);
 
         return eval;
     }
