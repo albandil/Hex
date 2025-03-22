@@ -68,14 +68,14 @@ char const * hex_ip = HEX_IP;
 
 std::string logo (std::string esc)
 {
-    return esc + "                                         \n" +
-           esc + "       / /   / /    __    \\ \\  / /     \n" +
-           esc + "      / /__ / /   / _ \\    \\ \\/ /     \n" +
-           esc + "     /  ___  /   | |/_/    / /\\ \\      \n" +
-           esc + "    / /   / /    \\_\\      / /  \\ \\   \n" +
-           esc + "                                         \n" +
-           esc + "             UK MFF (c) 2018             \n" +
-           esc + "                                         \n" +
+    return esc + "\n" +
+           esc + "       / /   / /    __    \\ \\  / /\n" +
+           esc + "      / /__ / /   / _ \\    \\ \\/ /\n" +
+           esc + "     /  ___  /   | |/_/    / /\\ \\\n" +
+           esc + "    / /   / /    \\_\\      / /  \\ \\\n" +
+           esc + "\n" +
+           esc + "             UK MFF (c) 2018\n" +
+           esc + "\n" +
            esc + "    version: 2.4-" HEX_GIT_COMMIT "." HEX_FP  "."  HEX_IP "\n" +
-           esc + "                                         \n";
+           esc + "\n";
 }
