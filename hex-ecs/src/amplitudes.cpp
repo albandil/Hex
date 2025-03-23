@@ -314,7 +314,8 @@ void Amplitudes::dipoles(std::string directory)
                 }
 
                 // impact momentum
-                Real ki = std::sqrt(inp_.Etot[ie] + inp_.Za*inp_.Za/(ni*ni));
+                Real Ek = 0.5*inp_.Etot[ie] + inp_.Za*inp_.Za/(2*ni*ni);
+                Real ki = std::sqrt(2*Ek);
 
                 // is this solution allowed at all for the given angular basis?
                 bool allowed = false;
@@ -475,23 +476,15 @@ void Amplitudes::dipoles(std::string directory)
                     dip_3[i] *= std::pow(2*special::constant::pi, -1.5);
                 }
 
+                // write complex-conjugated amplitudes, i.e. d = <free|D|bound>, not <bound|D|free>
                 files[is] << format
                 (
                     "%10.5f %15.8e %15.8e %15.8e %15.8e %15.8e %15.8e",
-                    ki*ki/2,
-                    (dip_1[0] + dip_2[0] + dip_3[0]).real(), (dip_1[0] + dip_2[0] + dip_3[0]).imag(),
-                    (dip_1[1] + dip_2[1] + dip_3[1]).real(), (dip_1[1] + dip_2[1] + dip_3[1]).imag(),
-                    (dip_1[2] + dip_2[2] + dip_3[2]).real(), (dip_1[2] + dip_2[2] + dip_3[2]).imag()
+                    Ek,
+                    (dip_1[0] + dip_2[0] + dip_3[0]).real(), -(dip_1[0] + dip_2[0] + dip_3[0]).imag(),
+                    (dip_1[1] + dip_2[1] + dip_3[1]).real(), -(dip_1[1] + dip_2[1] + dip_3[1]).imag(),
+                    (dip_1[2] + dip_2[2] + dip_3[2]).real(), -(dip_1[2] + dip_2[2] + dip_3[2]).imag()
                 ) << std::endl;
-
-                /*files[is] << format
-                (
-                    "%10.5f %15.8e %15.8e %15.8e %15.8e %15.8e %15.8e",
-                    ki*ki/2,
-                    dip_1[1].real(), dip_1[1].imag(),
-                    dip_2[1].real(), dip_2[1].imag(),
-                    dip_3[1].real(), dip_3[1].imag()
-                ) << std::endl;*/
             }
         }
     }
