@@ -342,7 +342,10 @@ void Amplitudes::dipoles(std::string directory)
                 for (unsigned ill = 0; ill < ang_.size(); ill++)
                     allOK = allOK and reader_.load(solution, ill);
                 if (not allOK)
+                {
+                    files[is] << format("%10.5f %15.8e %15.8e %15.8e %15.8e %15.8e %15.8e", ki*ki/2, 0., 0., 0., 0., 0., 0.) << std::endl;
                     continue;
+                }
 
                 int Nang_bound = bound_ang.states().size();
                 int Nang_free = ang_.size();
@@ -368,6 +371,11 @@ void Amplitudes::dipoles(std::string directory)
 
                     for (int l = 0; l <= inp_.maxell; l++)
                     {
+                        // if the RHS contraction is switched off, consider only a single partial wave
+                        //  - this has to be consistent with NoPreconditioner::rhs
+                        if (not cmd_.contract and l != inp_.L + mi)
+                            continue;
+
                         Complex prefactor = std::sqrt(2) * std::pow(1.0_i, l)
                                             * 4.0_r * special::constant::pi * std::sqrt((2*l + 1)/3.0_r)
                                             * special::cis(-special::coul_F_sigma(inp_.Za - 1, l, ki)) / ki;
@@ -475,6 +483,15 @@ void Amplitudes::dipoles(std::string directory)
                     (dip_1[1] + dip_2[1] + dip_3[1]).real(), (dip_1[1] + dip_2[1] + dip_3[1]).imag(),
                     (dip_1[2] + dip_2[2] + dip_3[2]).real(), (dip_1[2] + dip_2[2] + dip_3[2]).imag()
                 ) << std::endl;
+
+                /*files[is] << format
+                (
+                    "%10.5f %15.8e %15.8e %15.8e %15.8e %15.8e %15.8e",
+                    ki*ki/2,
+                    dip_1[1].real(), dip_1[1].imag(),
+                    dip_2[1].real(), dip_2[1].imag(),
+                    dip_3[1].real(), dip_3[1].imag()
+                ) << std::endl;*/
             }
         }
     }

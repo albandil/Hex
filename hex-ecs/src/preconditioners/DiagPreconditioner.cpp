@@ -92,9 +92,16 @@ void DiagPreconditioner::setup ()
 
             for (int lambda = 0; lambda <= ang_->maxlambda(); lambda++)
             {
-                if (ang_->f(ill,ill,lambda) != 0)
+                double f = ang_->f(ill,ill,lambda);
+
+                if (f != 0)
                 {
-                    segment -= inp_->Zp * ang_->f(ill,ill,lambda) * rad.calc_R_tr_dia_block(lambda, i, i).data().slice(0, Nspline);
+                    //segment -= inp_->Zp * f * rad.calc_R_tr_dia_block(lambda, i, i).data().slice(0, Nspline);
+
+                    SymBandMatrix<Complex> R = rad.calc_R_tr_dia_block(lambda, i, i);
+
+                    for (int j = 0; j < Nspline; j++)
+                        segment[j] -= inp_->Zp * f * R(j, j);
                 }
             }
         }

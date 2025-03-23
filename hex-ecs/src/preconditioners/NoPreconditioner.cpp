@@ -1006,6 +1006,10 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
         // for all allowed angular momenta (by momentum composition) of the projectile
         for (int l = std::abs(li - ang_->L()); l <= li + ang_->L(); l++)
         {
+            // if the RHS contraction is switched off, accept only a single partial wave
+            if (not cmd_->contract and l != ang_->L() + mi)
+                continue;
+
             // Ricatti-Bessel function B-spline overlaps for this angular momentum (only for the inner region)
             cArrayView Xj (XJ, l * Nspline_inner, Nspline_inner);
 
@@ -1014,10 +1018,12 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
                 continue;
 
             // compute energy- and angular momentum-dependent prefactor
-            Complex prefactor = std::pow(1.0_i,l)
-                              * std::sqrt(4.0_r * special::constant::pi * (2 * l + 1))
-                              * special::cis(-special::coul_F_sigma(inp_->Za - 1, l, ki))
-                              * (Real)special::ClebschGordan(li,mi, l,0, inp_->L,mi) / ki;
+            Complex prefactor = 4.0_r * special::constant::pi * std::pow(1.0_i,l)
+                              * special::cis(-special::coul_F_sigma(inp_->Za - 1, l, ki)) / ki;
+
+            // add angular and contraction factors
+            if (cmd_->contract)
+                prefactor *= special::ClebschGordan(li,mi, l,0, inp_->L,mi) * std::sqrt((2*l + 1)/(4.0_r * special::constant::pi));
 
             // skip non-contributing terms
             if (prefactor == 0.0_r)
