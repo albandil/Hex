@@ -372,11 +372,6 @@ void Amplitudes::dipoles(std::string directory)
 
                     for (int l = 0; l <= inp_.maxell; l++)
                     {
-                        // if the RHS contraction is switched off, consider only a single partial wave
-                        //  - this has to be consistent with NoPreconditioner::rhs
-                        if (not cmd_.contract and l != inp_.L + mi)
-                            continue;
-
                         Complex prefactor = std::sqrt(2) * std::pow(1.0_i, l)
                                             * 4.0_r * special::constant::pi * std::sqrt((2*l + 1)/3.0_r)
                                             * special::cis(-special::coul_F_sigma(inp_.Za - 1, l, ki)) / ki;

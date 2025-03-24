@@ -110,7 +110,7 @@ class CommandLine
               fast_bessel(false), hyb_additional_levels(0), multigrid_depth(0), multigrid_coarse_prec(0), dom_x_panels(1), dom_y_panels(1),
               dom_preconditioner("ILU"), dom_sweeps(-1), scratch(std::getenv("SCRATCHDIR") ? std::getenv("SCRATCHDIR") : "."), analytic_eigenstates(false),
               runtime_postprocess(false), sub_prec_verbose(false), multi_rhs(false), fpe(false), mumps_virtual_memory(false), nthreads(1),
-              checkpoints(false), autostop_tolerance(0), purge(-1), contract(true)
+              checkpoints(false), autostop_tolerance(0), purge(-1)
         {
 #ifdef _OPENMP
             // initialize the number of threads to OMP_NUM_THREADS
@@ -341,9 +341,6 @@ class CommandLine
 
         /// Delete old run-time post-processing directories.
         int purge;
-
-        /// Contract partial waves for RHS.
-        bool contract;
 };
 
 /**

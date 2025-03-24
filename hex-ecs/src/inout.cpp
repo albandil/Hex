@@ -190,7 +190,6 @@ void CommandLine::parse (int argc, char* argv[])
                     "\t                                 The '<parameters>' stands for '<filename> <Xmin> <Ymin> <Xmax> <Ymax> <Xn> <Yn>'.\n"
                     "\t--write-grid               (-g)  Write grid layout to a VTK file.\n"
                     "\t--write-intermediate-solutions   Write all intermediate solution (after every iteration of the PCOCG solver).\n"
-                    "\t--no-contract                    Interpret \"mi\" as index of contributing partial wave.\n"
                     "\t--bound                          Before solving the scattering equations calculate and write the two-electron bound state wfn.\n"
                     "\t--dipoles                        Evaluate dipole transition amplitudes from the bound state to all scattering states.\n"
                     "\t--purge <number>                 Clean intermediate solutions some steps back.\n"
@@ -305,12 +304,6 @@ void CommandLine::parse (int argc, char* argv[])
             {
                 // write grid to VTK
                 writegrid = true;
-                return true;
-            },
-        "no-contract", "", 0, [&](std::vector<std::string> const & optargs) -> bool
-            {
-                // do not contract partial waves for RHS
-                contract = false;
                 return true;
             },
         "bound", "", 0, [&](std::vector<std::string> const & optargs) -> bool
