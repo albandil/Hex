@@ -52,6 +52,7 @@
 // --------------------------------------------------------------------------------- //
 
 #ifdef WITH_OPENCL
+    #define CL_TARGET_OPENCL_VERSION 300
     #include <CL/cl.h>
 #endif
 
@@ -127,8 +128,8 @@ const std::string sample_input =
     "# L   S   Pi  nL  limit exchange\n"
     "  0   *   0   4   -1    1\n"
     "\n"
-    "# Projectile charge (+/-1)\n"
-    "  -1\n"
+    "# Atom core (Z >= 1) and projectile charge (+/-1)\n"
+    "  1  -1\n"
     "\n"
     "# Atom + projectile total energies in Rydbergs.\n"
     "# Use any of the following options:\n"
@@ -189,6 +190,8 @@ void CommandLine::parse (int argc, char* argv[])
                     "\t                                 The '<parameters>' stands for '<filename> <Xmin> <Ymin> <Xmax> <Ymax> <Xn> <Yn>'.\n"
                     "\t--write-grid               (-g)  Write grid layout to a VTK file.\n"
                     "\t--write-intermediate-solutions   Write all intermediate solution (after every iteration of the PCOCG solver).\n"
+                    "\t--bound                          Before solving the scattering equations calculate and write the two-electron bound state wfn.\n"
+                    "\t--dipoles                        Evaluate dipole transition amplitudes from the bound state to all scattering states.\n"
                     "\t--purge <number>                 Clean intermediate solutions some steps back.\n"
                     "\t--checkpoints                    Write all run-time intermediate data needed to continue interrupted calculation.\n"
                     "\t--autostop <number>              Monitor convergence of K-matrices and stop the solver on sufficiently small change between iterations.\n"
@@ -301,6 +304,18 @@ void CommandLine::parse (int argc, char* argv[])
             {
                 // write grid to VTK
                 writegrid = true;
+                return true;
+            },
+        "bound", "", 0, [&](std::vector<std::string> const & optargs) -> bool
+            {
+                // calculate two-electron bound state wave function
+                bound = true;
+                return true;
+            },
+        "dipoles", "", 0, [&](std::vector<std::string> const & optargs) -> bool
+            {
+                // evaluate dipole transition amplitudes from the bound state to all scattering states
+                dipoles = true;
                 return true;
             },
         "zip", "z", 7, [&](std::vector<std::string> const & optargs) -> bool
@@ -1150,7 +1165,7 @@ void InputFile::read (std::ifstream & inf)
     std::cout << "\tnL = " << levels << std::endl;
     std::cout << "\tlimit = " << limit << std::endl;
 
-    Za = 1;
+    Za = ReadNext<int>(inf).val;
     Zp = ReadNext<int>(inf).val;
 
     if (Zp == 0)
@@ -1158,6 +1173,7 @@ void InputFile::read (std::ifstream & inf)
 
     Zp = Zp / std::abs(Zp);
 
+    std::cout << "\tZa = " << Za << std::endl;
     std::cout << "\tZp = " << Zp << std::endl;
 
     //

@@ -29,6 +29,7 @@
 //                                                                                   //
 //  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
+#include <array>
 #include <iostream>
 
 // --------------------------------------------------------------------------------- //
@@ -322,7 +323,7 @@ void NoPreconditioner::setup ()
                 for (unsigned nr = 0; nr < Nspline_inner; nr++)
                 {
                     Real E = Hl_[i][l].Dl[indices[nr]].real();
-                    Real E0 = -0.5 / ((nr + l + 1) * (nr + l + 1));
+                    Real E0 = -0.5*inp_->Za*inp_->Za / ((nr + l + 1) * (nr + l + 1));
 
                     if (E < 0 and std::abs(E0 - E) < 1e-3 * std::abs(E0))
                         max_nr = nr;
@@ -339,7 +340,7 @@ void NoPreconditioner::setup ()
             for (unsigned nr = 0; nr < Nspline_inner; nr++)
             {
                 // bound energy of the state (Ry)
-                Complex Eb = loaded ? 2.0_r * Hl_[i][l].Dl[indices[nr]] : -1.0_r / ((nr + l + 1) * (nr + l + 1));
+                Complex Eb = loaded ? 2.0_r * Hl_[i][l].Dl[indices[nr]] : -inp_->Za*inp_->Za / ((nr + l + 1) * (nr + l + 1));
 
                 // add all requested channels
                 if
@@ -603,7 +604,7 @@ CooMatrix<LU_int_t, Complex> NoPreconditioner::calc_full_block (int ill, int ill
     return coo_block;
 }
 
-void NoPreconditioner::update (Real E)
+void NoPreconditioner::update (Real E, bool full)
 {
     // shorthands
     int order = inp_->order;
@@ -635,6 +636,10 @@ void NoPreconditioner::update (Real E)
 
     // update energy
     E_ = E;
+
+    // skip the rest of the update if not required
+    if (not full)
+        return;
 
     if (verbose_) std::cout << "\tUpdate the common preconditioner base" << std::endl;
 
@@ -744,7 +749,7 @@ void NoPreconditioner::update (Real E)
                 // channel-diagonal contribution
                 if (ill == illp and m == n)
                 {
-                    subblock += (E_ + 1.0_z / (2.0_z * (l1 + m + 1.0_r) * (l1 + m + 1.0_r))) * S_outer
+                    subblock += (E_ + inp_->Za*inp_->Za / (2.0_z * (l1 + m + 1.0_r) * (l1 + m + 1.0_r))) * S_outer
                              - 0.5_z * D_outer
                              - 0.5_z * (l2 * (l2 + 1.0_r)) * Mm2_outer;
                 }
@@ -773,7 +778,7 @@ void NoPreconditioner::update (Real E)
                 // channel-diagonal contribution
                 if (ill == illp and m == n)
                 {
-                    subblock += (E_ + 1.0_z / (2.0_z * (l2 + m + 1.0_r) * (l2 + m + 1.0_r))) * S_outer
+                    subblock += (E_ + inp_->Za*inp_->Za / (2.0_z * (l2 + m + 1.0_r) * (l2 + m + 1.0_r))) * S_outer
                              - 0.5_z * D_outer
                              - 0.5_z * (l1 * (l1 + 1.0_r)) * Mm2_outer;
                 }
@@ -872,7 +877,7 @@ void NoPreconditioner::update (Real E)
 
                 if (ill == illp and m == n)
                 {
-                    elem += (E_ + 0.5_r / ((n + l1 + 1) * (n + l1 + 1))) * rad_full_->S_y()(j,l)
+                    elem += (E_ + 0.5_r * inp_->Za*inp_->Za / ((n + l1 + 1) * (n + l1 + 1))) * rad_full_->S_y()(j,l)
                          - 0.5_r * rad_full_->D_y()(j,l)
                          - 0.5_r * (l2 * (l2 + 1.0_r)) * rad_full_->Mm2_y()(j,l);
                 }
@@ -904,7 +909,7 @@ void NoPreconditioner::update (Real E)
 
                 if (ill == illp and m == n)
                 {
-                    elem += (E_ + 0.5_r / ((n + l2 + 1) * (n + l2 + 1))) * rad_full_->S_x()(i,k)
+                    elem += (E_ + 0.5_r * inp_->Za*inp_->Za / ((n + l2 + 1) * (n + l2 + 1))) * rad_full_->S_x()(i,k)
                          - 0.5_r * rad_full_->D_x()(i,k)
                          - 0.5_r * (l1 * (l1 + 1.0_r)) * rad_full_->Mm2_x()(i,k);
                 }
@@ -946,15 +951,27 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
     std::size_t Nspline_outer = Nspline_full - Nspline_inner;
 
     // impact momentum
-    Real ki = std::sqrt(inp_->Etot[ie] + 1.0_r/(ni*ni));
+    Real ki = std::sqrt(inp_->Etot[ie] + inp_->Za*inp_->Za/(ni*ni));
 
     // get the initial bound pseudo-state B-spline expansion
     cArray Xp = cmd_->analytic_eigenstates ?
         luS_->solve(RadialIntegrals::overlapP(rad_inner_->bspline(), rad_inner_->gaussleg(), inp_->Za, ni, li), 1) :
         Hl_[0][li].readPseudoState(li, ni - li - 1);
 
-    // calculate Ricatti-Bessel B-spline expansions
-    cArray XJ = luS_->solve(RadialIntegrals::overlapj(rad_inner_->bspline(), rad_inner_->gaussleg(), ang_->maxell(), rArray{ ki }, cmd_->fast_bessel), ang_->maxell() + 1);
+    // calculate B-spline expansions of Ricatti-Bessel functions (or regular Coulomb if Za > 1)
+    cArray XJ = luS_->solve
+    (
+        RadialIntegrals::overlapj
+        (
+            rad_inner_->bspline(),
+            rad_inner_->gaussleg(),
+            inp_->Za - 1,
+            ang_->maxell(),
+            rArray{ ki },
+            cmd_->fast_bessel
+        ),
+        ang_->maxell() + 1
+    );
 
     // (anti)symmetrization
     Real Sign = ((ang_->S() + ang_->Pi()) % 2 == 0) ? 1. : -1.;
@@ -997,9 +1014,11 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
                 continue;
 
             // compute energy- and angular momentum-dependent prefactor
-            Complex prefactor = std::pow(1.0_i,l)
-                              * std::sqrt(4.0_r * special::constant::pi * (2 * l + 1))
-                              * (Real)special::ClebschGordan(li,mi, l,0, inp_->L,mi) / ki;
+            Complex prefactor = 4.0_r * special::constant::pi * std::pow(1.0_i,l)
+                              * special::cis(-special::coul_F_sigma(inp_->Za - 1, l, ki)) / ki;
+
+            // add angular and contraction factors
+            prefactor *= special::ClebschGordan(li, mi, l, 0, inp_->L, mi) * std::sqrt((2*l + 1)/(4.0_r * special::constant::pi));
 
             // skip non-contributing terms
             if (prefactor == 0.0_r)
@@ -1045,7 +1064,7 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
             rArray ji_x (xs.size());
             # pragma omp parallel for
             for (unsigned ix = 0; ix < xs.size(); ix++)
-                ji_x[ix] = special::ric_j(l, ki * xs[ix].real()); // FIXME : Coulomb for charge (inp_->Za - 1)
+                ji_x[ix] = special::ric_jv(inp_->Za - 1, l, ki, xs[ix].real()).back().real();
 
             // precompute integral moments
             cArrays M_L_P (rad_full_->maxlambda() + 1), M_mLm1_P (rad_full_->maxlambda() + 1);
@@ -1264,7 +1283,7 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
                                         Real Piy = rad_inner_->bspline().eval(Xp, ry).real();
                                         Real jiy = rad_inner_->bspline().R2() == rad_full_->bspline_y().R2()
                                                  ? rad_inner_->bspline().eval(Xj, ry).real() // if only inner region - just evaluate the precomputed B-spline expansion
-                                                 : special::ric_j(l, ki * ry); // if also outer region - evaluate the wave now
+                                                 : special::ric_j(l, ki * ry); // if also outer region - evaluate the wave now (FIXME: assuming Za = 1!)
 
                                         // damp factor
                                         Real dampfactor = 1;//damp(rx, ry, distance);
@@ -1307,7 +1326,7 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
                                         Real Piy = rad_inner_->bspline().eval(Xp, ry).real();
                                         Real jiy = rad_inner_->bspline().R2() == rad_full_->bspline_y().R2()
                                                  ? rad_inner_->bspline().eval(Xj, ry).real() // if only inner region - just evaluate the precomputed B-spline expansion
-                                                 : special::ric_j(l, ki * ry); // if also outer region - evaluate the wave now
+                                                 : special::ric_j(l, ki * ry); // if also outer region - evaluate the wave now (FIXME: assuming Za = 1!)
 
                                         // damp factor
                                         Real dampfactor = 1;//damp(rx, ry, distance);

@@ -108,7 +108,7 @@ class KPACGPreconditioner : public virtual CGPreconditioner
         }
 
         // preconditioner description
-        virtual std::string description () const;
+        std::string description () const override;
 
         // reuse parent definitions
         using CGPreconditioner::update;
@@ -119,13 +119,13 @@ class KPACGPreconditioner : public virtual CGPreconditioner
         using CGPreconditioner::CG_constrain;
 
         // declare own definitions
-        virtual void setup ();
-        virtual void finish ();
+        void setup () override;
+        void finish () override;
 
         // inner CG callback (needed by parent)
-        virtual void CG_init (int iblock) const;
-        virtual void CG_prec (int iblock, const cArrayView r, cArrayView z) const;
-        virtual void CG_exit (int iblock) const;
+        void CG_init (int iblock) const override;
+        void CG_prec (int iblock, const cArrayView r, cArrayView z) const override;
+        void CG_exit (int iblock) const override;
 
     protected:
 

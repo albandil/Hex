@@ -59,9 +59,9 @@ void HybCGPreconditioner::setup ()
     KPACGPreconditioner::setup();
 }
 
-void HybCGPreconditioner::update (Real E)
+void HybCGPreconditioner::update (Real E, bool full)
 {
-    ILUCGPreconditioner::update(E);
+    ILUCGPreconditioner::update(E, full);
 }
 
 void HybCGPreconditioner::CG_init (int iblock) const

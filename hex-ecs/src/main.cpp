@@ -165,6 +165,10 @@ int main (int argc, char* argv[])
             std::cout << std::endl;
         }
 
+        // define OpenCL devices if not set
+        if (cmd.ocl_device < 0)
+            cmd.ocl_device = par.iproc();
+
 #ifdef _OPENMP
         omp_set_num_threads(cmd.nthreads);
 
@@ -290,7 +294,10 @@ int main (int argc, char* argv[])
         std::cout << "\t- full basis" << std::endl;
         std::cout << "\t\t- number of splines: " << bspline_full.Nspline() << std::endl;
         std::cout << "\t\t- real knots : " << bspline_full.rknots().front() << " to " << bspline_full.rknots().back() << std::endl;
-        std::cout << "\t\t- complex knots : " << bspline_full.cknots2().front() << " to " << bspline_full.cknots2().back() << std::endl;
+        if (not bspline_full.cknots2().empty())
+        {
+            std::cout << "\t\t- complex knots : " << bspline_full.cknots2().front() << " to " << bspline_full.cknots2().back() << std::endl;
+        }
         std::cout << std::endl;
 
         // pick preconditioner according to the user preferences
@@ -311,15 +318,24 @@ int main (int argc, char* argv[])
 
         if (cmd.itinerary & CommandLine::StgExtract)
         {
-            // extract amplitudes
             Amplitudes ampl (bspline_inner, bspline_full, inp, par, cmd, ang.states());
-            ampl.extract();
 
-            // write T-matrices to a text file as SQL statements 
-            ampl.writeSQL_files();
+            if (cmd.dipoles)
+            {
+                // calculate transition dipoles from the bound state
+                ampl.dipoles();
+            }
+            else
+            {
+                // extract amplitudes
+                ampl.extract();
 
-            // write integral cross sections to a text file
-            ampl.writeICS_files();
+                // write T-matrices to a text file as SQL statements
+                ampl.writeSQL_files();
+
+                // write integral cross sections to a text file
+                ampl.writeICS_files();
+            }
         }
         else
         {

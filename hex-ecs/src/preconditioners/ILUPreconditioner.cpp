@@ -131,19 +131,19 @@ void ILUCGPreconditioner::setup ()
     reset_lu();
 }
 
-void ILUCGPreconditioner::update (Real E)
+void ILUCGPreconditioner::update (Real E, bool full)
 {
     // reset data on energy change
     if (E != E_ and not cmd_->noluupdate)
     {
-        CGPreconditioner::update(E);
+        CGPreconditioner::update(E, full);
 
         // release outdated LU factorizations
-        reset_lu();
+        if (full) reset_lu();
     }
     else
     {
-        CGPreconditioner::update(E);
+        CGPreconditioner::update(E, full);
     }
 }
 

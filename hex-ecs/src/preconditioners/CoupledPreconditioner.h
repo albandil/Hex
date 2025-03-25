@@ -80,7 +80,7 @@ class CoupledPreconditioner : public virtual KPACGPreconditioner
         }
 
         // preconditioner description
-        virtual std::string description () const;
+        std::string description () const override;
 
         // reuse parent definitions
         using KPACGPreconditioner::setup;
@@ -88,12 +88,12 @@ class CoupledPreconditioner : public virtual KPACGPreconditioner
         using KPACGPreconditioner::multiply;
 
         // override segregated preconditioner routine
-        virtual int solve_block (int ill, const cArrayView r, cArrayView z) const;
+        int solve_block (int ill, const cArrayView r, cArrayView z) const override;
 
         // declare own definitions
-        virtual void update (Real E);
-        virtual void precondition (BlockArray<Complex> const & r, BlockArray<Complex> & z) const;
-        virtual void finish ();
+        void update (Real E, bool full = true) override;
+        void precondition (BlockArray<Complex> const & r, BlockArray<Complex> & z) const override;
+        void finish () override;
 
     protected:
 

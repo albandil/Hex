@@ -79,16 +79,16 @@ class NoPreconditioner : public PreconditionerBase
         ~NoPreconditioner ();
 
         // description of the preconditioner
-        virtual std::string description () const;
+        std::string description () const override;
 
         // member functions
-        virtual void setup ();
-        virtual void update (Real E);
-        virtual std::pair<int,int> bstates (Real E, int l1, int l2) const;
-        virtual void finish ();
-        virtual void rhs (BlockArray<Complex> & chi, int ienergy, int instate) const;
-        virtual void multiply (BlockArray<Complex> const & p, BlockArray<Complex> & q, MatrixSelection::Selection tri = MatrixSelection::Both) const;
-        virtual void precondition (BlockArray<Complex> const & r, BlockArray<Complex> & z) const;
+        void setup () override;
+        void update (Real E, bool full = true) override;
+        std::pair<int,int> bstates (Real E, int l1, int l2) const override;
+        void finish () override;
+        void rhs (BlockArray<Complex> & chi, int ienergy, int instate) const override;
+        void multiply (BlockArray<Complex> const & p, BlockArray<Complex> & q, MatrixSelection::Selection tri = MatrixSelection::Both) const override;
+        void precondition (BlockArray<Complex> const & r, BlockArray<Complex> & z) const override;
 
         // internal routines
         BlockSymBandMatrix<Complex> calc_A_block (int ill, int illp, bool twoel = true) const;

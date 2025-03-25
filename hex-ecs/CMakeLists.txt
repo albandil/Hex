@@ -57,6 +57,7 @@ set(hex-ecs_SOURCES
     "src/factorizers/lu-umfpack.cpp"
     "src/preconditioners/CGPreconditioner.cpp"
     "src/preconditioners/CoupledPreconditioner.cpp"
+    "src/preconditioners/DiagPreconditioner.cpp"
     "src/preconditioners/DOMPreconditioner.cpp"
     "src/preconditioners/GPUPreconditioner.cpp"
     "src/preconditioners/HybPreconditioner.cpp"

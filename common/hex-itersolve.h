@@ -36,6 +36,7 @@
 #include <iostream>
 
 #include "hex-arrays.h"
+#include "hex-densematrix.h"
 #include "hex-matrix.h"
 #include "hex-misc.h"
 #include "hex-special.h"
@@ -417,6 +418,215 @@ class ConjugateGradients
         unsigned time_offset;
         bool recovered;
         bool stationary;
+        double residual;
+        bool ok;
+};
+
+/**
+ * @brief Davidson eigenvalue algorithm
+ *
+ * This is a basic version of the Davidson algorithm to find the lowest bound state.
+ *
+ * Davidson published his algorithm in the quantum chemistry field [2] as an efficient way
+ * to compute the lowest energy levels and the corresponding wave functions of the Schr6dinger
+ * operator. The original algorithm that computes the largest (or the smallest) eigenvalue of the
+ * matrix A can be expressed by the following algorithm where D stands for the diagonal of the
+ * matrix A.
+ *
+ * \verbatim
+ * Choose an initial unit vector v1; V := [v1];
+ * for k = 1, ..., do
+ *     Compute the interaction matrix H := V* A V;
+ *     Compute the largest (or the smallest) eigenpair (e, y) of H;
+ *     Compute the corresponding Ritz vector x := V y;
+ *     Compute the residual r := (e I - A)x;
+ *     if convergence then exit;
+ *     Compute the new direction to be incorporated t := (e I - D)^{-1} r;
+ *     Orthogonalize the system [V; t] into the new V;
+ * end for
+ * \endverbatim
+ * This algorithm looks like an algorithm of the Lanczos type with a diagonal preconditioning.
+ * When the dimension of the basis V becomes too large, the process restarts with the last Ritz
+ * vector as initial vector.
+ */
+template
+<
+    class T = double,
+    class TArray = rArray,
+    class TArrayView = rArray&
+>
+class Davidson
+{
+    public:
+
+        Davidson () {}
+
+        // verbosity control
+        bool verbose{};
+
+        // callback functions
+        std::function<void (const TArrayView, TArrayView)> apply_preconditioner;
+        std::function<void (const TArrayView, TArrayView)> matrix_multiply;
+        std::function<void (Real)> update_preconditioner;
+        std::function<double (TArrayView)> compute_norm_nonortho{default_compute_norm<TArrayView>};
+        std::function<T (TArrayView, TArrayView)> scalar_product{default_scalar_product<T,TArrayView>};
+        std::function<T (TArrayView, TArrayView)> scalar_product_nonortho{default_scalar_product<T,TArrayView>};
+        std::function<void (T, const TArrayView, T, TArrayView)> axby{default_axby<T,TArrayView>};
+        std::function<TArray (std::size_t,std::string)> new_array{default_new_array<TArray>};
+
+        // main solution routine
+        unsigned solve
+        (
+            TArrayView x,
+            double eps,
+            unsigned min_iterations,
+            unsigned max_iterations
+        )
+        {
+            const int restart_size = 50;
+            unsigned k;
+
+            Timer timer;
+            ok = false;
+
+            // get size of the problem
+            std::size_t N = x.size();
+
+            // reduced basis
+            std::vector<TArray> V(restart_size);
+            for (int i = 0; i < restart_size; i++)
+            {
+                V[i] = std::move(new_array(N, "dav-v" + std::to_string(i)));
+            }
+            axby(0., V[0], 1., x); // V[0] = x (i.e., the initial guess)
+
+            // projection (A*x or A*r)
+            TArray y = std::move(new_array(N, "dav-y"));
+
+            // residual vector and its magnitude relative to the solution vector
+            TArray r = std::move(new_array(N, "dav-r"));
+
+            // reduced Hamiltonian
+            ColMatrix<Real> H(0, 0);
+
+            Real xnorm = compute_norm_nonortho(x);
+            Real prev_eigval = 0;
+
+            residual = 1;
+
+            // Iterate
+
+            for (k = 1; k <= max_iterations; k++)
+            {
+                unsigned n = (k - 1) % restart_size;
+
+                if (verbose)
+                {
+                    std::cout << '\t';
+                    std::cout << std::setw(4) << std::right << k;
+                    std::cout << " | ";
+                    std::cout << std::setw(11) << std::left << timer.nice_time();
+                    std::cout << " | ";
+                    std::cout << std::setw(15) << std::left << residual;
+                }
+
+                // normalize the last direction vector
+                axby(1/xnorm, V[n], 0., V[n]);
+
+                // set up the new Hamiltonian: copy the previous matrix...
+                ColMatrix<Real> H_new(n + 1, n + 1);
+                for (unsigned i = 0; i < n; i++)
+                {
+                    for (unsigned j = 0; j < n; j++)
+                    {
+                        H_new(i, j) = H(i, j);
+                    }
+                }
+
+                // ... and add the new elements
+                update_preconditioner(0);
+                matrix_multiply(V[n], y);  // y = (0 - A)*V[n]
+                for (int i = 0; i <= n; i++)
+                {
+                    H_new(n, i) = H_new(i, n) = -realpart(scalar_product(V[i], y));
+                }
+                H = std::move(H_new);
+
+                // solve the reduced eigenproblem
+                NumberArray<Real> eigval(n + 1);
+                ColMatrix<Real> eigvec(n + 1, n + 1);
+                H.diagonalize(eigval, nullptr, &eigvec);
+
+                // get the lowest eigenvalue
+                int l = 0;
+                for (unsigned i = 1; i <= n; i++)
+                {
+                    if (eigval[i] < eigval[l])
+                        l = i;
+                }
+
+                int original_precision = std::cout.precision();
+                std::cout.precision(8);
+                std::cout << "(lowest eigenvalue: " << eigval[l] << ")";
+                std::cout.precision(original_precision);
+
+                // evaluate the Ritz vector
+                axby(0., x, 0., x);  // x = 0
+                for (unsigned i = 0; i <= n; i++)
+                {
+                    axby(1., x, eigvec(i, l), V[i]);
+                }
+
+                // evaluate the residual vector
+                update_preconditioner(eigval[l]);
+                matrix_multiply(x, r);  // r = (e S - A)*x
+
+                // compute and check norm
+                residual = realpart(scalar_product(r, r)); //std::abs(prev_eigval - eigval[l]) / std::abs(eigval[l]);
+                prev_eigval = eigval[l];
+                if (verbose)
+                    std::cout << std::endl;
+                if (not std::isfinite(residual))
+                {
+                    std::cout << "\t     The norm of the solution is not finite. Something went wrong!" << std::endl;
+                    ok = false;
+                    break;
+                }
+
+                // check convergence, but always do at least "min_iterations" iterations
+                if (k >= min_iterations and residual < eps)
+                {
+                    ok = true;
+                    if (verbose)
+                        std::cout << "\tConvergence reached, final residual " << residual << ", final guess " << eigval[l] << std::endl;
+                    break;
+                }
+
+                // restart if needed
+                if (n + 1 == restart_size)
+                {
+                    axby(0., V[0], 1., x);  // V[0] = x
+                    xnorm = compute_norm_nonortho(V[0]);
+                    prev_eigval = 0;
+                    continue;
+                }
+
+                // calculate new direction
+                apply_preconditioner(r, V[n + 1]); // V[n + 1] ~ (e S - A)⁻¹r
+
+                // orthogonalize the new vector against the existing ones
+                for (int i = 0; i <= n; i++)
+                {
+                    T prod = scalar_product_nonortho(V[i], V[n + 1]);
+                    axby(1., V[n + 1], -prod, V[i]);
+                }
+
+                xnorm = compute_norm_nonortho(V[n + 1]);
+            }
+
+            return k;
+        }
+
         double residual;
         bool ok;
 };

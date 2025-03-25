@@ -35,6 +35,7 @@
 #include <cassert>
 #include <complex>
 #include <cmath>
+#include <cstdint>
 
 #undef I
 
@@ -107,6 +108,16 @@ inline bool Complex_imagpart_less (Complex const & a, Complex const & b)
 inline bool Complex_finite (Complex const & z)
 {
     return std::isfinite(z.real()) and std::isfinite(z.imag());
+}
+
+/// Real part of a number.
+template <class T> T realpart (std::complex<T> x)
+{
+    return x.real();
+}
+template <class T> T realpart (T x)
+{
+    return x;
 }
 
 //

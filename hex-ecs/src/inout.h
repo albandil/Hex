@@ -102,7 +102,7 @@ class CommandLine
               droptol(1e-8), itinerary(StgNone), outofcore(false), cont(false), wholematrix(false), cache_all_radint(true), cache_own_radint(true),
               itertol(1e-8), prec_itertol(1e-8), parallel_precondition(false), gpu_large_data(false), lightweight_simple(false),
               lightweight_full(false), lightweight_radial_cache(false), shared_scratch(false), reuse_dia_blocks(false),
-              kpa_simple_rad(false), ocl_platform(0), ocl_device(0), factorizer("umfpack"), groupsize(1),
+              kpa_simple_rad(false), ocl_platform(0), ocl_device(-1), factorizer("umfpack"), groupsize(1),
               parallel_factorization(false), parallel_extraction(true), ilu_max_iter(10), max_sub_iter(0), fail_on_sub_iter(true),
               carry_initial_guess(false), gpu_multiply(false), extract_extrapolate(false), extract_rho(-1), extract_rho_begin(-1), extract_samples(-1),
               refine_solution(false), map_solution(), map_solution_target(), ssor(-1), noluupdate(false), coupling_limit(-1), couple_all(true),
@@ -139,6 +139,12 @@ class CommandLine
 
         // Write grid layout to a VTK file.
         bool writegrid;
+
+        /// Calculate bound state wave function of two-electron system.
+        bool bound{};
+
+        /// Evaluate dipole transition amplitudes from the bound state to all scattering states.
+        bool dipoles{};
 
         /// A B-spline expansion of a solution to "zip". See \ref Bspline::zip .
         struct s_zipdata
@@ -205,7 +211,7 @@ class CommandLine
         unsigned ocl_platform;
 
         /// Index of OpenCL device to use.
-        unsigned ocl_device;
+        int ocl_device;
 
         /// LU-factorizer.
         std::string factorizer;

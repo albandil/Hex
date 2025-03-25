@@ -218,7 +218,11 @@ int main (int argc, char *argv[])
         if (distort)
             dwba (Ni, Li, ki, Nf, Lf, kf, L, Tdir.back(), Texc.back(), rmax, direct, exchange);
         else
+#ifdef WITH_GINAC
             pwba (Ni, Li, ki, Nf, Lf, kf, L, Tdir.back(), Texc.back(), direct, exchange);
+#else
+            HexException("Package built without GiNaC, cannot run PWBA!");
+#endif
     }
 
     //

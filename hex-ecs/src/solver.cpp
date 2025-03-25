@@ -46,6 +46,7 @@
 // --------------------------------------------------------------------------------- //
 
 #include "amplitudes.h"
+#include "preconditioners/NoPreconditioner.h"
 #include "solver.h"
 
 // --------------------------------------------------------------------------------- //
@@ -138,8 +139,112 @@ void Solver::solve ()
     auto recover_array        = [&](BlockArray<Complex> & x) { return this->recover_array_(x); };
     auto constrain            = [&](BlockArray<Complex> & r) { return this->constrain_(r); };
 
+    auto scalar_product_nonortho = [&](BlockArray<Complex> const & x, BlockArray<Complex> const & y) { return this->scalar_product_nonortho_(x,y); };
+    auto compute_norm_nonortho   = [&](BlockArray<Complex> const & r) { return std::sqrt(this->scalar_product_nonortho_(r, r).real()); };
+    auto update_preconditioner   = [&](Real E) { this->E_ = E; this->prec_->update(E, false); };
+
     E_ = special::constant::Nan;
     int iterations_done = 0, computations_done = 0;
+
+#if 0
+    {
+        // DEBUG: 1-el hydrogen-like eigenstate
+
+        RadialIntegrals const & rad = dynamic_cast<NoPreconditioner*>(prec_)->rad_inner();
+        Davidson<Complex, cArray, cArray&> dav;
+
+        dav.update_preconditioner = [&](Real E) { E_ = E; };
+        dav.apply_preconditioner = [&](cArray const& p, cArray& x) { for (int i = 0; i < p.size(); i++) x[i] = p[i]/(E_*rad.S()(i,i) - 0.5*rad.D()(i,i) + inp_.Za*rad.Mm1()(i,i)); };
+        dav.matrix_multiply = [&](cArray const& x, cArray& p) { p = E_*rad.S().dot(x) - 0.5*rad.D().dot(x) + inp_.Za*rad.Mm1().dot(x); };
+        dav.verbose = true;
+        dav.compute_norm_nonortho = [&](cArray const& x) { return std::sqrt((x | rad.S().dot(x)).real()); };
+        dav.scalar_product = [&](cArray const& x, cArray const& y) { return x | y; };
+        dav.scalar_product_nonortho = [&](cArray const& x, cArray const& y) { return x | rad.S().dot(y); };
+        dav.axby = [&](Complex a, cArray& x, Complex b, cArray const& y) { for (int i = 0; i < x.size(); i++) x[i] = a*x[i] + b*y[i]; };
+        dav.new_array = [&](size_t n, std::string name) { return cArray(n); };
+
+        cArray psi(rad.bspline().Nspline());
+        psi[0] = 1;
+
+        auto max_iter = 100;
+        dav.solve(psi, cmd_.itertol, 0, max_iter);
+
+        std::exit(0);
+    }
+#endif
+
+    // solve for a two-electron bound state
+    if (cmd_.bound)
+    {
+        if (not cmd_.lightweight_full or prec_->name() != "diag")
+            HexException("Calculation of bound state is only available in the full lightweight mode and with the diag preconditioner");
+
+        std::cout << "\nSolving the bound state" << std::endl;
+
+        prec_->update(0);
+
+        // define dummy initial state
+        instates_ = {0};
+
+        // the bound state wave function as a complex vector with zero imag part
+        cBlockArray psi(new_array(ang_.states().size(),"dav-x"));
+
+        // diagonal of the full Hamiltonian
+        cBlockArray diag(new_array(ang_.states().size(), "dav-diag"));
+
+        // initial guess: product of the first B-splines
+        if (par_.isMyGroupWork(0) and par_.IamGroupMaster())
+            psi[0][0] = 1;
+
+        Davidson<Complex, cBlockArray, cBlockArray&> dav;
+
+        dav.update_preconditioner   = update_preconditioner;
+        dav.apply_preconditioner    = apply_preconditioner;
+        dav.matrix_multiply         = matrix_multiply;
+        dav.verbose                 = true;
+        dav.compute_norm_nonortho   = compute_norm_nonortho;
+        dav.scalar_product          = scalar_product;
+        dav.scalar_product_nonortho = scalar_product_nonortho;
+        dav.axby                    = axby_operation;
+        dav.new_array               = new_array;
+
+        Timer t;
+
+        auto max_iter = 1000;
+        auto iterations = dav.solve(psi, cmd_.itertol, 0, max_iter);
+
+        if (iterations >= max_iter)
+            std::cout << "\tConvergence too slow... The saved solution will be probably non-converged." << std::endl;
+        else
+            std::cout << "\tSolution converged after " << t.nice_time() << "." << std::endl;
+
+        // normalize to unit norm
+        Real norm = compute_norm_nonortho(psi);
+        for (auto& block : psi)
+            block /= norm;
+
+        // save solution to disk
+        for (unsigned ill = 0; ill < ang_.states().size(); ill++)
+        if (par_.isMyGroupWork(ill) and par_.IamGroupMaster())
+        {
+            // read solution from disk, if not available
+            if (not psi.inmemory())
+                psi.hdfload(ill);
+
+            // create the solution writer
+            SolutionIO writer(ang_.L(), ang_.S(), ang_.Pi(), 0, 0, 0, special::constant::Nan, ang_.states(), channels_);
+
+            // write the solution to disk
+            if (not writer.save(psi, ill))
+                HexException("Failed to save solution to disk - the data are lost!");
+
+            // release solution from memory if not needed
+            if (not psi.inmemory())
+                psi[ill].drop();
+        }
+
+        return;
+    }
 
     for (iE_ = 0; iE_ < (int)inp_.Etot.size(); iE_++)
     {
@@ -195,7 +300,7 @@ void Solver::solve ()
             int mi = std::get<2>(inp_.instates[instate]);
 
             // skip energy-forbidden states
-            if (inp_.Etot[iE_] <= -1./(ni*ni))
+            if (inp_.Etot[iE_] <= -inp_.Za*inp_.Za/(ni*ni))
             {
                 std::cout << "\tSkip initial state " << Hydrogen::stateName(ni,li,mi) << " (S = " << Spin
                           << ") : not allowed by total E." << std::endl;;
@@ -543,6 +648,18 @@ Complex Solver::scalar_product_ (BlockArray<Complex> const & x, BlockArray<Compl
 
     // return global scalar product
     return prod;
+}
+
+Complex Solver::scalar_product_nonortho_ (BlockArray<Complex> const & x, BlockArray<Complex> const & y) const
+{
+    RadialIntegrals const & rad = dynamic_cast<NoPreconditioner*>(prec_)->rad_inner();
+
+    BlockArray<Complex> z = y;
+
+    for (int i = 0; i < y.size(); i++)
+        kron_dot(0., z[i], 1., y[i], rad.S(), rad.S());
+
+    return scalar_product_(x, z);
 }
 
 Real Solver::compute_norm_ (BlockArray<Complex> const & r) const

@@ -398,32 +398,39 @@ class RadialIntegrals
          * 
          * @param bspline B-spline basis.
          * @param g Gauss-Legendre integrator adapted to the B-spline basis.
+         * @param Z Net charge of the core (= 1 for hydrogen-like atoms).
          * @param n Principal quantum number.
          * @param l Orbital quantum number.
+         * @param a Optional coordinate power to include in integration.
          */
         static cArray overlapP
         (
             Bspline const & bspline,
             GaussLegendre const & g,
-            Real Z, int n, int l
+            Real Z, int n, int l,
+            int a = 0
         );
 
         /**
          * @brief Compute j-overlaps
          * 
-         * Compute B-spline overlap integrals for Riccati-Bessel function.
+         * Compute B-spline overlap integrals for Riccati-Bessel (or regular Coulomb) function.
          * 
+         * @param Z Charge of the central monopole (0 for Riccati-Bessel functions, 1 for singly charged ions).
          * @param maxell Maximal degree of the Riccati-Bessel function.
          * @param vk Array containing linear momenta.
+         * @param a Optional coordinate power to include in integration.
          * @return Array of shape [vk.size() × (maxell + 1) × Nspline] in column-major format.
          */
         static cArray overlapj
         (
             Bspline const & bspline,
             GaussLegendre const & g,
+            int Z,
             int maxell,
             const rArrayView vk,
-            bool fast_bessel = false
+            bool fast_bessel = false,
+            int a = 0
         );
 
         // Return reference to the B-spline object.
@@ -446,6 +453,7 @@ class RadialIntegrals
         // Access the precomputed one-electron overlap matrices.
         OneElectronMatrixAccessors(D)
         OneElectronMatrixAccessors(S)
+        OneElectronMatrixAccessors(Mp1)
         OneElectronMatrixAccessors(Mm1)
         OneElectronMatrixAccessors(Mm2)
 
@@ -503,8 +511,8 @@ class RadialIntegrals
         GaussLegendre g_y_;
 
         // one-electron moment and overlap matrices
-        SymBandMatrix<Complex> D_x_, S_x_, Mm1_x_, Mm2_x_;
-        SymBandMatrix<Complex> D_y_, S_y_, Mm1_y_, Mm2_y_;
+        SymBandMatrix<Complex> D_x_, S_x_, Mp1_x_, Mm1_x_, Mm2_x_;
+        SymBandMatrix<Complex> D_y_, S_y_, Mp1_y_, Mm1_y_, Mm2_y_;
 
         // one-electron full integral moments for various orders (used to calculate R-integrals)
         std::vector<SymBandMatrix<Complex>> Mtr_L_x_, Mtr_mLm1_x_;

@@ -53,6 +53,7 @@
 // --------------------------------------------------------------------------------- //
 
 #include "amplitudes.h"
+#include "ang.h"
 #include "bspline.h"
 #include "hldata.h"
 #include "radial.h"
@@ -129,7 +130,7 @@ void Amplitudes::extract (std::string directory)
 
         for (unsigned ie = 0; ie < inp_.Etot.size(); ie++)
         {
-            if (verbose_) std::cout << "\t\tEi = " << inp_.Etot[ie] << std::endl;
+            if (verbose_) std::cout << "\t\tEi = " << inp_.Etot[ie] << " Ry" << std::endl;
 
             // for all initial states
             for (auto instate  : inp_.instates)
@@ -237,6 +238,250 @@ void Amplitudes::extract (std::string directory)
     for (auto xi : Xi_Sl1l2)
     {
         computeSigmaIon_(xi.first);
+    }
+}
+
+void Amplitudes::dipoles(std::string directory)
+{
+    par_.wait();
+
+    if (verbose_)
+        std::cout << "Extracting photoionization dipoles" << std::endl;
+
+    // find hex-ecs input file for bound state calculation
+    std::ifstream file("bound.inp");
+    if (not file.is_open())
+        HexException("Missing file bound.inp");
+
+    // set up bound state environments
+    InputFile bound_inp(file);
+    AngularBasis bound_ang(bound_inp);
+    Bspline bound_bspline(bound_inp.order, bound_inp.ecstheta, rArray{}, bound_inp.rknots, bound_inp.rknots.back() + bound_inp.cknots);
+    RadialIntegrals bound_rad(bound_bspline, bound_bspline, 0);
+
+    // shorthands
+    int Nbspline = bound_bspline.Nspline();
+    int Nfspline = rad_.bspline().Nspline();
+    int Nspline = std::min(Nbspline, Nfspline);
+
+    // require an S-state for bound state
+    if (bound_inp.L != 0)
+        HexException("Bound L must be zero.");
+
+    // verify that the free B-spline basis is compatible with the bound B-spline basis
+    if (bound_inp.order != rad_.bspline().order())
+        HexException("Bound state B-spline basis has different order than the free state B-spline basis");
+    for (int iknot = 0; iknot < Nspline + bound_bspline.order() + 1; iknot++)
+        if (bound_bspline.t(iknot) != rad_.bspline().t(iknot))
+            HexException("Knot %d mismatch between bound and free grid: %g vs. %g", bound_bspline.t(iknot).real(), rad_.bspline().t(iknot).real());
+
+    // read bound state
+    SolutionIO bound_reader(bound_inp.L, bound_inp.Spin[0], bound_inp.Pi, 0, 0, 0, special::constant::Nan, bound_ang.states(), {}, directory + "/psi");
+    BlockArray<Complex> bound_state(bound_ang.states().size(), true, "bound");
+    for (unsigned ill = 0; ill < bound_ang.states().size(); ill++)
+        bound_reader.load(bound_state, ill);
+
+    for (unsigned Spin : inp_.Spin)
+    {
+        if (verbose_)
+        {
+            if (Spin == 0)
+                std::cout << "\tSinglet" << std::endl;
+
+            if (Spin == 1)
+                std::cout << "\tTriplet" << std::endl;
+        }
+
+        std::vector<std::ofstream> files(inp_.instates.size());
+
+        for (unsigned ie = 0; ie < inp_.Etot.size(); ie++)
+        {
+            if (verbose_) std::cout << "\t\tEi = " << inp_.Etot[ie] << " Ry" << std::endl;
+
+            // for all initial states
+            for (unsigned is = 0; is < inp_.instates.size(); is++)
+            {
+                // get initial quantum numbers
+                int ni = std::get<0>(inp_.instates[is]);
+                int li = std::get<1>(inp_.instates[is]);
+                int mi = std::get<2>(inp_.instates[is]);
+
+                // open the output file
+                if (not files[is].is_open())
+                {
+                    files[is].open(format("d-S%d-n%d-l%d-m%d.dat", Spin, ni, li, mi));
+                    files[is] << "#Ek        Re_d-            Im_d-          Re_d0            Im_d0           Re_d+           Im_d+" << std::endl;
+                }
+
+                // impact momentum
+                Real Ek = 0.5*inp_.Etot[ie] + inp_.Za*inp_.Za/(2*ni*ni);
+                Real ki = std::sqrt(2*Ek);
+
+                // is this solution allowed at all for the given angular basis?
+                bool allowed = false;
+
+                // -> find a valid combination of atomic and projectile angular momentum
+                for (int l = std::abs(li - inp_.L); l <= li + inp_.L; l++)
+                {
+                    // does this combination conserve parity?
+                    if ((inp_.L + li + l) % 2 != inp_.Pi)
+                        continue;
+
+                    // does this combination have valid 'mi' for this partial wave?
+                    if (special::ClebschGordan(li,mi,l,0,inp_.L,mi) != 0)
+                        allowed = true;
+                }
+
+                // skip forbidden wave functions
+                if (not allowed)
+                    continue;
+
+                // read the scattering solution
+                reader_ = SolutionIO(inp_.L, Spin, inp_.Pi, ni, li, mi, inp_.Etot[ie], ang_, {}, directory + "/psi");
+                BlockArray<Complex> solution (ang_.size(), true, "sol");
+                bool allOK = true;
+                for (unsigned ill = 0; ill < ang_.size(); ill++)
+                    allOK = allOK and reader_.load(solution, ill);
+                if (not allOK)
+                {
+                    files[is] << format("%10.5f %15.8e %15.8e %15.8e %15.8e %15.8e %15.8e", ki*ki/2, 0., 0., 0., 0., 0., 0.) << std::endl;
+                    continue;
+                }
+
+                int Nang_bound = bound_ang.states().size();
+                int Nang_free = ang_.size();
+
+                // calculate B-spline overlaps
+                cArray SP  = RadialIntegrals::overlapP(rad_.bspline(), rad_.gaussleg(), inp_.Za, ni, li, 0);
+                cArray M1P = RadialIntegrals::overlapP(rad_.bspline(), rad_.gaussleg(), inp_.Za, ni, li, 1);
+                cArray SJ  = RadialIntegrals::overlapj(rad_.bspline(), rad_.gaussleg(), inp_.Za - 1, inp_.maxell, rArray{ ki }, cmd_.fast_bessel, 0);
+                cArray M1J = RadialIntegrals::overlapj(rad_.bspline(), rad_.gaussleg(), inp_.Za - 1, inp_.maxell, rArray{ ki }, cmd_.fast_bessel, 1);
+
+                Complex dip_1[3] = { 0., 0., 0. }; // -1, 0, +1 components of the transition dipole
+                Complex dip_2[3] = { 0., 0., 0. }; // -1, 0, +1 components of the transition dipole
+                Complex dip_3[3] = { 0., 0., 0. }; // -1, 0, +1 components of the transition dipole
+
+                for (int u = 0; u < Nang_bound; u++)
+                {
+                    int l1b = bound_ang.states()[u].first;
+                    int l2b = bound_ang.states()[u].second;
+
+                    // contribution from partial waves of the incident part
+                    //  - incident state is bound state times Ricatti-Bessel or Coulomb function
+                    //  - antisymmetry not needed as the bound state is already antisymmetric and operator is symmetric
+
+                    for (int l = 0; l <= inp_.maxell; l++)
+                    {
+                        Complex prefactor = std::sqrt(2) * std::pow(1.0_i, l)
+                                            * 4.0_r * special::constant::pi * std::sqrt((2*l + 1)/3.0_r)
+                                            * special::cis(-special::coul_F_sigma(inp_.Za - 1, l, ki)) / ki;
+
+                        // get slice of Ricatti-Bessel (or Coulomb) overlaps for partial wave l
+                        cArrayView Sj(SJ, l*Nfspline, Nspline);
+                        cArrayView M1j(M1J, l*Nfspline, Nspline);
+
+                        // dipole transition in the first coordinate
+                        if (l2b == l)
+                        {
+                            Real C = special::ClebschGordan(l1b, 0, l2b, 0, 0, 0);
+                            Real G = special::Gaunt(li, mi, 1, -mi, l1b, 0);
+
+                            if (C != 0 and G != 0)
+                            {
+                                Complex R = 0;
+
+                                for (int ispline = 0; ispline < Nspline; ispline++)
+                                {
+                                    cArrayView bound_segment(bound_state[u], ispline*Nbspline, Nspline);
+
+                                    R += M1P[ispline] * (bound_segment | Sj);
+                                }
+
+                                dip_1[1 - mi] += prefactor * C * G * R;
+                            }
+                        }
+
+                        // dipole transition in the second coordiante
+                        if (l1b == li)
+                        {
+                            Real C = special::ClebschGordan(l1b, mi, l2b, -mi, 0, 0);
+                            Real G = special::Gaunt(l, 0, 1, -mi, l2b, -mi);
+
+                            if (C != 0 and G != 0)
+                            {
+                                Complex R = 0;
+
+                                for (int ispline = 0; ispline < Nspline; ispline++)
+                                {
+                                    cArrayView bound_segment(bound_state[u], ispline*Nbspline, Nspline);
+
+                                    R += SP[ispline] * (bound_segment | M1j);
+                                }
+
+                                dip_2[1 - mi] += prefactor * C * G * R;
+                            }
+                        }
+                    }
+
+                    // contribution from the scattered part
+
+                    for (int v = 0; v < Nang_free; v++)
+                    {
+                        int l1f = ang_[v].first;
+                        int l2f = ang_[v].second;
+
+                        // skip non-contributing combinations
+                        if (std::abs(l1b - l1f) > 1 or std::abs(l2b - l2f) > 1)
+                            continue;
+
+                        // TODO: It would be more efficient to kron_dot bound state first and then multiply segments from free state
+                        Complex R1 = 0; cArray MSpsi(Nfspline*Nfspline); kron_dot(0., MSpsi, 1., solution[v], rad_.Mp1(), rad_.S());
+                        Complex R2 = 0; cArray SMpsi(Nfspline*Nfspline); kron_dot(0., SMpsi, 1., solution[v], rad_.S(), rad_.Mp1());
+
+                        for (int ispline = 0; ispline < Nspline; ispline++)
+                        {
+                            cArrayView bound_segment(bound_state[u], ispline*Nbspline, Nspline);
+
+                            cArrayView MSpsi_segment(MSpsi, ispline*Nfspline, Nspline);
+                            cArrayView SMpsi_segment(SMpsi, ispline*Nfspline, Nspline);
+
+                            R1 += (bound_segment | MSpsi_segment);
+                            R2 += (bound_segment | SMpsi_segment);
+                        }
+
+                        for (int m = -l1b; m <= l1b; m++)
+                        {
+                            Real C0 = special::ClebschGordan(l1b, m, l2b, -m, 0, 0);
+                            Real C1 = special::ClebschGordan(l1f, m + mi, l2f, -m, inp_.L, mi);
+                            Real C2 = special::ClebschGordan(l1f, m, l2f, mi - m, inp_.L, mi);
+
+                            Real I1 = l2f == l2b ? special::Gaunt(l1f, mi + m, 1, -mi, l1b, +m) : 0;
+                            Real I2 = l1f == l1b ? special::Gaunt(l2f, mi - m, 1, -mi, l2b, -m) : 0;
+
+                            dip_3[1 - mi] += std::sqrt(4*special::constant::pi/3) * C0 * (C1*I1*R1 + C2*I2*R2);
+                        }
+                    }
+                }
+
+                // fix plane wave normalization
+                for (int i = 0; i < 3; i++)
+                {
+                    dip_1[i] *= std::pow(2*special::constant::pi, -1.5);
+                    dip_2[i] *= std::pow(2*special::constant::pi, -1.5);
+                    dip_3[i] *= std::pow(2*special::constant::pi, -1.5);
+                }
+
+                // write complex-conjugated amplitudes, i.e. d = <free|D|bound>, not <bound|D|free>
+                files[is] << format
+                (
+                    "%10.5f %15.8e %15.8e %15.8e %15.8e %15.8e %15.8e",
+                    Ek,
+                    (dip_1[0] + dip_2[0] + dip_3[0]).real(), -(dip_1[0] + dip_2[0] + dip_3[0]).imag(),
+                    (dip_1[1] + dip_2[1] + dip_3[1]).real(), -(dip_1[1] + dip_2[1] + dip_3[1]).imag(),
+                    (dip_1[2] + dip_2[2] + dip_3[2]).real(), -(dip_1[2] + dip_2[2] + dip_3[2]).imag()
+                ) << std::endl;
+            }
+        }
     }
 }
 
@@ -543,9 +788,8 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> &
         int eval_knot = bspline_full_.knot(eval_r);
 
         // evaluate j and dj at far radius for all angular momenta up to maxell
-        // FIXME : Coulomb for charge (inp_->Za - 1)
-        cArray j_R0 = special::ric_jv(inp_.maxell, kf * eval_r);
-        cArray dj_R0 = special::dric_jv(inp_.maxell, kf * eval_r) * kf;
+        cArray j_R0 = special::ric_jv(inp_.Za - 1, inp_.maxell, kf, eval_r);
+        cArray dj_R0 = special::dric_jv(inp_.Za - 1, inp_.maxell, kf, eval_r) * kf;
 
         // evaluate B-splines and their derivatives at evaluation radius
         cArray Bspline_R0 (Nspline_full), Dspline_R0 (Nspline_full);
@@ -634,7 +878,7 @@ void Amplitudes::computeTmat_ (Amplitudes::Transition T)
 {
     // final projectile momenta
     // final projectile energies
-    rArray Ef = inp_.Etot + 1.0_r/(T.nf*T.nf) + (T.mf-T.mi) * inp_.B;
+    rArray Ef = inp_.Etot + inp_.Za*inp_.Za/(T.nf*T.nf) + (T.mf-T.mi) * inp_.B;
 
     // final projectile momenta
     rArray inv_kf; for (Real ef : Ef) inv_kf.push_back(ef > 0 ? 1./std::sqrt(ef) : 0.);
@@ -674,8 +918,8 @@ void Amplitudes::computeTmat_ (Amplitudes::Transition T)
 void Amplitudes::computeSigma_ (Amplitudes::Transition T)
 {
     // initial and final projectile energies
-    rArray Ei = inp_.Etot + 1.0_r/(T.ni*T.ni);
-    rArray Ef = inp_.Etot + 1.0_r/(T.nf*T.nf) + (T.mf-T.mi) * inp_.B;
+    rArray Ei = inp_.Etot + inp_.Za*inp_.Za/(T.ni*T.ni);
+    rArray Ef = inp_.Etot + inp_.Za*inp_.Za/(T.nf*T.nf) + (T.mf-T.mi) * inp_.B;
 
     // final projectile momenta
     rArray inv_ki; for (Real ei : Ei) inv_ki.push_back(ei > 0 ? 1./std::sqrt(ei) : 0.);
@@ -741,8 +985,8 @@ Chebyshev<double,Complex> Amplitudes::fcheb (cArrayView const & PsiSc, Real kmax
 
             // evaluate Coulomb wave functions and derivatives
             double F1, F2, F1p, F2p;
-            int err1 = special::coul_F(l1,k1,r1, F1,F1p);
-            int err2 = special::coul_F(l2,k2,r2, F2,F2p);
+            int err1 = special::coul_F(1,l1,k1,r1, F1,F1p);
+            int err2 = special::coul_F(1,l2,k2,r2, F2,F2p);
             if (err1 != GSL_SUCCESS or err2 != GSL_SUCCESS)
             {
                 std::cerr << "Errors while evaluating Coulomb function:" << std::endl;
@@ -893,7 +1137,7 @@ void Amplitudes::computeSigmaIon_ (Amplitudes::Transition T)
     unsigned Nenergy = inp_.Etot.size();
 
     // initial momentum
-    rArray ki = sqrt(inp_.Etot + 1.0_r/(T.ni*T.ni));
+    rArray ki = sqrt(inp_.Etot + inp_.Za*inp_.Za/(T.ni*T.ni));
 
     // allocate memory for cross sections
     if (sigma_S.find(T) == sigma_S.end())

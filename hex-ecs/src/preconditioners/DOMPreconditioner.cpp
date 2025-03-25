@@ -79,9 +79,9 @@ void DOMPreconditioner::setup ()
     NoPreconditioner::setup();
 }
 
-void DOMPreconditioner::update (Real E)
+void DOMPreconditioner::update (Real E, bool full)
 {
-    NoPreconditioner::update(E);
+    NoPreconditioner::update(E, full);
 }
 
 void DOMPreconditioner::precondition (BlockArray<Complex> const & r, BlockArray<Complex> & z) const

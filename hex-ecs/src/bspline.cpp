@@ -634,9 +634,11 @@ Bspline::Bspline
     // merge knots
     rArray knots;
     knots.append(cknots1);
-    if (not cknots1.empty()) knots.pop_back();
+    if (not cknots1.empty() and not rknots.empty())
+        knots.pop_back();
     knots.append(rknots);
-    if (not rknots.empty()) knots.pop_back();
+    if (not rknots.empty() and not cknots2.empty())
+        knots.pop_back();
     knots.append(cknots2);
 
     // rotate knots

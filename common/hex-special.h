@@ -424,14 +424,15 @@ Complex ric_j (int n, Complex z);
 /**
  * Vectorized interface for \ref ric_j.
  * 
- * Returns values of all Riccati-Bessel functions of order less than or equal to lmax.
+ * Returns values of all Riccati-Bessel functions (or regular Coulomb functions) of order less than or equal to lmax.
  * 
+ * @param Z Charge of the central monopole (0 for Ricatti-Bessel).
  * @param lmax Angular momentum limit.
- * @param z Complex argument.
- * @param routine GSL routine used for purely real evaluations. Expected is either
- *                the fast @c gsl_sf_bessel_jl_array, or the accurate @c gsl_sf_bessel_jl_steed_array.
+ * @param k Linear momentum.
+ * @param r Radial distance.
+ * @param fast_bessel For Z = 0 use either the fast @c gsl_sf_bessel_jl_array, or the accurate @c gsl_sf_bessel_jl_steed_array.
  */
-cArray ric_jv (int lmax, Complex z, std::function<int(int,double,double*)> jv = gsl_sf_bessel_jl_steed_array);
+cArray ric_jv (int Z, int lmax, double k, Complex r, bool fast_bessel = false);
 
 /** Derivative of Riccati-Bessel function
  * 
@@ -443,12 +444,14 @@ Complex dric_j (int n, Complex z);
 /**
  * Vectorized interface for \ref dric_j.
  * 
- * Returns values of all derivatives of Riccati-Bessel functions of order less than or equal to lmax.
- * 
+ * Returns values of all derivatives of Riccati-Bessel functions (or regular Coulomb function) of order less than or equal to lmax.
+ *
+ * @param Z Charge of the central monopole (0 for Ricatti-Bessel).
  * @param lmax Angular momentum limit.
- * @param z Complex argument.
+ * @param k Linear momentum.
+ * @param r Radial distance.
  */
-cArray dric_jv (int lmax, Complex z);
+cArray dric_jv (int Z, int lmax, double k, Complex r);
 
 /**
  * @brief Ricatti-Bessel function of the first kind, @f$ \hat{j}_n(x) @f$.
@@ -685,40 +688,44 @@ inline Complex dric_h_plus (int n, double x)
  *    Michel N, Uniform WKB approximation of Coulomb wave functions for arbitrary partial wave, EPL, 83 (2008) 10002.
  * 
  * The method is asymptotically valid for high energies and partial waves.
- * 
+ *
+ * @param Z Residual nuclear charge.
  * @param l Angular momentum.
  * @param k Wavenumber.
  * @param r Radial coordinate.
  * @param F Output reference for resulting value.
  * @param Fp Output reference for resulting derivative.
  */
-int coul_F_michel (int l, double k, double r, double& F, double& Fp);
+int coul_F_michel (int Z, int l, double k, double r, double& F, double& Fp);
 
 /**
  * @brief Evaluate Coulomb wave function (and its derivative).
+ * @param Z Residual nuclear charge.
  * @param l Angular momentum.
  * @param k Wavenumber.
  * @param r Radial coordinate.
  * @param F Output reference for resulting value.
  * @param Fp Output reference for resulting derivative.
  */
-int coul_F (int l, double k, double r, double & F, double & Fp);
+int coul_F (int Z, int l, double k, double r, double & F, double & Fp);
 
 /**
  * @brief Asymptotic form of the regular Coulomb wave.
+ * @param Z Residual nuclear charge.
  * @param l Angular momentum.
  * @param k Wavenumber.
  * @param r Radial coordinate.
  * @param sigma Optionally, the precomputed Coulomb phase shift.
  */
-double coul_F_asy (int l, double k, double r, double sigma = special::constant::Nan);
+double coul_F_asy (int Z, int l, double k, double r, double sigma = special::constant::Nan);
 
 /**
  * @brief Coulomb phase shift.
+ * @param Z Residual nuclear charge.
  * @param l Angular momentum.
  * @param k Wavenumber.
  */
-double coul_F_sigma (int l, double k);
+double coul_F_sigma (int Z, int l, double k);
 
 /**
  * @brief Check triangle inequality.

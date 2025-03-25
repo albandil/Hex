@@ -241,7 +241,7 @@ static inline std::string & ltrim (std::string & s)
         (
             s.begin(),
             s.end(),
-            std::not1(std::ptr_fun<int, int>(std::isspace))
+            [](char c){ return not std::isspace(c); }
         )
     );
     return s;
@@ -261,7 +261,7 @@ static inline std::string & rtrim (std::string & s)
         (
             s.rbegin(),
             s.rend(),
-            std::not1(std::ptr_fun<int, int>(std::isspace))
+            [](char c){ return not std::isspace(c); }
         ).base(), s.end()
     );
     return s;

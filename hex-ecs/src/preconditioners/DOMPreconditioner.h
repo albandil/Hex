@@ -91,17 +91,17 @@ class DOMPreconditioner : public NoPreconditioner
         );
 
         // description of the preconditioner
-        virtual std::string description () const;
+        std::string description () const override;
 
         // reuse parent definitions
         using NoPreconditioner::rhs;
         using NoPreconditioner::multiply;
 
         // declare own definitions
-        virtual void setup ();
-        virtual void update (Real E);
-        virtual void precondition (BlockArray<Complex> const & r, BlockArray<Complex> & z) const;
-        virtual void finish ();
+        void setup () override;
+        void update (Real E, bool full = true) override;
+        void precondition (BlockArray<Complex> const & r, BlockArray<Complex> & z) const override;
+        void finish () override;
 
     protected:
 

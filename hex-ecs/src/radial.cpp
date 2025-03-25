@@ -66,10 +66,12 @@ RadialIntegrals::RadialIntegrals
     rymax_(bspline_y.R2()),
     D_x_  (bspline_x.Nspline(), bspline_x.order() + 1),
     S_x_  (bspline_x.Nspline(), bspline_x.order() + 1),
+    Mp1_x_(bspline_x.Nspline(), bspline_x.order() + 1),
     Mm1_x_(bspline_x.Nspline(), bspline_x.order() + 1),
     Mm2_x_(bspline_x.Nspline(), bspline_x.order() + 1),
     D_y_  (bspline_y.Nspline(), bspline_y.order() + 1),
     S_y_  (bspline_y.Nspline(), bspline_y.order() + 1),
+    Mp1_y_(bspline_y.Nspline(), bspline_y.order() + 1),
     Mm1_y_(bspline_y.Nspline(), bspline_y.order() + 1),
     Mm2_y_(bspline_y.Nspline(), bspline_y.order() + 1),
     verbose_(true),
@@ -552,11 +554,13 @@ void RadialIntegrals::setupOneElectronIntegrals (bool shared_scratch, bool IamMa
         \
         D_##AXIS##_     .hdflink(format("rad-D-%.4lx.hdf",      hash_##AXIS)); \
         S_##AXIS##_     .hdflink(format("rad-S-%.4lx.hdf",      hash_##AXIS)); \
+        Mp1_##AXIS##_   .hdflink(format("rad-Mp1-%.4lx.hdf",    hash_##AXIS)); \
         Mm1_##AXIS##_   .hdflink(format("rad-Mm1-%.4lx.hdf",    hash_##AXIS)); \
         Mm2_##AXIS##_   .hdflink(format("rad-Mm2-%.4lx.hdf",    hash_##AXIS)); \
         \
         D_##AXIS##_     .populate([=](int m, int n) -> Complex { return computeD(bspline_##AXIS##_, g_##AXIS##_,     m, n); }); \
         S_##AXIS##_     .populate([=](int m, int n) -> Complex { return computeM(bspline_##AXIS##_, g_##AXIS##_,  0, m, n, bspline_##AXIS##_.Rmin(), bspline_##AXIS##_.Rmax(), false); }); \
+        Mp1_##AXIS##_   .populate([=](int m, int n) -> Complex { return computeM(bspline_##AXIS##_, g_##AXIS##_, +1, m, n, r##AXIS##min_,            r##AXIS##max_,            false); }); \
         Mm1_##AXIS##_   .populate([=](int m, int n) -> Complex { return computeM(bspline_##AXIS##_, g_##AXIS##_, -1, m, n, r##AXIS##min_,            r##AXIS##max_,            false); }); \
         Mm2_##AXIS##_   .populate([=](int m, int n) -> Complex { return computeM(bspline_##AXIS##_, g_##AXIS##_, -2, m, n, bspline_##AXIS##_.Rmin(), bspline_##AXIS##_.Rmax(), false); }); \
         \
@@ -564,6 +568,7 @@ void RadialIntegrals::setupOneElectronIntegrals (bool shared_scratch, bool IamMa
         { \
             D_##AXIS##_     .hdfsave(); \
             S_##AXIS##_     .hdfsave(); \
+            Mp1_##AXIS##_   .hdfsave(); \
             Mm1_##AXIS##_   .hdfsave(); \
             Mm2_##AXIS##_   .hdfsave(); \
         }
@@ -952,7 +957,7 @@ cArray RadialIntegrals::overlap
     return res;
 }
 
-cArray RadialIntegrals::overlapP (Bspline const & bspline, GaussLegendre const & g, Real Z, int n, int l)
+cArray RadialIntegrals::overlapP (Bspline const & bspline, GaussLegendre const & g, Real Z, int n, int l, int a)
 {
     // result
     cArray res (bspline.Nspline());
@@ -987,7 +992,7 @@ cArray RadialIntegrals::overlapP (Bspline const & bspline, GaussLegendre const &
                 if (gsl_sf_hydrogenicR_e(n, l, Z, x.real(), &R) == GSL_EUNDRFLW)
                     return 0.;
                 else
-                    return /* weightf(x) * */ x * Real(R.val);
+                    return /* weightf(x) * */ std::pow(x, a + 1) * Real(R.val);
             }
         );
 
@@ -1011,7 +1016,16 @@ cArray RadialIntegrals::overlapP (Bspline const & bspline, GaussLegendre const &
     return res;
 }
 
-cArray RadialIntegrals::overlapj (Bspline const & bspline, GaussLegendre const & g, int maxell, const rArrayView vk, bool fast_bessel)
+cArray RadialIntegrals::overlapj
+(
+    Bspline const & bspline,
+    GaussLegendre const & g,
+    int Z,
+    int maxell,
+    const rArrayView vk,
+    bool fast_bessel,
+    int a
+)
 {
     // shorthands
     int Nenergy = vk.size();
@@ -1052,11 +1066,8 @@ cArray RadialIntegrals::overlapj (Bspline const & bspline, GaussLegendre const &
             // evaluate the Riccati-Bessel function for this knot and energy and for all angular momenta
             for (int ipoint = 0; ipoint < points; ipoint++)
             {
-                // which Bessel function evaluator to use?
-                std::function<int(int,double,double*)> jv = (fast_bessel ? gsl_sf_bessel_jl_array : gsl_sf_bessel_jl_steed_array);
-
                 // evaluate all Riccati-Bessel functions in point
-                cArrayView(evalj, ipoint * (maxell + 1), maxell + 1) = special::ric_jv(maxell, vk[ie] * xs[ipoint].real(), jv);
+                cArrayView(evalj, ipoint * (maxell + 1), maxell + 1) = special::ric_jv(Z, maxell, vk[ie], xs[ipoint].real(), fast_bessel);
 
                 // clear all possible NaN entries (these may occur for far radii, where should be zero)
                 for (int l = 0; l <= maxell; l++) if (not Complex_finite(evalj[ipoint * (maxell + 1) + l]))
@@ -1072,7 +1083,7 @@ cArray RadialIntegrals::overlapj (Bspline const & bspline, GaussLegendre const &
                     // sum with weights
                     Complex sum = 0.;
                     for (int ipoint = 0; ipoint < points; ipoint++)
-                        sum += ws[ipoint] * evalj[ipoint * (maxell + 1) + l] * evalB[(iknot - ispline) * points + ipoint];
+                        sum += ws[ipoint] * std::pow(xs[ipoint].real(), a) * evalj[ipoint * (maxell + 1) + l] * evalB[(iknot - ispline) * points + ipoint];
 
                     // store the overlap; keep the shape Nmomenta × Nspline × (maxl+1)
                     # pragma omp critical
