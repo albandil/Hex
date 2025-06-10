@@ -177,6 +177,15 @@ class NoPreconditioner : public PreconditionerBase
 
         // occasionally useful LU decomposition of the overlap matrix
         std::shared_ptr<LUft> luS_;
+
+        // calculation of the right-hand side
+        void rhs_scat(BlockArray<Complex> & chi, int ienergy, int instate) const;
+        void rhs_dipV(BlockArray<Complex> & chi, int ienergy, int instate) const;
+
+        // solution used on the right-hand side
+        std::unique_ptr<InputFile> rhs_inp_;
+        std::unique_ptr<Bspline> rhs_bspline_;
+        std::unique_ptr<AngularBasis> rhs_ang_;
 };
 
 // --------------------------------------------------------------------------------- //

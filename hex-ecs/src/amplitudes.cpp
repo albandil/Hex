@@ -141,10 +141,10 @@ void Amplitudes::extract (std::string directory)
                 int mi = std::get<2>(instate);
 
                 // is this solution allowed at all for the given angular basis?
-                bool allowed = false;
+                bool allowed = not cmd_.rhs_dipV.empty();
 
                 // -> find a valid combination of atomic and projectile angular momentum
-                for (int l = std::abs(li - inp_.L); l <= li + inp_.L; l++)
+                for (int l = std::abs(li - inp_.L); l <= li + inp_.L and not allowed; l++)
                 {
                     // does this combination conserve parity?
                     if ((inp_.L + li + l) % 2 != inp_.Pi)

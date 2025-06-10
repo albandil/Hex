@@ -85,7 +85,24 @@ NoPreconditioner::NoPreconditioner
     rad_panel_(new RadialIntegrals(bspline_panel_x, bspline_panel_y, ang.maxlambda() + 1)),
     luS_(LUft::Choose("lapack"))
 {
-    // nothing to do
+    if (not cmd_->rhs_dipV.empty())
+    {
+        // set up the source solution config file and radial/angular basis
+        std::ifstream src_file(cmd_->rhs_dipV);
+        rhs_inp_.reset(new InputFile(src_file));
+        rhs_bspline_.reset
+        (
+            new Bspline
+            (
+                rhs_inp_->order,
+                rhs_inp_->ecstheta,
+                rArray{},
+                rhs_inp_->rknots,
+                rhs_inp_->rknots_ext.empty() ? rhs_inp_->rknots.back() + rhs_inp_->cknots : rArray{ rhs_inp_->rknots.back() }
+            )
+        );
+        rhs_ang_.reset(new AngularBasis(*rhs_inp_));
+    }
 }
 
 NoPreconditioner::~NoPreconditioner ()
@@ -938,6 +955,126 @@ void NoPreconditioner::update (Real E, bool full)
 }
 
 void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) const
+{
+    if (not cmd_->rhs_dipV.empty())
+    {
+        // construct photoionization source
+        rhs_dipV(chi, ie, instate);
+    }
+    else
+    {
+        // construct scattering source
+        rhs_scat(chi, ie, instate);
+    }
+}
+
+void NoPreconditioner::rhs_dipV (BlockArray<Complex> & chi, int ie, int instate) const
+{
+    std::size_t Nspline = rad_inner_->bspline().Nspline();
+    std::size_t Nspline0 = rhs_bspline_->Nspline();
+
+    // get source solution energy
+    Real rhs_Etot = inp_->Etot[ie % inp_->Etot.size()];
+
+    // read the source solution
+    SolutionIO rhs_reader(rhs_inp_->L, rhs_inp_->Spin[0], rhs_inp_->Pi, 0, 0, 0, rhs_Etot, rhs_ang_->states(), {});
+    BlockArray<Complex> rhs_source0(rhs_ang_->states().size(), true, "rhs_source0");
+    for (unsigned ill = 0; ill < rhs_ang_->states().size(); ill++)
+        rhs_reader.load(rhs_source0, ill);
+
+    // map the driving solution to the current grid if different (this is used for bound states with compatible radial grid spacing)
+    BlockArray<Complex> rhs_source(rhs_ang_->states().size(), true, "rhs_source");
+    for (unsigned ill = 0; ill < rhs_ang_->states().size(); ill++)
+    {
+        if (Nspline == Nspline0)
+        {
+            rhs_source[ill] = std::move(rhs_source0[ill]);
+        }
+        else
+        {
+            for (int ispline = 0; ispline < std::min(Nspline, Nspline0); ispline++)
+                for (int jspline = 0; jspline < std::min(Nspline, Nspline0); jspline++)
+                    rhs_source[ill][ispline*Nspline + jspline] = rhs_source0[ill][ispline*Nspline0 + jspline];
+
+            rhs_source0[ill].drop();
+        }
+    }
+
+    // for all segments constituting the RHS
+    for (unsigned ill = 0; ill < ang_->states().size(); ill++) if (par_->isMyGroupWork(ill))
+    {
+        int l1 = ang_->states()[ill].first;
+        int l2 = ang_->states()[ill].second;
+
+        // setup storage
+        cArray chi_block (Nspline*Nspline);
+
+        // for all segments constituting the source state
+        for (unsigned illp = 0; illp < rhs_ang_->states().size(); illp++)
+        {
+            int l1p = rhs_ang_->states()[ill].first;
+            int l2p = rhs_ang_->states()[ill].second;
+
+            // dipole transition in the first coordinate, overlap in second
+            if (l2 == l2p)
+            {
+                Real a = 0;
+                Real b = 0;
+
+                for (int m1 = -l1; m1 <= l1; m1++)
+                {
+                    int M = 0;
+                    int m2 = M;
+                    int m1p = m1;   // z polarization
+                    int m2p = m2;   // Kronecker delta
+
+                    Real C = special::ClebschGordan(l1, m1, l2, m2, ang_->L(), M);
+                    Real Cp = special::ClebschGordan(l1p, m1p, l2p, m2p, rhs_ang_->L(), M);
+                    Real G = std::sqrt(4*special::constant::pi/3) * special::Gaunt(1, 0, l1p, m1p, l1, m1);
+
+                    a += C*Cp*G*(l1*(l1 + 1) - l1p*(l1p + 1))/2;
+                    b -= C*Cp*G;
+                }
+
+                kron_dot(1.0, chi_block, a, rhs_source[illp], rad_inner_->Mm1(), rad_inner_->S());
+                kron_dot(1.0, chi_block, b, rhs_source[illp], rad_inner_->DL(), rad_inner_->S());
+            }
+
+            // dipole transition in the second coordinate, overlap in first
+            if (l1 == l1p)
+            {
+                Real a = 0;
+                Real b = 0;
+
+                for (int m2 = -l2; m2 <= l2; m2++)
+                {
+                    int M = 0;
+                    int m1 = M;
+                    int m1p = m1;   // Kronecker delta
+                    int m2p = m2;   // z polarization
+
+                    Real C = special::ClebschGordan(l1, m1, l2, m2, ang_->L(), M);
+                    Real Cp = special::ClebschGordan(l1p, m1p, l2p, m2p, rhs_ang_->L(), M);
+                    Real G = std::sqrt(4*special::constant::pi/3) * special::Gaunt(1, 0, l2p, m2p, l2, m2);
+
+                    a += C*Cp*G*(l2*(l2 + 1) - l2p*(l2p + 1))/2;
+                    b -= C*Cp*G;
+                }
+
+                kron_dot(1.0, chi_block, a, rhs_source[illp], rad_inner_->S(), rad_inner_->Mm1());
+                kron_dot(1.0, chi_block, b, rhs_source[illp], rad_inner_->S(), rad_inner_->DL());
+            }
+        }
+
+        // add phase from the momentum operator
+        chi_block *= -1.0_i;
+
+        // use the calculated block
+        chi[ill] = std::move(chi_block);
+    }
+}
+
+void NoPreconditioner::rhs_scat (BlockArray<Complex> & chi, int ie, int instate) const
 {
     // shorthands
     int ni = std::get<0>(inp_->instates[instate]);

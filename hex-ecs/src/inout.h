@@ -341,6 +341,9 @@ class CommandLine
 
         /// Delete old run-time post-processing directories.
         int purge;
+
+        /// Input file for solutions to use at right-hand side with dipole potential.
+        std::string rhs_dipV;
 };
 
 /**

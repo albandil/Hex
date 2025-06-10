@@ -167,7 +167,7 @@ class RadialIntegrals
 
         /**
          * @brief Partial derivative overlap.
-         * 
+         *
          * Compute derivative overlap of B-splines @f$ B_i @f$ and @f$ B_j @f$
          * over the knot "iknot", using Gauss-Legendre integration.
          * @param i      B-spline index.
@@ -177,13 +177,15 @@ class RadialIntegrals
         Complex computeD_iknot
         (
             Bspline const & bspline,
+            void (Bspline::* DL)(int, int, int, const Complex*, Complex*) const,
+            void (Bspline::* DR)(int, int, int, const Complex*, Complex*) const,
             GaussLegendre const & g,
             int i, int j, int iknot
         ) const;
 
         /**
          * @brief Derivative overlap.
-         * 
+         *
          * Compute derivative overlap for B-splines @f$ B_i @f$ and @f$ B_j @f$.
          * @param i B-spline index.
          * @param j B-spline index.
@@ -191,6 +193,8 @@ class RadialIntegrals
         Complex computeD
         (
             Bspline const & bspline,
+            void (Bspline::* DL)(int, int, int, const Complex*, Complex*) const,
+            void (Bspline::* DR)(int, int, int, const Complex*, Complex*) const,
             GaussLegendre const & g,
             int i, int j
         ) const;
@@ -452,6 +456,7 @@ class RadialIntegrals
 
         // Access the precomputed one-electron overlap matrices.
         OneElectronMatrixAccessors(D)
+        OneElectronMatrixAccessors(DL)
         OneElectronMatrixAccessors(S)
         OneElectronMatrixAccessors(Mp1)
         OneElectronMatrixAccessors(Mm1)
@@ -511,8 +516,8 @@ class RadialIntegrals
         GaussLegendre g_y_;
 
         // one-electron moment and overlap matrices
-        SymBandMatrix<Complex> D_x_, S_x_, Mp1_x_, Mm1_x_, Mm2_x_;
-        SymBandMatrix<Complex> D_y_, S_y_, Mp1_y_, Mm1_y_, Mm2_y_;
+        SymBandMatrix<Complex> D_x_, DL_x_, S_x_, Mp1_x_, Mm1_x_, Mm2_x_;
+        SymBandMatrix<Complex> D_y_, DL_y_, S_y_, Mp1_y_, Mm1_y_, Mm2_y_;
 
         // one-electron full integral moments for various orders (used to calculate R-integrals)
         std::vector<SymBandMatrix<Complex>> Mtr_L_x_, Mtr_mLm1_x_;

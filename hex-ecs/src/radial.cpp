@@ -65,11 +65,13 @@ RadialIntegrals::RadialIntegrals
     rxmax_(bspline_x.R2()),
     rymax_(bspline_y.R2()),
     D_x_  (bspline_x.Nspline(), bspline_x.order() + 1),
+    DL_x_ (bspline_x.Nspline(), bspline_x.order() + 1),
     S_x_  (bspline_x.Nspline(), bspline_x.order() + 1),
     Mp1_x_(bspline_x.Nspline(), bspline_x.order() + 1),
     Mm1_x_(bspline_x.Nspline(), bspline_x.order() + 1),
     Mm2_x_(bspline_x.Nspline(), bspline_x.order() + 1),
     D_y_  (bspline_y.Nspline(), bspline_y.order() + 1),
+    DL_y_ (bspline_y.Nspline(), bspline_y.order() + 1),
     S_y_  (bspline_y.Nspline(), bspline_y.order() + 1),
     Mp1_y_(bspline_y.Nspline(), bspline_y.order() + 1),
     Mm1_y_(bspline_y.Nspline(), bspline_y.order() + 1),
@@ -188,6 +190,8 @@ cArray RadialIntegrals::computeMi (Bspline const & bspline, GaussLegendre const 
 Complex RadialIntegrals::computeD_iknot
 (
     Bspline const & bspline,
+    void (Bspline::* DL)(int, int, int, const Complex*, Complex*) const,
+    void (Bspline::* DR)(int, int, int, const Complex*, Complex*) const,
     GaussLegendre const & g,
     int i, int j, int iknot
 ) const
@@ -211,8 +215,8 @@ Complex RadialIntegrals::computeD_iknot
 
     // evaluate B-splines at Gauss-Legendre nodes
     cArray values_i(points), values_j(points);
-    bspline.dB(i, iknot, points, xs.data(), values_i.data());
-    bspline.dB(j, iknot, points, xs.data(), values_j.data());
+    (bspline.*DL)(i, iknot, points, xs.data(), values_i.data());
+    (bspline.*DR)(j, iknot, points, xs.data(), values_j.data());
 
     // result
     Complex res = 0;
@@ -227,6 +231,8 @@ Complex RadialIntegrals::computeD_iknot
 Complex RadialIntegrals::computeD
 (
     Bspline const & bspline,
+    void (Bspline::* DL)(int, int, int, const Complex*, Complex*) const,
+    void (Bspline::* DR)(int, int, int, const Complex*, Complex*) const,
     GaussLegendre const & g,
     int i, int j
 ) const
@@ -240,7 +246,7 @@ Complex RadialIntegrals::computeD
 
     // undergo integration on sub-intervals
     for (int iknot = left; iknot <= right; iknot++)
-        res += computeD_iknot(bspline, g, i, j, iknot);
+        res += computeD_iknot(bspline, DL, DR, g, i, j, iknot);
 
     return res;
 }
@@ -553,12 +559,14 @@ void RadialIntegrals::setupOneElectronIntegrals (bool shared_scratch, bool IamMa
         std::size_t hash_##AXIS = bspline_##AXIS##_.hash(); \
         \
         D_##AXIS##_     .hdflink(format("rad-D-%.4lx.hdf",      hash_##AXIS)); \
+        DL_##AXIS##_    .hdflink(format("rad-DL-%.4lx.hdf",     hash_##AXIS)); \
         S_##AXIS##_     .hdflink(format("rad-S-%.4lx.hdf",      hash_##AXIS)); \
         Mp1_##AXIS##_   .hdflink(format("rad-Mp1-%.4lx.hdf",    hash_##AXIS)); \
         Mm1_##AXIS##_   .hdflink(format("rad-Mm1-%.4lx.hdf",    hash_##AXIS)); \
         Mm2_##AXIS##_   .hdflink(format("rad-Mm2-%.4lx.hdf",    hash_##AXIS)); \
         \
-        D_##AXIS##_     .populate([=](int m, int n) -> Complex { return computeD(bspline_##AXIS##_, g_##AXIS##_,     m, n); }); \
+        D_##AXIS##_     .populate([=](int m, int n) -> Complex { return computeD(bspline_##AXIS##_, &Bspline::dB, &Bspline::dB, g_##AXIS##_, m, n); }); \
+        DL_##AXIS##_    .populate([=](int m, int n) -> Complex { return computeD(bspline_##AXIS##_, &Bspline::dB, &Bspline::B,  g_##AXIS##_, m, n); }); \
         S_##AXIS##_     .populate([=](int m, int n) -> Complex { return computeM(bspline_##AXIS##_, g_##AXIS##_,  0, m, n, bspline_##AXIS##_.Rmin(), bspline_##AXIS##_.Rmax(), false); }); \
         Mp1_##AXIS##_   .populate([=](int m, int n) -> Complex { return computeM(bspline_##AXIS##_, g_##AXIS##_, +1, m, n, r##AXIS##min_,            r##AXIS##max_,            false); }); \
         Mm1_##AXIS##_   .populate([=](int m, int n) -> Complex { return computeM(bspline_##AXIS##_, g_##AXIS##_, -1, m, n, r##AXIS##min_,            r##AXIS##max_,            false); }); \
@@ -567,6 +575,7 @@ void RadialIntegrals::setupOneElectronIntegrals (bool shared_scratch, bool IamMa
         if (not shared_scratch or IamMaster) \
         { \
             D_##AXIS##_     .hdfsave(); \
+            DL_##AXIS##_    .hdfsave(); \
             S_##AXIS##_     .hdfsave(); \
             Mp1_##AXIS##_   .hdfsave(); \
             Mm1_##AXIS##_   .hdfsave(); \

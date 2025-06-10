@@ -533,9 +533,9 @@ void Solver::solve ()
                     SolutionIO writer
                     (
                         ang_.L(), ang_.S(), ang_.Pi(),
-                        std::get<0>(inp_.instates[instates_[i]]),
-                        std::get<1>(inp_.instates[instates_[i]]),
-                        std::get<2>(inp_.instates[instates_[i]]),
+                        cmd_.rhs_dipV.empty() ? std::get<0>(inp_.instates[instates_[i]]) : 0,
+                        cmd_.rhs_dipV.empty() ? std::get<1>(inp_.instates[instates_[i]]) : 0,
+                        cmd_.rhs_dipV.empty() ? std::get<2>(inp_.instates[instates_[i]]) : 0,
                         2 * E_, ang_.states(), channels_
                     );
 

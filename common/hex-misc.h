@@ -414,6 +414,10 @@ template <> inline int string_to (std::string str)
  */
 template <> inline Real string_to (std::string str)
 {
+    // check for nan
+    if (str == "nan" or str == "NaN" or str == "Nan" or str == "NAN")
+        return std::numeric_limits<Real>::quiet_NaN();
+
     // convert to float
     char* tail; double val = std::strtod(str.c_str(), &tail);
 
