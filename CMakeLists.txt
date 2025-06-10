@@ -40,7 +40,9 @@ enable_language(Fortran)
 option(WITH_BOINC        "Build as a BOINC application"                           OFF)
 option(WITH_CLN          "Build with CLN (Class Library for Numbers)"             OFF)
 option(WITH_GINAC        "Build with GiNaC (symbolic algebra library)"            OFF)
+option(WITH_HDF5         "Build with HDF5"                                        ON)
 option(WITH_MKL          "Build with MKL PARDISO"                                 OFF)
+option(WITH_MPI          "Build with MPI"                                         ON)
 option(WITH_MUMPS        "Build with MUMPS (enables coupled preconditioner)"      OFF)
 option(WITH_OPENCL       "Build with OpenCL support (enables GPU preconditioner)" OFF)
 option(WITH_PARDISO      "Build with the stand-alone PARDISO library"             OFF)
@@ -117,8 +119,13 @@ find_package(OpenMP REQUIRED)
 find_package(BLAS   REQUIRED)
 find_package(LAPACK REQUIRED)
 
-find_package(MPI)
-find_package(HDF5)
+if(WITH_MPI)
+    find_package(MPI)
+endif()
+
+if(WITH_HDF5)
+    find_package(HDF5)
+endif()
 
 ## --------------------------------------------------------------------------------- ##
 

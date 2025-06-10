@@ -95,6 +95,23 @@ Amplitudes::Amplitudes
 {
     rad_.verbose(false);
     rad_.setupOneElectronIntegrals(par, cmd);
+
+    // get total energies of the scattered solution
+    Etot_.push_back(inp_.Etot);
+
+    // also get total energies of solutions used to drive the scattering solution
+    for (std::string const& path : cmd_.rhs_dipV)
+    {
+        std::ifstream file(path);
+        InputFile inp(file);
+
+        if (not inp.Etot.empty() and not std::isnan(inp.Etot.front()))
+        {
+            Etot_.push_back(Etot_.back());
+            for (int ie = 0; ie < Etot_.back().size(); ie++)
+                Etot_.back()[ie] = inp.Etot[ie % inp.Etot.size()];
+        }
+    }
 }
 
 void Amplitudes::extract (std::string directory)
@@ -708,11 +725,13 @@ cArray Amplitudes::readAtomPseudoState (int l, int ichan) const
 
 void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> & solution, int ie, int Spin)
 {
-    // final projectile energy
-    Real Ef = inp_.Etot[ie] + 1.0_r/(T.nf*T.nf) + (T.mf-T.mi) * inp_.B;
-
-    // final projectile momentum
-    Real kf = (Ef >= 0 ? std::sqrt(Ef) : special::constant::Nan);
+    // final projectile energy and momentum
+    rArray Ef(Etot_.size()), kf(Etot_.size());
+    for (int i = 0; i < Etot_.size(); i++)
+    {
+        Ef[i] = Etot_[i][ie] + 1.0_r/(T.nf*T.nf) + (T.mf-T.mi) * inp_.B;
+        kf[i] = (Ef[i] >= 0 ? std::sqrt(Ef[i]) : special::constant::Nan);
+    }
 
     // shorthands
     unsigned Nenergy = inp_.Etot.size();               // energy count
@@ -733,7 +752,7 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> &
     }
 
     // skip impact energies with undefined outgoing momentum
-    if (not std::isfinite(kf) or kf == 0.)
+    if (not std::isfinite(kf[0]) or kf[0] == 0.)
         return;
 
     // skip angular-forbidden transitions
@@ -757,7 +776,7 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> &
     // extractions and get rid of the oscillations. Otherwise we need to extrapolate also
     // the trend of the T-matrix.
 
-    Real wavelength = special::constant::two_pi / kf;
+    Real wavelength = special::constant::two_pi / kf[0];
     Real Rb     = (cmd_.extract_rho       > 0) ? cmd_.extract_rho       : bspline_full_.R2();
     Real Ra     = (cmd_.extract_rho_begin > 0) ? cmd_.extract_rho_begin : Rb - wavelength; Ra = std::max(bspline_full_.R2() / 2, Ra);
     int samples = (cmd_.extract_samples   > 0) ? cmd_.extract_samples   : 10;
@@ -777,6 +796,8 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> &
     if (Rb > bspline_full_.R2())
         HexException("Extraction radius too far, %g > %g.", Rb, bspline_full_.R2());
 
+    std::vector<ColMatrix<Complex>> W(inp_.maxell + 1, ColMatrix<Complex>(Ef.size(), samples));
+
     // evaluate radial part for all evaluation radii
     for (int i = 0; i < samples; i++)
     {
@@ -788,8 +809,8 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> &
         int eval_knot = bspline_full_.knot(eval_r);
 
         // evaluate j and dj at far radius for all angular momenta up to maxell
-        cArray j_R0 = special::ric_jv(inp_.Za - 1, inp_.maxell, kf, eval_r);
-        cArray dj_R0 = special::dric_jv(inp_.Za - 1, inp_.maxell, kf, eval_r) * kf;
+        cArray j_R0 = special::ric_jv(inp_.Za - 1, inp_.maxell, kf[0], eval_r);
+        cArray dj_R0 = special::dric_jv(inp_.Za - 1, inp_.maxell, kf[0], eval_r) * kf[0];
 
         // evaluate B-splines and their derivatives at evaluation radius
         cArray Bspline_R0 (Nspline_full), Dspline_R0 (Nspline_full);
@@ -805,7 +826,16 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> &
         // evaluate Wronskians
         cArrays Wj (inp_.maxell + 1);
         for (int l = 0; l <= inp_.maxell; l++)
+        {
             Wj[l] = dj_R0[l] * Bspline_R0 - j_R0[l] * Dspline_R0;
+
+            for (int j = 0; j < Ef.size(); j++)
+            {
+                auto [Hl_R0, dHl_R0] = special::H_dH(inp_.Za - 1, l, kf[0], eval_r);
+
+                W[l](j, i) = dj_R0[l] * Hl_R0 - j_R0[l] * dHl_R0;
+            }
+        }
 
         // compute radial factor
         # pragma omp parallel for schedule (dynamic,1) if (cmd_.parallel_extraction)
@@ -857,6 +887,35 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> &
         }
     }
 
+    // extract multi-photon amplitudes
+    if (not cmd_.rhs_dipV.empty())
+    {
+        // We have now all the data:
+        // - distance-dependent Wronskians of F with the solution are stored in singlet_lambda (or triplet_lambda)
+        // - distance-dependent Wronskians of F with the possible asymptotic spectral components are stored in WW
+        // Let us minimize |W c - lambda|^2 for the vector of amplitudes "c" of size Ef.size(). This is done using
+        // solution of normal equation, Wt.W.c = Wt.lambda.
+
+        for (int ell = 0; ell <= inp_.maxell; ell++)
+        {
+            RowMatrix<Complex> WtW;
+            cArray b = W[ell].T() * singlet_lambda[ell];
+            Array<blas::Int> ipiv(b.size());
+
+            blas::gemm(1.0_z, W[ell].T(), W[ell], 0.0_z, WtW);
+            blas::getrf(b.size(), WtW.data(), ipiv);
+            blas::getrs(b.size(), WtW.data(), ipiv, b);
+
+            std::cout << "Amplitudes for partial wave ell = " << ell << ":";
+            for (Complex z : b)
+                std::cout << format("%10.5e%10.5e", z.real(), z.imag());
+            std::cout << std::endl;
+        }
+
+        return;
+    }
+
+    // calculate scattering T-matrix contributions
     for (int ell = 0; ell <= inp_.maxell; ell++)
     {
         if (cmd_.extract_extrapolate)

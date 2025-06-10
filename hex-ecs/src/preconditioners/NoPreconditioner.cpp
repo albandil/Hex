@@ -30,6 +30,7 @@
 //  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
 #include <array>
+#include <filesystem>
 #include <iostream>
 
 // --------------------------------------------------------------------------------- //
@@ -88,7 +89,7 @@ NoPreconditioner::NoPreconditioner
     if (not cmd_->rhs_dipV.empty())
     {
         // set up the source solution config file and radial/angular basis
-        std::ifstream src_file(cmd_->rhs_dipV);
+        std::ifstream src_file(cmd_->rhs_dipV.front());
         rhs_inp_.reset(new InputFile(src_file));
         rhs_bspline_.reset
         (
@@ -976,8 +977,10 @@ void NoPreconditioner::rhs_dipV (BlockArray<Complex> & chi, int ie, int instate)
     // get source solution energy
     Real rhs_Etot = inp_->Etot[ie % inp_->Etot.size()];
 
-    // read the source solution
-    SolutionIO rhs_reader(rhs_inp_->L, rhs_inp_->Spin[0], rhs_inp_->Pi, 0, 0, 0, rhs_Etot, rhs_ang_->states(), {});
+    // read the source solution from the directory containing the input file
+    std::filesystem::path path(cmd_->rhs_dipV.front());
+    path = path.parent_path() / "psi";
+    SolutionIO rhs_reader(rhs_inp_->L, rhs_inp_->Spin[0], rhs_inp_->Pi, 0, 0, 0, rhs_Etot, rhs_ang_->states(), {}, path.string());
     BlockArray<Complex> rhs_source0(rhs_ang_->states().size(), true, "rhs_source0");
     for (unsigned ill = 0; ill < rhs_ang_->states().size(); ill++)
         rhs_reader.load(rhs_source0, ill);

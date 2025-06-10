@@ -576,6 +576,11 @@ inline Complex ric_h_plus (int n, double x)
     return Complex(ric_j(n,x), ric_n(n,x));
 }
 
+/**
+ * @brief Coulomb-Hankel function and derivative.
+ */
+std::pair<Complex, Complex> H_dH (Real Z, int l, Real k, Real r);
+
 //
 // Other special functions.
 //

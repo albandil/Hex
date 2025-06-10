@@ -657,6 +657,18 @@ double special::coul_F_asy (int Z, int l, double k, double r, double sigma)
     return std::sin(k*r - l*special::constant::pi_half + Z*std::log(2.*k*r)/k + sigma);
 }
 
+std::pair<Complex, Complex> special::H_dH(Real Z, int l, Real k, Real r)
+{
+    gsl_sf_result f,g,fp,gp;
+    double ef,eg;
+    double eta = -Z/k;
+
+    int err = gsl_sf_coulomb_wave_FG_e(eta, k*r, l, 0, &f, &fp, &g, &gp, &ef, &eg);
+
+    return { Complex(g.val, f.val), Complex(gp.val, fp.val) };
+}
+
+
 bool special::makes_triangle (int two_j1, int two_j2, int two_j3)
 {
     return std::abs(two_j1 - two_j2) <= two_j3 and two_j3 <= two_j1 + two_j2

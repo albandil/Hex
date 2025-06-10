@@ -842,10 +842,10 @@ void CommandLine::parse (int argc, char* argv[])
                 multi_rhs = true;
                 return true;
             },
-        "rhs-dipV", "", 1, [&](std::vector<std::string> const & optargs) -> bool
+        "rhs-dipV", "", -1, [&](std::vector<std::string> const & optargs) -> bool
             {
                 // path to input file for solutions to use at the rhs with dipole potential
-                rhs_dipV = optargs[0];
+                rhs_dipV = optargs;
                 return true;
             },
 

@@ -296,6 +296,9 @@ class Amplitudes
 
         // standard output verbosity
         bool verbose_;
+
+        // total energies per driving state
+        rArrays Etot_;
 };
 
 #endif

@@ -93,6 +93,9 @@ namespace blas
     Int sbtrf (Int n, Int k, cArrayView ab, ArrayView<Int> ipiv);
     Int sbtrs (Int n, Int k, rArrayView ab, ArrayView<Int> ipiv, rArrayView bx);
     Int sbtrs (Int n, Int k, cArrayView ab, ArrayView<Int> ipiv, cArrayView bx);
+
+    Int getrf (Int n, cArrayView ab, ArrayView<Int> ipiv);
+    Int getrs (Int n, cArrayView ab, ArrayView<Int> ipiv, cArrayView bx);
 }
 
 #endif

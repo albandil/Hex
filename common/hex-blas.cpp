@@ -118,6 +118,22 @@ extern "C" void zgbtrs_
     char*, blas::Int*, blas::Int*, blas::Int*, blas::Int*, std::complex<double>*,
     blas::Int*, blas::Int*, std::complex<double>*, blas::Int*, blas::Int*
 );
+extern "C" void cgetrf_
+(
+    blas::Int*, blas::Int*, std::complex<float>*, blas::Int*, blas::Int*, blas::Int*
+);
+extern "C" void cgetrs_
+(
+    char*, blas::Int*, blas::Int*, std::complex<float>*, blas::Int*, blas::Int*, std::complex<float>, blas::Int*, blas::Int*
+);
+extern "C" void zgetrf_
+(
+    blas::Int*, blas::Int*, std::complex<double>*, blas::Int*, blas::Int*, blas::Int*
+);
+extern "C" void zgetrs_
+(
+    char*, blas::Int*, blas::Int*, std::complex<double>*, blas::Int*, blas::Int*, std::complex<double>*, blas::Int*, blas::Int*
+);
 
 // ---------------------------------------------------------------------------------- //
 
@@ -300,6 +316,19 @@ blas::Int blas::sbtrf (blas::Int n, blas::Int k, cArrayView ab, ArrayView<blas::
     return info;
 }
 
+blas::Int blas::getrf (blas::Int n, cArrayView ab, ArrayView<blas::Int> ipiv)
+{
+    blas::Int info;
+
+#ifdef SINGLE
+    cgetrf_(&n, &n, &ab[0], &n, &ipiv[0], &info);
+#else
+    zgetrf_(&n, &n, &ab[0], &n, &ipiv[0], &info);
+#endif
+
+    return info;
+}
+
 blas::Int blas::sbtrs (blas::Int n, blas::Int k, rArrayView ab, ArrayView<blas::Int> ipiv, rArrayView bx)
 {
     blas::Int info;
@@ -327,6 +356,23 @@ blas::Int blas::sbtrs (blas::Int n, blas::Int k, cArrayView ab, ArrayView<blas::
     cgbtrs_(&trans, &n, &k, &k, &nrhs, &ab[0], &ldab, &ipiv[0], &bx[0], &n, &info);
 #else
     zgbtrs_(&trans, &n, &k, &k, &nrhs, &ab[0], &ldab, &ipiv[0], &bx[0], &n, &info);
+#endif
+
+    return info;
+}
+
+blas::Int blas::getrs (blas::Int n, cArrayView ab, ArrayView<blas::Int> ipiv, cArrayView bx)
+{
+    blas::Int info;
+    blas::Int nrhs = 1;
+    blas::Int ldb = 1;
+
+    char trans = 'N';
+
+#ifdef SINGLE
+    cgetrs_(&trans, &n, &nrhs, &ab[0], &n, &ipiv[0], &info, &bx[0]);
+#else
+    zgetrs_(&trans, &n, &nrhs, &ab[0], &n, &ipiv[0], &bx[0], &ldb, &info);
 #endif
 
     return info;
