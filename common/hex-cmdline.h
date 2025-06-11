@@ -33,9 +33,18 @@
 #define HEX_CMDLINE
 
 #include <algorithm>
+#include <functional>
 #include <string>
 
 #include "hex-misc.h"
+
+using CommandLineOption = struct
+{
+    std::string longoptname;
+    std::string shortoptname;
+    int noptarg;
+    std::function<bool(std::vector<std::string> const&)> handler;
+};
 
 /**
  * @brief Command line option default hanndler.
@@ -231,6 +240,75 @@ template <class ...Params> void ParseCommandLine
     (
         HandleSwitch (i, argc, argv, params...)
     );
+}
+
+/// Stack-friendly version of the template "ParseCommandLine".
+inline void ParseCommandLine
+(
+    int argc,
+    char* argv[],
+    std::vector<CommandLineOption> const& options,
+    std::function<bool(std::string, std::vector<std::string> const&)> const& default_handler
+)
+{
+    for (int i = 1; i < argc;)
+    {
+        // option name
+        std::string optname = argv[i];
+
+        // collect all parameters
+        int next_i = i + 1;
+        std::vector<std::string> optargs;
+        while (next_i < argc and argv[next_i][0] != '-')
+            optargs.push_back(argv[next_i++]);
+
+        // remove leading dashes from the optname
+        while (optname[0] == '-')
+            optname.erase(optname.begin());
+
+        // option argument
+        std::string optarg = "";
+
+        // split option name at equation sign (if present)
+        auto iter = std::find(optname.begin(), optname.end(), '=');
+        if (iter != optname.end())
+        {
+            optarg = optname.substr(iter-optname.begin()+1);
+            optname = optname.substr(0, iter-optname.begin());
+        }
+
+        // add first optarg, if present
+        if (optarg.size() > 0)
+            optargs.insert(optargs.begin(), optarg);
+
+        bool found = false;
+
+        for (auto const& option : options)
+        {
+            // check that argv[i] is equal to the current optname
+            if (optname == option.longoptname or optname == option.shortoptname)
+            {
+                found = true;
+
+                // check number of parameters
+                if (option.noptarg != -1 and option.noptarg != (int)optargs.size())
+                    HexException("The option --%s accepts %d parameters (given %d).", optname.c_str(), option.noptarg, optargs.size());
+
+                // move on to the next option
+                i = next_i;
+
+                // pass the parameters to the callback function
+                option.handler(optargs);
+                break;
+            }
+        }
+
+        if (not found)
+        {
+            default_handler(optname, optargs);
+            return;
+        }
+    }
 }
 
 #endif

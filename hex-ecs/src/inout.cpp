@@ -148,708 +148,860 @@ void CommandLine::parse (int argc, char* argv[])
     ParseCommandLine
     (
         argc, argv,
-
-        "example", "e", 0, [&](std::vector<std::string> const & optargs) -> bool
+        {
             {
-                std::cout << "Writing sample input file to \"example.inp\".\n\n";
+                "example", "e", 0, [&](std::vector<std::string> const & optargs) -> bool
+                {
+                    std::cout << "Writing sample input file to \"example.inp\".\n\n";
 
-                // produce sample input file
-                std::ofstream out("example.inp");
-                if (out.bad())
-                    HexException("Error: Cannot write to \"example.inp\"\n");
+                    // produce sample input file
+                    std::ofstream out("example.inp");
+                    if (out.bad())
+                        HexException("Error: Cannot write to \"example.inp\"\n");
 
-                out << sample_input;
+                    out << sample_input;
 
-                out.close();
-                std::exit(EXIT_SUCCESS);
+                    out.close();
+                    std::exit(EXIT_SUCCESS);
+                }
             },
-        "input", "i", 1, [&](std::vector<std::string> const & optargs) -> bool
             {
-                // set custom input file
-                inputfile.open(optargs[0]);
-                if (not inputfile.good())
-                    HexException("Error: Input file \"%s\" not found.\n", optargs[0].c_str());
-                return true;
+                "input", "i", 1, [&](std::vector<std::string> const & optargs) -> bool
+                {
+                    // set custom input file
+                    inputfile.open(optargs[0]);
+                    if (not inputfile.good())
+                        HexException("Error: Input file \"%s\" not found.\n", optargs[0].c_str());
+                    return true;
+                }
             },
-        "help", "h", 0, [&](std::vector<std::string> const & optargs) -> bool
             {
-                // get all factorizers
-                std::ostringstream f;
-                for (LUft const * lu : *LUft::RTS_Table)
-                    f << " '" << lu->name() << "'";
+                "help", "h", 0, [&](std::vector<std::string> const & optargs) -> bool
+                {
+                    // get all factorizers
+                    std::ostringstream f;
+                    for (LUft const * lu : *LUft::RTS_Table)
+                        f << " '" << lu->name() << "'";
 
-                // print usage information
-                std::cout << "\n"
-                    "Available switches (short forms in parentheses):\n"
-                    "\n"
-                    "Basic usage\n"
-                    "\t--example                  (-e)  Create sample input file.\n"
-                    "\t--help                     (-h)  Display this help.\n"
-                    "\t--input <filename>         (-i)  Use custom input file (other than \"ecs.inp\").\n"
-                    "\t--zip <parameters>         (-z)  Solution file to zip (i.e. evaluate in B-spline basis and produce VTK datafile).\n"
-                    "\t                                 The '<parameters>' stands for '<filename> <Xmin> <Ymin> <Xmax> <Ymax> <Xn> <Yn>'.\n"
-                    "\t--write-grid               (-g)  Write grid layout to a VTK file.\n"
-                    "\t--write-intermediate-solutions   Write all intermediate solution (after every iteration of the PCOCG solver).\n"
-                    "\t--bound                          Before solving the scattering equations calculate and write the two-electron bound state wfn.\n"
-                    "\t--dipoles                        Evaluate dipole transition amplitudes from the bound state to all scattering states.\n"
-                    "\t--purge <number>                 Clean intermediate solutions some steps back.\n"
-                    "\t--checkpoints                    Write all run-time intermediate data needed to continue interrupted calculation.\n"
-                    "\t--autostop <number>              Monitor convergence of K-matrices and stop the solver on sufficiently small change between iterations.\n"
-                    "\t--continue                       Continue interrupted calculation from the last available checkpoint.\n"
-                    "\t--carry-initial-guess            Whether to use previous-energy solution as an initial guess for the new energy.\n"
-                    "\t--refine-solution                Load existing solutions and check that they are within tolerance, update if needed.\n"
-                    "\t--nthreads                       Number of OpenMP threads (otherwise honour OMP_NUM_THREADS).\n"
+                    // print usage information
+                    std::cout << "\n"
+                        "Available switches (short forms in parentheses):\n"
+                        "\n"
+                        "Basic usage\n"
+                        "\t--example                  (-e)  Create sample input file.\n"
+                        "\t--help                     (-h)  Display this help.\n"
+                        "\t--input <filename>         (-i)  Use custom input file (other than \"ecs.inp\").\n"
+                        "\t--zip <parameters>         (-z)  Solution file to zip (i.e. evaluate in B-spline basis and produce VTK datafile).\n"
+                        "\t                                 The '<parameters>' stands for '<filename> <Xmin> <Ymin> <Xmax> <Ymax> <Xn> <Yn>'.\n"
+                        "\t--write-grid               (-g)  Write grid layout to a VTK file.\n"
+                        "\t--write-intermediate-solutions   Write all intermediate solution (after every iteration of the PCOCG solver).\n"
+                        "\t--bound                          Before solving the scattering equations calculate and write the two-electron bound state wfn.\n"
+                        "\t--dipoles                        Evaluate dipole transition amplitudes from the bound state to all scattering states.\n"
+                        "\t--purge <number>                 Clean intermediate solutions some steps back.\n"
+                        "\t--checkpoints                    Write all run-time intermediate data needed to continue interrupted calculation.\n"
+                        "\t--autostop <number>              Monitor convergence of K-matrices and stop the solver on sufficiently small change between iterations.\n"
+                        "\t--continue                       Continue interrupted calculation from the last available checkpoint.\n"
+                        "\t--carry-initial-guess            Whether to use previous-energy solution as an initial guess for the new energy.\n"
+                        "\t--refine-solution                Load existing solutions and check that they are within tolerance, update if needed.\n"
+                        "\t--nthreads                       Number of OpenMP threads (otherwise honour OMP_NUM_THREADS).\n"
 #ifdef __linux__
-                    "\t--fp-exceptions                  Abort when invalid number is encountered. This can result in unnecessary GSL failures.\n"
+                        "\t--fp-exceptions                  Abort when invalid number is encountered. This can result in unnecessary GSL failures.\n"
 #endif
-                    "\n"
+                        "\n"
 #ifdef WITH_MPI
-                    "MPI setup\n"
-                    "\t--mpi                      (-m)  Use MPI (assuming that the program has been launched by mpiexec).\n"
-                    "\t--groupsize <number>       (-G)  How many processes factorize single LU (used by 'superlu_dist' and 'mumps' preconditioners).\n"
-                    "\n"
+                        "MPI setup\n"
+                        "\t--mpi                      (-m)  Use MPI (assuming that the program has been launched by mpiexec).\n"
+                        "\t--groupsize <number>       (-G)  How many processes factorize single LU (used by 'superlu_dist' and 'mumps' preconditioners).\n"
+                        "\n"
 #endif
-                    "LU decomposition\n"
-                    "\t--lu <name>                (-F)  Factorization library (one of" + f.str() + "). Default is 'umfpack'.\n"
+                        "LU decomposition\n"
+                        "\t--lu <name>                (-F)  Factorization library (one of" + f.str() + "). Default is 'umfpack'.\n"
 #ifdef WITH_MUMPS
-                    "\t--mumps-out-of-core              Use out-of-core capability of MUMPS (this is independent on --out-of-core option).\n"
-                    "\t--mumps-verbose <number>         Verbosity level of the MUMPS library. Zero ('0') means no output, higher numbers increase the verbosity.\n"
-                    "\t--mumps-memory-relaxation <number> How much percent more of the guessed LU factor storage to allocate.\n"
-                    "\t--mumps-virtual-memory           Use virtual memory (disk files) for LU factors.\n"
+                        "\t--mumps-out-of-core              Use out-of-core capability of MUMPS (this is independent on --out-of-core option).\n"
+                        "\t--mumps-verbose <number>         Verbosity level of the MUMPS library. Zero ('0') means no output, higher numbers increase the verbosity.\n"
+                        "\t--mumps-memory-relaxation <number> How much percent more of the guessed LU factor storage to allocate.\n"
+                        "\t--mumps-virtual-memory           Use virtual memory (disk files) for LU factors.\n"
 #endif
-                    "\n"
-                    "Stage selection\n"
-                    "\t--stg-integ                (-a)  Only calculate needed radial integrals.\n"
-                    "\t--stg-integ-solve          (-b)  Only calculate integrals and the solution.\n"
-                    "\t--stg-extract              (-c)  Only extract amplitudes (assumes that the solution files exist).\n"
-                    "\n"
-                    "Right-hand side\n"
-                    "\t--analytic-eigenstates           Use analytic formulae for initial/final states instead of diagonalization.\n"
-                    "\t--fast-bessel                    Use faster Bessel function evaluation routine (not the Steed/Barnett) when calculating RHS.\n"
-                    "\t--multi-rhs                      Solve for all initial states at once. Requires more memory, but might be faster. \n"
-                    "\n"
-                    "Disk access\n"
-                    "\t--own-radial-cache         (-w)  Keep two-electron radial integrals not referenced by preconditioner only on disk (slows down only the initialization).\n"
-                    "\t--no-radial-cache          (-r)  Keep all two-electron radial integrals only on disk (slows down also the solution process).\n"
-                    "\t--out-of-core              (-o)  Use hard disk drive to store most of intermediate data and thus to save RAM (considerably slower).\n"
-                    "\t--out-of-core-continue     (-O)  Start out-of-core solution from the existing OOC files.\n"
-                    "\t--whole-matrix             (-W)  In the above three cases: Load whole matrix from scratch file when calculating dot product (speeds them up a little).\n"
-                    "\t--shared-scratch           (-s)  Let every MPI process calculate only a subset of shared radial integrals (assume shared output directory).\n"
-                    "\t--lightweight-radial-cache (-l)  Do not precalculate two-electron integrals and only apply them on the fly (slower, but saves RAM).\n"
-                    "\t--lightweight-full         (-L)  Avoid precalculating all large matrices and only apply them on the fly.\n"
-                    "\t--lightweight-simple             Similar as lightweight-full, but precalculate diagonal block before every start of a nested CG solver.\n"
-                    "\n"
-                    "Preconditioners (general)\n"
-                    "\t--preconditioner <name>    (-p)  Preconditioner to use (default: ILU).\n"
-                    "\t--list-preconditioners     (-P)  List available preconditioners with short description of each.\n"
-                    "\t--ssor <number>                  Apply SSOR coupling.\n"
-                    "\t--tolerance <number>       (-T)  Set tolerance for the conjugate gradients solver (default: 1e-8).\n"
-                    "\t--prec-tolerance <number>  (-t)  Set tolerance for the conjugate gradients preconditioner (default: 1e-8).\n"
-                    "\t--drop-tolerance <number>  (-d)  Set drop tolerance for the ILU preconditioner (default: 1e-15).\n"
-                    "\t--sub-prec-iter <number>         Maximal number of inner preconditioner iterations before giving up. Default is number of unknowns.\n"
-                    "\t--sub-prec-nofail                Makes the solver continue with the calculation even when some of the inner preconditioners fails to converge.\n"
-                    "\t--sub-prec-verbose               Display convergence information for inner preconditioners.\n"
+                        "\n"
+                        "Stage selection\n"
+                        "\t--stg-integ                (-a)  Only calculate needed radial integrals.\n"
+                        "\t--stg-integ-solve          (-b)  Only calculate integrals and the solution.\n"
+                        "\t--stg-extract              (-c)  Only extract amplitudes (assumes that the solution files exist).\n"
+                        "\n"
+                        "Right-hand side\n"
+                        "\t--analytic-eigenstates           Use analytic formulae for initial/final states instead of diagonalization.\n"
+                        "\t--fast-bessel                    Use faster Bessel function evaluation routine (not the Steed/Barnett) when calculating RHS.\n"
+                        "\t--multi-rhs                      Solve for all initial states at once. Requires more memory, but might be faster. \n"
+                        "\n"
+                        "Disk access\n"
+                        "\t--own-radial-cache         (-w)  Keep two-electron radial integrals not referenced by preconditioner only on disk (slows down only the initialization).\n"
+                        "\t--no-radial-cache          (-r)  Keep all two-electron radial integrals only on disk (slows down also the solution process).\n"
+                        "\t--out-of-core              (-o)  Use hard disk drive to store most of intermediate data and thus to save RAM (considerably slower).\n"
+                        "\t--out-of-core-continue     (-O)  Start out-of-core solution from the existing OOC files.\n"
+                        "\t--whole-matrix             (-W)  In the above three cases: Load whole matrix from scratch file when calculating dot product (speeds them up a little).\n"
+                        "\t--shared-scratch           (-s)  Let every MPI process calculate only a subset of shared radial integrals (assume shared output directory).\n"
+                        "\t--lightweight-radial-cache (-l)  Do not precalculate two-electron integrals and only apply them on the fly (slower, but saves RAM).\n"
+                        "\t--lightweight-full         (-L)  Avoid precalculating all large matrices and only apply them on the fly.\n"
+                        "\t--lightweight-simple             Similar as lightweight-full, but precalculate diagonal block before every start of a nested CG solver.\n"
+                        "\n"
+                        "Preconditioners (general)\n"
+                        "\t--preconditioner <name>    (-p)  Preconditioner to use (default: ILU).\n"
+                        "\t--list-preconditioners     (-P)  List available preconditioners with short description of each.\n"
+                        "\t--ssor <number>                  Apply SSOR coupling.\n"
+                        "\t--tolerance <number>       (-T)  Set tolerance for the conjugate gradients solver (default: 1e-8).\n"
+                        "\t--prec-tolerance <number>  (-t)  Set tolerance for the conjugate gradients preconditioner (default: 1e-8).\n"
+                        "\t--drop-tolerance <number>  (-d)  Set drop tolerance for the ILU preconditioner (default: 1e-15).\n"
+                        "\t--sub-prec-iter <number>         Maximal number of inner preconditioner iterations before giving up. Default is number of unknowns.\n"
+                        "\t--sub-prec-nofail                Makes the solver continue with the calculation even when some of the inner preconditioners fails to converge.\n"
+                        "\t--sub-prec-verbose               Display convergence information for inner preconditioners.\n"
 #ifndef DISABLE_PARALLEL_PRECONDITION
-                    "\t--parallel-precondition          Apply multiple block preconditioners in parallel.\n"
+                        "\t--parallel-precondition          Apply multiple block preconditioners in parallel.\n"
 #endif
-                    "\n"
-                    "ILU preconditioner\n"
-                    "\t--parallel-factorization         Factorize multiple blocks simultaneously.\n"
-                    "\t--no-lu-update                   Do not recalculate LU factorization for different energies, use the first factorization for all of them.\n"
-                    "\t--ilu-max-iter <number>          Maximal number of iterations of the nested ILU preconditioner. When the number is exceeded, exception is thrown.\n"
-                    "\t--scratch <path>                 Scratch directory for out-of-core factorizers (currently only MUMPS). Also read from the $SCRATCHDIR env variable.\n"
-                    "\n"
-                    "KPA preconditioner\n"
-                    "\t--kpa-simple-rad           (-R)  Use simplified radial integral matrix for nested KPA iterations (experimental).\n"
-                    "\n"
-                    "HYB preconditioner\n"
-                    "\t--hyb-additional-levels <number> When using the HYB preconditioner: precondition more blocks with ILU, useful close below an excitation threshold.\n"
-                    "\n"
-                    "Coupled preconditioner\n"
-                    "\t--coupling-limit                 Maximal multipole to be considered by the coupled preconditioner.\n"
-                    "\t--couple-all                     Couple all angular blocks. (This is the default behaviour.)\n"
-                    "\t--couple-channels                Only couple blocks containing all open (and additional) channels as defined in input file.\n"
-                    "\n"
+                        "\n"
+                        "ILU preconditioner\n"
+                        "\t--parallel-factorization         Factorize multiple blocks simultaneously.\n"
+                        "\t--no-lu-update                   Do not recalculate LU factorization for different energies, use the first factorization for all of them.\n"
+                        "\t--ilu-max-iter <number>          Maximal number of iterations of the nested ILU preconditioner. When the number is exceeded, exception is thrown.\n"
+                        "\t--scratch <path>                 Scratch directory for out-of-core factorizers (currently only MUMPS). Also read from the $SCRATCHDIR env variable.\n"
+                        "\n"
+                        "KPA preconditioner\n"
+                        "\t--kpa-simple-rad           (-R)  Use simplified radial integral matrix for nested KPA iterations (experimental).\n"
+                        "\n"
+                        "HYB preconditioner\n"
+                        "\t--hyb-additional-levels <number> When using the HYB preconditioner: precondition more blocks with ILU, useful close below an excitation threshold.\n"
+                        "\n"
+                        "Coupled preconditioner\n"
+                        "\t--coupling-limit                 Maximal multipole to be considered by the coupled preconditioner.\n"
+                        "\t--couple-all                     Couple all angular blocks. (This is the default behaviour.)\n"
+                        "\t--couple-channels                Only couple blocks containing all open (and additional) channels as defined in input file.\n"
+                        "\n"
 #ifdef WITH_OPENCL
-                    "GPU preconditioner\n"
-                    "\t--cl-list                        List all OpenCL platforms and devices available.\n"
-                    "\t--cl-platform <index>            Use given OpenCL platform for GPU preconditioner (default is 0, i.e. the first platform found).\n"
-                    "\t--cl-device <index>              Use given OpenCL device for GPU preconditioner (default is 0, i.e. the first device found).\n"
-                    "\t--cl-use-host-memory             Keep large data in RAM instead of copying everything to the compute device. This will slow down the solution.\n"
-                    "\t--cl-multiply                    Do the sparse matrix multiplication on the OpenCL device (memory intensive!).\n"
+                        "GPU preconditioner\n"
+                        "\t--cl-list                        List all OpenCL platforms and devices available.\n"
+                        "\t--cl-platform <index>            Use given OpenCL platform for GPU preconditioner (default is 0, i.e. the first platform found).\n"
+                        "\t--cl-device <index>              Use given OpenCL device for GPU preconditioner (default is 0, i.e. the first device found).\n"
+                        "\t--cl-use-host-memory             Keep large data in RAM instead of copying everything to the compute device. This will slow down the solution.\n"
+                        "\t--cl-multiply                    Do the sparse matrix multiplication on the OpenCL device (memory intensive!).\n"
 #endif
-                    "\n"
-                    "Multigrid preconditioner\n"
-                    "\t--multigrid-depth <number>       Depth of the geometric multigrid (= maximal refinement level of the original B-spline knot sequence).\n"
-                    "\t--multigrid-coarse-prec <name>   What preconditioner to use for preconditioning of the solution of the coarse problem (specified in input file).\n"
-                    "\n"
-                    "Domain decomposition preconditioner\n"
-                    "\t--dom-xpanels <number>           Number of domain decomposition panels along x axis (default: 1).\n"
-                    "\t--dom-ypanels <number>           Number of domain decomposition panels along y axis (default: 1).\n"
-                    "\t--dom-sweeps <number>            Number of domain decomposition solution sweeps, default is the larger of xpanels, ypanels.\n"
-                    "\t--dom-preconditioner <name>      Panel preconditioner for domain decomposition (default: ILU).\n"
-                    "\n"
-                    "Post-processing\n"
-                    "\t--no-parallel-extraction         Disallow parallel extraction of T-matrices (e.g. when the whole solution does not fit into the memory).\n"
-                    "\t--extract-rho-begin              Where to start averaging / extrapolating the T-matrix.\n"
-                    "\t--extract-rho[-end]              Radius for T-matrix extraction.\n"
-                    "\t--extract-samples                Number of evaluations of the T-matrix between --extract-rho-begin and --extract-rho.\n"
-                    "\t--extract-extrapolate            Radially extrapolate the extracted T-matrices instead of simple averaging.\n"
-                    "\t--runtime-postprocess            Evaluate T-matrices after every iteration.\n"
-                    "\n"
-                ;
-                std::exit(EXIT_SUCCESS);
+                        "\n"
+                        "Multigrid preconditioner\n"
+                        "\t--multigrid-depth <number>       Depth of the geometric multigrid (= maximal refinement level of the original B-spline knot sequence).\n"
+                        "\t--multigrid-coarse-prec <name>   What preconditioner to use for preconditioning of the solution of the coarse problem (specified in input file).\n"
+                        "\n"
+                        "Domain decomposition preconditioner\n"
+                        "\t--dom-xpanels <number>           Number of domain decomposition panels along x axis (default: 1).\n"
+                        "\t--dom-ypanels <number>           Number of domain decomposition panels along y axis (default: 1).\n"
+                        "\t--dom-sweeps <number>            Number of domain decomposition solution sweeps, default is the larger of xpanels, ypanels.\n"
+                        "\t--dom-preconditioner <name>      Panel preconditioner for domain decomposition (default: ILU).\n"
+                        "\n"
+                        "Post-processing\n"
+                        "\t--no-parallel-extraction         Disallow parallel extraction of T-matrices (e.g. when the whole solution does not fit into the memory).\n"
+                        "\t--extract-rho-begin              Where to start averaging / extrapolating the T-matrix.\n"
+                        "\t--extract-rho[-end]              Radius for T-matrix extraction.\n"
+                        "\t--extract-samples                Number of evaluations of the T-matrix between --extract-rho-begin and --extract-rho.\n"
+                        "\t--extract-extrapolate            Radially extrapolate the extracted T-matrices instead of simple averaging.\n"
+                        "\t--runtime-postprocess            Evaluate T-matrices after every iteration.\n"
+                        "\n"
+                    ;
+                    std::exit(EXIT_SUCCESS);
+                }
             },
-        "write-grid", "g", 0, [&](std::vector<std::string> const & optargs) -> bool
             {
-                // write grid to VTK
-                writegrid = true;
-                return true;
+                "write-grid", "g", 0, [&](std::vector<std::string> const & optargs) -> bool
+                {
+                    // write grid to VTK
+                    writegrid = true;
+                    return true;
+                }
             },
-        "bound", "", 0, [&](std::vector<std::string> const & optargs) -> bool
             {
-                // calculate two-electron bound state wave function
-                bound = true;
-                return true;
+                "bound", "", 0, [&](std::vector<std::string> const & optargs) -> bool
+                {
+                    // calculate two-electron bound state wave function
+                    bound = true;
+                    return true;
+                }
             },
-        "dipoles", "", 0, [&](std::vector<std::string> const & optargs) -> bool
             {
-                // evaluate dipole transition amplitudes from the bound state to all scattering states
-                dipoles = true;
-                return true;
+                "dipoles", "", 0, [&](std::vector<std::string> const & optargs) -> bool
+                {
+                    // evaluate dipole transition amplitudes from the bound state to all scattering states
+                    dipoles = true;
+                    return true;
+                }
             },
-        "zip", "z", 7, [&](std::vector<std::string> const & optargs) -> bool
             {
-                // zip B-spline expansion file
-                zipdata.file = optargs[0];
-                zipdata.Xmin = std::stod(optargs[1]);
-                zipdata.Ymin = std::stod(optargs[2]);
-                zipdata.Xmax = std::stod(optargs[3]);
-                zipdata.Ymax = std::stod(optargs[4]);
-                zipdata.nX = std::stoi(optargs[5]);
-                zipdata.nY = std::stoi(optargs[6]);
-                return true;
+                "zip", "z", 7, [&](std::vector<std::string> const & optargs) -> bool
+                {
+                    // zip B-spline expansion file
+                    zipdata.file = optargs[0];
+                    zipdata.Xmin = std::stod(optargs[1]);
+                    zipdata.Ymin = std::stod(optargs[2]);
+                    zipdata.Xmax = std::stod(optargs[3]);
+                    zipdata.Ymax = std::stod(optargs[4]);
+                    zipdata.nX = std::stoi(optargs[5]);
+                    zipdata.nY = std::stoi(optargs[6]);
+                    return true;
+                }
             },
-        "nthreads", "F", 1, [&](std::vector<std::string> const & optargs) -> bool
             {
-                // choose factorizer
-                nthreads = std::atoi(optargs[0].c_str());
-                return true;
+                "nthreads", "F", 1, [&](std::vector<std::string> const & optargs) -> bool
+                {
+                    // choose factorizer
+                    nthreads = std::atoi(optargs[0].c_str());
+                    return true;
+                }
             },
 #ifdef __linux__
-        "fp-exceptions", "", 0, [&](std::vector<std::string> const & optargs) -> bool
             {
-                // enable SIGFPE
-                fpe = true;
-                return true;
+                "fp-exceptions", "", 0, [&](std::vector<std::string> const & optargs) -> bool
+                {
+                    // enable SIGFPE
+                    fpe = true;
+                    return true;
+                }
             },
 #endif
-        "lu", "F", 1, [&](std::vector<std::string> const & optargs) -> bool
             {
-                // choose factorizer
-                factorizer = optargs[0];
-                return true;
+                "lu", "F", 1, [&](std::vector<std::string> const & optargs) -> bool
+                {
+                    // choose factorizer
+                    factorizer = optargs[0];
+                    return true;
+                }
             },
-        "groupsize", "G", 1, [&](std::vector<std::string> const & optargs) -> bool
             {
-                // set the groupsize
-                groupsize = std::atoi(optargs[0].c_str());
-                return true;
+                "groupsize", "G", 1, [&](std::vector<std::string> const & optargs) -> bool
+                {
+                    // set the groupsize
+                    groupsize = std::atoi(optargs[0].c_str());
+                    return true;
+                }
             },
 #ifdef WITH_MPI
-        "mpi", "m", 0, [&](std::vector<std::string> const & optargs) -> bool
             {
-                // use MPI
-                parallel = true;
-                return true;
+                "mpi", "m", 0, [&](std::vector<std::string> const & optargs) -> bool
+                {
+                    // use MPI
+                    parallel = true;
+                    return true;
+                }
             },
 #endif
-        "stg-integ", "a", 0, [&](std::vector<std::string> const & optargs) -> bool
             {
-                // run only the first part (computation of radial integrals)
-                itinerary = StgRadial;
-                return true;
+                "stg-integ", "a", 0, [&](std::vector<std::string> const & optargs) -> bool
+                {
+                    // run only the first part (computation of radial integrals)
+                    itinerary = StgRadial;
+                    return true;
+                }
             },
-        "stg-integ-solve", "b", 0, [&](std::vector<std::string> const & optargs) -> bool
             {
-                // run only the first part (computation of radial integrals)
-                itinerary = StgRadial | StgSolve;
-                return true;
+                "stg-integ-solve", "b", 0, [&](std::vector<std::string> const & optargs) -> bool
+                {
+                    // run only the first part (computation of radial integrals)
+                    itinerary = StgRadial | StgSolve;
+                    return true;
+                }
             },
-        "stg-extract", "c", 0, [&](std::vector<std::string> const & optargs) -> bool
             {
-                // run only the third part (extraction of amplitudes)
-                itinerary = StgExtract;
-                return true;
+                "stg-extract", "c", 0, [&](std::vector<std::string> const & optargs) -> bool
+                {
+                    // run only the third part (extraction of amplitudes)
+                    itinerary = StgExtract;
+                    return true;
+                }
             },
-        "own-radial-cache", "w", 0, [&](std::vector<std::string> const & optargs) -> bool
             {
-                // do not cache un-'owned' two-electron radial integrals in memory
-                cache_own_radint = true;
-                cache_all_radint = false;
-                return true;
+                "own-radial-cache", "w", 0, [&](std::vector<std::string> const & optargs) -> bool
+                {
+                    // do not cache un-'owned' two-electron radial integrals in memory
+                    cache_own_radint = true;
+                    cache_all_radint = false;
+                    return true;
+                }
             },
-        "no-radial-cache", "r", 0, [&](std::vector<std::string> const & optargs) -> bool
             {
-                // do not cache any two-electron radial integrals in memory at all
-                cache_own_radint = false;
-                cache_all_radint = false;
-                return true;
+                "no-radial-cache", "r", 0, [&](std::vector<std::string> const & optargs) -> bool
+                {
+                    // do not cache any two-electron radial integrals in memory at all
+                    cache_own_radint = false;
+                    cache_all_radint = false;
+                    return true;
+                }
             },
-        "scratch", "", 1, [&](std::vector<std::string> const & optargs) -> bool
             {
-                // scratch directory for the out-of-core mode factorizers (currently MUMPS only)
-                scratch = optargs[0];
-                return true;
+                "scratch", "", 1, [&](std::vector<std::string> const & optargs) -> bool
+                {
+                    // scratch directory for the out-of-core mode factorizers (currently MUMPS only)
+                    scratch = optargs[0];
+                    return true;
+                }
             },
-        "out-of-core", "o", 0, [&](std::vector<std::string> const & optargs) -> bool
             {
-                // use full out-of-core functionality: store also diagonal blocks (and factorizations) on disk
-                cache_all_radint = false;
-                cache_own_radint = false;
-                outofcore = true;
-                return true;
+                "out-of-core", "o", 0, [&](std::vector<std::string> const & optargs) -> bool
+                {
+                    // use full out-of-core functionality: store also diagonal blocks (and factorizations) on disk
+                    cache_all_radint = false;
+                    cache_own_radint = false;
+                    outofcore = true;
+                    return true;
+                }
             },
-        "continue", "", 0, [&](std::vector<std::string> const & optargs) -> bool
             {
-                // continue checkpointed calculation (if possible)
-                cont = true;
-                return true;
+                "continue", "", 0, [&](std::vector<std::string> const & optargs) -> bool
+                {
+                    // continue checkpointed calculation (if possible)
+                    cont = true;
+                    return true;
+                }
             },
-        "out-of-core-continue", "O", 0, [&](std::vector<std::string> const & optargs) -> bool
             {
-                // continue OOC calculation
-                cache_all_radint = false;
-                cache_own_radint = false;
-                reuse_dia_blocks = true;
-                outofcore = true;
-                cont = true;
-                return true;
+                "out-of-core-continue", "O", 0, [&](std::vector<std::string> const & optargs) -> bool
+                {
+                    // continue OOC calculation
+                    cache_all_radint = false;
+                    cache_own_radint = false;
+                    reuse_dia_blocks = true;
+                    outofcore = true;
+                    cont = true;
+                    return true;
+                }
             },
-        "whole-matrix", "W", 0, [&](std::vector<std::string> const & optargs) -> bool
             {
-                // whether to load whole matrix from scratch disk when calculating dot product (etc.)
-                wholematrix = true;
-                return true;
+                "whole-matrix", "W", 0, [&](std::vector<std::string> const & optargs) -> bool
+                {
+                    // whether to load whole matrix from scratch disk when calculating dot product (etc.)
+                    wholematrix = true;
+                    return true;
+                }
             },
-        "drop-tolerance", "d", 1, [&](std::vector<std::string> const & optargs) -> bool
             {
-                // drop tolerance for iLU-factorization
-                droptol = std::atof(optargs[0].c_str());
-                return true;
+                "drop-tolerance", "d", 1, [&](std::vector<std::string> const & optargs) -> bool
+                {
+                    // drop tolerance for iLU-factorization
+                    droptol = std::atof(optargs[0].c_str());
+                    return true;
+                }
             },
-        "tolerance", "T", 1, [&](std::vector<std::string> const & optargs) -> bool
             {
-                // iteration tolerance for terminating iteration solution
-                itertol = std::atof(optargs[0].c_str());
-                return true;
+                "tolerance", "T", 1, [&](std::vector<std::string> const & optargs) -> bool
+                {
+                    // iteration tolerance for terminating iteration solution
+                    itertol = std::atof(optargs[0].c_str());
+                    return true;
+                }
             },
-        "prec-tolerance", "t", 1, [&](std::vector<std::string> const & optargs) -> bool
             {
-                // iteration tolerance for terminating iteration solution
-                prec_itertol = std::atof(optargs[0].c_str());
-                return true;
+                "prec-tolerance", "t", 1, [&](std::vector<std::string> const & optargs) -> bool
+                {
+                    // iteration tolerance for terminating iteration solution
+                    prec_itertol = std::atof(optargs[0].c_str());
+                    return true;
+                }
             },
-        "preconditioner", "p", 1, [&](std::vector<std::string> const & optargs) -> bool
             {
-                // look-up the preconditioner
-                std::vector<PreconditionerBase*>::const_iterator ip = std::find_if
-                (
-                    PreconditionerBase::RTS_Table->begin(),
-                    PreconditionerBase::RTS_Table->end(),
-                    [&](PreconditionerBase* ptr)
+                "preconditioner", "p", 1, [&](std::vector<std::string> const & optargs) -> bool
+                {
+                    // look-up the preconditioner
+                    std::vector<PreconditionerBase*>::const_iterator ip = std::find_if
+                    (
+                        PreconditionerBase::RTS_Table->begin(),
+                        PreconditionerBase::RTS_Table->end(),
+                        [&](PreconditionerBase* ptr)
+                        {
+                            return ptr->name() == optargs[0];
+                        }
+                    );
+
+                    if (ip == PreconditionerBase::RTS_Table->end())
                     {
-                        return ptr->name() == optargs[0];
+                        HexException("Unknown preconditioner \"%s\".", optargs[0].c_str());
                     }
-                );
 
-                if (ip == PreconditionerBase::RTS_Table->end())
-                {
-                    HexException("Unknown preconditioner \"%s\".", optargs[0].c_str());
+                    preconditioner = optargs[0];
+                    return true;
                 }
-
-                preconditioner = optargs[0];
-                return true;
             },
-        "checkpoints", "", 0, [&](std::vector<std::string> const & optargs) -> bool
             {
-                // write checkpoints after every iteration of COCG
-                checkpoints = true;
-                return true;
-            },
-        "autostop", "", 1, [&](std::vector<std::string> const & optargs) -> bool
-            {
-                // monitor K-matrix convergence
-                write_intermediate_solutions = true;
-                runtime_postprocess = true;
-                autostop_tolerance = std::stod(optargs[0]);
-                return true;
-            },
-        "list-preconditioners", "P", 0, [&](std::vector<std::string> const & optargs) -> bool
-            {
-                // look-up the preconditioners description
-                std::cout << "\nPreconditioners description (\"ILU\" is the default):\n\n";
-                for (PreconditionerBase const * ip : *PreconditionerBase::RTS_Table)
+                "checkpoints", "", 0, [&](std::vector<std::string> const & optargs) -> bool
                 {
-                    std::cout << ip->name() << "\n";
-                    std::cout << "\t" << ip->description() << "\n";
+                    // write checkpoints after every iteration of COCG
+                    checkpoints = true;
+                    return true;
                 }
-                std::cout << std::endl;
-                std::exit(EXIT_SUCCESS);
+            },
+            {
+                "autostop", "", 1, [&](std::vector<std::string> const & optargs) -> bool
+                {
+                    // monitor K-matrix convergence
+                    write_intermediate_solutions = true;
+                    runtime_postprocess = true;
+                    autostop_tolerance = std::stod(optargs[0]);
+                    return true;
+                }
+            },
+            {
+                "list-preconditioners", "P", 0, [&](std::vector<std::string> const & optargs) -> bool
+                {
+                    // look-up the preconditioners description
+                    std::cout << "\nPreconditioners description (\"ILU\" is the default):\n\n";
+                    for (PreconditionerBase const * ip : *PreconditionerBase::RTS_Table)
+                    {
+                        std::cout << ip->name() << "\n";
+                        std::cout << "\t" << ip->description() << "\n";
+                    }
+                    std::cout << std::endl;
+                    std::exit(EXIT_SUCCESS);
+                }
             },
 #ifndef DISABLE_PARALLEL_PRECONDITION
-        "parallel-precondition", "", 0, [&](std::vector<std::string> const & optargs) -> bool
             {
-                // parallelize preconditioning
-                parallel_precondition = true;
-                return true;
+                "parallel-precondition", "", 0, [&](std::vector<std::string> const & optargs) -> bool
+                {
+                    // parallelize preconditioning
+                    parallel_precondition = true;
+                    return true;
+                }
             },
 #endif
-        "lightweight-radial-cache", "l", 0, [&](std::vector<std::string> const & optargs) -> bool
             {
-                // do not precompute two-electron radial integral matrices but only apply them on the fly
-                lightweight_radial_cache = true;
-                return true;
+                "lightweight-radial-cache", "l", 0, [&](std::vector<std::string> const & optargs) -> bool
+                {
+                    // do not precompute two-electron radial integral matrices but only apply them on the fly
+                    lightweight_radial_cache = true;
+                    return true;
+                }
             },
-        "lightweight-full", "L", 0, [&](std::vector<std::string> const & optargs) -> bool
             {
-                // do not precompute large matrices but only apply them on the fly
-                lightweight_full = lightweight_radial_cache = true;
-                lightweight_simple = false;
-                return true;
+                "lightweight-full", "L", 0, [&](std::vector<std::string> const & optargs) -> bool
+                {
+                    // do not precompute large matrices but only apply them on the fly
+                    lightweight_full = lightweight_radial_cache = true;
+                    lightweight_simple = false;
+                    return true;
+                }
             },
-        "lightweight-simple", "", 0, [&](std::vector<std::string> const & optargs) -> bool
             {
-                // only precompute diagonal matrices just before nested CG solution
-                lightweight_simple = lightweight_full = lightweight_radial_cache = true;
-                return true;
+                "lightweight-simple", "", 0, [&](std::vector<std::string> const & optargs) -> bool
+                {
+                    // only precompute diagonal matrices just before nested CG solution
+                    lightweight_simple = lightweight_full = lightweight_radial_cache = true;
+                    return true;
+                }
             },
-        "write-intermediate-solutions", "", 0, [&](std::vector<std::string> const & optargs) -> bool
             {
-                // write intermediate solutions
-                write_intermediate_solutions = true;
-                return true;
+                "write-intermediate-solutions", "", 0, [&](std::vector<std::string> const & optargs) -> bool
+                {
+                    // write intermediate solutions
+                    write_intermediate_solutions = true;
+                    return true;
+                }
             },
-        "kpa-simple-rad", "R", 0, [&](std::vector<std::string> const & optargs) -> bool
             {
-                // use simplified radial matrix for KPA nested iterations
-                kpa_simple_rad = true;
-                return true;
+                "kpa-simple-rad", "R", 0, [&](std::vector<std::string> const & optargs) -> bool
+                {
+                    // use simplified radial matrix for KPA nested iterations
+                    kpa_simple_rad = true;
+                    return true;
+                }
             },
-        "hyb-additional-levels", "", 1, [&](std::vector<std::string> const & optargs) -> bool
             {
-                // when using the HYB preconditioner: precondition more blocks with ILU, useful close below an excitation threshold
-                hyb_additional_levels = std::stoi(optargs[0]);
-                return true;
+                "hyb-additional-levels", "", 1, [&](std::vector<std::string> const & optargs) -> bool
+                {
+                    // when using the HYB preconditioner: precondition more blocks with ILU, useful close below an excitation threshold
+                    hyb_additional_levels = std::stoi(optargs[0]);
+                    return true;
+                }
             },
-        "no-lu-update", "", 0, [&](std::vector<std::string> const & optargs) -> bool
             {
-                // do not recalculate LU
-                noluupdate = true;
-                return true;
+                "no-lu-update", "", 0, [&](std::vector<std::string> const & optargs) -> bool
+                {
+                    // do not recalculate LU
+                    noluupdate = true;
+                    return true;
+                }
             },
-        "ilu-max-iter", "", 1, [&](std::vector<std::string> const & optargs) -> bool
             {
-                // maximal number of ILU preconditioner iterations
-                ilu_max_iter = std::atoi(optargs[0].c_str());
-                return true;
+                "ilu-max-iter", "", 1, [&](std::vector<std::string> const & optargs) -> bool
+                {
+                    // maximal number of ILU preconditioner iterations
+                    ilu_max_iter = std::atoi(optargs[0].c_str());
+                    return true;
+                }
             },
-        "sub-prec-iter", "", 1, [&](std::vector<std::string> const & optargs) -> bool
             {
-                // maximal number of preconditioner iterations
-                max_sub_iter = std::atoi(optargs[0].c_str());
-                return true;
+                "sub-prec-iter", "", 1, [&](std::vector<std::string> const & optargs) -> bool
+                {
+                    // maximal number of preconditioner iterations
+                    max_sub_iter = std::atoi(optargs[0].c_str());
+                    return true;
+                }
             },
-        "sub-prec-nofail", "", 0, [&](std::vector<std::string> const & optargs) -> bool
             {
-                // continue calculation even when some of the preconditioners fails to converge
-                fail_on_sub_iter = false;
-                return true;
+                "sub-prec-nofail", "", 0, [&](std::vector<std::string> const & optargs) -> bool
+                {
+                    // continue calculation even when some of the preconditioners fails to converge
+                    fail_on_sub_iter = false;
+                    return true;
+                }
             },
-        "sub-prec-verbose", "", 0, [&](std::vector<std::string> const & optargs) -> bool
             {
-                // verbose inner preconditioners
-                sub_prec_verbose = true;
-                return true;
+                "sub-prec-verbose", "", 0, [&](std::vector<std::string> const & optargs) -> bool
+                {
+                    // verbose inner preconditioners
+                    sub_prec_verbose = true;
+                    return true;
+                }
             },
-        "coupling-limit", "", 1, [&](std::vector<std::string> const & optargs) -> bool
             {
-                // maximal multipole to be considered by the coupled preconditioner
-                coupling_limit = std::atoi(optargs[0].c_str());
-                return true;
+                "coupling-limit", "", 1, [&](std::vector<std::string> const & optargs) -> bool
+                {
+                    // maximal multipole to be considered by the coupled preconditioner
+                    coupling_limit = std::atoi(optargs[0].c_str());
+                    return true;
+                }
             },
-        "couple-all", "", 0, [&](std::vector<std::string> const & optargs) -> bool
             {
-                // couple all angular blocks when using coupled preconditioner
-                couple_all = true;
-                return true;
+                "couple-all", "", 0, [&](std::vector<std::string> const & optargs) -> bool
+                {
+                    // couple all angular blocks when using coupled preconditioner
+                    couple_all = true;
+                    return true;
+                }
             },
-        "couple-channels", "", 0, [&](std::vector<std::string> const & optargs) -> bool
             {
-                // couple only blocks containing open channels when using coupled preconditioner
-                couple_all = false;
-                return true;
+                "couple-channels", "", 0, [&](std::vector<std::string> const & optargs) -> bool
+                {
+                    // couple only blocks containing open channels when using coupled preconditioner
+                    couple_all = false;
+                    return true;
+                }
             },
 #ifdef WITH_MUMPS
-        "mumps-out-of-core", "", 0, [&](std::vector<std::string> const & optargs) -> bool
             {
-                // MUMPS out of core
-                mumps_outofcore = true;
-                return true;
+                "mumps-out-of-core", "", 0, [&](std::vector<std::string> const & optargs) -> bool
+                {
+                    // MUMPS out of core
+                    mumps_outofcore = true;
+                    return true;
+                }
             },
-        "mumps-verbose", "", 1, [&](std::vector<std::string> const & optargs) -> bool
             {
-                // maximal multipole to be considered by the coupled preconditioner
-                mumps_verbose = std::atoi(optargs[0].c_str());
-                return true;
+                "mumps-verbose", "", 1, [&](std::vector<std::string> const & optargs) -> bool
+                {
+                    // maximal multipole to be considered by the coupled preconditioner
+                    mumps_verbose = std::atoi(optargs[0].c_str());
+                    return true;
+                }
             },
-        "mumps-memory-relaxation", "", 1, [&](std::vector<std::string> const & optargs) -> bool
             {
-                // MUMPS memory relaxation factor
-                mumps_relax = std::atof(optargs[0].c_str());
-                return true;
+                "mumps-memory-relaxation", "", 1, [&](std::vector<std::string> const & optargs) -> bool
+                {
+                    // MUMPS memory relaxation factor
+                    mumps_relax = std::atof(optargs[0].c_str());
+                    return true;
+                }
             },
-        "mumps-virtual-memory", "", 0, [&](std::vector<std::string> const & optargs) -> bool
             {
-                // MUMPS out of core
-                mumps_virtual_memory = true;
-                return true;
+                "mumps-virtual-memory", "", 0, [&](std::vector<std::string> const & optargs) -> bool
+                {
+                    // MUMPS out of core
+                    mumps_virtual_memory = true;
+                    return true;
+                }
             },
 #endif
-        "shared-scratch", "s", 0, [&](std::vector<std::string> const & optargs) -> bool
             {
-                // precompute only the owned subset of radial integrals
-                shared_scratch = true;
-                return true;
+                "shared-scratch", "s", 0, [&](std::vector<std::string> const & optargs) -> bool
+                {
+                    // precompute only the owned subset of radial integrals
+                    shared_scratch = true;
+                    return true;
+                }
             },
 #ifdef WITH_OPENCL
-        "cl-list", "", 0,  [&](std::vector<std::string> const & optargs) -> bool
             {
-                // list all available OpenCL platforms and devices
-                std::cout << "Available OpenCL devices" << std::endl;
-                char platform_name[1024], platform_vendor[1024], platform_version[1024];
-                char device_name[1024], device_vendor[1024];
-                cl_platform_id platforms[10];
-                cl_device_id devices[10];
-                cl_uint nplatforms, ndevices;
-                clGetPlatformIDs(10, platforms, &nplatforms);
-                for (cl_uint i = 0; i < nplatforms; i++)
+                "cl-list", "", 0,  [&](std::vector<std::string> const & optargs) -> bool
                 {
-                    clGetPlatformInfo(platforms[i], CL_PLATFORM_NAME, sizeof(platform_name), platform_name, nullptr);
-                    clGetPlatformInfo(platforms[i], CL_PLATFORM_VENDOR, sizeof(platform_vendor), platform_vendor, nullptr);
-                    clGetPlatformInfo(platforms[i], CL_PLATFORM_VERSION, sizeof(platform_version), platform_version, nullptr);
-                    std::cout << "\t- Platform " << i << ": " << platform_name << " (" << platform_vendor << ", " << platform_version << ")" << std::endl;
-                    clGetDeviceIDs(platforms[i], CL_DEVICE_TYPE_ALL, 10, devices, &ndevices);
-                    for (cl_uint j = 0; j < ndevices; j++)
+                    // list all available OpenCL platforms and devices
+                    std::cout << "Available OpenCL devices" << std::endl;
+                    char platform_name[1024], platform_vendor[1024], platform_version[1024];
+                    char device_name[1024], device_vendor[1024];
+                    cl_platform_id platforms[10];
+                    cl_device_id devices[10];
+                    cl_uint nplatforms, ndevices;
+                    clGetPlatformIDs(10, platforms, &nplatforms);
+                    for (cl_uint i = 0; i < nplatforms; i++)
                     {
-                        clGetDeviceInfo(devices[j], CL_DEVICE_NAME, sizeof(device_name), device_name, nullptr);
-                        clGetDeviceInfo(devices[j], CL_DEVICE_VENDOR, sizeof(device_vendor), device_vendor, nullptr);
-                        std::cout << "\t\t- Device " << j << ": " << device_name << " (" << device_vendor << ")" << std::endl;
+                        clGetPlatformInfo(platforms[i], CL_PLATFORM_NAME, sizeof(platform_name), platform_name, nullptr);
+                        clGetPlatformInfo(platforms[i], CL_PLATFORM_VENDOR, sizeof(platform_vendor), platform_vendor, nullptr);
+                        clGetPlatformInfo(platforms[i], CL_PLATFORM_VERSION, sizeof(platform_version), platform_version, nullptr);
+                        std::cout << "\t- Platform " << i << ": " << platform_name << " (" << platform_vendor << ", " << platform_version << ")" << std::endl;
+                        clGetDeviceIDs(platforms[i], CL_DEVICE_TYPE_ALL, 10, devices, &ndevices);
+                        for (cl_uint j = 0; j < ndevices; j++)
+                        {
+                            clGetDeviceInfo(devices[j], CL_DEVICE_NAME, sizeof(device_name), device_name, nullptr);
+                            clGetDeviceInfo(devices[j], CL_DEVICE_VENDOR, sizeof(device_vendor), device_vendor, nullptr);
+                            std::cout << "\t\t- Device " << j << ": " << device_name << " (" << device_vendor << ")" << std::endl;
+                        }
                     }
+                    std::cout << std::endl;
+                    std::exit(0);
                 }
-                std::cout << std::endl;
-                std::exit(0);
             },
-        "cl-platform", "", 1, [&](std::vector<std::string> const & optargs) -> bool
             {
-                // use given OpenCL platform
-                ocl_platform = std::atol(optargs[0].c_str());
-                return true;
+                "cl-platform", "", 1, [&](std::vector<std::string> const & optargs) -> bool
+                {
+                    // use given OpenCL platform
+                    ocl_platform = std::atol(optargs[0].c_str());
+                    return true;
+                }
             },
-        "cl-device", "", 1, [&](std::vector<std::string> const & optargs) -> bool
             {
-                // use given OpenCL device
-                ocl_device = std::atol(optargs[0].c_str());
-                return true;
+                "cl-device", "", 1, [&](std::vector<std::string> const & optargs) -> bool
+                {
+                    // use given OpenCL device
+                    ocl_device = std::atol(optargs[0].c_str());
+                    return true;
+                }
             },
-        "cl-use-host-memory", "", 0, [&](std::vector<std::string> const & optargs) -> bool
             {
-                // keep large data in RAM
-                gpu_large_data = true;
-                return true;
+                "cl-use-host-memory", "", 0, [&](std::vector<std::string> const & optargs) -> bool
+                {
+                    // keep large data in RAM
+                    gpu_large_data = true;
+                    return true;
+                }
             },
-        "cl-multiply", "", 0, [&](std::vector<std::string> const & optargs) -> bool
             {
-                // do the lightweight multiplication on OpenCL device
-                lightweight_radial_cache = true;
-                gpu_multiply = true;
-                return true;
+                "cl-multiply", "", 0, [&](std::vector<std::string> const & optargs) -> bool
+                {
+                    // do the lightweight multiplication on OpenCL device
+                    lightweight_radial_cache = true;
+                    gpu_multiply = true;
+                    return true;
+                }
             },
 #endif
-        "parallel-factorization", "", 0, [&](std::vector<std::string> const & optargs) -> bool
             {
-                // allow multiple factorizations at a time
-                parallel_factorization = true;
-                return true;
+                "parallel-factorization", "", 0, [&](std::vector<std::string> const & optargs) -> bool
+                {
+                    // allow multiple factorizations at a time
+                    parallel_factorization = true;
+                    return true;
+                }
             },
-        "no-parallel-extraction", "", 0, [&](std::vector<std::string> const & optargs) -> bool
             {
-                // disallow parallel extraction
-                parallel_extraction = false;
-                return true;
+                "no-parallel-extraction", "", 0, [&](std::vector<std::string> const & optargs) -> bool
+                {
+                    // disallow parallel extraction
+                    parallel_extraction = false;
+                    return true;
+                }
             },
-        "carry-initial-guess", "", 0, [&](std::vector<std::string> const & optargs) -> bool
             {
-                // use previous solution as an initial guess
-                carry_initial_guess = true;
-                return true;
+                "carry-initial-guess", "", 0, [&](std::vector<std::string> const & optargs) -> bool
+                {
+                    // use previous solution as an initial guess
+                    carry_initial_guess = true;
+                    return true;
+                }
             },
-        "refine-solution", "", 0, [&](std::vector<std::string> const & optargs) -> bool
             {
-                // refine solution
-                refine_solution = true;
-                return true;
+                "refine-solution", "", 0, [&](std::vector<std::string> const & optargs) -> bool
+                {
+                    // refine solution
+                    refine_solution = true;
+                    return true;
+                }
             },
-        "extract-extrapolate", "", 0, [&](std::vector<std::string> const & optargs) -> bool
             {
-                // radially extrapolate extracted T-matrices
-                extract_extrapolate = true;
-                return true;
+                "extract-extrapolate", "", 0, [&](std::vector<std::string> const & optargs) -> bool
+                {
+                    // radially extrapolate extracted T-matrices
+                    extract_extrapolate = true;
+                    return true;
+                }
             },
-        "extract-rho-begin", "", 1, [&](std::vector<std::string> const & optargs) -> bool
             {
-                // beginning of averaging/extrapolation window
-                extract_rho_begin = std::atof(optargs[0].c_str());
-                return true;
+                "extract-rho-begin", "", 1, [&](std::vector<std::string> const & optargs) -> bool
+                {
+                    // beginning of averaging/extrapolation window
+                    extract_rho_begin = std::atof(optargs[0].c_str());
+                    return true;
+                }
             },
-        "extract-rho-end", "", 1, [&](std::vector<std::string> const & optargs) -> bool
             {
-                // end of averaging/extrapolation window
-                extract_rho = std::atof(optargs[0].c_str());
-                return true;
+                "extract-rho-end", "", 1, [&](std::vector<std::string> const & optargs) -> bool
+                {
+                    // end of averaging/extrapolation window
+                    extract_rho = std::atof(optargs[0].c_str());
+                    return true;
+                }
             },
-        "extract-rho", "", 1, [&](std::vector<std::string> const & optargs) -> bool
             {
-                // end of averaging/extrapolation window
-                extract_rho = std::atof(optargs[0].c_str());
-                return true;
+                "extract-rho", "", 1, [&](std::vector<std::string> const & optargs) -> bool
+                {
+                    // end of averaging/extrapolation window
+                    extract_rho = std::atof(optargs[0].c_str());
+                    return true;
+                }
             },
-        "extract-samples", "", 1, [&](std::vector<std::string> const & optargs) -> bool
             {
-                // number of extrapolation/averaging samples
-                extract_samples = std::atoi(optargs[0].c_str());
-                return true;
+                "extract-samples", "", 1, [&](std::vector<std::string> const & optargs) -> bool
+                {
+                    // number of extrapolation/averaging samples
+                    extract_samples = std::atoi(optargs[0].c_str());
+                    return true;
+                }
             },
-        "ssor", "", 1, [&](std::vector<std::string> const & optargs) -> bool
             {
-                // apply SSOR coupling
-                ssor = std::stod(optargs[0]);
-                return true;
+                "ssor", "", 1, [&](std::vector<std::string> const & optargs) -> bool
+                {
+                    // apply SSOR coupling
+                    ssor = std::stod(optargs[0]);
+                    return true;
+                }
             },
-        "fast-bessel", "", 0, [&](std::vector<std::string> const & optargs) -> bool
             {
-                // use faster Bessel function evaluation routine (not the Steed/Barnett) when calculating RHS
-                fast_bessel = true;
-                return true;
+                "fast-bessel", "", 0, [&](std::vector<std::string> const & optargs) -> bool
+                {
+                    // use faster Bessel function evaluation routine (not the Steed/Barnett) when calculating RHS
+                    fast_bessel = true;
+                    return true;
+                }
             },
-        "multigrid-depth", "", 1, [&](std::vector<std::string> const & optargs) -> bool
             {
-                // multigrid levels
-                multigrid_depth = std::stoi(optargs[0]);
-                return true;
+                "multigrid-depth", "", 1, [&](std::vector<std::string> const & optargs) -> bool
+                {
+                    // multigrid levels
+                    multigrid_depth = std::stoi(optargs[0]);
+                    return true;
+                }
             },
-        "multigrid-coarse-prec", "", 1, [&](std::vector<std::string> const & optargs) -> bool
             {
-                // look-up the preconditioner
-                std::vector<PreconditionerBase*>::const_iterator ip = std::find_if
-                (
-                    PreconditionerBase::RTS_Table->begin(),
-                    PreconditionerBase::RTS_Table->end(),
-                    [&](PreconditionerBase* ptr)
-                    {
-                        return ptr->name() == optargs[0];
-                    }
-                );
+                "multigrid-coarse-prec", "", 1, [&](std::vector<std::string> const & optargs) -> bool
+                {
+                    // look-up the preconditioner
+                    std::vector<PreconditionerBase*>::const_iterator ip = std::find_if
+                    (
+                        PreconditionerBase::RTS_Table->begin(),
+                        PreconditionerBase::RTS_Table->end(),
+                        [&](PreconditionerBase* ptr)
+                        {
+                            return ptr->name() == optargs[0];
+                        }
+                    );
 
-                // check that it exists
-                if (ip == PreconditionerBase::RTS_Table->end())
-                    HexException("Unknown coarse preconditioner");
+                    // check that it exists
+                    if (ip == PreconditionerBase::RTS_Table->end())
+                        HexException("Unknown coarse preconditioner");
 
-                return true;
+                    return true;
+                }
             },
-        "dom-sweeps", "", 1, [&](std::vector<std::string> const & optargs) -> bool
             {
-                // domain decomposition sweeps
-                dom_sweeps = std::stoi(optargs[0]);
-                return true;
+                "dom-sweeps", "", 1, [&](std::vector<std::string> const & optargs) -> bool
+                {
+                    // domain decomposition sweeps
+                    dom_sweeps = std::stoi(optargs[0]);
+                    return true;
+                }
             },
-        "dom-xpanels", "", 1, [&](std::vector<std::string> const & optargs) -> bool
             {
-                // domain decomposition panels (x axis)
-                dom_x_panels = std::stoi(optargs[0]);
+                "dom-xpanels", "", 1, [&](std::vector<std::string> const & optargs) -> bool
+                {
+                    // domain decomposition panels (x axis)
+                    dom_x_panels = std::stoi(optargs[0]);
 
-                // check that the number make sense
-                if (dom_x_panels < 1)
-                    HexException("There must be at least one DOM panel in direction of X axis.");
+                    // check that the number make sense
+                    if (dom_x_panels < 1)
+                        HexException("There must be at least one DOM panel in direction of X axis.");
 
-                return true;
+                    return true;
+                }
             },
-        "dom-ypanels", "", 1, [&](std::vector<std::string> const & optargs) -> bool
             {
-                // domain decomposition panels (y axis)
-                dom_y_panels = std::stoi(optargs[0]);
+                "dom-ypanels", "", 1, [&](std::vector<std::string> const & optargs) -> bool
+                {
+                    // domain decomposition panels (y axis)
+                    dom_y_panels = std::stoi(optargs[0]);
 
-                // check that the number make sense
-                if (dom_y_panels < 1)
-                    HexException("There must be at least one DOM panel in direction of Y axis.");
+                    // check that the number make sense
+                    if (dom_y_panels < 1)
+                        HexException("There must be at least one DOM panel in direction of Y axis.");
 
-                return true;
+                    return true;
+                }
             },
-        "dom-preconditioner", "", 1, [&](std::vector<std::string> const & optargs) -> bool
             {
-                // domain decomposition panels (y axis)
-                dom_preconditioner = optargs[0];
+                "dom-preconditioner", "", 1, [&](std::vector<std::string> const & optargs) -> bool
+                {
+                    // domain decomposition panels (y axis)
+                    dom_preconditioner = optargs[0];
 
-                // look-up the preconditioner
-                std::vector<PreconditionerBase*>::const_iterator ip = std::find_if
-                (
-                    PreconditionerBase::RTS_Table->begin(),
-                    PreconditionerBase::RTS_Table->end(),
-                    [&](PreconditionerBase* ptr)
-                    {
-                        return ptr->name() == dom_preconditioner;
-                    }
-                );
+                    // look-up the preconditioner
+                    std::vector<PreconditionerBase*>::const_iterator ip = std::find_if
+                    (
+                        PreconditionerBase::RTS_Table->begin(),
+                        PreconditionerBase::RTS_Table->end(),
+                        [&](PreconditionerBase* ptr)
+                        {
+                            return ptr->name() == dom_preconditioner;
+                        }
+                    );
 
-                // check that it exists
-                if (ip == PreconditionerBase::RTS_Table->end())
-                    HexException("Unknown domain decomposition panel preconditioner");
+                    // check that it exists
+                    if (ip == PreconditionerBase::RTS_Table->end())
+                        HexException("Unknown domain decomposition panel preconditioner");
 
-                return true;
+                    return true;
+                }
             },
-        "analytic-eigenstates", "", 0, [&](std::vector<std::string> const & optargs) -> bool
             {
-                // use analytic eigenstates instead of those obtained from the diagonalization
-                analytic_eigenstates = true;
-                return true;
+                "analytic-eigenstates", "", 0, [&](std::vector<std::string> const & optargs) -> bool
+                {
+                    // use analytic eigenstates instead of those obtained from the diagonalization
+                    analytic_eigenstates = true;
+                    return true;
+                }
             },
-        "runtime-postprocess", "", 0, [&](std::vector<std::string> const & optargs) -> bool
             {
-                // use analytic eigenstates instead of those obtained from the diagonalization
-                write_intermediate_solutions = true;
-                runtime_postprocess = true;
-                return true;
+                "runtime-postprocess", "", 0, [&](std::vector<std::string> const & optargs) -> bool
+                {
+                    // use analytic eigenstates instead of those obtained from the diagonalization
+                    write_intermediate_solutions = true;
+                    runtime_postprocess = true;
+                    return true;
+                }
             },
-        "purge", "", 1, [&](std::vector<std::string> const & optargs) -> bool
             {
-                // remove old directories generated by run-time postprocess
-                purge = std::stoi(optargs[0]);
-                return true;
+                "purge", "", 1, [&](std::vector<std::string> const & optargs) -> bool
+                {
+                    // remove old directories generated by run-time postprocess
+                    purge = std::stoi(optargs[0]);
+                    return true;
+                }
             },
-        "multi-rhs", "", 0, [&](std::vector<std::string> const & optargs) -> bool
             {
-                // solve for multiple initial states at once
-                multi_rhs = true;
-                return true;
+                "multi-rhs", "", 0, [&](std::vector<std::string> const & optargs) -> bool
+                {
+                    // solve for multiple initial states at once
+                    multi_rhs = true;
+                    return true;
+                }
             },
-        "rhs-dipV", "", -1, [&](std::vector<std::string> const & optargs) -> bool
             {
-                // path to input file for solutions to use at the rhs with dipole potential
-                rhs_dipV = optargs;
-                return true;
-            },
-
-        [&] (std::string optname, std::vector<std::string> const & optargs) -> bool
+                "rhs-dipV", "", -1, [&](std::vector<std::string> const & optargs) -> bool
+                {
+                    // path to input file for solutions to use at the rhs with dipole potential
+                    rhs_dipV = optargs;
+                    return true;
+                }
+            }
+        },
+        [&](std::string optname, std::vector<std::string> const & optargs) -> bool
         {
             HexException("Unknown switch \"%s\".", optname.c_str());
         }
