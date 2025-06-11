@@ -975,7 +975,7 @@ void NoPreconditioner::rhs_dipV (BlockArray<Complex> & chi, int ie, int instate)
     std::size_t Nspline0 = rhs_bspline_->Nspline();
 
     // get source solution energy
-    Real rhs_Etot = inp_->Etot[ie % inp_->Etot.size()];
+    Real rhs_Etot = rhs_inp_->Etot[ie % inp_->Etot.size()];
 
     // read the source solution from the directory containing the input file
     std::filesystem::path path(cmd_->rhs_dipV.front());
@@ -995,6 +995,7 @@ void NoPreconditioner::rhs_dipV (BlockArray<Complex> & chi, int ie, int instate)
         }
         else
         {
+            rhs_source[ill].resize(Nspline*Nspline);
             for (int ispline = 0; ispline < std::min(Nspline, Nspline0); ispline++)
                 for (int jspline = 0; jspline < std::min(Nspline, Nspline0); jspline++)
                     rhs_source[ill][ispline*Nspline + jspline] = rhs_source0[ill][ispline*Nspline0 + jspline];
