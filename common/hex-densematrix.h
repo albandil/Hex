@@ -74,6 +74,8 @@ template <class T> class DenseMatrixView
             assert(data.size() == rows * cols);
         }
 
+        virtual ~DenseMatrixView() {}
+
         // get elements array (read-write access)
         ArrayView<T> data () { return data_; }
 
@@ -178,6 +180,8 @@ template <class T> class DenseMatrix : public DenseMatrixView<T>
             DenseMatrixView<T>::data_.reset(rows * cols, storage_.data());
         }
 
+        virtual ~DenseMatrix() {}
+
         // get matrix elements array (read-write access)
         ArrayView<T> data ()
         {
@@ -275,6 +279,8 @@ template <class Type, class Base> class ColMatrix : public Base
             : Base(m.rows(), m.cols(), m.data()), ld_(m.ld()) { }
         explicit ColMatrix (RowMatrix<Type> const & m)
             : Base(m.rows(), m.cols(), m.data()), ld_(m.rows()) { reorder_(); }
+
+        virtual ~ColMatrix() {}
 
         /**
          * @brief Assignment operator.
@@ -468,6 +474,8 @@ template <class Type, class Base> class RowMatrix : public Base
             : Base(m.rows(), m.cols(), m.data()), ld_(m.ld()) { }
         explicit RowMatrix (ColMatrix<Type> const & m)
             : Base(m.rows(), m.cols(), m.data()), ld_(m.cols()) { reorder_(); }
+
+        virtual ~RowMatrix() {}
 
         /**
          * @brief Assignment operator.
