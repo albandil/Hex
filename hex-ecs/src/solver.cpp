@@ -295,9 +295,9 @@ void Solver::solve ()
         for (unsigned Spin : inp_.Spin)
         {
             // decode initial state
-            int ni = std::get<0>(inp_.instates[instate]);
-            int li = std::get<1>(inp_.instates[instate]);
-            int mi = std::get<2>(inp_.instates[instate]);
+            int ni = cmd_.rhs_dipV.empty() ? std::get<0>(inp_.instates[instate]) : 0;
+            int li = cmd_.rhs_dipV.empty() ? std::get<1>(inp_.instates[instate]) : 0;
+            int mi = cmd_.rhs_dipV.empty() ? std::get<2>(inp_.instates[instate]) : 0;
 
             // skip energy-forbidden states
             if (inp_.Etot[iE_] <= -inp_.Za*inp_.Za/(ni*ni))
@@ -308,7 +308,7 @@ void Solver::solve ()
             }
 
             // check if the right hand side will be zero for this instate
-            bool allowed = false;
+            bool allowed = not cmd_.rhs_dipV.empty();
             for (unsigned ill = 0; ill < ang_.states().size(); ill++) if (ang_.states()[ill].first == li)
             {
                 // get partia wave
@@ -396,6 +396,12 @@ void Solver::solve ()
                 // calculate right-hand sides
                 for (unsigned i = 0; i < instates_.size(); i++)
                 {
+                    if (not cmd_.rhs_dipV.empty())
+                    {
+                        std::filesystem::path inppath = cmd_.rhs_dipV.front();
+                        std::cout << "\tDriving solution will be read from " << inppath.parent_path() << std::endl;
+                    }
+
                     std::cout << "\tCreate right-hand side for initial state";
                     std::cout << " " << Hydrogen::stateName
                     (
