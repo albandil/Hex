@@ -153,9 +153,9 @@ void Amplitudes::extract (std::string directory)
             for (auto instate  : inp_.instates)
             {
                 // get initial quantum numbers
-                int ni = std::get<0>(instate);
-                int li = std::get<1>(instate);
-                int mi = std::get<2>(instate);
+                int ni = cmd_.rhs_dipV.empty() ? std::get<0>(instate) : 0;
+                int li = cmd_.rhs_dipV.empty() ? std::get<1>(instate) : 0;
+                int mi = cmd_.rhs_dipV.empty() ? std::get<2>(instate) : 0;
 
                 // is this solution allowed at all for the given angular basis?
                 bool allowed = not cmd_.rhs_dipV.empty();
@@ -247,8 +247,15 @@ void Amplitudes::extract (std::string directory)
     // update T-matrices and cross sections for discrete transitions
     for (auto lambda : Lambda_Slp)
     {
-        computeTmat_(lambda.first);
-        computeSigma_(lambda.first);
+        if (not cmd_.rhs_dipV.empty())
+        {
+            writeMultiDipoles_(lambda.first);
+        }
+        else
+        {
+            computeTmat_(lambda.first);
+            computeSigma_(lambda.first);
+        }
     }
 
     // update cross sections for ionization
@@ -894,22 +901,18 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> &
         // - distance-dependent Wronskians of F with the solution are stored in singlet_lambda (or triplet_lambda)
         // - distance-dependent Wronskians of F with the possible asymptotic spectral components are stored in WW
         // Let us minimize |W c - lambda|^2 for the vector of amplitudes "c" of size Ef.size(). This is done using
-        // solution of normal equation, Wt.W.c = Wt.lambda.
+        // the linear least squares routine from LAPACK.
 
         for (int ell = 0; ell <= inp_.maxell; ell++)
         {
-            RowMatrix<Complex> WtW;
-            cArray b = W[ell].T() * singlet_lambda[ell];
-            Array<blas::Int> ipiv(b.size());
+            cArray bs = singlet_lambda[ell];
+            cArray bt = triplet_lambda[ell];
 
-            blas::gemm(1.0_z, W[ell].T(), W[ell], 0.0_z, WtW);
-            blas::getrf(b.size(), WtW.data(), ipiv);
-            blas::getrs(b.size(), WtW.data(), ipiv, b);
+            blas::gels(W[ell], bs);
+            blas::gels(W[ell], bt);
 
-            std::cout << "Amplitudes for partial wave ell = " << ell << ":";
-            for (Complex z : b)
-                std::cout << format("%10.5e%10.5e", z.real(), z.imag());
-            std::cout << std::endl;
+            Lambda_Slp[T][ell].first[ie] += bs[0];
+            Lambda_Slp[T][ell].second[ie] += bt[0];
         }
 
         return;
@@ -1004,6 +1007,45 @@ void Amplitudes::computeSigma_ (Amplitudes::Transition T)
         rArray Re_f1_ell = -realpart(Tmat_S1) / special::constant::two_pi;
         rArray Im_f1_ell = -imagpart(Tmat_S1) / special::constant::two_pi;
         sigma_S[T].second += 0.75 * kf * inv_ki * (Re_f1_ell * Re_f1_ell + Im_f1_ell * Im_f1_ell);
+    }
+}
+
+void Amplitudes::writeMultiDipoles_(Amplitudes::Transition T)
+{
+    rArray Ef = inp_.Etot + inp_.Za*inp_.Za/(T.nf*T.nf) + (T.mf-T.mi) * inp_.B;
+
+    for (int Spin : inp_.Spin)
+    {
+        std::ofstream out(format("mdip-L%d-S%d-Pi%d-nf%d-lf%d-mf%d.txt", inp_.L, Spin, inp_.Pi, T.nf, T.lf, T.mf));
+
+        out << logo("#");
+        out << "# File generated on " << current_time() << "#" << std::endl;
+        out << "# Partial multiphoton ionization amplitudes vs. photoelectron energy." << std::endl;
+        out << "#" << std::endl;
+        out << "# E [Ry]";
+        for (int ell = 0; ell <= inp_.maxell; ell++)
+            out << "    Re_d[" << ell << "]      Im_d[" << ell << "]  ";
+        out << std::endl;
+        out << "# ------";
+        for (int ell = 0; ell <= inp_.maxell; ell++)
+            out << "    -------      -------  ";
+        out << std::endl;
+
+        auto data = Lambda_Slp[T];
+
+        for (int ie = 0; ie < data.front().first.size(); ie++)
+        {
+            out << format("%10.5f", Ef[ie]);
+
+            for (int ell = 0; ell <= inp_.maxell; ell++)
+            {
+               Complex d = Spin == 0 ? data[ell].first[ie] : data[ell].second[ie];
+
+               out << format(" %+10.5e %+10.5e", d.real(), d.imag());
+            }
+
+            out << std::endl;
+        }
     }
 }
 

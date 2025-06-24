@@ -126,6 +126,11 @@ extern "C" void cgetrs_
 (
     char*, blas::Int*, blas::Int*, std::complex<float>*, blas::Int*, blas::Int*, std::complex<float>, blas::Int*, blas::Int*
 );
+extern "C" void zgels_
+(
+    char*, blas::Int*, blas::Int*, blas::Int*, std::complex<double>*, blas::Int*, std::complex<double>*, blas::Int*,
+    std::complex<double>*, blas::Int*, blas::Int*
+);
 extern "C" void zgetrf_
 (
     blas::Int*, blas::Int*, std::complex<double>*, blas::Int*, blas::Int*, blas::Int*
@@ -377,3 +382,39 @@ blas::Int blas::getrs (blas::Int n, cArrayView ab, ArrayView<blas::Int> ipiv, cA
 
     return info;
 }
+
+void blas::gels(DenseMatrixView<Complex> const& A, cArrayView b)
+{
+#ifdef SINGLE
+#error "gels not yet implemented for single precision"
+#else
+    blas::Int m = A.rows(), n = A.cols(), lda = A.ld(), ldb = A.cols(), nrhs = b.size()/A.cols();
+    blas::Int lwork = -1, info;
+    char trans = A.layout();
+    cArray work(1);
+
+    zgels_
+    (
+        &trans, &m, &n, &nrhs,
+        const_cast<std::complex<double>*>(A.data().data()),
+        &lda, &b[0], &ldb, &work[0], &lwork, &info
+    );
+
+    if (info != 0)
+        HexException("zgels error %d during workspace query", info);
+
+    lwork = work[0].real();
+    work.resize(lwork);
+
+    zgels_
+    (
+        &trans, &m, &n, &nrhs,
+        const_cast<std::complex<double>*>(A.data().data()),
+        &lda, &b[0], &ldb, &work[0], &lwork, &info
+    );
+
+    if (info != 0)
+        HexException("zgels error %d during least squares solution", info);
+#endif
+}
+

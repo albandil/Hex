@@ -282,14 +282,25 @@ Complex special::ric_j (int l, Complex z)
 
 cArray special::dric_jv (int Z, int lmax, double k, Complex r)
 {
+    // results
+    cArray deval(lmax+1);
+
+    // evaluate Coulomb functions
     if (Z != 0)
-        HexException("dric_jv not implemented for nonzero Z");
+    {
+        rArray F(lmax + 1), Fp(lmax + 1), expF(lmax + 1);
+        rArray G(lmax + 1), Gp(lmax + 1), expG(lmax + 1);
+
+        if (gsl_sf_coulomb_wave_FGp_array(0, lmax, -Z/k, k*r.real(), &F[0], &Fp[0], &G[0], &Gp[0], &expF[0], &expG[0]) != GSL_SUCCESS)
+            HexException("Failed to evaluate Coulomb functions using gsl_sf_coulomb_wave_FGp_array.");
+        for (int i = 0; i <= lmax; i++)
+            deval[i] = Fp[i] * std::exp(expF[i]);
+
+        return deval;
+    }
 
     // evaluate first the Riccati-Bessel functions themselves
     cArray eval = ric_jv(Z, lmax, k, r);
-
-    // results
-    cArray deval(lmax+1);
 
     // shorthand
     Complex inv_z = Complex(1.)/(k*r);

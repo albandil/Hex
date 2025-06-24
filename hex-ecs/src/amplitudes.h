@@ -225,6 +225,14 @@ class Amplitudes
         void computeTmat_ (Transition T);
 
         /**
+         * @brief Write multi-photon amplitudes.
+         *
+         * Use the precomputed multi-photon amplitudes obtained by fitting the asymptotic
+         * forms of the photoelectron wave functions and write them to file.
+         */
+        void writeMultiDipoles_(Transition T);
+
+        /**
          * @brief Extract radial part of ionization amplitude.
          * 
          * Compute hyperangular integrals for evaluation of the ionization T-matrices,

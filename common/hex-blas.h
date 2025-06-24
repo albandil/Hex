@@ -89,6 +89,8 @@ namespace blas
         const cArrayView y
     );
 
+    void gels(DenseMatrixView<Complex> const& A, cArrayView b);
+
     Int sbtrf (Int n, Int k, rArrayView ab, ArrayView<Int> ipiv);
     Int sbtrf (Int n, Int k, cArrayView ab, ArrayView<Int> ipiv);
     Int sbtrs (Int n, Int k, rArrayView ab, ArrayView<Int> ipiv, rArrayView bx);
