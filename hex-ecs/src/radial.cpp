@@ -590,6 +590,9 @@ void RadialIntegrals::setupOneElectronIntegrals (bool shared_scratch, bool IamMa
     SetupOneElectronIntegrals(x)
     SetupOneElectronIntegrals(y)
 
+    DL_x_.setAntisymmetric(true);
+    DL_y_.setAntisymmetric(true);
+
     if (verbose_)
         std::cout << "done in " << t.nice_time() << std::endl << std::endl;
 

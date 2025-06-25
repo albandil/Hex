@@ -104,6 +104,10 @@ class MatrixSelection
  *   a simple increase of bandwidth. It holds that the bandwidth of the
  *   matrix C = AB is equal to the sum of the bandwidths of the factors
  *   decreased by one.
+ *
+ * Note that this class has a switch that makes the matrix antisymmetric
+ * rather than symmetric. Be aware, though, that not all members repsect
+ * this flag. Always check the code if you want to use this feature.
  */
 template <class DataT> class SymBandMatrix
 {
@@ -209,7 +213,7 @@ public:
 
         assert(irow < n_ and icol < n_);
 
-        return idia < d_ ? elems_[irow * d_ + idia] : 0.;
+        return idia < d_ ? antisymmetric and i > j ? -elems_[irow * d_ + idia] : elems_[irow * d_ + idia] : 0.;
     }
     DataT & operator() (int i, int j)
     {
@@ -218,6 +222,7 @@ public:
         std::size_t idia = icol - irow;
 
         assert(irow < n_ and icol < n_ and idia < d_);
+        assert(i <= j or not antisymmetric);
 
         return elems_[irow * d_ + idia];
     }
@@ -262,6 +267,9 @@ public:
 
         if (d_ != B.d_)
             HexException("Unequal half-bandwidths (%d != %d).", d_, B.d_);
+
+        if (antisymmetric != B.antisymmetric)
+            HexException("Different symmetry properties.");
 
         return true;
     }
@@ -602,7 +610,7 @@ public:
 
             // assign sub-diagonal elements
             for (std::size_t j = (i >= d_ - 1 ? i - d_ + 1 : 0); j < i; j++)
-                out[x + j - i] = elems_[j * d_ + i - j];
+                out[x + j - i] = antisymmetric ? -elems_[j * d_ + i - j] : elems_[j * d_ + i - j];
 
             // assign super-diagonal elements
             for (std::size_t j = i + 1; j < n_ and j < i + d_; j++)
@@ -645,7 +653,7 @@ public:
                 {
                     I.push_back(i+d);
                     J.push_back(i);
-                    V.push_back(*el);
+                    V.push_back(antisymmetric ? -*el : *el);
                 }
 
                 // main diagonal
@@ -687,7 +695,7 @@ public:
 
                 // lower triangle
                 if ((d != 0) and (triangle & MatrixSelection::StrictLower))
-                    M(i+d,i) = *el;
+                    M(i+d,i) = antisymmetric ? -*el : *el;
             }
             // move on to the next elements
             el++;
@@ -696,10 +704,19 @@ public:
         return M;
     }
 
+    /// Mark matrix as antisymmetric rather than symmetric.
+    void setAntisymmetric(bool flag)
+    {
+        antisymmetric = flag;
+    }
+
     /// Output to a text stream.
 //     friend std::ostream & operator << (std::ostream & out, SymBandMatrix<DataT> const & A);
 
 private:
+
+    // antisymmetry switch
+    bool antisymmetric{};
 
     // dimension (only square matrices allowed)
     std::size_t n_;
