@@ -1009,6 +1009,7 @@ void NoPreconditioner::rhs_dipV (BlockArray<Complex> & chi, int ie, int instate)
     {
         int l1 = ang_->states()[ill].first;
         int l2 = ang_->states()[ill].second;
+        // std::cout << "\nBlock " << ill << ": (" << l1 << ", " << l2 << ")\n";
 
         // setup storage
         cArray chi_block (Nspline*Nspline);
@@ -1016,19 +1017,19 @@ void NoPreconditioner::rhs_dipV (BlockArray<Complex> & chi, int ie, int instate)
         // for all segments constituting the source state
         for (unsigned illp = 0; illp < rhs_ang_->states().size(); illp++)
         {
-            int l1p = rhs_ang_->states()[ill].first;
-            int l2p = rhs_ang_->states()[ill].second;
+            int l1p = rhs_ang_->states()[illp].first;
+            int l2p = rhs_ang_->states()[illp].second;
+            // std::cout << "\tBlock " << illp << ": (" << l1p << ", " << l2p << ")\n";
 
             // dipole transition in the first coordinate, overlap in second
             if (l2 == l2p)
             {
-                Real a = 0;
-                Real b = 0;
+                Real a = 0, b = 0, c = 0;
 
                 for (int m1 = -l1; m1 <= l1; m1++)
                 {
                     int M = 0;
-                    int m2 = M;
+                    int m2 = M - m1;
                     int m1p = m1;   // z polarization
                     int m2p = m2;   // Kronecker delta
 
@@ -1036,24 +1037,34 @@ void NoPreconditioner::rhs_dipV (BlockArray<Complex> & chi, int ie, int instate)
                     Real Cp = special::ClebschGordan(l1p, m1p, l2p, m2p, rhs_ang_->L(), M);
                     Real G = std::sqrt(4*special::constant::pi/3) * special::Gaunt(1, 0, l1p, m1p, l1, m1);
 
-                    a += C*Cp*G*(l1*(l1 + 1) - l1p*(l1p + 1))/2;
-                    b -= C*Cp*G;
+                    if (not cmd_->length_gauge)
+                    {
+                        a += C*Cp*G*(l1p*(l1p + 1) - l1*(l1 + 1))/2;
+                        b -= C*Cp*G;
+
+                        /*if (C*Cp*G != 0)
+                            std::cout << "\t\tcontribution from (" << l1p << ", " << l2p << "); m1 = " << m1 << ", m2 = " << m2 << ", m1p = " << m1p << ", m2p = " << m2p << "; a = " << a << std::endl;*/
+                    }
+                    else
+                    {
+                        c += C*Cp*G;
+                    }
                 }
 
-                kron_dot(1.0, chi_block, a, rhs_source[illp], rad_inner_->Mm1(), rad_inner_->S());
-                kron_dot(1.0, chi_block, b, rhs_source[illp], rad_inner_->DL(), rad_inner_->S());
+                if (a != 0) kron_dot(1.0, chi_block, a, rhs_source[illp], rad_inner_->Mm1(), rad_inner_->S());
+                if (b != 0) kron_dot(1.0, chi_block, b, rhs_source[illp], rad_inner_->DL(),  rad_inner_->S());
+                if (c != 0) kron_dot(1.0, chi_block, c, rhs_source[illp], rad_inner_->Mp1(), rad_inner_->S());
             }
 
             // dipole transition in the second coordinate, overlap in first
             if (l1 == l1p)
             {
-                Real a = 0;
-                Real b = 0;
+                Real a = 0, b = 0, c = 0;
 
                 for (int m2 = -l2; m2 <= l2; m2++)
                 {
                     int M = 0;
-                    int m1 = M;
+                    int m1 = M - m2;
                     int m1p = m1;   // Kronecker delta
                     int m2p = m2;   // z polarization
 
@@ -1061,17 +1072,29 @@ void NoPreconditioner::rhs_dipV (BlockArray<Complex> & chi, int ie, int instate)
                     Real Cp = special::ClebschGordan(l1p, m1p, l2p, m2p, rhs_ang_->L(), M);
                     Real G = std::sqrt(4*special::constant::pi/3) * special::Gaunt(1, 0, l2p, m2p, l2, m2);
 
-                    a += C*Cp*G*(l2*(l2 + 1) - l2p*(l2p + 1))/2;
-                    b -= C*Cp*G;
+                    if (not cmd_->length_gauge)
+                    {
+                        a += C*Cp*G*(l2p*(l2p + 1) - l2*(l2 + 1))/2;
+                        b -= C*Cp*G;
+
+                        /*if (C*Cp*G != 0)
+                            std::cout << "\t\tcontribution from (" << l1p << ", " << l2p << "); m1 = " << m1 << ", m2 = " << m2 << ", m1p = " << m1p << ", m2p = " << m2p << "; a = " << a << std::endl;*/
+                    }
+                    else
+                    {
+                        c += C*Cp*G;
+                    }
                 }
 
-                kron_dot(1.0, chi_block, a, rhs_source[illp], rad_inner_->S(), rad_inner_->Mm1());
-                kron_dot(1.0, chi_block, b, rhs_source[illp], rad_inner_->S(), rad_inner_->DL());
+                if (a != 0) kron_dot(1.0, chi_block, a, rhs_source[illp], rad_inner_->S(), rad_inner_->Mm1());
+                if (b != 0) kron_dot(1.0, chi_block, b, rhs_source[illp], rad_inner_->S(), rad_inner_->DL());
+                if (c != 0) kron_dot(1.0, chi_block, c, rhs_source[illp], rad_inner_->S(), rad_inner_->Mp1());
             }
         }
 
         // add phase from the momentum operator
-        chi_block *= -1.0_i;
+        if (not cmd_->length_gauge)
+            chi_block *= -1.0_i;
 
         // use the calculated block
         chi[ill] = std::move(chi_block);

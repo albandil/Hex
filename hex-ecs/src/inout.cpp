@@ -999,6 +999,14 @@ void CommandLine::parse (int argc, char* argv[])
                     rhs_dipV = optargs;
                     return true;
                 }
+            },
+            {
+                "length-gauge", "", 0, [&](std::vector<std::string> const & optargs) -> bool
+                {
+                    // switch to length gauge for Dalgarno-Lewis mode
+                    length_gauge = true;
+                    return true;
+                }
             }
         },
         [&](std::string optname, std::vector<std::string> const & optargs) -> bool

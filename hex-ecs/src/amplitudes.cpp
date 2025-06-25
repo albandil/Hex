@@ -736,9 +736,11 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> &
     rArray Ef(Etot_.size()), kf(Etot_.size());
     for (int i = 0; i < Etot_.size(); i++)
     {
-        Ef[i] = Etot_[i][ie] + 1.0_r/(T.nf*T.nf) + (T.mf-T.mi) * inp_.B;
+        Ef[i] = Etot_[i][ie] + inp_.Za*inp_.Za/(T.nf*T.nf) + (T.mf-T.mi) * inp_.B;
         kf[i] = (Ef[i] >= 0 ? std::sqrt(Ef[i]) : special::constant::Nan);
     }
+    // std::cout << "Ef = " << Ef << std::endl;
+    // std::cout << "kf = " << kf << std::endl;
 
     // shorthands
     unsigned Nenergy = inp_.Etot.size();               // energy count
@@ -803,7 +805,7 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> &
     if (Rb > bspline_full_.R2())
         HexException("Extraction radius too far, %g > %g.", Rb, bspline_full_.R2());
 
-    std::vector<ColMatrix<Complex>> W(inp_.maxell + 1, ColMatrix<Complex>(Ef.size(), samples));
+    std::vector<ColMatrix<Complex>> W(inp_.maxell + 1, ColMatrix<Complex>(samples, Ef.size()));
 
     // evaluate radial part for all evaluation radii
     for (int i = 0; i < samples; i++)
@@ -838,9 +840,9 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> &
 
             for (int j = 0; j < Ef.size(); j++)
             {
-                auto [Hl_R0, dHl_R0] = special::H_dH(inp_.Za - 1, l, kf[0], eval_r);
+                auto [Hl_R0, dHl_R0] = special::H_dH(inp_.Za - 1, l, kf[j], eval_r);
 
-                W[l](j, i) = dj_R0[l] * Hl_R0 - j_R0[l] * dHl_R0;
+                W[l](i, j) = dj_R0[l] * Hl_R0 - j_R0[l] * dHl_R0 * kf[j];
             }
         }
 
@@ -866,6 +868,10 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> &
                     Nspline_inner,  // columns
                     solution[ill]   // data
                 );
+
+                // DEBUG
+                // lambda = (Sp | PsiSc | Bspline_R0);
+                // std::cout << eval_r << " " << ill << " " << ell << " " << lambda.real() << " " << lambda.imag() << std::endl;
 
                 // calculate radial integral
                 lambda = (Sp | PsiSc | Wj[ell]);
@@ -905,14 +911,25 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> &
 
         for (int ell = 0; ell <= inp_.maxell; ell++)
         {
-            cArray bs = singlet_lambda[ell];
-            cArray bt = triplet_lambda[ell];
+            if (singlet_lambda[ell].norm() != 0)
+            {
+                blas::gels(W[ell], singlet_lambda[ell]);
+                Lambda_Slp[T][ell].first[ie] += singlet_lambda[ell][0];
 
-            blas::gels(W[ell], bs);
-            blas::gels(W[ell], bt);
-
-            Lambda_Slp[T][ell].first[ie] += bs[0];
-            Lambda_Slp[T][ell].second[ie] += bt[0];
+                /*std::cout << "\nFit (kf[0] = " << kf[0] << "):\n";
+                for (int i = 0; i < samples; i++)
+                {
+                    auto [Hl_R0, dHl_R0] = special::H_dH(inp_.Za - 1, ell, kf[0], grid[i]);
+                    dHl_R0 = singlet_lambda[ell][0]*Hl_R0;
+                    std::cout << grid[i] << " " << Hl_R0.real() << " " << Hl_R0.imag() << " " << dHl_R0.real() << " " << dHl_R0.imag() << std::endl;
+                }
+                std::cout << std::endl;*/
+            }
+            if (triplet_lambda[ell].norm() != 0)
+            {
+                blas::gels(W[ell], triplet_lambda[ell]);
+                Lambda_Slp[T][ell].second[ie] += triplet_lambda[ell][0];
+            }
         }
 
         return;
@@ -1016,7 +1033,7 @@ void Amplitudes::writeMultiDipoles_(Amplitudes::Transition T)
 
     for (int Spin : inp_.Spin)
     {
-        std::ofstream out(format("mdip-L%d-S%d-Pi%d-nf%d-lf%d-mf%d.txt", inp_.L, Spin, inp_.Pi, T.nf, T.lf, T.mf));
+        std::ofstream out(format("mdip-L%d-S%d-Pi%d-n%d-l%d-m%+d.dat", inp_.L, Spin, inp_.Pi, T.nf, T.lf, T.mf));
 
         out << logo("#");
         out << "# File generated on " << current_time() << "#" << std::endl;
@@ -1039,7 +1056,19 @@ void Amplitudes::writeMultiDipoles_(Amplitudes::Transition T)
 
             for (int ell = 0; ell <= inp_.maxell; ell++)
             {
-               Complex d = Spin == 0 ? data[ell].first[ie] : data[ell].second[ie];
+               Complex ap = Spin == 0 ? data[ell].first[ie] : data[ell].second[ie];
+
+               // compensate symmetry factor in the asymptotic wave-function
+               ap *= special::constant::sqrt_two;
+
+               /*if (ell == 1) {
+                   auto [Hl_R0, dHl_R0] = special::H_dH(inp_.Za - 1, ell, std::sqrt(Ef[ie]), bspline_full_.R2());
+                   dHl_R0 *= std::sqrt(Ef[ie]);
+                   std::cout << 0.5*Ef[ie] << " " << ap << " " << std::abs(ap) << " " << std::arg(ap) << " " << Hl_R0 << " " << dHl_R0 << std::endl;
+               }*/
+
+               // calculate dipole element from the asymptotic expansion coefficient
+               Complex d = std::sqrt(std::sqrt(Ef[ie])/special::constant::two_pi) * ap;
 
                out << format(" %+10.5e %+10.5e", d.real(), d.imag());
             }

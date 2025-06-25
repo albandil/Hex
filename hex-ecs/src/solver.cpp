@@ -400,6 +400,7 @@ void Solver::solve ()
                     {
                         std::filesystem::path inppath = cmd_.rhs_dipV.front();
                         std::cout << "\tDriving solution will be read from " << inppath.parent_path() << std::endl;
+                        std::cout << "\tUsing " << (cmd_.length_gauge ? "length" : "velocity") << " gauge for the dipole operator" << std::endl;
                     }
 
                     std::cout << "\tCreate right-hand side for initial state";

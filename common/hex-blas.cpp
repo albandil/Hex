@@ -388,7 +388,7 @@ void blas::gels(DenseMatrixView<Complex> const& A, cArrayView b)
 #ifdef SINGLE
 #error "gels not yet implemented for single precision"
 #else
-    blas::Int m = A.rows(), n = A.cols(), lda = A.ld(), ldb = A.cols(), nrhs = b.size()/A.cols();
+    blas::Int m = A.rows(), n = A.cols(), lda = A.ld(), ldb = A.rows(), nrhs = b.size()/A.rows();
     blas::Int lwork = -1, info;
     char trans = A.layout();
     cArray work(1);

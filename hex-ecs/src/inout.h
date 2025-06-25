@@ -344,6 +344,9 @@ class CommandLine
 
         /// Input file for solutions to use at right-hand side with dipole potential.
         std::vector<std::string> rhs_dipV;
+
+        /// Switch to length gauge in Dalgarno-Lewis mode.
+        bool length_gauge{false};
 };
 
 /**
