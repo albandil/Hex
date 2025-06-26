@@ -1058,8 +1058,13 @@ void Amplitudes::writeMultiDipoles_(Amplitudes::Transition T)
             {
                Complex ap = Spin == 0 ? data[ell].first[ie] : data[ell].second[ie];
 
+               int M = 0;
+
                // compensate symmetry factor in the asymptotic wave-function
                ap *= special::constant::sqrt_two;
+
+               // add the coupling factor for this L, M solution (equals to one for s-states)
+               ap *= special::ClebschGordan(T.lf, T.mf, ell, M - T.mf, inp_.L, M);
 
                /*if (ell == 1) {
                    auto [Hl_R0, dHl_R0] = special::H_dH(inp_.Za - 1, ell, std::sqrt(Ef[ie]), bspline_full_.R2());
