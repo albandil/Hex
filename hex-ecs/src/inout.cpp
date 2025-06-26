@@ -32,6 +32,7 @@
 #include <cstdio>
 #include <cstring>
 #include <cstdlib>
+#include <filesystem>
 #include <fstream>
 #include <string>
 #include <tuple>
@@ -997,6 +998,11 @@ void CommandLine::parse (int argc, char* argv[])
                 {
                     // path to input file for solutions to use at the rhs with dipole potential
                     rhs_dipV = optargs;
+                    for (auto const& path : rhs_dipV)
+                    {
+                        if (not std::filesystem::exists(path))
+                            HexException("Input file %s not found.", path.c_str());
+                    }
                     return true;
                 }
             },
