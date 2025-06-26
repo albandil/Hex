@@ -1039,13 +1039,13 @@ void Amplitudes::writeMultiDipoles_(Amplitudes::Transition T)
         out << "# File generated on " << current_time() << "#" << std::endl;
         out << "# Partial multiphoton ionization amplitudes vs. photoelectron energy." << std::endl;
         out << "#" << std::endl;
-        out << "# E [Ry]";
+        out << "#   E [Ry]";
         for (int ell = 0; ell <= inp_.maxell; ell++)
-            out << "    Re_d[" << ell << "]      Im_d[" << ell << "]  ";
+            out << "      Re_d[" << ell << "]      Im_d[" << ell << "]";
         out << std::endl;
-        out << "# ------";
+        out << "# --------";
         for (int ell = 0; ell <= inp_.maxell; ell++)
-            out << "    -------      -------  ";
+            out << "  -----------  -----------";
         out << std::endl;
 
         auto data = Lambda_Slp[T];
