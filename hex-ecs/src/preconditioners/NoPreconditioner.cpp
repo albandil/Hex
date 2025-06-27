@@ -974,6 +974,14 @@ void NoPreconditioner::rhs_dipV (BlockArray<Complex> & chi, int ie, int instate)
     std::size_t Nspline = rad_inner_->bspline().Nspline();
     std::size_t Nspline0 = rhs_bspline_->Nspline();
 
+    if (ie >= rhs_inp_->Etot.size())
+    {
+        if (rhs_inp_->Etot.empty())
+            HexException("No energies available in the driving solution.");
+        if (not std::isnan(rhs_inp_->Etot[ie % rhs_inp_->Etot.size()]))
+            HexException("Driving solution has fewer energies, but they do not correspond to bound state.");
+    }
+
     // get source solution energy
     Real rhs_Etot = rhs_inp_->Etot[ie % rhs_inp_->Etot.size()];
 

@@ -1033,7 +1033,7 @@ void Amplitudes::computeSigma_ (Amplitudes::Transition T)
 
 void Amplitudes::writeMultiDipoles_(Amplitudes::Transition T)
 {
-    rArray Ef0 = Etot_[1] + inp_.Za*inp_.Za/(T.nf*T.nf) + (T.mf-T.mi) * inp_.B;
+    //rArray Ef0 = Etot_[1] + inp_.Za*inp_.Za/(T.nf*T.nf) + (T.mf-T.mi) * inp_.B;
     rArray Ef = inp_.Etot + inp_.Za*inp_.Za/(T.nf*T.nf) + (T.mf-T.mi) * inp_.B;
 
     for (int Spin : inp_.Spin)
@@ -1057,7 +1057,7 @@ void Amplitudes::writeMultiDipoles_(Amplitudes::Transition T)
 
         for (int ie = 0; ie < data.front().first.size(); ie++)
         {
-            Real kf0 = std::sqrt(Ef0[ie]);
+            //Real kf0 = std::sqrt(Ef0[ie]);
             Real kf = std::sqrt(Ef[ie]);
 
             out << format("%10.5f", Ef[ie]);
