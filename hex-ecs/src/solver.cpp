@@ -299,8 +299,10 @@ void Solver::solve ()
             int li = cmd_.rhs_dipV.empty() ? std::get<1>(inp_.instates[instate]) : 0;
             int mi = cmd_.rhs_dipV.empty() ? std::get<2>(inp_.instates[instate]) : 0;
 
+            bool allowed = not cmd_.rhs_dipV.empty();
+
             // skip energy-forbidden states
-            if (inp_.Etot[iE_] <= -inp_.Za*inp_.Za/(ni*ni))
+            if (not allowed and inp_.Etot[iE_] <= -inp_.Za*inp_.Za/(ni*ni))
             {
                 std::cout << "\tSkip initial state " << Hydrogen::stateName(ni,li,mi) << " (S = " << Spin
                           << ") : not allowed by total E." << std::endl;;
@@ -308,7 +310,6 @@ void Solver::solve ()
             }
 
             // check if the right hand side will be zero for this instate
-            bool allowed = not cmd_.rhs_dipV.empty();
             for (unsigned ill = 0; ill < ang_.states().size(); ill++) if (ang_.states()[ill].first == li)
             {
                 // get partia wave

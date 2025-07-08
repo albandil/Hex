@@ -733,11 +733,18 @@ cArray Amplitudes::readAtomPseudoState (int l, int ichan) const
 void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> & solution, int ie, int Spin)
 {
     // final projectile energy and momentum
-    rArray Ef(Etot_.size()), kf(Etot_.size());
+    rArray Ef, kf;
     for (int i = 0; i < Etot_.size(); i++)
     {
-        Ef[i] = Etot_[i][ie] + inp_.Za*inp_.Za/(T.nf*T.nf) + (T.mf-T.mi) * inp_.B;
-        kf[i] = (Ef[i] >= 0 ? std::sqrt(Ef[i]) : special::constant::Nan);
+        Real E = Etot_[i][ie] + inp_.Za*inp_.Za/(T.nf*T.nf) + (T.mf-T.mi) * inp_.B;
+        Real k = (E >= 0 ? std::sqrt(E) : special::constant::Nan);
+
+        // store kinetic energies and momenta in open channels
+        if (E > 0)
+        {
+            Ef.push_back(E);
+            kf.push_back(k);
+        }
     }
     // std::cout << "Ef = " << Ef << std::endl;
     // std::cout << "kf = " << kf << std::endl;
@@ -761,7 +768,7 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> &
     }
 
     // skip impact energies with undefined outgoing momentum
-    if (not std::isfinite(kf[0]) or kf[0] == 0.)
+    if (kf.empty() or not std::isfinite(kf[0]) or kf[0] == 0.)
         return;
 
     // skip angular-forbidden transitions
@@ -838,7 +845,7 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> &
         {
             Wj[l] = dj_R0[l] * Bspline_R0 - j_R0[l] * Dspline_R0;
 
-            for (int j = 0; j < Ef.size(); j++)
+            for (int j = 0; j < kf.size(); j++)
             {
                 auto [Hl_R0, dHl_R0] = special::H_dH(inp_.Za - 1, l, kf[j], eval_r);
 
