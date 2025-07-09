@@ -736,14 +736,19 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> &
     rArray Ef, kf;
     for (int i = 0; i < Etot_.size(); i++)
     {
-        Real E = Etot_[i][ie] + inp_.Za*inp_.Za/(T.nf*T.nf) + (T.mf-T.mi) * inp_.B;
-        Real k = (E >= 0 ? std::sqrt(E) : special::constant::Nan);
-
         // store kinetic energies and momenta in open channels
-        if (E > 0)
+        for (int nf = T.lf + 1; nf < T.nf + 5; nf++)
         {
-            Ef.push_back(E);
-            kf.push_back(k);
+            if (nf == T.nf or i > 0)
+            {
+                Real E = Etot_[i][ie] + inp_.Za*inp_.Za/(nf*nf) + (T.mf - T.mi)*inp_.B;
+
+                if (E > 0)
+                {
+                    Ef.push_back(E);
+                    kf.push_back(std::sqrt(E));
+                }
+            }
         }
     }
     // std::cout << "Ef = " << Ef << std::endl;
