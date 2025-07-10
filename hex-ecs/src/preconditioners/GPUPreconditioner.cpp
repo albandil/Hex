@@ -187,11 +187,12 @@ void GPUCGPreconditioner::setup ()
 
     std::cout << "\t- device " << cmd_->ocl_device << ": " << device_name << " (" << device_vendor << ")" << std::endl;
 
-    cl_ulong max_compute_units, max_work_group_size, local_memory_size, global_memory_size;
+    cl_ulong max_compute_units, max_work_group_size, local_memory_size, global_memory_size, max_allocation;
     clGetDeviceInfo(device_, CL_DEVICE_MAX_COMPUTE_UNITS, sizeof(cl_ulong), &max_compute_units, 0);
     clGetDeviceInfo(device_, CL_DEVICE_MAX_WORK_GROUP_SIZE, sizeof(cl_ulong), &max_work_group_size, 0);
     clGetDeviceInfo(device_, CL_DEVICE_LOCAL_MEM_SIZE, sizeof(cl_ulong), &local_memory_size, 0);
     clGetDeviceInfo(device_, CL_DEVICE_GLOBAL_MEM_SIZE, sizeof(cl_ulong), &global_memory_size, 0);
+    clGetDeviceInfo(device_, CL_DEVICE_MAX_MEM_ALLOC_SIZE, sizeof(cl_ulong), &max_allocation, 0);
 
     std::cout << "\t- max compute units: " << max_compute_units << std::endl;
     std::cout << "\t- max work group size: " << max_work_group_size << std::endl;
@@ -258,7 +259,17 @@ void GPUCGPreconditioner::setup ()
     lreq *= 16;
 
     std::cout << "\t- local memory size: " << local_memory_size/1024 << " kiB ";
-    std::cout << "(apx. " << format("%.2f", lreq * 100. / local_memory_size) << " % will be used)" << std::endl << std::endl;
+    std::cout << "(apx. " << format("%.2f", lreq * 100. / local_memory_size) << " % will be used)" << std::endl;
+    std::cout << "\t- max allocation: " << max_allocation/(1024*1024) << " MiB" << std::endl << std::endl;
+    std::cout << std::flush;
+
+    if (cmd_->lightweight_simple or not cmd_->lightweight_full)
+    {
+        std::size_t Asize = (order + 1)*(order + 1)*Nspline_inner_x*Nspline_inner_y*sizeof(Complex);
+
+        if (max_allocation < Asize)
+            HexException("Allocation of %lld MiB requested, but not supported by device!", Asize/(1024*1024));
+    }
 
     // create context and command queue
     context_ = clCreateContext(nullptr, 1, &device_, nullptr, nullptr, nullptr);
