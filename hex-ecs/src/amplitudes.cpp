@@ -1067,7 +1067,7 @@ void Amplitudes::writeMultiDipoles_(Amplitudes::Transition T)
 
         auto data = Lambda_Slp[T];
 
-        for (int ie = 0; ie < data.front().first.size(); ie++)
+        for (int ie = 0; ie < data.front().first.size(); ie++) if (Ef[ie] > 0)
         {
             //Real kf0 = std::sqrt(Ef0[ie]);
             Real kf = std::sqrt(Ef[ie]);
