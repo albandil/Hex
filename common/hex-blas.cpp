@@ -131,6 +131,11 @@ extern "C" void zgels_
     char*, blas::Int*, blas::Int*, blas::Int*, std::complex<double>*, blas::Int*, std::complex<double>*, blas::Int*,
     std::complex<double>*, blas::Int*, blas::Int*
 );
+extern "C" void zgelss_
+(
+    blas::Int*, blas::Int*, blas::Int*, std::complex<double>*, blas::Int*, std::complex<double>*, blas::Int*,
+    double*, double*, blas::Int*, std::complex<double>*, blas::Int*, double*, blas::Int*
+);
 extern "C" void zgetrf_
 (
     blas::Int*, blas::Int*, std::complex<double>*, blas::Int*, blas::Int*, blas::Int*
@@ -418,3 +423,41 @@ void blas::gels(DenseMatrixView<Complex> const& A, cArrayView b)
 #endif
 }
 
+void blas::gelss(DenseMatrixView<Complex> const& A, cArrayView b)
+{
+#ifdef SINGLE
+#error "gelss not yet implemented for single precision"
+#else
+    if (A.layout() != 'N')
+        HexException("gelss requires normal layout, but was given %d×%d matrix with layout %c", A.rows(), A.cols(), A.layout());
+
+    blas::Int m = A.rows(), n = A.cols(), lda = A.ld(), ldb = A.rows(), nrhs = b.size()/A.rows();
+    blas::Int lwork = -1, rank, info;
+    cArray work(1);
+    rArray s(std::min(m, n)), rwork(5*std::min(m, n));
+    Real rcond = -1;
+
+    zgelss_
+    (
+        &m, &n, &nrhs,
+        const_cast<std::complex<double>*>(A.data().data()),
+        &lda, &b[0], &ldb, &s[0], &rcond, &rank, &work[0], &lwork, &rwork[0], &info
+    );
+
+    if (info != 0)
+        HexException("zgelss error %d during workspace query", info);
+
+    lwork = work[0].real();
+    work.resize(lwork);
+
+    zgelss_
+    (
+        &m, &n, &nrhs,
+        const_cast<std::complex<double>*>(A.data().data()),
+        &lda, &b[0], &ldb, &s[0], &rcond, &rank, &work[0], &lwork, &rwork[0], &info
+    );
+
+    if (info != 0)
+        HexException("zgelss error %d during least squares solution", info);
+#endif
+}

@@ -90,6 +90,7 @@ namespace blas
     );
 
     void gels(DenseMatrixView<Complex> const& A, cArrayView b);
+    void gelss(DenseMatrixView<Complex> const& A, cArrayView b);
 
     Int sbtrf (Int n, Int k, rArrayView ab, ArrayView<Int> ipiv);
     Int sbtrf (Int n, Int k, cArrayView ab, ArrayView<Int> ipiv);

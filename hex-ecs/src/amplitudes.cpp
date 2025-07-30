@@ -751,8 +751,6 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> &
             }
         }
     }
-    // std::cout << "Ef = " << Ef << std::endl;
-    // std::cout << "kf = " << kf << std::endl;
 
     // shorthands
     unsigned Nenergy = inp_.Etot.size();               // energy count
@@ -881,10 +879,6 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> &
                     solution[ill]   // data
                 );
 
-                // DEBUG
-                // lambda = (Sp | PsiSc | Bspline_R0);
-                // std::cout << eval_r << " " << ill << " " << ell << " " << lambda.real() << " " << lambda.imag() << std::endl;
-
                 // calculate radial integral
                 lambda = (Sp | PsiSc | Wj[ell]);
             }
@@ -925,25 +919,12 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> &
         {
             if (singlet_lambda[ell].norm() != 0)
             {
-                blas::gels(W[ell], singlet_lambda[ell]);
+                blas::gelss(W[ell], singlet_lambda[ell]);
                 Lambda_Slp[T][ell].first[ie] += singlet_lambda[ell][0];
-
-                /*std::cout << "\nFit (kf = " << kf << "): " << singlet_lambda[ell].slice(0, Ef.size()) << "\n";
-
-                for (int i = 0; i < samples; i++)
-                {
-                    auto [Hf0, dHf0] = special::H_dH(inp_.Za - 1, ell, kf[0], grid[i]);
-                    auto [Hf1, dHf1] = special::H_dH(inp_.Za - 1, ell, kf[1], grid[i]);
-
-                    Complex psi = singlet_lambda[ell][0]*Hf0 + singlet_lambda[ell][1]*Hf1;
-
-                    std::cout << grid[i] << " " << psi.real() << " " << psi.imag() << std::endl;
-                }
-                std::cout << std::endl;*/
             }
             if (triplet_lambda[ell].norm() != 0)
             {
-                blas::gels(W[ell], triplet_lambda[ell]);
+                blas::gelss(W[ell], triplet_lambda[ell]);
                 Lambda_Slp[T][ell].second[ie] += triplet_lambda[ell][0];
             }
         }
@@ -1069,7 +1050,6 @@ void Amplitudes::writeMultiDipoles_(Amplitudes::Transition T)
 
         for (int ie = 0; ie < data.front().first.size(); ie++) if (Ef[ie] > 0)
         {
-            //Real kf0 = std::sqrt(Ef0[ie]);
             Real kf = std::sqrt(Ef[ie]);
 
             out << format("%10.5f", Ef[ie]);
@@ -1085,14 +1065,6 @@ void Amplitudes::writeMultiDipoles_(Amplitudes::Transition T)
 
                // add the coupling factor for this L, M solution (equals to one for s-states)
                ap *= special::ClebschGordan(T.lf, T.mf, ell, M - T.mf, inp_.L, M);
-
-               /*if (ell == 0 or ell == 2) {
-                   auto [Hf0, dHf0] = special::H_dH(inp_.Za - 1, ell, kf0, bspline_full_.R2());
-                   auto [Hf, dHf] = special::H_dH(inp_.Za - 1, ell, kf, bspline_full_.R2());
-                   dHf0 *= kf0;
-                   dHf *= kf;
-                   std::cout << 0.5*Ef[ie] << " " << ap << " " << std::abs(ap) << " " << std::arg(ap) << " " << Hf << " " << dHf << std::endl;
-               }*/
 
                // calculate dipole element from the asymptotic expansion coefficient
                Complex d = std::sqrt(kf/special::constant::two_pi) * ap;
