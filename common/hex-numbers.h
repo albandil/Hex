@@ -69,19 +69,19 @@
 typedef std::complex<Real> Complex;
 
 // real number literal
-inline Real operator "" _r (long double x)
+inline Real operator ""_r (long double x)
 {
     return x;
 }
 
 // imaginary number literal
-inline Complex operator "" _i (long double x)
+inline Complex operator ""_i (long double x)
 {
     return Complex(0.,x);
 }
 
 // complex number literal
-inline Complex operator "" _z (long double x)
+inline Complex operator ""_z (long double x)
 {
     return Complex(x,0.);
 }

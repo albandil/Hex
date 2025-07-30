@@ -496,7 +496,7 @@ template <class T> ReadItem<T> ReadNext (std::ifstream & f, unsigned allowed_spe
     if (s == "*")
     {
         if (allowed_special & ReadItem<T>::asterisk)
-            return ReadItem<T>({ T(0), ReadItem<T>::asterisk });
+            return ReadItem<T>({ T{}, ReadItem<T>::asterisk });
         else
             HexException("Asterisk '*' not allowed here.");
     }

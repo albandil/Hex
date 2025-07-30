@@ -565,12 +565,12 @@ void RadialIntegrals::setupOneElectronIntegrals (bool shared_scratch, bool IamMa
         Mm1_##AXIS##_   .hdflink(format("rad-Mm1-%.4lx.hdf",    hash_##AXIS)); \
         Mm2_##AXIS##_   .hdflink(format("rad-Mm2-%.4lx.hdf",    hash_##AXIS)); \
         \
-        D_##AXIS##_     .populate([=](int m, int n) -> Complex { return computeD(bspline_##AXIS##_, &Bspline::dB, &Bspline::dB, g_##AXIS##_, m, n); }); \
-        DL_##AXIS##_    .populate([=](int m, int n) -> Complex { return computeD(bspline_##AXIS##_, &Bspline::dB, &Bspline::B,  g_##AXIS##_, m, n); }); \
-        S_##AXIS##_     .populate([=](int m, int n) -> Complex { return computeM(bspline_##AXIS##_, g_##AXIS##_,  0, m, n, bspline_##AXIS##_.Rmin(), bspline_##AXIS##_.Rmax(), false); }); \
-        Mp1_##AXIS##_   .populate([=](int m, int n) -> Complex { return computeM(bspline_##AXIS##_, g_##AXIS##_, +1, m, n, r##AXIS##min_,            r##AXIS##max_,            false); }); \
-        Mm1_##AXIS##_   .populate([=](int m, int n) -> Complex { return computeM(bspline_##AXIS##_, g_##AXIS##_, -1, m, n, r##AXIS##min_,            r##AXIS##max_,            false); }); \
-        Mm2_##AXIS##_   .populate([=](int m, int n) -> Complex { return computeM(bspline_##AXIS##_, g_##AXIS##_, -2, m, n, bspline_##AXIS##_.Rmin(), bspline_##AXIS##_.Rmax(), false); }); \
+        D_##AXIS##_     .populate([this](int m, int n) -> Complex { return computeD(bspline_##AXIS##_, &Bspline::dB, &Bspline::dB, g_##AXIS##_, m, n); }); \
+        DL_##AXIS##_    .populate([this](int m, int n) -> Complex { return computeD(bspline_##AXIS##_, &Bspline::dB, &Bspline::B,  g_##AXIS##_, m, n); }); \
+        S_##AXIS##_     .populate([this](int m, int n) -> Complex { return computeM(bspline_##AXIS##_, g_##AXIS##_,  0, m, n, bspline_##AXIS##_.Rmin(), bspline_##AXIS##_.Rmax(), false); }); \
+        Mp1_##AXIS##_   .populate([this](int m, int n) -> Complex { return computeM(bspline_##AXIS##_, g_##AXIS##_, +1, m, n, r##AXIS##min_,            r##AXIS##max_,            false); }); \
+        Mm1_##AXIS##_   .populate([this](int m, int n) -> Complex { return computeM(bspline_##AXIS##_, g_##AXIS##_, -1, m, n, r##AXIS##min_,            r##AXIS##max_,            false); }); \
+        Mm2_##AXIS##_   .populate([this](int m, int n) -> Complex { return computeM(bspline_##AXIS##_, g_##AXIS##_, -2, m, n, bspline_##AXIS##_.Rmin(), bspline_##AXIS##_.Rmax(), false); }); \
         \
         if (not shared_scratch or IamMaster) \
         { \
