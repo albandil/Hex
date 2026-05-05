@@ -242,7 +242,7 @@ void cmul2xd
     // [ a4 ]   [ b4 ]   [ a4 ] * [ b3 ] + [ a3 ] * [ b4 ]
 
     __m256d A1234 = _mm256_loadu_pd(reinterpret_cast<const double*>(A));
-    __m256d A2143 = _mm256_permute_pd(A1234, 0b01010101);
+    __m256d A2143 = _mm256_permute_pd(A1234, 0b0101);
 
     __m256d B1234 = _mm256_loadu_pd(reinterpret_cast<const double*>(B));
     __m256d B1133 = _mm256_unpacklo_pd(B1234, B1234);
