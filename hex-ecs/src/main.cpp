@@ -167,7 +167,7 @@ int main (int argc, char* argv[])
 
         // define OpenCL devices if not set
         if (cmd.ocl_device < 0)
-            cmd.ocl_device = par.iproc();
+            cmd.ocl_device = par.iproc() % par.Nproc();
 
 #ifdef _OPENMP
         omp_set_num_threads(cmd.nthreads);
