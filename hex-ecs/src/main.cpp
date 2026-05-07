@@ -176,11 +176,11 @@ int main (int argc, char* argv[])
         # pragma omp master
         {
             int nthreads = omp_get_num_threads();
-            bool nested = omp_get_nested();
+            int nlevels = omp_get_max_active_levels();
 
             std::cout << "OpenMP environment" << std::endl;
             std::cout << "\tthreads: " << nthreads << std::endl;
-            std::cout << "\tnesting: " << (nested ? "on" : "off") << std::endl;
+            std::cout << "\tmax active levels: " << nlevels << std::endl;
         }
 #endif
 
