@@ -60,7 +60,7 @@ add_library(libhex-common SHARED ${libhex-common_SOURCES})
 
 set_target_properties(libhex-common PROPERTIES PREFIX "")
 
-target_compile_options(libhex-common PUBLIC ${OpenMP_CXX_FLAGS} ${OPTFLAGS})
+target_compile_options(libhex-common PUBLIC "${OPTFLAGS}")
 
 target_include_directories(libhex-common PUBLIC
     ../libs
@@ -81,4 +81,5 @@ target_link_libraries(libhex-common
     ${UMFPACK_LIBRARIES}
     ${LAPACK_LIBRARIES}
     ${BLAS_LIBRARIES}
+    OpenMP::OpenMP_CXX
 )

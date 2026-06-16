@@ -31,3 +31,20 @@
 
 cmake_minimum_required(VERSION 3.13)
 
+add_executable(hex-chebeval chebeval/chebeval.cpp)
+add_executable(hex-f-pattern f-pattern/hex-f-pattern.cpp)
+#add_executable(hex-hdf2hdf hdf2hdf/hdf2hdf.cpp)
+add_executable(hex-hdf2txt hdf2txt/hdf2txt.cpp)
+add_executable(hex-special special/hex-special.cpp)
+
+target_include_directories(hex-chebeval PRIVATE "${CMAKE_CURRENT_LIST_DIR}/../common")
+target_include_directories(hex-f-pattern PRIVATE "${CMAKE_CURRENT_LIST_DIR}/../common")
+#target_include_directories(hex-hdf2hdf PRIVATE "${CMAKE_CURRENT_LIST_DIR}/../common")
+target_include_directories(hex-hdf2txt PRIVATE "${CMAKE_CURRENT_LIST_DIR}/../common")
+target_include_directories(hex-special PRIVATE "${CMAKE_CURRENT_LIST_DIR}/../common")
+
+target_link_libraries(hex-chebeval PRIVATE libhex-common)
+target_link_libraries(hex-f-pattern PRIVATE libhex-common)
+#target_link_libraries(hex-hdf2hdf PRIVATE libhex-common)
+target_link_libraries(hex-hdf2txt PRIVATE libhex-common)
+target_link_libraries(hex-special PRIVATE libhex-common)

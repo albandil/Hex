@@ -77,7 +77,7 @@ target_include_directories(libhex-db PUBLIC
     ../libs
 )
 
-target_link_libraries(libhex-db
+target_link_libraries(libhex-db PRIVATE
     libhex-common
 )
 
