@@ -29,14 +29,10 @@
 //                                                                                   //
 //  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
+#include "hex-hydrogen.h"
 #include "hex-special.h"
 
 #include "eigchans.h"
-
-Real radialDipole(int n, int li, int lf)
-{
-    return 0;
-}
 
 void Eigchans::calc(InputFile const& inp, std::vector<std::pair<int,int>> const & ang)
 {
@@ -60,7 +56,7 @@ void Eigchans::calc(InputFile const& inp, std::vector<std::pair<int,int>> const 
                 auto [l1p, l2p] = ang[illp];
 
                 auto f = special::computef(1, l1, l2, l1p, l2p, inp.L);
-                auto d = radialDipole(ni, l1, l1p);
+                auto d = Hydrogen::radialDipole(inp.Za, ni, l1, l1p);
 
                 M(ill, illp) += 2*f*d;
             }
