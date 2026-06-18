@@ -39,6 +39,7 @@ set(hex-ecs_SOURCES
     "src/amplitudes.cpp"
     "src/ang.cpp"
     "src/bspline.cpp"
+    "src/eigchans.cpp"
     "src/gauss.cpp"
     "src/hldata.cpp"
     "src/inout.cpp"

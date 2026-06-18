@@ -112,6 +112,9 @@ Amplitudes::Amplitudes
                 Etot_.back()[ie] = inp.Etot[ie % inp.Etot.size()];
         }
     }
+
+    // determine angular momentum eigenchannels
+    eigchans_.calc(inp_, ang_);
 }
 
 void Amplitudes::extract (std::string directory)
