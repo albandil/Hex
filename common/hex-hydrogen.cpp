@@ -445,9 +445,7 @@ double getFreeFar (double k, int l, double Sigma, double eps, int max_steps)
 
 Real radialDipole(Real Z, int n, int li, int lf)
 {
-    assert(n > li and li >= 0 and n > lf and lf >= 0);
-
-    if (li != lf + 1 and li != lf - 1)
+    if (n <= li or n <= lf or abs(li - lf) != 1)
         return 0;
 
     auto lmax = std::max(li, lf);

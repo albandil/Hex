@@ -679,6 +679,37 @@ std::pair<Complex, Complex> special::H_dH(Real Z, int l, Real k, Real r)
     return { Complex(g.val, f.val), Complex(gp.val, fp.val) };
 }
 
+std::pair<Complex, Complex> special::H_dH_asy(Real Z, int s, Complex l, Real k, Real r)
+{
+    gsl_sf_result lnr, arg;
+    int err = gsl_sf_lngamma_complex_e(l.real() + 1, l.imag() - Z/k, &lnr, &arg);
+
+    if (err != GSL_SUCCESS)
+        HexException("Error while evaluating Coulomb phaseshift for H/dH.");
+
+    auto rho = k*r;
+    auto eta = -Z*s/k;
+    auto a = l + 1._r + eta*1._i;
+    auto b = -l + eta*1._i;
+    auto Hterm = 1._z;
+    auto Hsum = Hterm;
+    auto dHsum = 0._z;
+
+    // include the first 10 correction terms
+    for (int n = 1; n <= 10; n++)
+    {
+        Hterm *= (a + Real(n - 1))*(b + Real(n - 1))/(2._i*Real(n)*Real(s)*rho);
+        Hsum += Hterm;
+        dHsum += -n / rho * Hterm;
+    }
+
+    auto theta = rho - eta*std::log(2*rho) - constant::pi*l/2._r + arg.val;
+    auto exp_itheta = std::exp(Real(s)*1._i*theta);
+    auto H = exp_itheta * Hsum;
+    auto dH = 1._i * Real(s) * (1 - eta/rho) * H + exp_itheta * dHsum;
+
+    return {H, dH};
+}
 
 bool special::makes_triangle (int two_j1, int two_j2, int two_j3)
 {

@@ -858,6 +858,14 @@ void CommandLine::parse (int argc, char* argv[])
                 }
             },
             {
+                "eigenchannels", "", 0, [&](std::vector<std::string> const & optargs) -> bool
+                {
+                    // use angular momentum eigenchannels for T-matrix extraction
+                    eigenchannels = true;
+                    return true;
+                }
+            },
+            {
                 "ssor", "", 1, [&](std::vector<std::string> const & optargs) -> bool
                 {
                     // apply SSOR coupling

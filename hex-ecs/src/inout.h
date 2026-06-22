@@ -252,6 +252,9 @@ class CommandLine
         /// Extraction averaging/extrapolation sample count.
         int extract_samples;
 
+        /// Use angular momentum eigenstates for extraction of T-matrices.
+        bool eigenchannels{};
+
         /// Load also existing solutions and check that they are within tolerance.
         bool refine_solution;
 

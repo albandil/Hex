@@ -581,6 +581,13 @@ inline Complex ric_h_plus (int n, double x)
  */
 std::pair<Complex, Complex> H_dH (Real Z, int l, Real k, Real r);
 
+/**
+ * @brief Coulomb-Hankel function and derivative (asymptotic).
+ *
+ * Evaluates H and its derivative using asymptotic series. Allows complex angular momentum.
+ */
+std::pair<Complex, Complex> H_dH_asy (Real Z, int sign, Complex l, Real k, Real r);
+
 //
 // Other special functions.
 //

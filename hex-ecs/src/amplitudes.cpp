@@ -114,7 +114,8 @@ Amplitudes::Amplitudes
     }
 
     // determine angular momentum eigenchannels
-    eigchans_.calc(inp_, ang_);
+    if (cmd_.eigenchannels)
+        eigchans_.calc(inp_, ang_);
 }
 
 void Amplitudes::extract (std::string directory)
@@ -761,6 +762,7 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> &
     int Nspline_inner = bspline_inner_.Nspline(); // B-spline count (inner basis)
     int Nspline_full  = bspline_full_ .Nspline(); // B-spline count (combined basis)
     int Nspline_outer = Nspline_full - Nspline_inner; // B-spline count (outer basis)
+    int Nang = ang_.size();                     // number of coupled angular momentum pairs
 
     // check that memory for this transition is allocated
     if (Lambda_Slp.find(T) == Lambda_Slp.end())
@@ -804,13 +806,13 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> &
     int samples = (cmd_.extract_samples   > 0) ? cmd_.extract_samples   : 10;
 
     rArray grid;
-    cArrays singlet_lambda, triplet_lambda;
-    for (int ell = 0; ell <= inp_.maxell; ell++)
-    {
-        // resize arrays
-        singlet_lambda.push_back(cArray(samples));
-        triplet_lambda.push_back(cArray(samples));
-    }
+
+    ColMatrix<Complex> coeff(Nang, Nang), singlet_eig_ampl(Nang, samples), triplet_eig_ampl(Nang, samples);
+
+    if (cmd_.eigenchannels)
+        for (int ill = 0; ill < Nang; ill++)
+            for (int illp = 0; illp < Nang; illp++)
+                coeff(ill, illp) = eigchans_.eigvecs[T.nf](ill, illp);
 
     if (Ra > Rb)
         HexException("Wrong order of radial extraction bounds, %g > %g.", Ra, Rb);
@@ -845,7 +847,17 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> &
             Dspline_R0[ispline] = bspline_full_.dspline(ispline, eval_knot, order, eval_r);
         }
 
-        // evaluate Wronskians
+        // evalaute Wronskians for angular momentum eigenchannels
+        cArrays WHm(Nang);
+        for (int ieig = 0; ieig < Nang; ieig++) if (cmd_.eigenchannels)
+        {
+            auto lambda = eigchans_.eigmoms[T.nf][ieig];
+            auto [Hm_R0, dHm_R0] = special::H_dH_asy(inp_.Za - 1, -1, lambda, kf[0], eval_r);
+
+            WHm[ieig] = kf[0]*dHm_R0*Bspline_R0 - Hm_R0*Dspline_R0;
+        }
+
+        // evaluate Wronskians for physical channels
         cArrays Wj (inp_.maxell + 1);
         for (int l = 0; l <= inp_.maxell; l++)
         {
@@ -882,13 +894,24 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> &
                     solution[ill]   // data
                 );
 
-                // calculate radial integral
-                lambda = (Sp | PsiSc | Wj[ell]);
+                // project to outgoing channel
+                auto PsiScFf = (Sp | PsiSc);
+
+                // calculate radial integrals
+                if (cmd_.eigenchannels)
+                {
+                    for (int ieig = 0; ieig < Nang; ieig++)
+                        lambda += 0.5_i * coeff(ieig, ill) * (PsiScFf | WHm[ieig]);
+                }
+                else
+                {
+                    lambda = (PsiScFf | Wj[ell]);
+                }
             }
             else
             {
 
-                // change view to row-major dense matrix
+                // change view to the outgoing channel
                 cArrayView PsiScFf
                 (
                     solution[ill],  // data
@@ -897,16 +920,56 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> &
                 );
 
                 // calculate radial integral
-                lambda = (PsiScFf | Wj[ell].slice(Nspline_inner, Nspline_full));
+                if (cmd_.eigenchannels)
+                {
+                    for (int ieig = 0; ieig < Nang; ieig++)
+                        lambda += 0.5_i * coeff(ieig, ill) * (PsiScFf | WHm[ieig].slice(Nspline_inner, Nspline_full));
+                }
+                else
+                {
+                    lambda = (PsiScFf | Wj[ell].slice(Nspline_inner, Nspline_full));
+                }
             }
 
             // update the stored value
-            # pragma omp critical
             if (Spin == 0)
-                singlet_lambda[ell][i] += lambda;
+                singlet_eig_ampl(ill, i) = lambda;
             else
-                triplet_lambda[ell][i] += lambda;
+                triplet_eig_ampl(ill, i) = lambda;
         }
+    }
+
+    // transform amplitudes from eigenchannels to physical channels
+    if (cmd_.eigenchannels)
+    {
+        auto singlet_eig_ampl0 = singlet_eig_ampl;
+        auto triplet_eig_ampl0 = triplet_eig_ampl;
+
+        for (int ieig = 0; ieig < Nang; ieig++)
+        {
+            singlet_eig_ampl0.col(ieig) *= exp(-1._i * special::constant::pi * eigchans_.eigmoms[T.nf] / 2._r);
+            triplet_eig_ampl0.col(ieig) *= exp(-1._i * special::constant::pi * eigchans_.eigmoms[T.nf] / 2._r);
+        }
+
+        blas::gemm(1._r, coeff, singlet_eig_ampl0, 0._r, singlet_eig_ampl);
+        blas::gemm(1._r, coeff, triplet_eig_ampl0, 0._r, triplet_eig_ampl);
+
+        for (int ill = 0; ill < Nang; ill++)
+        {
+            singlet_eig_ampl.col(ill) *= std::exp(1._i * (special::constant::pi * ang_[ill].second / 2._r));
+            triplet_eig_ampl.col(ill) *= std::exp(1._i * (special::constant::pi * ang_[ill].second / 2._r));
+        }
+    }
+
+    // sum contributions from all blocks
+    ColMatrix<Complex> singlet_lambda(inp_.maxell + 1, samples);
+    ColMatrix<Complex> triplet_lambda(inp_.maxell + 1, samples);
+    for (int ill = 0; ill < Nang; ill++)
+    {
+        auto ell = ang_[ill].second;
+
+        singlet_lambda.col(ell) += singlet_eig_ampl.col(ill);
+        triplet_lambda.col(ell) += triplet_eig_ampl.col(ill);
     }
 
     // extract multi-photon amplitudes
@@ -920,15 +983,15 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> &
 
         for (int ell = 0; ell <= inp_.maxell; ell++)
         {
-            if (singlet_lambda[ell].norm() != 0)
+            if (singlet_lambda.col(ell).norm() != 0)
             {
-                blas::gelss(W[ell], singlet_lambda[ell]);
-                Lambda_Slp[T][ell].first[ie] += singlet_lambda[ell][0];
+                blas::gelss(W[ell], singlet_lambda.col(ell));
+                Lambda_Slp[T][ell].first[ie] += singlet_lambda.col(ell)[0];
             }
-            if (triplet_lambda[ell].norm() != 0)
+            if (triplet_lambda.col(ell).norm() != 0)
             {
-                blas::gelss(W[ell], triplet_lambda[ell]);
-                Lambda_Slp[T][ell].second[ie] += triplet_lambda[ell][0];
+                blas::gelss(W[ell], triplet_lambda.col(ell));
+                Lambda_Slp[T][ell].second[ie] += triplet_lambda.col(ell)[0];
             }
         }
 
@@ -941,14 +1004,14 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> &
         if (cmd_.extract_extrapolate)
         {
             // radial extrapolation
-            Lambda_Slp[T][ell].first[ie] += inv_power_extrapolate(grid, singlet_lambda[ell]);
-            Lambda_Slp[T][ell].second[ie] += inv_power_extrapolate(grid, triplet_lambda[ell]);
+            Lambda_Slp[T][ell].first[ie] += inv_power_extrapolate(grid, singlet_lambda.col(ell));
+            Lambda_Slp[T][ell].second[ie] += inv_power_extrapolate(grid, triplet_lambda.col(ell));
         }
         else
         {
             // plain averaging
-            Lambda_Slp[T][ell].first[ie] += sum(singlet_lambda[ell]) / Real(samples);
-            Lambda_Slp[T][ell].second[ie] += sum(triplet_lambda[ell]) / Real(samples);
+            Lambda_Slp[T][ell].first[ie] += sum(singlet_lambda.col(ell)) / Real(samples);
+            Lambda_Slp[T][ell].second[ie] += sum(triplet_lambda.col(ell)) / Real(samples);
         }
     }
 }

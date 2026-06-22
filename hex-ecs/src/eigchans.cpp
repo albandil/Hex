@@ -36,10 +36,12 @@
 
 void Eigchans::calc(InputFile const& inp, std::vector<std::pair<int,int>> const & ang)
 {
-    for (auto [ni, li, mi] : inp.instates)
+    std::cout << "\nSetting up angular momentum eigenchannels\n";
+
+    for (auto [nf, lf, mf] : inp.outstates)
     {
         // skip already processed shell
-        if (eigmoms.find(ni) != eigmoms.end())
+        if (eigmoms.find(nf) != eigmoms.end())
             continue;
 
         // calculate the 1/2r² potential matrix
@@ -56,16 +58,30 @@ void Eigchans::calc(InputFile const& inp, std::vector<std::pair<int,int>> const 
                 auto [l1p, l2p] = ang[illp];
 
                 auto f = special::computef(1, l1, l2, l1p, l2p, inp.L);
-                auto d = Hydrogen::radialDipole(inp.Za, ni, l1, l1p);
+                auto d = Hydrogen::radialDipole(inp.Za, nf, l1, l1p);
 
                 M(ill, illp) += 2*f*d;
             }
         }
 
+        std::cout << "\n\tShell n = " << nf << "\n\n";
+        std::cout << "\t\tCoupling matrix\n";
+        for (std::size_t ill = 0; ill < ang.size(); ill++)
+        {
+            std::cout << "\t\t";
+            for (std::size_t illp = 0; illp < ang.size(); illp++)
+                std::cout << format("%8.2f", M(ill, illp));
+            std::cout << '\n';
+        }
+        std::cout << '\n';
+
         // diagonalize the matrix
-        M.diagonalize(eigvals[ni], &eigvecs[ni]);
+        M.diagonalize(eigvals[nf], nullptr, &eigvecs[nf]);
 
         // evaluate the generalized angular momenta
-        eigmoms[ni] = -0.5_r + sqrt(0.25_z + eigvals[ni]);
+        eigmoms[nf] = -0.5_r + sqrt(0.25_z + eigvals[nf]);
+
+        for (std::size_t ieig = 0; ieig < ang.size(); ieig++)
+            std::cout << "\t\tlambda[" << ieig<< "] = " << eigmoms[nf][ieig] << '\n';
     }
 }
