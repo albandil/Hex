@@ -681,22 +681,21 @@ std::pair<Complex, Complex> special::H_dH(Real Z, int l, Real k, Real r)
 
 std::pair<Complex, Complex> special::H_dH_asy(Real Z, int s, Complex l, Real k, Real r)
 {
-    gsl_sf_result lnr, arg;
-    int err = gsl_sf_lngamma_complex_e(l.real() + 1, l.imag() - Z/k, &lnr, &arg);
-
-    if (err != GSL_SUCCESS)
-        HexException("Error while evaluating Coulomb phaseshift for H/dH.");
-
     auto rho = k*r;
-    auto eta = -Z*s/k;
-    auto a = l + 1._r + eta*1._i;
-    auto b = -l + eta*1._i;
+    auto eta = -Z/k;
+    auto a = l + 1._r + s*eta*1._i;
+    auto b = -l + s*eta*1._i;
     auto Hterm = 1._z;
     auto Hsum = Hterm;
     auto dHsum = 0._z;
 
-    // include the first 10 correction terms
-    for (int n = 1; n <= 10; n++)
+    // get Coulomb phase
+    gsl_sf_result lnr, arg;
+    if (gsl_sf_lngamma_complex_e(l.real() + 1, l.imag() + eta, &lnr, &arg) != GSL_SUCCESS)
+        HexException("Error while evaluating Coulomb phaseshift for H/dH.");
+
+    // include the first 10 correction terms (or fewer if l is integer and Z is zero)
+    for (int n = 1; n <= 10 and Hterm != 0.; n++)
     {
         Hterm *= (a + Real(n - 1))*(b + Real(n - 1))/(2._i*Real(n)*Real(s)*rho);
         Hsum += Hterm;
