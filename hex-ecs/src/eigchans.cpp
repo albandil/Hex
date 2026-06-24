@@ -83,5 +83,15 @@ void Eigchans::calc(InputFile const& inp, std::vector<std::pair<int,int>> const 
 
         for (std::size_t ieig = 0; ieig < ang.size(); ieig++)
             std::cout << "\t\tlambda[" << ieig<< "] = " << eigmoms[nf][ieig] << '\n';
+
+        std::cout << "\n\t\tEigenvectors\n";
+        for (std::size_t ill = 0; ill < ang.size(); ill++)
+        {
+            std::cout << "\t\t";
+            for (std::size_t ieig = 0; ieig < ang.size(); ieig++)
+                std::cout << format("%9.4f", eigvecs[nf](ill, ieig));
+            std::cout << '\n';
+        }
+        std::cout << '\n';
     }
 }
