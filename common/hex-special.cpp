@@ -648,12 +648,10 @@ int special::coul_F (int Z, int l, double k, double r, double& F, double& Fp)
     return err;
 }
 
-double special::coul_F_sigma (int Z, int l, double k)
+double special::coul_F_sigma (int Z, Complex l, double k)
 {
-    // return arg(gamma(Complex(l+1,-Z/k)));
-
     gsl_sf_result lnr, arg;
-    int err = gsl_sf_lngamma_complex_e(l+1, -Z/k, &lnr, &arg);
+    int err = gsl_sf_lngamma_complex_e(l.real() + 1, l.imag() - Z/k, &lnr, &arg);
 
     if (err != GSL_SUCCESS)
         HexException("Error while evaluating Coulomb phaseshift.");
@@ -702,7 +700,8 @@ std::pair<Complex, Complex> special::H_dH_asy(Real Z, int s, Complex l, Real k, 
         dHsum += -n / rho * Hterm;
     }
 
-    auto theta = rho - eta*std::log(2*rho) - constant::pi*l/2._r + arg.val;
+    auto sigma = arg.val;
+    auto theta = rho - eta*std::log(2*rho) - constant::pi*l/2._r + sigma;
     auto exp_itheta = std::exp(Real(s)*1._i*theta);
     auto H = exp_itheta * Hsum;
     auto dH = 1._i * Real(s) * (1 - eta/rho) * H + exp_itheta * dHsum;

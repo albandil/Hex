@@ -737,7 +737,7 @@ double coul_F_asy (int Z, int l, double k, double r, double sigma = special::con
  * @param l Angular momentum.
  * @param k Wavenumber.
  */
-double coul_F_sigma (int Z, int l, double k);
+double coul_F_sigma (int Z, Complex l, double k);
 
 /**
  * @brief Check triangle inequality.

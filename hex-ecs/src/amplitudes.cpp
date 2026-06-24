@@ -784,15 +784,22 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> &
         return;
 
     // read the appropriate projectile channel function for the final state (nf,lf,*)
-    cArray Xp, Sp;
-    if (cmd_.analytic_eigenstates)
+    cArray Xp;
+    cArrays Sp(std::min(inp_.maxell + 1, T.nf));
+    for (int lf = 0; lf < Sp.size(); lf++)
     {
-        Sp = RadialIntegrals::overlapP(bspline_inner_, rad_.gaussleg(), inp_.Za, T.nf, T.lf);
-    }
-    else
-    {
-        Xp = readAtomPseudoState(T.lf, T.nf - T.lf - 1);
-        Sp = rad_.S_x().dot(Xp);
+        if (T.lf == lf or cmd_.eigenchannels)
+        {
+            if (cmd_.analytic_eigenstates)
+            {
+                Sp[lf] = RadialIntegrals::overlapP(bspline_inner_, rad_.gaussleg(), inp_.Za, T.nf, lf);
+            }
+            else
+            {
+                Xp = readAtomPseudoState(lf, T.nf - lf - 1);
+                Sp[lf] = rad_.S_x().dot(Xp);
+            }
+        }
     }
 
     // The extracted T-matrix oscillates and slowly radially converges.
@@ -807,19 +814,23 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> &
 
     rArray grid;
 
-    ColMatrix<Complex> coeff(Nang, Nang), singlet_eig_ampl(Nang, samples), triplet_eig_ampl(Nang, samples);
-
-    if (cmd_.eigenchannels)
-        for (int ill = 0; ill < Nang; ill++)
-            for (int illp = 0; illp < Nang; illp++)
-                coeff(ill, illp) = eigchans_.eigvecs[T.nf](ill, illp);
-
     if (Ra > Rb)
         HexException("Wrong order of radial extraction bounds, %g > %g.", Ra, Rb);
 
     if (Rb > bspline_full_.R2())
         HexException("Extraction radius too far, %g > %g.", Rb, bspline_full_.R2());
 
+    // convert angular momentum eigenvectors to complex
+    ColMatrix<Complex> coeff(Nang, Nang);
+    if (cmd_.eigenchannels)
+        for (int ieig = 0; ieig < Nang; ieig++)
+            for (int ill = 0; ill < Nang; ill++)
+                coeff(ill, ieig) = eigchans_.eigvecs[T.nf](ill, ieig);
+
+    // extracted reduced scattering amplitudes
+    RowMatrix<Complex> lambda(Nang, samples);
+
+    // Wronskian matrix for extraction of multi-photon photoionization amplitudes
     std::vector<ColMatrix<Complex>> W(inp_.maxell + 1, ColMatrix<Complex>(samples, Ef.size()));
 
     // evaluate radial part for all evaluation radii
@@ -847,12 +858,12 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> &
             Dspline_R0[ispline] = bspline_full_.dspline(ispline, eval_knot, order, eval_r);
         }
 
-        // evalaute Wronskians for angular momentum eigenchannels
+        // evaluate Wronskians for angular momentum eigenchannels
         cArrays WHm(Nang);
         for (int ieig = 0; ieig < Nang; ieig++) if (cmd_.eigenchannels)
         {
-            auto lambda = eigchans_.eigmoms[T.nf][ieig];
-            auto [Hm_R0, dHm_R0] = special::H_dH_asy(inp_.Za - 1, -1, lambda, kf[0], eval_r);
+            auto lam = eigchans_.eigmoms[T.nf][ieig];
+            auto [Hm_R0, dHm_R0] = special::H_dH_asy(inp_.Za - 1, -1, lam, kf[0], eval_r);
 
             WHm[ieig] = kf[0]*dHm_R0*Bspline_R0 - Hm_R0*Dspline_R0;
         }
@@ -875,15 +886,18 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> &
         # pragma omp parallel for schedule (dynamic,1) if (cmd_.parallel_extraction)
         for (unsigned ill = 0; ill < ang_.size(); ill++) if (par_.isMyGroupWork(ill) and par_.IamGroupMaster())
         {
-            // skip blocks that do not contribute to (l1 = ) lf
-            if (ang_[ill].first != T.lf)
+            // get atomic and projectile angular momentum
+            auto [lf, ell] = ang_[ill];
+
+            // skip blocks that do not contribute to the requested final shell
+            if (lf >= T.nf)
                 continue;
 
-            // get projectile angular momentum
-            int ell = ang_[ill].second;
+            // skip blocks that do not contribute to the requested angular momentum (unless dipole-coupled)
+            if (lf != T.lf and not cmd_.eigenchannels)
+                continue;
 
             // evaluate radial integrals
-            Complex lambda = 0;
             if (inp_.inner_only)
             {
                 // change view to row-major dense matrix
@@ -895,27 +909,26 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> &
                 );
 
                 // project to outgoing channel
-                auto PsiScFf = (Sp | PsiSc);
+                auto PsiScFf = (Sp[lf] | PsiSc);
 
                 // calculate radial integrals
                 if (cmd_.eigenchannels)
                 {
                     for (int ieig = 0; ieig < Nang; ieig++)
-                        lambda += 0.5_i * coeff(ieig, ill) * (PsiScFf | WHm[ieig]);
+                        lambda(ieig, i) += 0.5_i * coeff(ill, ieig) * (PsiScFf | WHm[ieig]);
                 }
                 else
                 {
-                    lambda = (PsiScFf | Wj[ell]);
+                    lambda(ill, i) = (PsiScFf | Wj[ell]);
                 }
             }
             else
             {
-
                 // change view to the outgoing channel
                 cArrayView PsiScFf
                 (
                     solution[ill],  // data
-                    Nspline_inner * Nspline_inner + (reader_.channels()[ill].first + T.nf - T.lf - 1) * Nspline_outer, // offset
+                    Nspline_inner * Nspline_inner + (reader_.channels()[ill].first + T.nf - lf - 1) * Nspline_outer, // offset
                     Nspline_outer   // elements
                 );
 
@@ -923,53 +936,127 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> &
                 if (cmd_.eigenchannels)
                 {
                     for (int ieig = 0; ieig < Nang; ieig++)
-                        lambda += 0.5_i * coeff(ieig, ill) * (PsiScFf | WHm[ieig].slice(Nspline_inner, Nspline_full));
+                        lambda(ieig, i) += 0.5_i * coeff(ieig, ill) * (PsiScFf | WHm[ieig].slice(Nspline_inner, Nspline_full));
                 }
                 else
                 {
-                    lambda = (PsiScFf | Wj[ell].slice(Nspline_inner, Nspline_full));
+                    lambda(ill, i) = (PsiScFf | Wj[ell].slice(Nspline_inner, Nspline_full));
                 }
             }
-
-            // update the stored value
-            if (Spin == 0)
-                singlet_eig_ampl(ill, i) = lambda;
-            else
-                triplet_eig_ampl(ill, i) = lambda;
         }
+
+        // DEBUG: recalculate manually
+        /*if (cmd_.eigenchannels and i == 0 and T.nf == 2 and T.lf == 0)
+        {
+            auto rgrid = linspace(1000., 1600., 6001);
+            std::cout << "k = " << kf[0] << std::endl;
+
+            RowMatrixView<Complex> psi01(Nspline_inner, Nspline_inner, solution[0]);
+            RowMatrixView<Complex> psi10(Nspline_inner, Nspline_inner, solution[1]);
+
+            // project blocks on bound states
+            auto u0 = (Sp[0] | psi01);
+            auto u1 = (Sp[1] | psi10);
+            write_array(rgrid, bspline_full_.zip(u0, rgrid), "calculated-u-n2-ill0.txt");
+            write_array(rgrid, bspline_full_.zip(u1, rgrid), "calculated-u-n2-ill1.txt");
+
+            // transform projectile wfns to eigenbasis
+            auto Ct_u0 = coeff(0, 0)*u0 + coeff(1, 0)*u1;
+            auto Ct_u1 = coeff(0, 1)*u0 + coeff(1, 1)*u1;
+
+            // evaluate amplitude in eigenbasis
+            auto b0 = 0.5_i * (Ct_u0 | WHm[0]) / kf[0];
+            auto b1 = 0.5_i * (Ct_u1 | WHm[1]) / kf[0];
+            std::cout << "b0 = " << b0 << ' ' << std::abs(b0) << ' ' << std::arg(b0) << '\n';
+            std::cout << "b1 = " << b1 << ' ' << std::abs(b1) << ' ' << std::arg(b1) << '\n';
+
+            // evaluate Bessel functions
+            cArray Hp0(rgrid.size());
+            cArray Hp1(rgrid.size());
+            auto lam0 = eigchans_.eigmoms[T.nf][0];
+            auto lam1 = eigchans_.eigmoms[T.nf][1];
+            for (std::size_t i = 0; i < rgrid.size(); i++)
+            {
+                auto [hp0, dhp0] = special::H_dH_asy(inp_.Za - 1, +1, lam0, kf[0], rgrid[i]);
+                auto [hp1, dhp1] = special::H_dH_asy(inp_.Za - 1, +1, lam1, kf[0], rgrid[i]);
+                Hp0[i] = hp0;
+                Hp1[i] = hp1;
+            }
+
+            // reconstruct solutions
+            auto w0 = coeff(0, 0)*b0*Hp0 + coeff(0, 1)*b1*Hp1;
+            auto w1 = coeff(1, 0)*b0*Hp0 + coeff(1, 1)*b1*Hp1;
+            write_array(rgrid, w0, "reconstructed-u-n2-ill0.txt");
+            write_array(rgrid, w1, "reconstructed-u-n2-ill1.txt");
+
+            // transform amplitudes
+            auto ell0 = ang_[0].second;
+            auto ell1 = ang_[1].second;
+            auto sigma0 = special::coul_F_sigma(inp_.Za - 1, lam0, kf[0]); std::cout << "sigma0 = " << sigma0 << std::endl;
+            auto sigma1 = special::coul_F_sigma(inp_.Za - 1, lam1, kf[0]); std::cout << "sigma1 = " << sigma1 << std::endl;
+            b0 *= std::exp(-1._i*special::constant::pi*lam0/2._r + 1._i*sigma0);
+            b1 *= std::exp(-1._i*special::constant::pi*lam1/2._r + 1._i*sigma1);
+            auto a0 = coeff(0, 0)*b0 + coeff(0, 1)*b1;
+            auto a1 = coeff(1, 0)*b0 + coeff(1, 1)*b1;
+            a0 *= std::exp(1._i*(special::constant::pi*ell0/2._r));
+            a1 *= std::exp(1._i*(special::constant::pi*ell1/2._r));
+            std::cout << "a0 = " << a0 << ' ' << std::abs(a0) << ' ' << std::arg(a0) << '\n';
+            std::cout << "a1 = " << a1 << ' ' << std::abs(a1) << ' ' << std::arg(a1) << '\n';
+
+            // should be essentially the same as when extracted directly
+            a0 = (u0 | Wj[1]) / kf[0];
+            a1 = (u1 | Wj[0]) / kf[0];
+            std::cout << "a0* = " << a0 << ' ' << std::abs(a0) << ' ' << std::arg(a0) << '\n';
+            std::cout << "a1* = " << a1 << ' ' << std::abs(a1) << ' ' << std::arg(a1) << '\n';
+
+            // also essentially the same as using (physical) Hankel functions
+            auto [hm0, dhm0] = special::H_dH_asy(inp_.Za - 1, -1, ell0, kf[0], eval_r);
+            auto [hm1, dhm1] = special::H_dH_asy(inp_.Za - 1, -1, ell1, kf[0], eval_r);
+            auto WHm0 = kf[0]*dhm0*Bspline_R0 - hm0*Dspline_R0;
+            auto WHm1 = kf[0]*dhm1*Bspline_R0 - hm1*Dspline_R0;
+            a0 = 0.5_i * (u0 | WHm0) / kf[0];
+            a1 = 0.5_i * (u1 | WHm1) / kf[0];
+            std::cout << "a0** = " << a0 << ' ' << std::abs(a0) << ' ' << std::arg(a0) << '\n';
+            std::cout << "a1** = " << a1 << ' ' << std::abs(a1) << ' ' << std::arg(a1) << '\n';
+
+            // verify a <--> b relation
+            b0 = coeff(0, 0)*std::exp(1._i*(special::constant::pi*(lam0 - Real(ell0))/2._r + 0*sigma0))*a0
+               + coeff(1, 0)*std::pow(1._i, lam0 - Real(ell1))*a1;
+            b1 = coeff(0, 1)*std::pow(1._i, lam1 - Real(ell0))*a0 + coeff(1, 1)*std::pow(1._i, lam1 - Real(ell1))*a1;
+            std::cout << "b0* = " << b0 << ' ' << std::abs(b0) << ' ' << std::arg(b0) << '\n';
+            std::cout << "b1* = " << b1 << ' ' << std::abs(b1) << ' ' << std::arg(b1) << '\n';
+            a0 = coeff(0, 0)*std::pow(1._i, Real(ell0) - lam0)*b0 + coeff(0, 1)*std::pow(1._i, Real(ell0) - lam1)*b1;
+            a1 = coeff(1, 0)*std::pow(1._i, Real(ell1) - lam0)*b0 + coeff(1, 1)*std::pow(1._i, Real(ell1) - lam1)*b1;
+            std::cout << "a0*** = " << a0 << ' ' << std::abs(a0) << ' ' << std::arg(a0) << '\n';
+            std::cout << "a1*** = " << a1 << ' ' << std::abs(a1) << ' ' << std::arg(a1) << '\n';
+        }*/
     }
 
     // transform amplitudes from eigenchannels to physical channels
     if (cmd_.eigenchannels)
     {
-        auto singlet_eig_ampl0 = singlet_eig_ampl;
-        auto triplet_eig_ampl0 = triplet_eig_ampl;
-
+        auto lambda0 = lambda;
         for (int ieig = 0; ieig < Nang; ieig++)
         {
-            singlet_eig_ampl0.col(ieig) *= exp(-1._i * special::constant::pi * eigchans_.eigmoms[T.nf] / 2._r);
-            triplet_eig_ampl0.col(ieig) *= exp(-1._i * special::constant::pi * eigchans_.eigmoms[T.nf] / 2._r);
+            auto lam = eigchans_.eigmoms[T.nf][ieig];
+            auto sigma = special::coul_F_sigma(inp_.Za - 1, lam, kf[0]);
+            lambda0.row(ieig) *= std::exp(-1._i * special::constant::pi * lam / 2._r + 1._i*sigma);
         }
 
-        blas::gemm(1._r, coeff, singlet_eig_ampl0, 0._r, singlet_eig_ampl);
-        blas::gemm(1._r, coeff, triplet_eig_ampl0, 0._r, triplet_eig_ampl);
-
+        blas::gemm(1._r, coeff, lambda0, 0._r, lambda);
         for (int ill = 0; ill < Nang; ill++)
-        {
-            singlet_eig_ampl.col(ill) *= std::exp(1._i * (special::constant::pi * ang_[ill].second / 2._r));
-            triplet_eig_ampl.col(ill) *= std::exp(1._i * (special::constant::pi * ang_[ill].second / 2._r));
-        }
+            lambda.row(ill) *= std::exp(1._i * (special::constant::pi * ang_[ill].second / 2._r));
     }
 
     // sum contributions from all blocks
-    ColMatrix<Complex> singlet_lambda(inp_.maxell + 1, samples);
-    ColMatrix<Complex> triplet_lambda(inp_.maxell + 1, samples);
+    RowMatrix<Complex> singlet_lambda(inp_.maxell + 1, samples);
+    RowMatrix<Complex> triplet_lambda(inp_.maxell + 1, samples);
     for (int ill = 0; ill < Nang; ill++)
     {
-        auto ell = ang_[ill].second;
+        auto [lf, ell] = ang_[ill];
 
-        singlet_lambda.col(ell) += singlet_eig_ampl.col(ill);
-        triplet_lambda.col(ell) += triplet_eig_ampl.col(ill);
+        if (lf == T.lf and Spin == 0) singlet_lambda.row(ell) += lambda.row(ill);
+        if (lf == T.lf and Spin == 1) triplet_lambda.row(ell) += lambda.row(ill);
     }
 
     // extract multi-photon amplitudes
@@ -983,15 +1070,15 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> &
 
         for (int ell = 0; ell <= inp_.maxell; ell++)
         {
-            if (singlet_lambda.col(ell).norm() != 0)
+            if (singlet_lambda.row(ell).norm() != 0)
             {
-                blas::gelss(W[ell], singlet_lambda.col(ell));
-                Lambda_Slp[T][ell].first[ie] += singlet_lambda.col(ell)[0];
+                blas::gelss(W[ell], singlet_lambda.row(ell));
+                Lambda_Slp[T][ell].first[ie] += singlet_lambda.row(ell)[0];
             }
-            if (triplet_lambda.col(ell).norm() != 0)
+            if (triplet_lambda.row(ell).norm() != 0)
             {
-                blas::gelss(W[ell], triplet_lambda.col(ell));
-                Lambda_Slp[T][ell].second[ie] += triplet_lambda.col(ell)[0];
+                blas::gelss(W[ell], triplet_lambda.row(ell));
+                Lambda_Slp[T][ell].second[ie] += triplet_lambda.row(ell)[0];
             }
         }
 
@@ -1004,14 +1091,14 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> &
         if (cmd_.extract_extrapolate)
         {
             // radial extrapolation
-            Lambda_Slp[T][ell].first[ie] += inv_power_extrapolate(grid, singlet_lambda.col(ell));
-            Lambda_Slp[T][ell].second[ie] += inv_power_extrapolate(grid, triplet_lambda.col(ell));
+            Lambda_Slp[T][ell].first[ie] += inv_power_extrapolate(grid, singlet_lambda.row(ell));
+            Lambda_Slp[T][ell].second[ie] += inv_power_extrapolate(grid, triplet_lambda.row(ell));
         }
         else
         {
             // plain averaging
-            Lambda_Slp[T][ell].first[ie] += sum(singlet_lambda.col(ell)) / Real(samples);
-            Lambda_Slp[T][ell].second[ie] += sum(triplet_lambda.col(ell)) / Real(samples);
+            Lambda_Slp[T][ell].first[ie] += sum(singlet_lambda.row(ell)) / Real(samples);
+            Lambda_Slp[T][ell].second[ie] += sum(triplet_lambda.row(ell)) / Real(samples);
         }
     }
 }
