@@ -584,7 +584,11 @@ std::pair<Complex, Complex> H_dH (Real Z, int l, Real k, Real r);
 /**
  * @brief Coulomb-Hankel function and derivative (asymptotic).
  *
- * Evaluates H and its derivative using asymptotic series. Allows complex angular momentum.
+ * Evaluates H and its derivative for complex angular momentum. Uses the divergent asymptotic
+ * series with optimal (smallest-term) truncation; if that is not accurate enough at the
+ * requested radius (which happens for strongly complex @f$ l @f$ not too far from the matching
+ * radius), the series is evaluated further out, where it is trustworthy, and the defining
+ * Coulomb ODE is integrated back inward by RK4 to the requested radius.
  */
 std::pair<Complex, Complex> H_dH_asy (Real Z, int sign, Complex l, Real k, Real r);
 
