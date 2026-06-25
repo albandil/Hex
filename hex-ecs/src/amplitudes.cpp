@@ -938,7 +938,7 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> &
                 {
                     #pragma omp critical
                     for (int ieig = 0; ieig < Nang; ieig++)
-                        lambda(ieig, i) += 0.5_i * coeff(ieig, ill) * (PsiScFf | WHm[ieig].slice(Nspline_inner, Nspline_full));
+                        lambda(ieig, i) += 0.5_i * coeff(ill, ieig) * (PsiScFf | WHm[ieig].slice(Nspline_inner, Nspline_full));
                 }
                 else
                 {
