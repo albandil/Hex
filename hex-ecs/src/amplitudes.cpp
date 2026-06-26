@@ -721,15 +721,17 @@ cArray Amplitudes::readAtomPseudoState (int l, int ichan) const
         HexException("Failed to read the pseudostate l = %d, ichan = %d from the dataset \"Cl\" in file %s.", l, ichan, filename.c_str());
 
     // Adjust the overall sign of the eigenvector so that the result is compatible with the
-    // sign convention of GSL's function gsl_sf_hydrogenicR (used in previous versions of hex-ecs).
-    // That is, the radial function should increase from origin to positive values, then turn back
-    // and (potentially) dive through zero.
+    // sign convention of GSL's function gsl_sf_hydrogenicR and also with the analytic formula
+    // used in Hydrogen::radialDipole. The sign is determined by the overlap with the analytic
+    // reduced wavefunction: a negative overlap means the signs are opposite. Using the first
+    // B-spline coefficient (as a proxy for the value near the origin) is unreliable for l >= 2
+    // because u_{nl}(r) ~ r^{l+1} vanishes there. See also NoPreconditioner::setup.
 
-    if (data.front().real() < 0.0_r)
-    {
+    auto SP = RadialIntegrals::overlapP(bspline_inner_, rad_.gaussleg(), inp_.Za, l + ichan + 1, l);
+
+    if ((data | SP).real() < 0.0_r)
         for (Complex & z : data)
             z = -z;
-    }
 
     return data;
 }
@@ -946,92 +948,6 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> &
                 }
             }
         }
-
-        // DEBUG: recalculate manually
-        /*if (cmd_.eigenchannels and i == 0 and T.nf == 2 and T.lf == 0)
-        {
-            auto rgrid = linspace(1000., 1600., 6001);
-            std::cout << "k = " << kf[0] << std::endl;
-
-            RowMatrixView<Complex> psi01(Nspline_inner, Nspline_inner, solution[0]);
-            RowMatrixView<Complex> psi10(Nspline_inner, Nspline_inner, solution[1]);
-
-            // project blocks on bound states
-            auto u0 = (Sp[0] | psi01);
-            auto u1 = (Sp[1] | psi10);
-            write_array(rgrid, bspline_full_.zip(u0, rgrid), "calculated-u-n2-ill0.txt");
-            write_array(rgrid, bspline_full_.zip(u1, rgrid), "calculated-u-n2-ill1.txt");
-
-            // transform projectile wfns to eigenbasis
-            auto Ct_u0 = coeff(0, 0)*u0 + coeff(1, 0)*u1;
-            auto Ct_u1 = coeff(0, 1)*u0 + coeff(1, 1)*u1;
-
-            // evaluate amplitude in eigenbasis
-            auto b0 = 0.5_i * (Ct_u0 | WHm[0]) / kf[0];
-            auto b1 = 0.5_i * (Ct_u1 | WHm[1]) / kf[0];
-            std::cout << "b0 = " << b0 << ' ' << std::abs(b0) << ' ' << std::arg(b0) << '\n';
-            std::cout << "b1 = " << b1 << ' ' << std::abs(b1) << ' ' << std::arg(b1) << '\n';
-
-            // evaluate Bessel functions
-            cArray Hp0(rgrid.size());
-            cArray Hp1(rgrid.size());
-            auto lam0 = eigchans_.eigmoms[T.nf][0];
-            auto lam1 = eigchans_.eigmoms[T.nf][1];
-            for (std::size_t i = 0; i < rgrid.size(); i++)
-            {
-                auto [hp0, dhp0] = special::H_dH_asy(inp_.Za - 1, +1, lam0, kf[0], rgrid[i]);
-                auto [hp1, dhp1] = special::H_dH_asy(inp_.Za - 1, +1, lam1, kf[0], rgrid[i]);
-                Hp0[i] = hp0;
-                Hp1[i] = hp1;
-            }
-
-            // reconstruct solutions
-            auto w0 = coeff(0, 0)*b0*Hp0 + coeff(0, 1)*b1*Hp1;
-            auto w1 = coeff(1, 0)*b0*Hp0 + coeff(1, 1)*b1*Hp1;
-            write_array(rgrid, w0, "reconstructed-u-n2-ill0.txt");
-            write_array(rgrid, w1, "reconstructed-u-n2-ill1.txt");
-
-            // transform amplitudes
-            auto ell0 = ang_[0].second;
-            auto ell1 = ang_[1].second;
-            auto sigma0 = special::coul_F_sigma(inp_.Za - 1, lam0, kf[0]); std::cout << "sigma0 = " << sigma0 << std::endl;
-            auto sigma1 = special::coul_F_sigma(inp_.Za - 1, lam1, kf[0]); std::cout << "sigma1 = " << sigma1 << std::endl;
-            b0 *= std::exp(-1._i*special::constant::pi*lam0/2._r + 1._i*sigma0);
-            b1 *= std::exp(-1._i*special::constant::pi*lam1/2._r + 1._i*sigma1);
-            auto a0 = coeff(0, 0)*b0 + coeff(0, 1)*b1;
-            auto a1 = coeff(1, 0)*b0 + coeff(1, 1)*b1;
-            a0 *= std::exp(1._i*(special::constant::pi*ell0/2._r));
-            a1 *= std::exp(1._i*(special::constant::pi*ell1/2._r));
-            std::cout << "a0 = " << a0 << ' ' << std::abs(a0) << ' ' << std::arg(a0) << '\n';
-            std::cout << "a1 = " << a1 << ' ' << std::abs(a1) << ' ' << std::arg(a1) << '\n';
-
-            // should be essentially the same as when extracted directly
-            a0 = (u0 | Wj[1]) / kf[0];
-            a1 = (u1 | Wj[0]) / kf[0];
-            std::cout << "a0* = " << a0 << ' ' << std::abs(a0) << ' ' << std::arg(a0) << '\n';
-            std::cout << "a1* = " << a1 << ' ' << std::abs(a1) << ' ' << std::arg(a1) << '\n';
-
-            // also essentially the same as using (physical) Hankel functions
-            auto [hm0, dhm0] = special::H_dH_asy(inp_.Za - 1, -1, ell0, kf[0], eval_r);
-            auto [hm1, dhm1] = special::H_dH_asy(inp_.Za - 1, -1, ell1, kf[0], eval_r);
-            auto WHm0 = kf[0]*dhm0*Bspline_R0 - hm0*Dspline_R0;
-            auto WHm1 = kf[0]*dhm1*Bspline_R0 - hm1*Dspline_R0;
-            a0 = 0.5_i * (u0 | WHm0) / kf[0];
-            a1 = 0.5_i * (u1 | WHm1) / kf[0];
-            std::cout << "a0** = " << a0 << ' ' << std::abs(a0) << ' ' << std::arg(a0) << '\n';
-            std::cout << "a1** = " << a1 << ' ' << std::abs(a1) << ' ' << std::arg(a1) << '\n';
-
-            // verify a <--> b relation
-            b0 = coeff(0, 0)*std::exp(1._i*(special::constant::pi*(lam0 - Real(ell0))/2._r + 0*sigma0))*a0
-               + coeff(1, 0)*std::pow(1._i, lam0 - Real(ell1))*a1;
-            b1 = coeff(0, 1)*std::pow(1._i, lam1 - Real(ell0))*a0 + coeff(1, 1)*std::pow(1._i, lam1 - Real(ell1))*a1;
-            std::cout << "b0* = " << b0 << ' ' << std::abs(b0) << ' ' << std::arg(b0) << '\n';
-            std::cout << "b1* = " << b1 << ' ' << std::abs(b1) << ' ' << std::arg(b1) << '\n';
-            a0 = coeff(0, 0)*std::pow(1._i, Real(ell0) - lam0)*b0 + coeff(0, 1)*std::pow(1._i, Real(ell0) - lam1)*b1;
-            a1 = coeff(1, 0)*std::pow(1._i, Real(ell1) - lam0)*b0 + coeff(1, 1)*std::pow(1._i, Real(ell1) - lam1)*b1;
-            std::cout << "a0*** = " << a0 << ' ' << std::abs(a0) << ' ' << std::arg(a0) << '\n';
-            std::cout << "a1*** = " << a1 << ' ' << std::abs(a1) << ' ' << std::arg(a1) << '\n';
-        }*/
     }
 
     // transform amplitudes from eigenchannels to physical channels

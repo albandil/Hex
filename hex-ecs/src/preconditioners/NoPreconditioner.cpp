@@ -376,11 +376,16 @@ void NoPreconditioner::setup ()
                         Eb_[i][l].push_back(Eb);
 
                         // Adjust the overall sign of the eigenvector so that the result is compatible with the
-                        // sign convention of GSL's function gsl_sf_hydrogenicR (used in previous versions of hex-ecs).
-                        // That is, the radial function should increase from origin to positive values, then turn back
-                        // and (potentially) dive through zero.
+                        // sign convention of GSL's function gsl_sf_hydrogenicR and also with the analytic formula
+                        // used in Hydrogen::radialDipole. The sign is determined by the overlap with the analytic
+                        // reduced wavefunction: a negative overlap means the signs are opposite. Using the first
+                        // B-spline coefficient (as a proxy for the value near the origin) is unreliable for l >= 2
+                        // because u_{nl}(r) ~ r^{l+1} vanishes there. See also Amplitudes::readAtomPseudoState.
 
-                        if (Xp_[i][l].back().front().real() < 0.0_r)
+                        auto const & gl = (i == 0 ? rad_inner_->gaussleg_x() : rad_inner_->gaussleg_y());
+                        auto SP = RadialIntegrals::overlapP(bspline_inner, gl, inp_->Za, nr + l + 1, l);
+
+                        if ((Xp_[i][l].back() | SP).real() < 0.0_r)
                         {
                             Xp_[i][l].back() = -Xp_[i][l].back();
                             Sp_[i][l].back() = -Sp_[i][l].back();
