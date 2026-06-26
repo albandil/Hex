@@ -283,8 +283,8 @@ void CommandLine::parse (int argc, char* argv[])
                         "\t--cl-device <index>              Use given OpenCL device for GPU preconditioner (default is 0, i.e. the first device found).\n"
                         "\t--cl-use-host-memory             Keep large data in RAM instead of copying everything to the compute device. This will slow down the solution.\n"
                         "\t--cl-multiply                    Do the sparse matrix multiplication on the OpenCL device (memory intensive!).\n"
-#endif
                         "\n"
+#endif
                         "Multigrid preconditioner\n"
                         "\t--multigrid-depth <number>       Depth of the geometric multigrid (= maximal refinement level of the original B-spline knot sequence).\n"
                         "\t--multigrid-coarse-prec <name>   What preconditioner to use for preconditioning of the solution of the coarse problem (specified in input file).\n"
@@ -297,6 +297,7 @@ void CommandLine::parse (int argc, char* argv[])
                         "\n"
                         "Post-processing\n"
                         "\t--no-parallel-extraction         Disallow parallel extraction of T-matrices (e.g. when the whole solution does not fit into the memory).\n"
+                        "\t--eigenchannels                  Use angular momentum eigenchannels in extraction to accelerate R-convergence.\n"
                         "\t--extract-rho-begin              Where to start averaging / extrapolating the T-matrix.\n"
                         "\t--extract-rho[-end]              Radius for T-matrix extraction.\n"
                         "\t--extract-samples                Number of evaluations of the T-matrix between --extract-rho-begin and --extract-rho.\n"
