@@ -211,7 +211,6 @@ endif()
 if(MPI_FOUND)
     message(STATUS "Building with MPI")
     add_definitions(-DWITH_MPI)
-    set(CMAKE_CXX_COMPILER "${MPI_CXX_COMPILER}")
 endif()
 
 ## --------------------------------------------------------------------------------- ##
