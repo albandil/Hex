@@ -228,7 +228,7 @@ void CGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArray<C
     std::cout << " | ";
     std::cout << std::setw(5) << (*std::min_element(n_.begin(), n_.end()));
     std::cout << std::setw(5) << (*std::max_element(n_.begin(), n_.end()));
-    std::cout << std::setw(5) << format("%g", std::accumulate(n_.begin(), n_.end(), 0) / float(n_.size()));
+    std::cout << std::setw(5) << format("%.1f", std::accumulate(n_.begin(), n_.end(), 0) / float(n_.size()));
 
     // preconditioner timing
     std::size_t us_total = us_axby_ + us_mmul_ + us_norm_ + us_prec_ + us_spro_;

@@ -38,6 +38,7 @@
 #include "hex-chebyshev.h"
 
 #include "bspline.h"
+#include "eigchans.h"
 #include "inout.h"
 #include "parallel.h"
 #include "radial.h"
@@ -298,6 +299,9 @@ class Amplitudes
 
         // angular basis
         std::vector<std::pair<int,int>> const & ang_;
+
+        // angular momentum eigenchannels
+        Eigchans eigchans_;
 
         // solution reader
         SolutionIO reader_;

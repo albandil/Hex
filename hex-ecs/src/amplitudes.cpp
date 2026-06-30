@@ -112,6 +112,10 @@ Amplitudes::Amplitudes
                 Etot_.back()[ie] = inp.Etot[ie % inp.Etot.size()];
         }
     }
+
+    // determine angular momentum eigenchannels
+    if (cmd_.eigenchannels)
+        eigchans_.calc(inp_, ang_);
 }
 
 void Amplitudes::extract (std::string directory)
@@ -717,15 +721,17 @@ cArray Amplitudes::readAtomPseudoState (int l, int ichan) const
         HexException("Failed to read the pseudostate l = %d, ichan = %d from the dataset \"Cl\" in file %s.", l, ichan, filename.c_str());
 
     // Adjust the overall sign of the eigenvector so that the result is compatible with the
-    // sign convention of GSL's function gsl_sf_hydrogenicR (used in previous versions of hex-ecs).
-    // That is, the radial function should increase from origin to positive values, then turn back
-    // and (potentially) dive through zero.
+    // sign convention of GSL's function gsl_sf_hydrogenicR and also with the analytic formula
+    // used in Hydrogen::radialDipole. The sign is determined by the overlap with the analytic
+    // reduced wavefunction: a negative overlap means the signs are opposite. Using the first
+    // B-spline coefficient (as a proxy for the value near the origin) is unreliable for l >= 2
+    // because u_{nl}(r) ~ r^{l+1} vanishes there. See also NoPreconditioner::setup.
 
-    if (data.front().real() < 0.0_r)
-    {
+    auto SP = RadialIntegrals::overlapP(bspline_inner_, rad_.gaussleg(), inp_.Za, l + ichan + 1, l);
+
+    if ((data | SP).real() < 0.0_r)
         for (Complex & z : data)
             z = -z;
-    }
 
     return data;
 }
@@ -758,6 +764,7 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> &
     int Nspline_inner = bspline_inner_.Nspline(); // B-spline count (inner basis)
     int Nspline_full  = bspline_full_ .Nspline(); // B-spline count (combined basis)
     int Nspline_outer = Nspline_full - Nspline_inner; // B-spline count (outer basis)
+    int Nang = ang_.size();                     // number of coupled angular momentum pairs
 
     // check that memory for this transition is allocated
     if (Lambda_Slp.find(T) == Lambda_Slp.end())
@@ -779,15 +786,22 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> &
         return;
 
     // read the appropriate projectile channel function for the final state (nf,lf,*)
-    cArray Xp, Sp;
-    if (cmd_.analytic_eigenstates)
+    cArray Xp;
+    cArrays Sp(std::min(inp_.maxell + 1, T.nf));
+    for (int lf = 0; lf < Sp.size(); lf++)
     {
-        Sp = RadialIntegrals::overlapP(bspline_inner_, rad_.gaussleg(), inp_.Za, T.nf, T.lf);
-    }
-    else
-    {
-        Xp = readAtomPseudoState(T.lf, T.nf - T.lf - 1);
-        Sp = rad_.S_x().dot(Xp);
+        if (T.lf == lf or cmd_.eigenchannels)
+        {
+            if (cmd_.analytic_eigenstates)
+            {
+                Sp[lf] = RadialIntegrals::overlapP(bspline_inner_, rad_.gaussleg(), inp_.Za, T.nf, lf);
+            }
+            else
+            {
+                Xp = readAtomPseudoState(lf, T.nf - lf - 1);
+                Sp[lf] = rad_.S_x().dot(Xp);
+            }
+        }
     }
 
     // The extracted T-matrix oscillates and slowly radially converges.
@@ -801,13 +815,6 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> &
     int samples = (cmd_.extract_samples   > 0) ? cmd_.extract_samples   : 10;
 
     rArray grid;
-    cArrays singlet_lambda, triplet_lambda;
-    for (int ell = 0; ell <= inp_.maxell; ell++)
-    {
-        // resize arrays
-        singlet_lambda.push_back(cArray(samples));
-        triplet_lambda.push_back(cArray(samples));
-    }
 
     if (Ra > Rb)
         HexException("Wrong order of radial extraction bounds, %g > %g.", Ra, Rb);
@@ -815,6 +822,17 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> &
     if (Rb > bspline_full_.R2())
         HexException("Extraction radius too far, %g > %g.", Rb, bspline_full_.R2());
 
+    // convert angular momentum eigenvectors to complex
+    ColMatrix<Complex> coeff(Nang, Nang);
+    if (cmd_.eigenchannels)
+        for (int ieig = 0; ieig < Nang; ieig++)
+            for (int ill = 0; ill < Nang; ill++)
+                coeff(ill, ieig) = eigchans_.eigvecs[T.nf](ill, ieig);
+
+    // extracted reduced scattering amplitudes
+    RowMatrix<Complex> lambda(Nang, samples);
+
+    // Wronskian matrix for extraction of multi-photon photoionization amplitudes
     std::vector<ColMatrix<Complex>> W(inp_.maxell + 1, ColMatrix<Complex>(samples, Ef.size()));
 
     // evaluate radial part for all evaluation radii
@@ -842,7 +860,17 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> &
             Dspline_R0[ispline] = bspline_full_.dspline(ispline, eval_knot, order, eval_r);
         }
 
-        // evaluate Wronskians
+        // evaluate Wronskians for angular momentum eigenchannels
+        cArrays WHm(Nang);
+        for (int ieig = 0; ieig < Nang; ieig++) if (cmd_.eigenchannels)
+        {
+            auto lam = eigchans_.eigmoms[T.nf][ieig];
+            auto [Hm_R0, dHm_R0] = special::H_dH_asy(inp_.Za - 1, -1, lam, kf[0], eval_r);
+
+            WHm[ieig] = kf[0]*dHm_R0*Bspline_R0 - Hm_R0*Dspline_R0;
+        }
+
+        // evaluate Wronskians for physical channels
         cArrays Wj (inp_.maxell + 1);
         for (int l = 0; l <= inp_.maxell; l++)
         {
@@ -860,15 +888,18 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> &
         # pragma omp parallel for schedule (dynamic,1) if (cmd_.parallel_extraction)
         for (unsigned ill = 0; ill < ang_.size(); ill++) if (par_.isMyGroupWork(ill) and par_.IamGroupMaster())
         {
-            // skip blocks that do not contribute to (l1 = ) lf
-            if (ang_[ill].first != T.lf)
+            // get atomic and projectile angular momentum
+            auto [lf, ell] = ang_[ill];
+
+            // skip blocks that do not contribute to the requested final shell
+            if (lf >= T.nf)
                 continue;
 
-            // get projectile angular momentum
-            int ell = ang_[ill].second;
+            // skip blocks that do not contribute to the requested angular momentum (unless dipole-coupled)
+            if (lf != T.lf and not cmd_.eigenchannels)
+                continue;
 
             // evaluate radial integrals
-            Complex lambda = 0;
             if (inp_.inner_only)
             {
                 // change view to row-major dense matrix
@@ -879,31 +910,71 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> &
                     solution[ill]   // data
                 );
 
-                // calculate radial integral
-                lambda = (Sp | PsiSc | Wj[ell]);
+                // project to outgoing channel
+                auto PsiScFf = (Sp[lf] | PsiSc);
+
+                // calculate radial integrals
+                if (cmd_.eigenchannels)
+                {
+                    #pragma omp critical
+                    for (int ieig = 0; ieig < Nang; ieig++)
+                        lambda(ieig, i) += 0.5_i * coeff(ill, ieig) * (PsiScFf | WHm[ieig]);
+                }
+                else
+                {
+                    lambda(ill, i) = (PsiScFf | Wj[ell]);
+                }
             }
             else
             {
-
-                // change view to row-major dense matrix
+                // change view to the outgoing channel
                 cArrayView PsiScFf
                 (
                     solution[ill],  // data
-                    Nspline_inner * Nspline_inner + (reader_.channels()[ill].first + T.nf - T.lf - 1) * Nspline_outer, // offset
+                    Nspline_inner * Nspline_inner + (reader_.channels()[ill].first + T.nf - lf - 1) * Nspline_outer, // offset
                     Nspline_outer   // elements
                 );
 
                 // calculate radial integral
-                lambda = (PsiScFf | Wj[ell].slice(Nspline_inner, Nspline_full));
+                if (cmd_.eigenchannels)
+                {
+                    #pragma omp critical
+                    for (int ieig = 0; ieig < Nang; ieig++)
+                        lambda(ieig, i) += 0.5_i * coeff(ill, ieig) * (PsiScFf | WHm[ieig].slice(Nspline_inner, Nspline_full));
+                }
+                else
+                {
+                    lambda(ill, i) = (PsiScFf | Wj[ell].slice(Nspline_inner, Nspline_full));
+                }
             }
-
-            // update the stored value
-            # pragma omp critical
-            if (Spin == 0)
-                singlet_lambda[ell][i] += lambda;
-            else
-                triplet_lambda[ell][i] += lambda;
         }
+    }
+
+    // transform amplitudes from eigenchannels to physical channels
+    if (cmd_.eigenchannels)
+    {
+        auto lambda0 = lambda;
+        for (int ieig = 0; ieig < Nang; ieig++)
+        {
+            auto lam = eigchans_.eigmoms[T.nf][ieig];
+            auto sigma = special::coul_F_sigma(inp_.Za - 1, lam, kf[0]);
+            lambda0.row(ieig) *= std::exp(-1._i * special::constant::pi * lam / 2._r + 1._i*sigma);
+        }
+
+        blas::gemm(1._r, coeff, lambda0, 0._r, lambda);
+        for (int ill = 0; ill < Nang; ill++)
+            lambda.row(ill) *= std::exp(1._i * (special::constant::pi * ang_[ill].second / 2._r));
+    }
+
+    // sum contributions from all blocks
+    RowMatrix<Complex> singlet_lambda(inp_.maxell + 1, samples);
+    RowMatrix<Complex> triplet_lambda(inp_.maxell + 1, samples);
+    for (int ill = 0; ill < Nang; ill++)
+    {
+        auto [lf, ell] = ang_[ill];
+
+        if (lf == T.lf and Spin == 0) singlet_lambda.row(ell) += lambda.row(ill);
+        if (lf == T.lf and Spin == 1) triplet_lambda.row(ell) += lambda.row(ill);
     }
 
     // extract multi-photon amplitudes
@@ -917,15 +988,15 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> &
 
         for (int ell = 0; ell <= inp_.maxell; ell++)
         {
-            if (singlet_lambda[ell].norm() != 0)
+            if (singlet_lambda.row(ell).norm() != 0)
             {
-                blas::gelss(W[ell], singlet_lambda[ell]);
-                Lambda_Slp[T][ell].first[ie] += singlet_lambda[ell][0];
+                blas::gelss(W[ell], singlet_lambda.row(ell));
+                Lambda_Slp[T][ell].first[ie] += singlet_lambda.row(ell)[0];
             }
-            if (triplet_lambda[ell].norm() != 0)
+            if (triplet_lambda.row(ell).norm() != 0)
             {
-                blas::gelss(W[ell], triplet_lambda[ell]);
-                Lambda_Slp[T][ell].second[ie] += triplet_lambda[ell][0];
+                blas::gelss(W[ell], triplet_lambda.row(ell));
+                Lambda_Slp[T][ell].second[ie] += triplet_lambda.row(ell)[0];
             }
         }
 
@@ -938,14 +1009,14 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> &
         if (cmd_.extract_extrapolate)
         {
             // radial extrapolation
-            Lambda_Slp[T][ell].first[ie] += inv_power_extrapolate(grid, singlet_lambda[ell]);
-            Lambda_Slp[T][ell].second[ie] += inv_power_extrapolate(grid, triplet_lambda[ell]);
+            Lambda_Slp[T][ell].first[ie] += inv_power_extrapolate(grid, singlet_lambda.row(ell));
+            Lambda_Slp[T][ell].second[ie] += inv_power_extrapolate(grid, triplet_lambda.row(ell));
         }
         else
         {
             // plain averaging
-            Lambda_Slp[T][ell].first[ie] += sum(singlet_lambda[ell]) / Real(samples);
-            Lambda_Slp[T][ell].second[ie] += sum(triplet_lambda[ell]) / Real(samples);
+            Lambda_Slp[T][ell].first[ie] += sum(singlet_lambda.row(ell)) / Real(samples);
+            Lambda_Slp[T][ell].second[ie] += sum(triplet_lambda.row(ell)) / Real(samples);
         }
     }
 }

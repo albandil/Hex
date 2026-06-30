@@ -648,12 +648,10 @@ int special::coul_F (int Z, int l, double k, double r, double& F, double& Fp)
     return err;
 }
 
-double special::coul_F_sigma (int Z, int l, double k)
+double special::coul_F_sigma (int Z, Complex l, double k)
 {
-    // return arg(gamma(Complex(l+1,-Z/k)));
-
     gsl_sf_result lnr, arg;
-    int err = gsl_sf_lngamma_complex_e(l+1, -Z/k, &lnr, &arg);
+    int err = gsl_sf_lngamma_complex_e(l.real() + 1, l.imag() - Z/k, &lnr, &arg);
 
     if (err != GSL_SUCCESS)
         HexException("Error while evaluating Coulomb phaseshift.");
@@ -679,6 +677,105 @@ std::pair<Complex, Complex> special::H_dH(Real Z, int l, Real k, Real r)
     return { Complex(g.val, f.val), Complex(gp.val, fp.val) };
 }
 
+namespace
+{
+    // Evaluate the (formally divergent) asymptotic series for H^(s)_l(eta,rho) and its
+    // rho-derivative with *optimal* truncation: sum while terms shrink and stop at the
+    // smallest one (the standard way to get the best accuracy out of a semi-convergent
+    // series). 'relerr' on return is the size of that smallest term relative to the sum,
+    // i.e. an estimate of the achieved accuracy, used by the caller to decide whether the
+    // series can be trusted at this rho at all.
+    void H_asy_series (Complex const & l, Real eta, int s, Real rho, Real sigma, Complex & H, Complex & dH, Real & relerr)
+    {
+        auto a = l + 1._r + Real(s)*eta*1._i;
+        auto b = -l + Real(s)*eta*1._i;
+
+        auto term = 1._z, Hsum = 1._z, dHsum = 0._z;
+        auto bestHsum = Hsum, bestdHsum = dHsum;
+        auto bestAbs = std::abs(term);
+        relerr = 1;
+
+        for (int n = 1; n <= 40 and std::abs(term) <= 1e6 * bestAbs; n++)
+        {
+            term *= (a + Real(n - 1))*(b + Real(n - 1))/(2._i*Real(n)*Real(s)*rho);
+            Hsum += term;
+            dHsum += -n / rho * term;
+
+            if (std::abs(term) <= bestAbs)
+            {
+                bestAbs = std::abs(term);
+                relerr = bestAbs / std::max(std::abs(Hsum), 1e-300);
+                bestHsum = Hsum;
+                bestdHsum = dHsum;
+            }
+
+            if (term == 0._z)
+                break;  // series terminates exactly (happens whenever l is a non-negative integer)
+        }
+
+        auto theta = rho - eta*std::log(2*rho) - special::constant::pi*l/2._r + sigma;
+        auto exp_itheta = std::exp(Real(s)*1._i*theta);
+        H  = exp_itheta * bestHsum;
+        dH = 1._i * Real(s) * (1 - eta/rho) * H + exp_itheta * bestdHsum;
+    }
+}
+
+std::pair<Complex, Complex> special::H_dH_asy(Real Z, int s, Complex l, Real k, Real r)
+{
+    Real eta = -Z/k;
+    Real rho = k*r;
+
+    // Coulomb phase (shared by the series at every radius)
+    gsl_sf_result lnr, arg;
+    if (gsl_sf_lngamma_complex_e(l.real() + 1, l.imag() + eta, &lnr, &arg) != GSL_SUCCESS)
+        HexException("Error while evaluating Coulomb phaseshift for H/dH.");
+    Real sigma = arg.val;
+
+    // try the asymptotic series directly at the requested radius
+    Complex H, dH;
+    Real relerr;
+    H_asy_series(l, eta, s, rho, sigma, H, dH, relerr);
+    if (relerr < 1e-10)
+        return {H, dH};
+
+    // The series is not yet trustworthy here -- this happens for strongly complex/fractional
+    // l (e.g. the higher Gailitis-Damburg eigenchannels of deeper degenerate shells) evaluated
+    // not too far past the matching radius. Push the evaluation point rho1 outward until the
+    // series *is* accurate there, then shoot the exact defining Coulomb ODE
+    //     d^2H/drho^2 = [ l(l+1)/rho^2 + 2 eta/rho - 1 ] H
+    // back inward to the requested rho with RK4. This holds for any complex l and any rho > 0,
+    // so it has none of the series' accuracy ceiling.
+    Real rho1 = rho;
+    Complex H1 = H, dH1 = dH;
+    for (int it = 0; it < 200 and relerr >= 1e-10; it++)
+    {
+        rho1 += std::max(5.0, 0.1 * rho1);
+        H_asy_series(l, eta, s, rho1, sigma, H1, dH1, relerr);
+    }
+
+    auto deriv = [&] (Real x, Complex y0, Complex y1) -> std::pair<Complex, Complex>
+    {
+        return { y1, (l*(l + 1._r)/(x*x) + 2._r*eta/x - 1._r) * y0 };
+    };
+
+    int N = std::max(1, (int)std::ceil((rho1 - rho) / 0.05));
+    Real h = (rho - rho1) / N;  // negative step: integrating inward
+    Complex y0 = H1, y1 = dH1;
+    Real x = rho1;
+
+    for (int i = 0; i < N; i++)
+    {
+        auto [k1a, k1b] = deriv(x, y0, y1);
+        auto [k2a, k2b] = deriv(x + 0.5_r*h, y0 + 0.5_r*h*k1a, y1 + 0.5_r*h*k1b);
+        auto [k3a, k3b] = deriv(x + 0.5_r*h, y0 + 0.5_r*h*k2a, y1 + 0.5_r*h*k2b);
+        auto [k4a, k4b] = deriv(x + h,       y0 + h*k3a,       y1 + h*k3b);
+        y0 += (h/6._r) * (k1a + 2._r*k2a + 2._r*k3a + k4a);
+        y1 += (h/6._r) * (k1b + 2._r*k2b + 2._r*k3b + k4b);
+        x  += h;
+    }
+
+    return {y0, y1};
+}
 
 bool special::makes_triangle (int two_j1, int two_j2, int two_j3)
 {

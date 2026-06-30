@@ -263,6 +263,26 @@ double getFreeFar
     int max_steps = DEFAULT_MAXSTEPS
 );
 
+/**
+ * @brief Radial part of the dipole matrix element between degenerate hydrogen states.
+ *
+ * Evaluates
+ * @f[
+ *     d(n,l_i,l_f) = \int_0^\infty P_{n l_i}(r)\, r\, P_{n l_f}(r)\, \mathrm{d}r
+ * @f]
+ * for two hydrogen states sharing the same principal quantum number @f$ n @f$.
+ * The integral is a special case of Gordon's general (hypergeometric, Gamma-function)
+ * formula for radial matrix elements between hydrogen states (see @ref special::hydro_rho
+ * for the general @f$ n_i \ne n_f @f$ case); in the degenerate limit @f$ n_i = n_f @f$ all
+ * the Gamma functions cancel and the integral reduces to the elementary closed form
+ * @f[
+ *     d(n,l_i,l_f) = -\frac{3n}{2}\sqrt{n^2 - l_>^2} \,, \qquad l_> = \max(l_i,l_f) \,,
+ * @f]
+ * valid for @f$ l_f = l_i \pm 1 @f$ (the only case relevant for a dipole transition;
+ * the integral vanishes for any other @f$ l_f @f$ by parity).
+ */
+Real radialDipole(Real Z, int n, int li, int lf);
+
 } // end of namespace hydrogen
 
 /**

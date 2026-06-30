@@ -443,6 +443,16 @@ double getFreeFar (double k, int l, double Sigma, double eps, int max_steps)
     return idx_mid * M_PI;
 }
 
+Real radialDipole(Real Z, int n, int li, int lf)
+{
+    if (n <= li or n <= lf or abs(li - lf) != 1)
+        return 0;
+
+    auto lmax = std::max(li, lf);
+
+    return -1.5_r * n / Z * std::sqrt(Real(n*n - lmax*lmax));
+}
+
 } // endof namespace Hydrogen
 
 double HydrogenFunction::operator() (double r) const

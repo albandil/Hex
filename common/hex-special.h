@@ -581,6 +581,17 @@ inline Complex ric_h_plus (int n, double x)
  */
 std::pair<Complex, Complex> H_dH (Real Z, int l, Real k, Real r);
 
+/**
+ * @brief Coulomb-Hankel function and derivative (asymptotic).
+ *
+ * Evaluates H and its derivative for complex angular momentum. Uses the divergent asymptotic
+ * series with optimal (smallest-term) truncation; if that is not accurate enough at the
+ * requested radius (which happens for strongly complex @f$ l @f$ not too far from the matching
+ * radius), the series is evaluated further out, where it is trustworthy, and the defining
+ * Coulomb ODE is integrated back inward by RK4 to the requested radius.
+ */
+std::pair<Complex, Complex> H_dH_asy (Real Z, int sign, Complex l, Real k, Real r);
+
 //
 // Other special functions.
 //
@@ -730,7 +741,7 @@ double coul_F_asy (int Z, int l, double k, double r, double sigma = special::con
  * @param l Angular momentum.
  * @param k Wavenumber.
  */
-double coul_F_sigma (int Z, int l, double k);
+double coul_F_sigma (int Z, Complex l, double k);
 
 /**
  * @brief Check triangle inequality.
