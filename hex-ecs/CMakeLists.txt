@@ -35,6 +35,25 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
 
+find_program(XXD_EXECUTABLE xxd REQUIRED)
+
+set(GPU_CL_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/src/preconditioners/GPUPreconditioner.cl")
+set(GPU_CL_INC    "${CMAKE_CURRENT_SOURCE_DIR}/src/preconditioners/GPUPreconditioner.inc")
+
+add_custom_command(
+    OUTPUT  "${GPU_CL_INC}"
+    COMMAND ${CMAKE_COMMAND}
+            -D "INPUT=${GPU_CL_SOURCE}"
+            -D "OUTPUT=${GPU_CL_INC}"
+            -D "VARNAME=src_preconditioners_GPUPreconditioner_cl"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/xxd_embed.cmake"
+    DEPENDS "${GPU_CL_SOURCE}"
+    COMMENT "Embedding GPUPreconditioner.cl as C byte array"
+    VERBATIM
+)
+
+add_custom_target(hex-ecs-embed-gpu-cl DEPENDS "${GPU_CL_INC}")
+
 set(hex-ecs_SOURCES
     "src/amplitudes.cpp"
     "src/ang.cpp"
@@ -68,6 +87,8 @@ set(hex-ecs_SOURCES
 )
 
 add_executable(hex-ecs ${hex-ecs_SOURCES})
+
+add_dependencies(hex-ecs hex-ecs-embed-gpu-cl)
 
 if(DISABLE_PARALLEL_PRECONDITION)
     target_compile_definitions(hex-ecs PRIVATE DISABLE_PARALLEL_PRECONDITION)
