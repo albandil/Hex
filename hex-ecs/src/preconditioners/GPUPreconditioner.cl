@@ -280,10 +280,7 @@ kernel void mmul_simple
         }
 
         // push result to global memory
-        if (bd == -ORDER)
-            y[i * NSPLINE_PROJ + j] = result;
-        else
-            y[i * NSPLINE_PROJ + j] += result;
+        y[i * NSPLINE_PROJ + j] += result;
     }
 }
 
@@ -831,14 +828,14 @@ kernel void A2el_coupled
         {
             if (d < NSPLINE_PROJ)
             {
-                private int I = a;
+                private int I = a * (ORDER + 1) + c - a;
                 private int J = b * (ORDER + 1) + d - b;
 
                 for (private int idx = Rp[I]; idx < Rp[I + 1]; idx++)
                 {
                     if (Ri[idx] == J)
                     {
-                        A[I * NSPLINE_PROJ * (ORDER + 1) + J] += ZP * f[lambda] * Rx[idx];
+                        A[a * NSPLINE_PROJ * (ORDER + 1) + J] += ZP * f[lambda] * Rx[idx];
                     }
                 }
             }

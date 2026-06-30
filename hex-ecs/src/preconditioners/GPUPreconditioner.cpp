@@ -705,10 +705,14 @@ void GPUCGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArra
 
             if (cmd_->lightweight_simple or not cmd_->lightweight_full)
             {
+                const cl_uchar zero = 0;
+                clEnqueueFillBuffer(queue_, b.handle(), &zero, sizeof(zero), 0, Nsegsiz * sizeof(Complex), 0, nullptr, nullptr);
+                clFinish(queue_);
+
                 // special kernel for BlockSymBandMatrix::dot
-                for (int bd = -order; bd <= order; bd++)
+                for (int bd = -int(order); bd <= int(order); bd++)
                 {
-                    clSetKernelArg(mmls_, 0, sizeof(cl_mem), &A[bd].handle());
+                    clSetKernelArg(mmls_, 0, sizeof(cl_mem), &A[std::abs(bd)].handle());
                     clSetKernelArg(mmls_, 1, sizeof(cl_int), &bd);
                     clSetKernelArg(mmls_, 2, sizeof(cl_mem), &a.handle());
                     clSetKernelArg(mmls_, 3, sizeof(cl_mem), &b.handle());
