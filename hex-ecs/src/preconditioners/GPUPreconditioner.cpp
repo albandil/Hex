@@ -266,7 +266,7 @@ void GPUCGPreconditioner::setup ()
 
     if (cmd_->lightweight_simple or not cmd_->lightweight_full)
     {
-        std::size_t Asize = (order + 1)*(order + 1)*Nspline_inner_x*Nspline_inner_y*sizeof(Complex);
+        std::size_t Asize = (order + 1)*Nspline_inner_x*Nspline_inner_y*sizeof(Complex);
 
         if (max_allocation < Asize)
             HexException("Allocation of %lld MiB requested, but not supported by device!", Asize/(1024*1024));
