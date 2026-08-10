@@ -167,6 +167,10 @@ void LUft_UMFPACK::solve (const cArrayView b, cArrayView x, int eqs) const
     cArrayView B(b), X(x);
 #endif
 
+    // get default setting
+    double Control[UMFPACK_CONTROL];
+    UMFPACK_DEFAULTS_F(Control);
+
     // solve for all RHSs
     for (int eq = 0; eq < eqs; eq++)
     {
@@ -190,7 +194,7 @@ void LUft_UMFPACK::solve (const cArrayView b, cArrayView x, int eqs) const
             nullptr,
 
             numeric_,   // factorization object
-            nullptr,    // ?
+            Control,    // control array
             &info_[0]   // diagnostic information
         );
 

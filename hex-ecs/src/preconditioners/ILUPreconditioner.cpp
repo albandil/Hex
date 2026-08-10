@@ -231,7 +231,7 @@ void ILUCGPreconditioner::CG_init (int iblock) const
 
         // save the diagonal block's factorization
         lu_[iblock]->link(format("lu-E%+g-%d-%4x-%4x.bin", E_, iblock, rad_panel().bspline_x().hash(), rad_panel().bspline_y().hash()));
-        lu_[iblock]->save();
+        if (cmd_->outofcore) lu_[iblock]->save();
 
 #ifdef _OPENMP
         // release lock
