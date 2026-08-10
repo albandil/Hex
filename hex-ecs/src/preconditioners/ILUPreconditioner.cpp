@@ -159,15 +159,6 @@ void ILUCGPreconditioner::CG_init (int iblock) const
     // check that the factorization is loaded
     if (not lu_[iblock]->valid())
     {
-#ifdef _OPENMP
-        // allow only one factorization at a time when not using SuperLU DIST or MUMPS
-        if (not cmd_->parallel_factorization)
-            omp_set_lock(&lu_lock_);
-#endif
-
-        // start timer
-        Timer timer;
-
         // create the CSR block that will be factorized
         CsrMatrix<LU_int_t,Complex> csr = calc_full_block(iblock, iblock).tocsr();
 
@@ -200,6 +191,15 @@ void ILUCGPreconditioner::CG_init (int iblock) const
         }
 #endif
 
+#ifdef _OPENMP
+        // allow only one factorization at a time when not using SuperLU DIST or MUMPS
+        if (not cmd_->parallel_factorization)
+            omp_set_lock(&lu_lock_);
+#endif
+
+        // start timer
+        Timer timer;
+
         // factorize the block and store it
         lu_[iblock]->factorize(csr);
 
@@ -211,7 +211,7 @@ void ILUCGPreconditioner::CG_init (int iblock) const
                 std::cout << std::endl << std::setw(37) << format
                 (
                     "\tLU #%d (%d,%d) in %d:%02d (%s, cond %1.0e)",
-                    iblock, ang_->states()[iblock].first, ang_->states()[iblock].second,      // block identification (id, ℓ₁, ℓ₂)
+                    iblock, ang_->states()[iblock].first, ang_->states()[iblock].second,    // block identification (id, ℓ₁, ℓ₂)
                     timer.seconds() / 60, timer.seconds() % 60,                             // factorization time
                     nice_size(lu_[iblock]->size()).c_str(),                                 // final memory size
                     lu_[iblock]->cond()                                                     // estimation of the condition number
@@ -222,7 +222,7 @@ void ILUCGPreconditioner::CG_init (int iblock) const
                 std::cout << std::endl << std::setw(37) << format
                 (
                     "\tLU #%d (%d,%d) in %d:%02d (%s)",
-                    iblock, ang_->states()[iblock].first, ang_->states()[iblock].second,      // block identification (id, ℓ₁, ℓ₂)
+                    iblock, ang_->states()[iblock].first, ang_->states()[iblock].second,    // block identification (id, ℓ₁, ℓ₂)
                     timer.seconds() / 60, timer.seconds() % 60,                             // factorization time
                     nice_size(lu_[iblock]->size()).c_str()                                  // final memory size
                 );
