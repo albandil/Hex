@@ -334,7 +334,7 @@ void NoPreconditioner::setup ()
 
                 // get sorted energies (ascending real parts)
                 std::iota(indices.begin(), indices.end(), 0);
-                std::sort(indices.begin(), indices.end(), [=](int a, int b){ return Hl_[i][l].Dl[a].real() < Hl_[i][l].Dl[b].real(); });
+                std::sort(indices.begin(), indices.end(), [this, i, l](int a, int b){ return Hl_[i][l].Dl[a].real() < Hl_[i][l].Dl[b].real(); });
 
                 // get maximal element that has accurate bound state energy
                 int max_nr = -1;

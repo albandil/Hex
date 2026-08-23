@@ -943,7 +943,7 @@ cArray RadialIntegrals::overlap
             evalF[ixpoint * points + iypoint] =
                 funct(xs[ixknot * points + ixpoint], ys[iyknot * points + iypoint])
                 * wxs[ixknot * points + ixpoint]
-                * wys[ixknot * points + ixpoint];
+                * wys[iyknot * points + iypoint];
         }
 
         // for all relevant B-splines

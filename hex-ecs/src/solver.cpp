@@ -979,8 +979,8 @@ bool Solver::check_convergence_ (cArray const & T1, cArray const & T2) const
             return false;
 
         // and then compare phase factors
-        double D1 = std::atan2(T1[i].real(), T1[i].imag());
-        double D2 = std::atan2(T2[i].real(), T2[i].imag());
+        double D1 = std::atan2(T1[i].imag(), T1[i].real());
+        double D2 = std::atan2(T2[i].imag(), T2[i].real());
         double D_reldiff = 2.0_r * std::abs(D1 - D2) / (std::abs(D1) + std::abs(D2));
         if (not std::isfinite(D_reldiff) or D_reldiff > cmd_.autostop_tolerance)
             return false;

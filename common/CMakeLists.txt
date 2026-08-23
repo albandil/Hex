@@ -82,4 +82,5 @@ target_link_libraries(libhex-common
     ${LAPACK_LIBRARIES}
     ${BLAS_LIBRARIES}
     OpenMP::OpenMP_CXX
+    MPI::MPI_C
 )

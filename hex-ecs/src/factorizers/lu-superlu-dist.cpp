@@ -115,7 +115,7 @@ void LUft_SUPERLU_DIST::factorize (CsrMatrix<LU_int_t,Complex> const & matrix)
         options.PrintStat    = NO;
         options.SymPattern   = YES;
         options.ILU_DropRule = /* DROP_BASIC */ 1;
-        options.ILU_DropTol  = rdata["drop_tolerance"];
+        options.ILU_DropTol  = rdata_["drop_tolerance"];
 
         // distributed scale and permutation data
         ScalePermstructInit(A.nrow, A.ncol, &ScalePermstruct_);

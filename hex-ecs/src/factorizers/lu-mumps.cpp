@@ -193,8 +193,8 @@ void LUft_MUMPS::solve (const cArrayView b, cArrayView x, int eqs) const
 
     // run the back-substitution
     settings.job  = MUMPS_SOLVE;
-    settings.nrhs = 1;
-    settings.lrhs = x.size();
+    settings.nrhs = eqs;
+    settings.lrhs = x.size() / eqs;
     settings.rhs  = reinterpret_cast<MUMPS_COMPLEX*>(x.data());
     MUMPS_C(&settings);
 

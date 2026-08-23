@@ -1034,7 +1034,7 @@ void Amplitudes::computeTmat_ (Amplitudes::Transition T)
     if (Tmat_Slp.find(T) == Tmat_Slp.end())
     {
         Tmat_Slp[T] = std::vector<std::pair<cArray,cArray>>(inp_.maxell + 1);
-        for (auto vec : Tmat_Slp[T])
+        for (auto & vec : Tmat_Slp[T])
             vec.first = vec.second = cArray(inp_.Etot.size());
     }
 
