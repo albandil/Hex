@@ -128,9 +128,15 @@ int CGPreconditioner::solve_block (int ill, const cArrayView r, cArrayView z) co
     if (n >= max_iterations)
     {
         if (cmd_->fail_on_sub_iter)
-            HexException("Error: Maximal number of iterations (%d) reached in the sub-preconditioner.", max_iterations);
+            HexException(
+                "Error: Maximal number of iterations (%d) reached in the sub-preconditioner for block #%d (%d,%d).",
+                max_iterations, ill, ang_->states()[ill].first, ang_->states()[ill].second
+            );
         else
-            std::cout << "\tWarning: Maximal number of iterations (" << max_iterations << ") reached in the sub-preconditioner." << std::endl;
+            std::printf(
+                "Error: Maximal number of iterations (%d) reached in the sub-preconditioner for block #%d (%d,%d).",
+                max_iterations, ill, ang_->states()[ill].first, ang_->states()[ill].second
+            );
     }
 
     // release block-preconditioner block-specific data
