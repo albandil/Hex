@@ -243,7 +243,7 @@ void CommandLine::parse (int argc, char* argv[])
                         "\t--shared-scratch           (-s)  Let every MPI process calculate only a subset of shared radial integrals (assume shared output directory).\n"
                         "\t--lightweight-radial-cache (-l)  Do not precalculate two-electron integrals and only apply them on the fly (slower, but saves RAM).\n"
                         "\t--lightweight-full         (-L)  Avoid precalculating all large matrices and only apply them on the fly.\n"
-                        "\t--lightweight-simple             Similar as lightweight-full, but precalculate diagonal block before every start of a nested CG solver.\n"
+                        "\t--lightweight-simple       (-S)  Similar as lightweight-full, but precalculate diagonal block before every start of a nested CG solver.\n"
                         "\n"
                         "Preconditioners (general)\n"
                         "\t--preconditioner <name>    (-p)  Preconditioner to use (default: ILU).\n"
@@ -585,7 +585,7 @@ void CommandLine::parse (int argc, char* argv[])
                 }
             },
             {
-                "lightweight-simple", "", 0, [&](std::vector<std::string> const & optargs) -> bool
+                "lightweight-simple", "S", 0, [&](std::vector<std::string> const & optargs) -> bool
                 {
                     // only precompute diagonal matrices just before nested CG solution
                     lightweight_simple = lightweight_full = lightweight_radial_cache = true;
