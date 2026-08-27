@@ -110,7 +110,12 @@ target_link_libraries(hex-ecs
     ${OpenCL_LIBRARIES}
     ${MKL_LIBRARIES}
     ${SCALAPACK_LIBRARIES}
-    MPI::MPI_C
+    OpenMP::OpenMP_CXX
 )
 
-target_link_options(hex-ecs PUBLIC ${OpenMP_CXX_FLAGS})
+if(WITH_MPI)
+    target_link_libraries(hex-ecs
+        ${SCALAPACK_LIBRARIES}
+        MPI::MPI_C
+    )
+endif()

@@ -96,40 +96,40 @@ class LUft_UMFPACK : public LUft
         LUft_UMFPACK ();
 
         /// Destructor.
-        virtual ~LUft_UMFPACK () { drop(); }
+        ~LUft_UMFPACK () override { drop(); }
 
         // Disable bitwise copy
         LUft_UMFPACK const & operator= (LUft_UMFPACK const &) = delete;
 
         /// Factorize.
-        virtual void factorize (CsrMatrix<LU_int_t,Complex> const & matrix);
+        void factorize (CsrMatrix<LU_int_t,Complex> const & matrix) override;
 
         /// Return factorization information.
         NumberArray<double> const & info () const { return info_; }
 
         /// Validity indicator.
-        virtual bool valid () const;
+        bool valid () const override;
 
         /// Return LU byte size.
-        virtual std::size_t size () const;
+        std::size_t size () const override;
 
         /// Return condition number.
-        virtual Real cond () const;
+        Real cond () const override;
 
         /// Solve equations.
-        virtual void solve (const cArrayView b, cArrayView x, int eqs) const;
+        void solve (const cArrayView b, cArrayView x, int eqs) const override;
 
         /// Save factorization data to disk.
-        virtual void save (std::string name) const;
+        void save (std::string name) const override;
 
         /// Load factorization data from disk.
-        virtual void load (std::string name, bool throw_on_io_failure = true);
+        void load (std::string name, bool throw_on_io_failure = true) override;
 
         /// Release memory.
-        virtual void drop ();
+        void drop () override;
 
         /// Convert LU to CSR.
-        virtual CsrMatrix<LU_int_t,Complex> get () const;
+        CsrMatrix<LU_int_t,Complex> get () const override;
 
     private:
 

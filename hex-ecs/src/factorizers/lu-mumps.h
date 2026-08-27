@@ -94,41 +94,41 @@ class LUft_MUMPS : public LUft
         LUft_MUMPS ();
 
         /// Destructor.
-        virtual ~LUft_MUMPS ();
+        ~LUft_MUMPS () override;
 
         // Disable bitwise copy
         LUft_MUMPS const & operator= (LUft_MUMPS const &) = delete;
 
         /// Factorize.
-        virtual void factorize (CsrMatrix<LU_int_t,Complex> const & matrix);
+        void factorize (CsrMatrix<LU_int_t,Complex> const & matrix) override;
 
         /// Validity indicator.
-        virtual bool valid () const
+        bool valid () const override
         {
             return mmin(I.size(), J.size(), A.size()) > 0;
         }
 
         /// Return LU byte size.
-        virtual std::size_t size () const;
+        std::size_t size () const override;
 
         /// Condition number.
-        virtual Real cond () const
+        Real cond () const override
         {
             #define RINFO(x) rinfo[x-1]
             return settings.RINFO(11);
         }
 
         /// Solve equations.
-        virtual void solve (const cArrayView b, cArrayView x, int eqs) const;
+        void solve (const cArrayView b, cArrayView x, int eqs) const override;
 
         /// Save large data to disk.
-        virtual void save (std::string name) const;
+        void save (std::string name) const override;
 
         /// Load large data from disk.
-        virtual void load (std::string name, bool throw_on_io_failure = true);
+        void load (std::string name, bool throw_on_io_failure = true) override;
 
         /// Release memory.
-        virtual void drop ()
+        void drop () override
         {
             I.drop();
             J.drop();

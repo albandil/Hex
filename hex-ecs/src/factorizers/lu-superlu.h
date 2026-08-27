@@ -68,31 +68,31 @@ class LUft_SUPERLU : public LUft
         LUft_SUPERLU ();
 
         /// Destructor.
-        virtual ~LUft_SUPERLU () { drop(); }
+        ~LUft_SUPERLU () override { drop(); }
 
         // Disable bitwise copy
         LUft_SUPERLU const & operator= (LUft_SUPERLU const &) = delete;
 
         /// Factorize.
-        virtual void factorize (CsrMatrix<LU_int_t,Complex> const & matrix);
+        void factorize (CsrMatrix<LU_int_t,Complex> const & matrix) override;
 
         /// Validity indicator.
-        virtual bool valid () const;
+        bool valid () const override;
 
         /// Return LU byte size.
-        virtual std::size_t size () const { return size_; }
+        std::size_t size () const override { return size_; }
 
         /// Solve equations.
-        virtual void solve (const cArrayView b, cArrayView x, int eqs) const;
+        void solve (const cArrayView b, cArrayView x, int eqs) const override;
 
         /// Save factorization data to disk.
-        virtual void save (std::string name) const;
+        void save (std::string name) const override;
 
         /// Load factorization data from disk.
-        virtual void load (std::string name, bool throw_on_io_failure = true);
+        void load (std::string name, bool throw_on_io_failure = true) override;
 
         /// Release memory.
-        virtual void drop ();
+        void drop () override;
 
     private:
 

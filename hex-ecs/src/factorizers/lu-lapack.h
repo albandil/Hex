@@ -58,31 +58,31 @@ class LUft_LAPACK : public LUft
         LUft_LAPACK ();
 
         /// Destructor.
-        virtual ~LUft_LAPACK();
+        ~LUft_LAPACK() override;
 
         // Disable bitwise copy
         LUft_LAPACK const & operator= (LUft_LAPACK const &) = delete;
 
         /// Factorize.
-        virtual void factorize (CsrMatrix<LU_int_t,Complex> const & matrix);
+        void factorize (CsrMatrix<LU_int_t,Complex> const & matrix) override;
 
         /// Validity indicator.
-        virtual bool valid () const { return size() != 0; }
+        bool valid () const override { return size() != 0; }
 
         /// Return LU byte size.
-        virtual std::size_t size () const;
+        std::size_t size () const override;
 
         /// Solve equations.
-        virtual void solve (const cArrayView b, cArrayView x, int eqs) const;
+        void solve (const cArrayView b, cArrayView x, int eqs) const override;
 
         /// Save to disk.
-        virtual void save (std::string name) const;
+        void save (std::string name) const override;
 
         /// Load from disk.
-        virtual void load (std::string name, bool throw_on_io_failure = true);
+        void load (std::string name, bool throw_on_io_failure = true) override;
 
         /// Release memory.
-        virtual void drop ();
+        void drop () override;
 
     private:
 

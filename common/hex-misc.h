@@ -76,6 +76,11 @@
 
 void create_directory (std::string dir);
 
+inline std::string format (const char* fmt)
+{
+    return fmt;
+}
+
 /**
  * @brief printf-like formatting.
  * 
@@ -83,17 +88,17 @@ void create_directory (std::string dir);
  * the first one is the formatting string (printf-like syntax). All the
  * arguments are sent to snprintf without change.
  */
-template <class ...Params> std::string format (Params ...p)
+template <class ...Params> std::string format (const char* fmt, Params ...p)
 {
     // calculate the necessary space
-    unsigned n = std::snprintf(nullptr, 0, p...);
+    unsigned n = std::snprintf(nullptr, 0, fmt, p...);
 
     // allocate the string
     std::string text;
     text.resize(n);
 
     // compose the text
-    std::snprintf(&text[0], n + 1, p...);
+    std::snprintf(&text[0], n + 1, fmt, p...);
 
     // return the text
     return text;

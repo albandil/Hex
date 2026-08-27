@@ -134,14 +134,14 @@ class Q : public ScatteringQuantity \
 { \
     public: \
         derivedClassRunTimeSelectionDefinitions(ScatteringQuantity, (), Q, (), NAME) \
-        std::string description (); \
-        std::vector<std::pair<std::string,std::string>> params (); \
-        std::vector<std::string> vparams (); \
-        std::vector<std::string> dependencies (); \
-        bool initialize (sqlitepp::session & db); \
-        bool createTable (); \
-        bool updateTable (); \
-        bool run (std::map<std::string,std::string> const & params); \
+        std::string description () override; \
+        std::vector<std::pair<std::string,std::string>> params () override; \
+        std::vector<std::string> vparams () override; \
+        std::vector<std::string> dependencies () override; \
+        bool initialize (sqlitepp::session & db) override; \
+        bool createTable () override; \
+        bool updateTable () override; \
+        bool run (std::map<std::string,std::string> const & params) override; \
 }; \
 addClassToParentRunTimeSelectionTable(ScatteringQuantity, Q)
 

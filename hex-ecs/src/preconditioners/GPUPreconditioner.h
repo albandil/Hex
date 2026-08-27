@@ -92,17 +92,17 @@ class GPUCGPreconditioner : public virtual KPACGPreconditioner
         );
 
         // preconditioner description
-        virtual std::string description () const;
+        std::string description () const override;
 
         // reuse parent definitions
         using KPACGPreconditioner::rhs;
         using KPACGPreconditioner::update;
 
         // declare own definitions
-        virtual void setup ();
-        virtual void finish ();
-        virtual void multiply (BlockArray<Complex> const & p, BlockArray<Complex> & q, MatrixSelection::Selection tri) const;
-        virtual void precondition (BlockArray<Complex> const & r, BlockArray<Complex> & z) const;
+        void setup () override;
+        void finish () override;
+        void multiply (BlockArray<Complex> const & p, BlockArray<Complex> & q, MatrixSelection::Selection tri) const override;
+        void precondition (BlockArray<Complex> const & r, BlockArray<Complex> & z) const override;
 
     protected:
 
