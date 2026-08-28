@@ -33,8 +33,6 @@ cmake_minimum_required(VERSION 3.13)
 
 project(Hex)
 
-enable_language(Fortran)
-
 ## --------------------------------------------------------------------------------- ##
 
 option(WITH_BOINC        "Build as a BOINC application"                           OFF)
@@ -92,6 +90,12 @@ set(SQLite3_LIBRARIES      "" CACHE STRING "SQLite3 libraries")
 set(SCALAPACK_INCLUDE_DIRS "" CACHE STRING "SCALAPACK include directories (not used)")
 set(SCALAPACK_LIBRARIES    "" CACHE STRING "SCALAPACK libraries")
 
+set(SUPERLU_INCLUDE_DIRS   "" CACHE STRING "SuperLU include directories")
+set(SUPERLU_LIBRARIES      "" CACHE STRING "SuperLU libraries")
+
+set(SUPERLU_DIST_INCLUDE_DIRS "" CACHE STRING "SuperLU_DIST include directories")
+set(SUPERLU_DIST_LIBRARIES    "" CACHE STRING "SuperLU_DIST libraries")
+
 set(UMFPACK_INCLUDE_DIRS   "" CACHE STRING "UMFPACK include directories")
 set(UMFPACK_LIBRARIES      "" CACHE STRING "UMFPACK libraries")
 
@@ -146,7 +150,7 @@ if(WITH_BOINC)
     message(STATUS "Building for BOINC")
     message(STATUS "    includes:  ${BOINC_INCLUDE_DIRS}")
     message(STATUS "    libraries: ${BOINC_LIBRARIES}")
-    add_definitions(-DWITH_CLN)
+    add_definitions(-DWITH_BOINC)
 endif()
 
 if(WITH_CLN)
@@ -172,7 +176,7 @@ endif()
 
 if(WITH_PNG)
     if(NOT PNG_LIBRARIES)
-        set(PNG_LIBRARIES libpng)
+        set(PNG_LIBRARIES png)
     endif()
     message(STATUS "Building with PNG")
     message(STATUS "    includes:  ${PNG_INCLUDE_DIRS}")
@@ -194,11 +198,31 @@ if(WITH_MUMPS)
     add_definitions(-DWITH_MUMPS)
 endif()
 
+if(WITH_PARDISO)
+    message(STATUS "Building with the stand-alone PARDISO")
+    message(STATUS "    libraries: ${PARDISO_LIBRARIES}")
+    add_definitions(-DWITH_PARDISO)
+endif()
+
 if(WITH_SCALAPACK)
     message(STATUS "Building with ScaLAPACK")
     message(STATUS "    includes:  ${SCALAPACK_INCLUDE_DIRS}")
     message(STATUS "    libraries: ${SCALAPACK_LIBRARIES}")
     add_definitions(-DWITH_SCALAPACK)
+endif()
+
+if(WITH_SUPERLU)
+    message(STATUS "Building with SuperLU")
+    message(STATUS "    includes:  ${SUPERLU_INCLUDE_DIRS}")
+    message(STATUS "    libraries: ${SUPERLU_LIBRARIES}")
+    add_definitions(-DWITH_SUPERLU)
+endif()
+
+if(WITH_SUPERLU_DIST)
+    message(STATUS "Building with SuperLU_DIST")
+    message(STATUS "    includes:  ${SUPERLU_DIST_INCLUDE_DIRS}")
+    message(STATUS "    libraries: ${SUPERLU_DIST_LIBRARIES}")
+    add_definitions(-DWITH_SUPERLU_DIST)
 endif()
 
 if(WITH_UMFPACK)
@@ -231,13 +255,13 @@ add_subdirectory(hex-db)
 add_subdirectory(hex-dwba)
 add_subdirectory(hex-ecs)
 
-if(WITH_DEVEL)
+if(BUILD_DEVEL)
     add_subdirectory(hex-pecs)
 endif()
 
 ## --------------------------------------------------------------------------------- ##
 
-install(FILES README
+install(FILES README.md
     DESTINATION "${CMAKE_INSTALL_DOCDIR}"
 )
 

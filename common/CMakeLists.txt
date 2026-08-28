@@ -41,7 +41,6 @@ set(libhex-common_SOURCES
     "hex-born.cpp"
     "hex-hdffile.cpp"
     "hex-hydrogen.cpp"
-    "hex-luft.cpp"
     "hex-matrix.cpp"
     "hex-misc.cpp"
     "hex-special.cpp"
@@ -64,20 +63,24 @@ target_compile_options(libhex-common PUBLIC "${OPTFLAGS}")
 
 target_include_directories(libhex-common PUBLIC
     ../libs
+    ${BOINC_INCLUDE_DIRS}
     ${CLN_INCLUDE_DIRS}
     ${GSL_INCLUDE_DIRS}
     ${GINAC_INCLUDE_DIRS}
     ${HDF5_INCLUDE_DIRS}
     ${MUMPS_INCLUDE_DIRS}
+    ${PNG_INCLUDE_DIRS}
     ${UMFPACK_INCLUDE_DIRS}
 )
 
 target_link_libraries(libhex-common
+    ${BOINC_LIBRARIES}
     ${CLN_LIBRARIES}
     ${GINAC_LIBRARIES}
     ${GSL_LIBRARIES}
     ${HDF5_LIBRARIES}
     ${MUMPS_LIBRARIES}
+    ${PNG_LIBRARIES}
     ${UMFPACK_LIBRARIES}
     ${LAPACK_LIBRARIES}
     ${BLAS_LIBRARIES}

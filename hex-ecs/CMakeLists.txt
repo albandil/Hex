@@ -35,24 +35,30 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
 
-find_program(XXD_EXECUTABLE xxd REQUIRED)
+# The OpenCL kernel is embedded into the binary as a C byte array. It is only
+# referenced from the WITH_OPENCL part of GPUPreconditioner.cpp, so the generated
+# header is not needed in builds without OpenCL.
+if(WITH_OPENCL)
 
-set(GPU_CL_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/src/preconditioners/GPUPreconditioner.cl")
-set(GPU_CL_INC    "${CMAKE_CURRENT_SOURCE_DIR}/src/preconditioners/GPUPreconditioner.inc")
+    set(GPU_CL_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/src/preconditioners/GPUPreconditioner.cl")
+    set(GPU_CL_INC    "${CMAKE_CURRENT_SOURCE_DIR}/src/preconditioners/GPUPreconditioner.inc")
 
-add_custom_command(
-    OUTPUT  "${GPU_CL_INC}"
-    COMMAND ${CMAKE_COMMAND}
-            -D "INPUT=${GPU_CL_SOURCE}"
-            -D "OUTPUT=${GPU_CL_INC}"
-            -D "VARNAME=src_preconditioners_GPUPreconditioner_cl"
-            -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/xxd_embed.cmake"
-    DEPENDS "${GPU_CL_SOURCE}"
-    COMMENT "Embedding GPUPreconditioner.cl as C byte array"
-    VERBATIM
-)
+    add_custom_command(
+        OUTPUT  "${GPU_CL_INC}"
+        COMMAND ${CMAKE_COMMAND}
+                -D "INPUT=${GPU_CL_SOURCE}"
+                -D "OUTPUT=${GPU_CL_INC}"
+                -D "VARNAME=src_preconditioners_GPUPreconditioner_cl"
+                -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/embed_file.cmake"
+        DEPENDS "${GPU_CL_SOURCE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/cmake/embed_file.cmake"
+        COMMENT "Embedding GPUPreconditioner.cl as C byte array"
+        VERBATIM
+    )
 
-add_custom_target(hex-ecs-embed-gpu-cl DEPENDS "${GPU_CL_INC}")
+    add_custom_target(hex-ecs-embed-gpu-cl DEPENDS "${GPU_CL_INC}")
+
+endif()
 
 set(hex-ecs_SOURCES
     "src/amplitudes.cpp"
@@ -89,7 +95,9 @@ set(hex-ecs_SOURCES
 
 add_executable(hex-ecs ${hex-ecs_SOURCES})
 
-add_dependencies(hex-ecs hex-ecs-embed-gpu-cl)
+if(WITH_OPENCL)
+    add_dependencies(hex-ecs hex-ecs-embed-gpu-cl)
+endif()
 
 if(DISABLE_PARALLEL_PRECONDITION)
     target_compile_definitions(hex-ecs PRIVATE DISABLE_PARALLEL_PRECONDITION)
@@ -101,6 +109,8 @@ target_include_directories(hex-ecs PUBLIC
     ${GSL_INCLUDE_DIRS}
     ${OpenCL_INCLUDE_DIRS}
     ${MKL_INCLUDE_DIRS}
+    ${SUPERLU_INCLUDE_DIRS}
+    ${SUPERLU_DIST_INCLUDE_DIRS}
 )
 
 target_compile_options(hex-ecs PUBLIC ${OpenMP_CXX_FLAGS} ${OPTFLAGS})
@@ -109,7 +119,10 @@ target_link_libraries(hex-ecs
     libhex-common
     ${OpenCL_LIBRARIES}
     ${MKL_LIBRARIES}
+    ${PARDISO_LIBRARIES}
     ${SCALAPACK_LIBRARIES}
+    ${SUPERLU_LIBRARIES}
+    ${SUPERLU_DIST_LIBRARIES}
     OpenMP::OpenMP_CXX
 )
 
