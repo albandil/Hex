@@ -750,6 +750,15 @@ class BesselNodeIntegrator1D
 
         double epsabs_;
         double epsrel_;
+
+        // Maximum number of Bessel nodes (integration parcels) to sum over. Both stopping
+        // criteria in "integrate" below are checked per parcel and normally fire long
+        // before this limit is reached; the limit only has to be high enough not to cut
+        // them off. That matters for the multipoles lambda > 0, whose integrand carries an
+        // oscillating r^(-lambda-1) tail beating at |ki - kf|: the parcels then decay only
+        // as 1/n^2, and truncating the sum early leaves a fixed *absolute* error that
+        // swamps the (small) integrals of the high partial waves. Surveying 1s -> 2p from
+        // just above threshold up to 200 Ry, the criteria need up to ~2700 parcels.
         int limit_;
 
 
@@ -757,7 +766,7 @@ class BesselNodeIntegrator1D
 
         BesselNodeIntegrator1D (Functor f, double k, int l)
             : Q_(f), k_(k), l_(l), result_(0), ok_(true), status_(),
-              epsabs_(1e-8), epsrel_(1e-5), limit_(100)
+              epsabs_(1e-8), epsrel_(1e-5), limit_(5000)
         {
         }
 
