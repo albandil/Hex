@@ -75,10 +75,12 @@ target_include_directories(libhex-db PUBLIC
     src
     ../common
     ../libs
+    ${SQLite3_INCLUDE_DIRS}
 )
 
 target_link_libraries(libhex-db PRIVATE
     libhex-common
+    ${SQLite3_LIBRARIES}
 )
 
 set(hex-db_SOURCES
