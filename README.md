@@ -15,6 +15,10 @@ exchange), summed over all angular momenta.
 SQLite3 database. The same program `hex-db` can be then used to extract observables from this database. It can also
 interpolate missing energy points.
 
+Finally, `hex-ecs` can be used to calculate bound states of two-electron atoms and to solve perturbative photoionization,
+either by means of the Fermi golden rule formula (as a dipole transition between the initial bound and final scattering
+state), or by matching asymptotics of solution of dripole-driven Schrödinger equation.
+
 The hard requirements for HEX are:
 
  - C++17 compiler and CMake 3.13 or later
