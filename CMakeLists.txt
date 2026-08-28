@@ -33,6 +33,10 @@ cmake_minimum_required(VERSION 3.13)
 
 project(Hex)
 
+# hex-ecs uses std::filesystem
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
 ## --------------------------------------------------------------------------------- ##
 
 option(WITH_BOINC        "Build as a BOINC application"                           OFF)
@@ -141,8 +145,11 @@ if("${CMAKE_BUILD_TYPE}" STREQUAL "Release")
     set(OPTFLAGS ${OPTFLAGS} -fno-rounding-math -fno-signed-zeros)
 endif()
 
-# do not check complex overflows in FP64, where they do not occur
-if(NOT SINGLE_PRECISION)
+# select the floating-point type; also, do not check complex overflows in FP64,
+# where they do not occur
+if(SINGLE_PRECISION)
+    add_definitions(-DSINGLE)
+else()
     set(OPTFLAGS ${OPTFLAGS} -fcx-limited-range)
 endif()
 
