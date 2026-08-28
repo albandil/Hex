@@ -1,7 +1,7 @@
 # The test cases are built against the sources of the surrounding Hex tree and
 # against UMFPACK. Override these on the command line if they live elsewhere:
 #     make HEX_PATH=~/Hex SUITESPARSE_INCLUDE=/opt/suitesparse-4.5.6/include
-HEX_PATH ?= ../../..
+HEX_PATH ?= ../../../..
 SUITESPARSE_INCLUDE ?= /usr/include/suitesparse
 
 INCLUDES ?= -I$(HEX_PATH)/common \
@@ -13,9 +13,9 @@ LIBS ?= -lumfpack -lopenblas -lgsl -lgslcblas -lpng
 
 CXX ?= g++
 
-CXXFLAGS ?= -std=c++17 -g -O2 $(INCLUDES) -D_LONGINT -DWITH_UMFPACK -DWITH_PNG
+CXXFLAGS ?= -std=c++17 -fopenmp -g -O2 $(INCLUDES) -D_LONGINT -DWITH_UMFPACK -DWITH_PNG -DNDEBUG
 
-LFLAGS ?= $(LIBS)
+LFLAGS ?= -fopenmp $(LIBS)
 
 COMMON_DEPS_FILES = hex-arrays hex-blas hex-hdffile hex-misc hex-matrix hex-special hex-vtkfile
 COMMON_DEPS_SRCS  = $(patsubst %,$(HEX_PATH)/common/%.cpp,$(COMMON_DEPS_FILES))
@@ -27,10 +27,10 @@ ECS_DEPS_SRCS  = $(patsubst %,$(HEX_PATH)/hex-ecs/src/%.cpp,$(ECS_DEPS_FILES))
 ECS_DEPS_DEPS  = $(patsubst %,obj/hex-ecs/%.dep,$(ECS_DEPS_FILES))
 ECS_DEPS_OBJS  = $(patsubst %,obj/hex-ecs/%.o,$(ECS_DEPS_FILES))
 
-SCAT_EXE = bin/scat
-SCAT_SRC = src/scat.cpp
-SCAT_DEP = obj/scat.dep
-SCAT_OBJ = obj/scat.o
+SCAT_EXE = bin/scat3d
+SCAT_SRC = src/scat3d.cpp
+SCAT_DEP = obj/scat3d.dep
+SCAT_OBJ = obj/scat3d.o
 
 all: $(SCAT_EXE)
 

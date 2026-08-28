@@ -1,7 +1,7 @@
 # The test cases are built against the sources of the surrounding Hex tree and
 # against UMFPACK. Override these on the command line if they live elsewhere:
 #     make HEX_PATH=~/Hex SUITESPARSE_INCLUDE=/opt/suitesparse-4.5.6/include
-HEX_PATH ?= ../../..
+HEX_PATH ?= ../../../..
 SUITESPARSE_INCLUDE ?= /usr/include/suitesparse
 
 INCLUDES ?= -I$(HEX_PATH)/common \
@@ -13,7 +13,7 @@ LIBS ?= -lumfpack -lopenblas -lgsl -lgslcblas -lpng
 
 CXX ?= g++
 
-CXXFLAGS ?= -std=c++17 -g -O2 $(INCLUDES) -D_LONGINT -DWITH_UMFPACK -DWITH_PNG -DNDEBUG
+CXXFLAGS ?= -std=c++17 -g -O2 $(INCLUDES) -D_LONGINT -DWITH_UMFPACK -DWITH_PNG
 
 LFLAGS ?= $(LIBS)
 
@@ -22,22 +22,22 @@ COMMON_DEPS_SRCS  = $(patsubst %,$(HEX_PATH)/common/%.cpp,$(COMMON_DEPS_FILES))
 COMMON_DEPS_DEPS  = $(patsubst %,obj/common/%.dep,$(COMMON_DEPS_FILES))
 COMMON_DEPS_OBJS  = $(patsubst %,obj/common/%.o,$(COMMON_DEPS_FILES))
 
-ECS_DEPS_FILES = bspline gauss luft radial slater factorizers/lu-umfpack
+ECS_DEPS_FILES = bspline gauss luft inout preconditioners radial slater factorizers/lu-umfpack
 ECS_DEPS_SRCS  = $(patsubst %,$(HEX_PATH)/hex-ecs/src/%.cpp,$(ECS_DEPS_FILES))
 ECS_DEPS_DEPS  = $(patsubst %,obj/hex-ecs/%.dep,$(ECS_DEPS_FILES))
 ECS_DEPS_OBJS  = $(patsubst %,obj/hex-ecs/%.o,$(ECS_DEPS_FILES))
 
-HT_EXE = bin/ht
-HT_SRC = src/ht.cpp
-HT_OBJ = obj/ht.o
-HT_DEP = obj/ht.dep
+SCAT_EXE = bin/scat
+SCAT_SRC = src/scat.cpp
+SCAT_DEP = obj/scat.dep
+SCAT_OBJ = obj/scat.o
 
-all: $(HT_EXE)
+all: $(SCAT_EXE)
 
 clean:
-	rm -rf $(COMMON_DEPS_OBJS) $(COMMON_DEPS_DEPS) $(ECS_DEPS_OBJS) $(ECS_DEPS_DEPS) $(HT_OBJ) $(HT_DEP)
+	rm -rf $(COMMON_DEPS_OBJS) $(COMMON_DEPS_DEPS) $(ECS_DEPS_OBJS) $(ECS_DEPS_DEPS) $(SCAT_OBJ) $(SCAT_DEP)
 
-$(HT_EXE): $(COMMON_DEPS_OBJS) $(ECS_DEPS_OBJS) $(HT_OBJ)
+$(SCAT_EXE): $(COMMON_DEPS_OBJS) $(ECS_DEPS_OBJS) $(SCAT_OBJ)
 	@mkdir -p $(@D)
 	$(CXX) $(LFLAGS) $^ -o $@
 
@@ -49,8 +49,8 @@ obj/hex-ecs/%.o: $(HEX_PATH)/hex-ecs/src/%.cpp
 	@mkdir -p $(@D)
 	$(CXX) $(CXXFLAGS) -c $< -o $@ -MMD -MF $(patsubst %.o,%.dep,$@)
 
-$(HT_OBJ): $(HT_SRC)
+$(SCAT_OBJ): $(SCAT_SRC)
 	@mkdir -p $(@D)
 	$(CXX) $(CXXFLAGS) -c $< -o $@ -MMD -MF $(patsubst %.o,%.dep,$@)
 
--include $(COMMON_DEPS_DEPS) $(ECS_DEPS_DEPS) $(HT_DEP)
+-include $(COMMON_DEPS_DEPS) $(ECS_DEPS_DEPS) $(SCAT_DEP)
