@@ -902,6 +902,10 @@ double compute_Idir (int li, int lf, int lambda, int Ni, int Li, double ki, int 
         symbolic::poly Lagi = symbolic::GeneralizedLaguerre (Ni-Li-1, 2*Li+1);
         symbolic::poly Lagf = symbolic::GeneralizedLaguerre (Nf-Lf-1, 2*Lf+1);
 
+        // rescale the polynomial argument from "x" to "2r/n"
+        for (symbolic::term & pi : Lagi) pi.kr *= cln::expt(symbolic::make_rational(2,Ni), pi.a);
+        for (symbolic::term & pf : Lagf) pf.kr *= cln::expt(symbolic::make_rational(2,Nf), pf.a);
+
         // multiply by the angular factor
         for (symbolic::term & pi : Lagi) pi.a += Li + 1;
         for (symbolic::term & pf : Lagf) pf.a += Lf + 1;
@@ -1143,6 +1147,10 @@ void pwba
             // for all multipoles
             for (int lam = std::max(std::abs(Lf-Li), std::abs(lf-li)); direct and lam <= std::min(Li+Lf, lf+li); lam++)
             {
+                // skip multipoles forbidden by parity (the Wigner 3j symbols in "computef" would vanish)
+                if ((Li + lam + Lf) % 2 != 0)
+                    continue;
+
                 // compute the needed radial integrals
                 double Vdir = compute_Idir(li, lf, lam, Ni, Li, ki, Nf, Lf, kf);
 
