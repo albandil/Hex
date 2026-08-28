@@ -122,7 +122,12 @@ int convert_hdf_to_h5 (std::string srcfile, std::string dstfile)
 herr_t write_dataset_h5_to_hdf (hid_t id, const char * name, const H5L_info_t * info, void * data)
 {
     H5O_info_t infobuf;
+#if H5_VERSION_GE(1,12,0)
+    // since 1.12 the call also takes the set of fields to retrieve
+    if (H5Oget_info_by_name(id, name, &infobuf, H5O_INFO_BASIC, H5P_DEFAULT) < 0)
+#else
     if (H5Oget_info_by_name(id, name, &infobuf, H5P_DEFAULT) < 0)
+#endif
     {
         std::cerr << "Failed to determine type of object \"" << name << "\"" << std::endl;
         return -1;

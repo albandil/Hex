@@ -36,23 +36,35 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
 add_executable(hex-chebeval chebeval/chebeval.cpp)
 add_executable(hex-f-pattern f-pattern/hex-f-pattern.cpp)
 add_executable(hex-fullborn fullborn/hex-fullborn.cpp)
-#add_executable(hex-hdf2hdf hdf2hdf/hdf2hdf.cpp)
 add_executable(hex-hdf2txt hdf2txt/hdf2txt.cpp)
 add_executable(hex-special special/hex-special.cpp)
 
 target_include_directories(hex-chebeval PRIVATE "${CMAKE_CURRENT_LIST_DIR}/../common")
 target_include_directories(hex-f-pattern PRIVATE "${CMAKE_CURRENT_LIST_DIR}/../common")
 target_include_directories(hex-fullborn PRIVATE "${CMAKE_CURRENT_LIST_DIR}/../common")
-#target_include_directories(hex-hdf2hdf PRIVATE "${CMAKE_CURRENT_LIST_DIR}/../common")
 target_include_directories(hex-hdf2txt PRIVATE "${CMAKE_CURRENT_LIST_DIR}/../common")
 target_include_directories(hex-special PRIVATE "${CMAKE_CURRENT_LIST_DIR}/../common")
 
 target_link_libraries(hex-chebeval PRIVATE libhex-common)
 target_link_libraries(hex-f-pattern PRIVATE libhex-common)
 target_link_libraries(hex-fullborn PRIVATE libhex-common)
-#target_link_libraries(hex-hdf2hdf PRIVATE libhex-common)
 target_link_libraries(hex-hdf2txt PRIVATE libhex-common)
 target_link_libraries(hex-special PRIVATE libhex-common)
+
+# hex-hdf2hdf converts between the Hex data format and HDF5, so unlike the other
+# utilities it needs the HDF5 library itself
+if(HDF5_FOUND)
+
+    add_executable(hex-hdf2hdf hdf2hdf/hdf2hdf.cpp)
+
+    target_include_directories(hex-hdf2hdf PRIVATE
+        "${CMAKE_CURRENT_LIST_DIR}/../common"
+        ${HDF5_INCLUDE_DIRS}
+    )
+
+    target_link_libraries(hex-hdf2hdf PRIVATE libhex-common ${HDF5_LIBRARIES})
+
+endif()
 
 ## --------------------------------------------------------------------------------- ##
 
@@ -64,3 +76,7 @@ install(TARGETS
     hex-special
     RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
 )
+
+if(HDF5_FOUND)
+    install(TARGETS hex-hdf2hdf RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
+endif()

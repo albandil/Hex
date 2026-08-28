@@ -35,6 +35,7 @@ The following are nice to have, as they add some additional capabilities:
  - MUMPS (for large-scale distributed LU decomposition in `hex-ecs`)
  - SuperLU_DIST (for large-scale distributed LU decomposition in `hex-ecs`)
  - ScaLAPACK (for distributed dense LU decomposition in `hex-ecs`)
+ - HDF5 (needed by the `hex-hdf2hdf` conversion utility)
  - OpenCL (for GPU acceleration in `hex-ecs`)
  - libpng (printing matrix structure for debugging/illustrative purposes)
  - Doxygen (for generated documentation)
