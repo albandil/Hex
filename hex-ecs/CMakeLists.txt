@@ -41,7 +41,7 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
 if(WITH_OPENCL)
 
     set(GPU_CL_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/src/preconditioners/GPUPreconditioner.cl")
-    set(GPU_CL_INC    "${CMAKE_CURRENT_SOURCE_DIR}/src/preconditioners/GPUPreconditioner.inc")
+    set(GPU_CL_INC    "${CMAKE_CURRENT_BINARY_DIR}/GPUPreconditioner.inc")
 
     add_custom_command(
         OUTPUT  "${GPU_CL_INC}"
@@ -106,6 +106,7 @@ endif()
 target_include_directories(hex-ecs PUBLIC
     src
     ../common
+    "${CMAKE_CURRENT_BINARY_DIR}"
     ${GSL_INCLUDE_DIRS}
     ${OpenCL_INCLUDE_DIRS}
     ${MKL_INCLUDE_DIRS}
