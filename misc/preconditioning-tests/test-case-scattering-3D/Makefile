@@ -1,17 +1,19 @@
-HEX_PATH = /home/jacob/Dokumenty/prog/Hex
+# The test cases are built against the sources of the surrounding Hex tree and
+# against UMFPACK. Override these on the command line if they live elsewhere:
+#     make HEX_PATH=~/Hex SUITESPARSE_INCLUDE=/opt/suitesparse-4.5.6/include
+HEX_PATH ?= ../../..
+SUITESPARSE_INCLUDE ?= /usr/include/suitesparse
 
-INCLUDES = -I$(HEX_PATH)/common \
-           -I$(HEX_PATH)/libs \
-           -I$(HEX_PATH)/hex-ecs/src \
-           -I/opt/suitesparse-4.5.6/include
+INCLUDES ?= -I$(HEX_PATH)/common \
+            -I$(HEX_PATH)/libs \
+            -I$(HEX_PATH)/hex-ecs/src \
+            -I$(SUITESPARSE_INCLUDE)
 
-LIBS = -L/opt/suitesparse-4.5.6/lib -lumfpack -Wl,-rpath,/opt/suitesparse-4.5.6/lib \
-       -L/opt/openblas-0.2.20/lib -lopenblas_openmp -Wl,-rpath,/opt/openblas-0.2.20/lib \
-       -lgsl -lgslcblas -lpng
+LIBS ?= -lumfpack -lopenblas -lgsl -lgslcblas -lpng
 
 CXX ?= g++
 
-CXXFLAGS ?= -fopenmp -g -O2 $(INCLUDES) -DWITH_UMFPACK -DWITH_PNG -DNDEBUG
+CXXFLAGS ?= -std=c++17 -fopenmp -g -O2 $(INCLUDES) -D_LONGINT -DWITH_UMFPACK -DWITH_PNG -DNDEBUG
 
 LFLAGS ?= -fopenmp $(LIBS)
 

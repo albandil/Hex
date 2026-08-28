@@ -234,7 +234,7 @@ int main (void)
                 else
                 {
                     // update level
-                    A[i][j] = std::min(A[i][j], (A[k][j],A[i][k]) + 1);
+                    A[i][j] = std::min(A[i][j], std::max(A[k][j],A[i][k]) + 1);
                 }
                 plot(Anz, L, A, k, i, j, true);
             }
