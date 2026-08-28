@@ -232,9 +232,9 @@ int main (int argc, char *argv[])
     // create the SQL batch file
     char sqlname[50];
     if (distort)
-        std::sprintf(sqlname, "dwba-%d-%d-%d-%d-L%d-E%g.sql", Ni, Li, Nf, Lf, Ls.last, Ei);
+        std::snprintf(sqlname, sizeof(sqlname), "dwba-%d-%d-%d-%d-L%d-E%g.sql", Ni, Li, Nf, Lf, Ls.last, Ei);
     else
-        std::sprintf(sqlname, "pwba-%d-%d-%d-%d-L%d-E%g.sql", Ni, Li, Nf, Lf, Ls.last, Ei);
+        std::snprintf(sqlname, sizeof(sqlname), "pwba-%d-%d-%d-%d-L%d-E%g.sql", Ni, Li, Nf, Lf, Ls.last, Ei);
     std::ofstream out(sqlname);
     out << "BEGIN TRANSACTION;\n";
 

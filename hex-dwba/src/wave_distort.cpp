@@ -147,8 +147,8 @@ DistortedWave::DistortedWave(double _kn, int _ln, DistortingPotential const & _U
 
     // look for relevant data
     char filename[255], filename0[255];
-    sprintf(filename, "dwr_a-N%d-K%g-l%d-k%g.dwf", U.n(), U.k(), ln, kn);
-    sprintf(filename0, "dwr_f-N%d-K%g-l%d-k%g.dwf", U.n(), U.k(), ln, kn);
+    snprintf(filename, sizeof(filename), "dwr_a-N%d-K%g-l%d-k%g.dwf", U.n(), U.k(), ln, kn);
+    snprintf(filename0, sizeof(filename0), "dwr_f-N%d-K%g-l%d-k%g.dwf", U.n(), U.k(), ln, kn);
     if (array.hdfload(filename) and (ln == 0 or array0.hdfload(filename0)))
     {
         // the last element is the phase shift
