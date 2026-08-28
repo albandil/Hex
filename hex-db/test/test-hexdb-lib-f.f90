@@ -1,7 +1,28 @@
 program test
-integer :: NULL
+
+use iso_c_binding
+
 integer, parameter :: outunit=44
 double precision, dimension(3) :: energy, sigma
+
+! The optional arguments of the complete cross section routine are recognized by
+! being null pointers, which cannot be written down without an explicit interface.
+interface
+    subroutine hex_complete_cross_section &
+    ( &
+        ni, li, mi, &
+        nf, lf, mf, &
+        N, energies, &
+        ccs, Nall, &
+        npws, pws &
+    ) &
+    bind(C, name='hex_complete_cross_section_')
+        import :: c_int, c_double, c_ptr
+        integer(c_int) :: ni, li, mi, nf, lf, mf, N
+        real(c_double) :: energies(*), ccs(*)
+        type(c_ptr), value :: Nall, npws, pws
+    end subroutine
+end interface
 
 ! setup the database (create new if non-existant)
 call hex_initialize('hex-f.db'//achar(0)) ! add terminating zero
@@ -38,7 +59,9 @@ call hex_complete_cross_section&
     3,          & ! number of energies
     energy,     & ! energy list
     sigma,      & ! cross sections
-    NULL        & ! auxiliary variable
+    c_null_ptr, & ! auxiliary variable (not used)
+    c_null_ptr, & ! partial wave count (all)
+    c_null_ptr  & ! partial wave list (all)
 )
 
 ! print the cross section
