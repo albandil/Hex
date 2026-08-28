@@ -45,7 +45,10 @@
 # variable MPIEXEC_PREFLAGS; with Open MPI the tests that combine several ranks
 # with several threads want at least "-bind-to none" there.
 
-set(HEX_ECS_TEST_TIMEOUT 7200 CACHE STRING "Time limit of a single hex-ecs test [s]")
+# Four hours. The KPA test of the sample problem needs close to two on a six-core
+# machine, and the slowest energy of that run converges erratically, so the limit
+# is meant as a bound on a hung test and not as a schedule.
+set(HEX_ECS_TEST_TIMEOUT 14400 CACHE STRING "Time limit of a single hex-ecs test [s]")
 
 # both spin channels of the lowest partial wave of the sample problem
 set(HEX_ECS_TEST_OUTPUTS "ics-L0-S0-Pi0.dat" "ics-L0-S1-Pi0.dat")
