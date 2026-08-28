@@ -29,95 +29,72 @@
 ##                                                                                   ##
 ## --------------------------------------------------------------------------------- ##
 
-cmake_minimum_required(VERSION 3.13)
+# Tests of the C and Fortran bindings of libhex-db. Both programs fill a small
+# database with a few T-matrices and print the complete cross section computed
+# from them; the expected numbers are checked by CTest.
+#
+# The Fortran binding is only tested when a Fortran compiler is available. It is
+# the sole use of Fortran in the project, so the language is enabled here and not
+# in the top-level CMakeLists.txt.
 
-find_package(SQLite3 REQUIRED)
+# the three cross sections that the sample T-matrices give, one per line
+set(HEX_DB_EXPECTED "16\\.5930[^\n]*\n[^\n]*14\\.0468[^\n]*\n[^\n]*12\\.3309")
 
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
-set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
+## --------------------------------------------------------------------------------- ##
 
-set(libhex-db_SOURCES
-    "src/db.cpp"
-    "src/quantities.cpp"
-    "src/utils.cpp"
-    "src/var/asy.cpp"
-    "src/var/ccs.cpp"
-    "src/var/colls.cpp"
-    "src/var/dcs.cpp"
-    "src/var/ics.cpp"
-    "src/var/ionamp.cpp"
-    "src/var/ionf.cpp"
-    "src/var/momtf.cpp"
-    "src/var/scatamp-dir.cpp"
-    "src/var/scatamp.cpp"
-    "src/var/sdcs12.cpp"
-    "src/var/sdcsE.cpp"
-    "src/var/spflip.cpp"
-    "src/var/stokes.cpp"
-    "src/var/tcs.cpp"
-    "src/var/tdcs.cpp"
-    "src/var/tmat.cpp"
-    "../libs/sqlitepp/binders.cpp"
-    "../libs/sqlitepp/exception.cpp"
-    "../libs/sqlitepp/query.cpp"
-    "../libs/sqlitepp/session.cpp"
-    "../libs/sqlitepp/statement.cpp"
-    "../libs/sqlitepp/string.cpp"
-    "../libs/sqlitepp/transaction.cpp"
+add_executable(test-hexdb-lib-c "${CMAKE_CURRENT_LIST_DIR}/test-hexdb-lib-c.c")
+
+# keep the test programs out of the directory with the installed ones
+set_target_properties(test-hexdb-lib-c PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
 )
 
-add_library(libhex-db SHARED ${libhex-db_SOURCES})
+target_link_libraries(test-hexdb-lib-c PRIVATE libhex-db)
 
-set_target_properties(libhex-db PROPERTIES PREFIX "")
+# the programs write their database and SQL batch into the current directory
+file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/c")
 
-target_include_directories(libhex-db PUBLIC
-    src
-    ../common
-    ../libs
-    ${SQLite3_INCLUDE_DIRS}
+add_test(
+    NAME "hex-db.binding-c"
+    COMMAND test-hexdb-lib-c
+    WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/c"
 )
 
-target_link_libraries(libhex-db PRIVATE
-    libhex-common
-    ${SQLite3_LIBRARIES}
-)
-
-set(hex-db_SOURCES
-    "src/ui.cpp"
-)
-
-add_executable(hex-db ${hex-db_SOURCES})
-
-target_link_libraries(hex-db
-    libhex-common
-    libhex-db
-    ${SQLite3_LIBRARIES}
+set_tests_properties("hex-db.binding-c" PROPERTIES
+    PASS_REGULAR_EXPRESSION "${HEX_DB_EXPECTED}"
 )
 
 ## --------------------------------------------------------------------------------- ##
 
-if(BUILD_TESTING)
-    add_subdirectory(test)
+include(CheckLanguage)
+check_language(Fortran)
+
+if(CMAKE_Fortran_COMPILER)
+
+    enable_language(Fortran)
+
+    add_executable(test-hexdb-lib-f "${CMAKE_CURRENT_LIST_DIR}/test-hexdb-lib-f.f90")
+
+    set_target_properties(test-hexdb-lib-f PROPERTIES
+        RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
+    )
+
+    target_link_libraries(test-hexdb-lib-f PRIVATE libhex-db)
+
+    file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/fortran")
+
+    add_test(
+        NAME "hex-db.binding-fortran"
+        COMMAND test-hexdb-lib-f
+        WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/fortran"
+    )
+
+    set_tests_properties("hex-db.binding-fortran" PROPERTIES
+        PASS_REGULAR_EXPRESSION "${HEX_DB_EXPECTED}"
+    )
+
+else()
+
+    message(STATUS "The hex-db Fortran binding test was left out, no Fortran compiler")
+
 endif()
-
-## --------------------------------------------------------------------------------- ##
-
-install(TARGETS libhex-db hex-db
-    RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
-    LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
-    ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
-)
-
-install(DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/src/"
-    DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/hex/hex-db"
-    FILES_MATCHING
-    PATTERN "var" EXCLUDE
-    PATTERN "*.h"
-)
-
-# bundled SQLite wrapper used by the public headers above
-install(DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/../libs/sqlitepp"
-    DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/hex"
-    FILES_MATCHING PATTERN "*.hpp"
-)
