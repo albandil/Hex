@@ -328,10 +328,10 @@ bool IntegralCrossSection::updateTable ()
                 {
                     // try to find this merged energy within the data for this angular momentum
                     std::size_t j = std::lower_bound(energies.begin(), energies.end(), merged_energies[i]) - energies.begin();
-                    if (j < energies.size() and energies[j] == merged_energies[j])
+                    if (j < energies.size() and energies[j] == merged_energies[i])
                     {
                         // great, no need to interpolate -- let's just use the value
-                        merged_T[i] = Complex(Re_T[j], Im_T[j]) / k[j];
+                        merged_T[i] += Complex(Re_T[j], Im_T[j]) / k[j];
                     }
 
                     // interpolate if within dataset
