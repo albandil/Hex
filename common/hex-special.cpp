@@ -669,12 +669,44 @@ double special::coul_F_asy (int Z, int l, double k, double r, double sigma)
 std::pair<Complex, Complex> special::H_dH(Real Z, int l, Real k, Real r)
 {
     gsl_sf_result f,g,fp,gp;
-    double ef,eg;
+    double ef = 0, eg = 0;
     double eta = -Z/k;
 
     int err = gsl_sf_coulomb_wave_FG_e(eta, k*r, l, 0, &f, &fp, &g, &gp, &ef, &eg);
 
-    return { Complex(g.val, f.val), Complex(gp.val, fp.val) };
+    // GSL gives up once the wave is deep under the centrifugal barrier (k r well below l),
+    // where the irregular solution has grown by many orders of magnitude: it then signals
+    // GSL_EOVRFLW and returns the values scaled by exp(ef), exp(eg), or signals GSL_ELOSS,
+    // or simply hands back NaN. This is reached routinely by the amplitude extraction for
+    // the slow outgoing channels of a high-L calculation, so the status must not be ignored
+    // -- passing a NaN on silently poisons the whole extraction matrix.
+    if (err == GSL_SUCCESS and ef == 0. and eg == 0.)
+    {
+        Complex H (g.val, f.val), dH (gp.val, fp.val);
+
+        if (std::isfinite(H.real()) and std::isfinite(H.imag()) and
+            std::isfinite(dH.real()) and std::isfinite(dH.imag()))
+            return { H, dH };
+    }
+
+    // Fall back to the series/ODE evaluation, which is not restricted to the classically
+    // allowed region. Note that the imaginary (regular) part of H is negligible against the
+    // real one here and carries few significant digits -- that is inherent to representing
+    // G + iF in one double-precision complex number, not a defect of the fallback.
+    std::pair<Complex, Complex> HdH = H_dH_asy(Z, +1, Complex(l, 0), k, r);
+
+    if (not std::isfinite(std::abs(HdH.first)) or not std::isfinite(std::abs(HdH.second)))
+    {
+        HexException
+        (
+            "Cannot evaluate the Coulomb-Hankel function H[%d] for Z = %g, k = %g, r = %g: "
+            "k r = %g lies so far below the centrifugal barrier that H overflows double "
+            "precision. Use a larger radius, or drop this partial wave.",
+            l, Z, k, r, k*r
+        );
+    }
+
+    return HdH;
 }
 
 namespace
@@ -758,7 +790,16 @@ std::pair<Complex, Complex> special::H_dH_asy(Real Z, int s, Complex l, Real k, 
         return { y1, (l*(l + 1._r)/(x*x) + 2._r*eta/x - 1._r) * y0 };
     };
 
-    int N = std::max(1, (int)std::ceil((rho1 - rho) / 0.05));
+    // The step has to resolve the fastest variation of H along the way. Under the
+    // centrifugal barrier the logarithmic derivative of the dominant (growing inward)
+    // solution is |kappa| = |sqrt(l(l+1)/rho^2 + 2 eta/rho - 1)|, which is ~l/rho and thus
+    // unbounded as l grows at fixed rho; a step fixed in rho then lets the RK4 truncation
+    // error accumulate without limit (45 % at l = 150, rho = 5). Scale it so that the
+    // phase/decay advance per step, |kappa| h, stays bounded instead.
+    Real kappa = std::abs(std::sqrt(l*(l + 1._r)/(rho*rho) + 2._r*eta/rho - 1._r));
+    Real hmax = 0.05_r / std::max(1._r, kappa);
+
+    int N = std::max(1, (int)std::ceil((rho1 - rho) / hmax));
     Real h = (rho - rho1) / N;  // negative step: integrating inward
     Complex y0 = H1, y1 = dH1;
     Real x = rho1;
