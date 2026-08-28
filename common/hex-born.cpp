@@ -852,129 +852,102 @@ double compute_Idir (int li, int lf, int lambda, int Ni, int Li, double ki, int 
 //         lambda, Ni, Li, ki, li, Nf, Lf, kf, lf
 //     );
 
-    if (lambda == 0)
+    // compute normalization factors of the generalized Laguerre polynomials
+    double Normi = std::sqrt(std::pow(2./Ni,3) * gsl_sf_fact(Ni-Li-1) / (2. * Ni * gsl_sf_fact(Ni+Li)));
+    double Normf = std::sqrt(std::pow(2./Nf,3) * gsl_sf_fact(Nf-Lf-1) / (2. * Nf * gsl_sf_fact(Nf+Lf)));
+
+    // compute the polynomials
+    symbolic::poly Lagi = symbolic::GeneralizedLaguerre (Ni-Li-1, 2*Li+1);
+    symbolic::poly Lagf = symbolic::GeneralizedLaguerre (Nf-Lf-1, 2*Lf+1);
+
+    // rescale the polynomial argument from "x" to "2r/n"
+    for (symbolic::term & pi : Lagi) pi.kr *= cln::expt(symbolic::make_rational(2,Ni), pi.a);
+    for (symbolic::term & pf : Lagf) pf.kr *= cln::expt(symbolic::make_rational(2,Nf), pf.a);
+
+    // multiply by the angular factor
+    for (symbolic::term & pi : Lagi) pi.a += Li + 1;
+    for (symbolic::term & pf : Lagf) pf.a += Lf + 1;
+
+    // part of the angular factor goes to normalization
+    Normi *= std::pow(2./Ni,Li);
+    Normf *= std::pow(2./Nf,Lf);
+
+    // compute the product of the polynomials
+    symbolic::poly PP = Lagi * Lagf;
+
+    // factor in the argument of the exponential
+    double c = 1./Ni + 1./Nf;
+
+    // outer integrand evaluated at "r"
+    auto integrand = [PP,c,lambda,Normi,Normf,ki,kf,li,lf](double r) -> double
     {
-        //
-        // r1 > r2
-        //
+        // inner integral
+        double integral = 0;
 
-        auto integrand = [Ni,Li,Nf,Lf,li,ki,lf,kf](double r2) -> double
+        // integrate term by term
+        for (symbolic::term const & p : PP)
         {
-            // inner integrand
-            auto iintegrand = [Ni,Li,Nf,Lf,r2](double r1) -> double { return Hydrogen::P(Ni,Li,r1) * Hydrogen::P(Nf,Lf,r1) * (1./r1 - 1./r2); };
-
-            // inner integrator
-            GaussKronrod<decltype(iintegrand)> Qi(iintegrand);
-            Qi.setEpsAbs(0);
-
-            // integrate and check success
-            if (not Qi.integrate(r2,special::constant::Inf))
+            // compute the high integral, i.e. the r' > r part
+            //    r^λ ∫_r^∞ P_i(r') P_f(r') r'^(-λ-1) dr'
+            gsl_sf_result res;
+            int err_high = gsl_sf_gamma_inc_e (p.a - lambda, c * r, &res);
+            if (err_high != GSL_SUCCESS and err_high != GSL_EUNDRFLW)
             {
                 throw exception
                 (
-                    "compute_Idir (inner) failed for λ=0, Ni=%d, Li=%d, ki=%g, li=%d, Nf=%d, Lf=%d, kf=%g, lf=%d, r2=%g (\"%s\").\n\tresult = %g\n",
-                    Ni, Li, ki, li, Nf, Lf, kf, lf, r2, Qi.status().c_str(), Qi.result()
+                    "Unable to evaluate incomplete gamma-function Gamma(%d,%g) - %s.",
+                    p.a - lambda, c * r, gsl_strerror(err_high)
                 );
             }
+            double int_high = 0;
+            if (err_high != GSL_EUNDRFLW)
+                int_high = gsl_sf_pow_int(c*r,lambda) * res.val;
 
-            return Qi.result() * special::ric_j(li,ki*r2) * special::ric_j(lf,kf*r2);
-        };
-
-        // which Bessel function oscillates slowlier ?
-        int    l = (ki < kf ? li : lf);
-        double k = (ki < kf ? ki : kf);
-
-        // outer integrator
-        BesselNodeIntegrator1D<decltype(integrand),GaussKronrod<decltype(integrand)>> R(integrand, k, l);
-        R.setEpsAbs(0);
-        R.integrate(0,special::constant::Inf);
-
-//         std::cout << "\tIdir = " << R.result() << std::endl;
-        return R.result();
-    }
-    else
-    {
-        // compute normalization factors of the generalized Laguerre polynomials
-        double Normi = std::sqrt(std::pow(2./Ni,3) * gsl_sf_fact(Ni-Li-1) / (2. * Ni * gsl_sf_fact(Ni+Li)));
-        double Normf = std::sqrt(std::pow(2./Nf,3) * gsl_sf_fact(Nf-Lf-1) / (2. * Nf * gsl_sf_fact(Nf+Lf)));
-
-        // compute the polynomials
-        symbolic::poly Lagi = symbolic::GeneralizedLaguerre (Ni-Li-1, 2*Li+1);
-        symbolic::poly Lagf = symbolic::GeneralizedLaguerre (Nf-Lf-1, 2*Lf+1);
-
-        // rescale the polynomial argument from "x" to "2r/n"
-        for (symbolic::term & pi : Lagi) pi.kr *= cln::expt(symbolic::make_rational(2,Ni), pi.a);
-        for (symbolic::term & pf : Lagf) pf.kr *= cln::expt(symbolic::make_rational(2,Nf), pf.a);
-
-        // multiply by the angular factor
-        for (symbolic::term & pi : Lagi) pi.a += Li + 1;
-        for (symbolic::term & pf : Lagf) pf.a += Lf + 1;
-
-        // part of the angular factor goes to normalization
-        Normi *= std::pow(2./Ni,Li);
-        Normf *= std::pow(2./Nf,Lf);
-
-        // compute the product of the polynomials
-        symbolic::poly PP = Lagi * Lagf;
-
-        // factor in the argument of the exponential
-        double c = 1./Ni + 1./Nf;
-
-        // outer integrand evaluated at "r"
-        auto integrand = [PP,c,lambda,Normi,Normf,ki,kf,li,lf](double r) -> double
-        {
-            // inner integral
-            double integral = 0;
-
-            // integrate term by term
-            for (symbolic::term const & p : PP)
+            // compute the low integral, i.e. the r' < r part
+            //    r^(-λ-1) ∫_0^r P_i(r') P_f(r') r'^λ dr'
+            // For λ = 0 the attraction of the projectile to the nucleus, -1/r, has to be added
+            // to the multipole expansion of the inter-electron repulsion. It exactly cancels the
+            // monopole moment ⟨f|i⟩/r of the low integral, which is the same as replacing the
+            // regularized incomplete gamma-function P by -Q = P - 1 below. Besides being the
+            // physically correct screened monopole, this also avoids subtracting two 1/r tails
+            // in floating point.
+            int err_low = (lambda == 0)
+                        ? gsl_sf_gamma_inc_Q_e (p.a + lambda + 1, c * r, &res)
+                        : gsl_sf_gamma_inc_P_e (p.a + lambda + 1, c * r, &res);
+            if (err_low != GSL_SUCCESS and err_low != GSL_EUNDRFLW)
             {
-                // compute the high integral
-                gsl_sf_result res;
-                int err_high = gsl_sf_gamma_inc_e (p.a - lambda, c * r, &res);
-                if (err_high != GSL_SUCCESS and err_high != GSL_EUNDRFLW)
-                {
-                    throw exception
-                    (
-                        "Unable to evaluate incomplete gamma-function Gamma(%d,%g) - %s.",
-                        p.a - lambda, c * r, gsl_strerror(err_high)
-                    );
-                }
-                double int_high = 0;
-                if (err_high != GSL_EUNDRFLW)
-                    int_high = gsl_sf_pow_int(c*r,lambda) * res.val;
-
-                // compute the low integral
-                int err_low = gsl_sf_gamma_inc_P_e (p.a + lambda + 1, c * r, &res);
-                double scale = gsl_sf_gamma (p.a + lambda + 1);
-                if (err_low != GSL_SUCCESS)
-                {
-                    throw exception
-                    (
-                        "Unable to evaluate scaled complementary incomplete gamma-function P(%d,%g) - %s.",
-                        p.a + lambda + 1, c * r, gsl_strerror(err_low)
-                    );
-                }
-                double int_low = gsl_sf_pow_int(c*r,-lambda-1) * res.val * scale;
-
-                // sum both contributions
-                integral += (int_low + int_high) * symbolic::double_approx(p.kr) / gsl_sf_pow_int(c,p.a);
+                throw exception
+                (
+                    "Unable to evaluate regularized incomplete gamma-function %c(%d,%g) - %s.",
+                    (lambda == 0 ? 'Q' : 'P'), p.a + lambda + 1, c * r, gsl_strerror(err_low)
+                );
+            }
+            double int_low = 0;
+            if (err_low != GSL_EUNDRFLW)
+            {
+                int_low = (lambda == 0 ? -1. : +1.) * gsl_sf_pow_int(c*r,-lambda-1)
+                        * res.val * gsl_sf_gamma(p.a + lambda + 1);
             }
 
-            return Normi * Normf * integral * special::ric_j(li,ki*r) * special::ric_j(lf,kf*r);
-        };
+            // sum both contributions
+            integral += (int_low + int_high) * symbolic::double_approx(p.kr) / gsl_sf_pow_int(c,p.a);
+        }
 
-        // which Bessel function oscillates slowlier ?
-        int    l = std::max(li, lf);
-        double k = (ki == kf ? ki : std::abs(ki - kf));
+        return Normi * Normf * integral * special::ric_j(li,ki*r) * special::ric_j(lf,kf*r);
+    };
 
-        // outer integrator
-        BesselNodeIntegrator1D<decltype(integrand),GaussKronrod<decltype(integrand)>> R(integrand, k, l);
-        R.integrate (0,special::constant::Inf);
-//         std::cout << "\tIdir = " << R.result() << std::endl;
+    // which Bessel function oscillates slowlier ?
+    //  - the screened monopole (λ = 0) decays exponentially, so just follow the slower wave
+    //  - the higher multipoles have an oscillating r^(-λ-1) tail that beats at |ki - kf|
+    int    l = (lambda == 0 ? (ki < kf ? li : lf) : std::max(li, lf));
+    double k = (lambda == 0 ? std::min(ki, kf) : (ki == kf ? ki : std::abs(ki - kf)));
 
-        return R.result();
-    }
+    // outer integrator
+    BesselNodeIntegrator1D<decltype(integrand),GaussKronrod<decltype(integrand)>> R(integrand, k, l);
+    R.integrate (0,special::constant::Inf);
+//     std::cout << "\tIdir = " << R.result() << std::endl;
+
+    return R.result();
 }
 
 double compute_Iexc (int li, int lf, int lambda, int Ni, int Li, double ki, int Nf, int Lf, double kf)
