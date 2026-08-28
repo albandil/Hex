@@ -978,72 +978,26 @@ double special::computef (int lambda, int l1, int l2, int l1p, int l2p, int L)
     return pow(-1, L + l2 + l2p) * sqrt((2*l1 + 1) * (2*l2 + 1) * (2*l1p + 1) * (2*l2p + 1)) * A * B * C;
 }
 
-inline long double dfact (long double x)
-{
-    if (x < 0)
-        return 0.;
-
-    long double prod = 1.;
-
-    while (x >= 0.0001) // = 0 + rounding errors
-    {
-        prod *= x;
-        x -= 1.;
-    }
-
-    return prod;
-}
-
 double special::ClebschGordan (int in_j1, int in_m1, int in_j2, int in_m2, int in_J, int in_M)
 {
-    if((in_m1 + in_m2) != in_M) return 0.;
-    if(abs(in_m1) > in_j1) return 0;
-    if(abs(in_m2) > in_j2) return 0;
+    if ((in_m1 + in_m2) != in_M) return 0.;
+    if (std::abs(in_m1) > in_j1) return 0.;
+    if (std::abs(in_m2) > in_j2) return 0.;
 
-    // convert to pure integers (each 2*spin)
-    int j1 = (int)(2.*in_j1);
-    int m1 = (int)(2.*in_m1);
-    int j2 = (int)(2.*in_j2);
-    int m2 = (int)(2.*in_m2);
-    int J = (int)(2.*in_J);
-    int M = (int)(2.*in_M);
+    // Evaluate through the Wigner 3j-symbol,
+    //
+    //    <j1 m1, j2 m2 | J M> = (-1)^(j1 - j2 + M) sqrt(2J + 1) Wigner3j(j1, j2, J; m1, m2, -M)
+    //
+    // instead of summing the Racah series here. Both series contain the same alternating
+    // terms, but Wigner3j_2 keeps the (huge) common factorial prefactor inside every
+    // summand in logarithmic form, so the terms are of the order of the result itself.
+    // Summing them with the prefactor pulled out, as the plain Racah form does, loses
+    // log10(max|term| / |sum|) digits; for three comparable momenta that ratio reaches
+    // 10^18 already at J ~ 40, i.e. more than even long double can absorb.
 
-    long double n0,n1,n2,n3,n4,n5,d0,d1,d2,d3,d4,A,exp;
-    int nu = 0;
+    int sign = ((in_j1 - in_j2 + in_M) % 2 == 0) ? 1 : -1;
 
-    long double sum = 0;
-    while (((d3=(j1-j2-M)/2+nu) < 0)||((n2=(j1-m1)/2+nu) < 0 ))
-        nu++;
-    while (((d1=(J-j1+j2)/2-nu) >= 0) && ((d2=(J+M)/2-nu) >= 0) && ((n1=(j2+J+m1)/2-nu) >= 0 ))
-    {
-        d3=((j1-j2-M)/2+nu);
-        n2=((j1-m1)/2+nu);
-        d0=dfact((double) nu);
-        exp=nu+(j2+m2)/2;
-        n0 = (double) std::pow(-1.,exp);
-        sum += ((n0*dfact(n1)*dfact(n2))/(d0*dfact(d1)*dfact(d2)*dfact(d3)));
-        nu++;
-    }
-
-    if (sum == 0)
-        return 0;
-
-    n0 = J+1;
-    n1 = dfact((double) (J+j1-j2)/2);
-    n2 = dfact((double) (J-j1+j2)/2);
-    n3 = dfact((double) (j1+j2-J)/2);
-    n4 = dfact((double) (J+M)/2);
-    n5 = dfact((J-M)/2);
-
-    d0 = dfact((double) (j1+j2+J)/2+1);
-    d1 = dfact((double) (j1-m1)/2);
-    d2 = dfact((double) (j1+m1)/2);
-    d3 = dfact((double) (j2-m2)/2);
-    d4 = dfact((double) (j2+m2)/2);
-
-    A = ((long double) (n0*n1*n2*n3*n4*n5))/((long double) (d0*d1*d2*d3*d4));
-
-    return std::sqrt(A)*sum;
+    return sign * std::sqrt(2. * in_J + 1.) * Wigner3j(in_j1, in_j2, in_J, in_m1, in_m2, -in_M);
 }
 
 double special::Gaunt (int l1, int m1, int l2, int m2, int l, int m)
