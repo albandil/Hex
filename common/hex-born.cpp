@@ -953,6 +953,18 @@ double compute_Idir (int li, int lf, int lambda, int Ni, int Li, double ki, int 
 
     // outer integrator
     BesselNodeIntegrator1D<decltype(integrand),GaussKronrod<decltype(integrand)>> R(integrand, k, l);
+
+    // The multipoles lambda >= 2 need a tighter absolute tolerance than the default 1e-8.
+    // Their integrand keeps the oscillating r^(-lambda-1) tail, so the parcels only decay
+    // as n^(-lambda-1) and the sum is stopped while the high partial-wave integrals are
+    // themselves already far below 1e-8 -- everything smaller then comes out as noise.
+    // Tightening is affordable precisely here: reaching a given tolerance costs about
+    // epsabs^(-1/(lambda+1)) parcels, i.e. some 20x more for lambda = 2 and rapidly less
+    // beyond, while for lambda = 1 (tail n^-2) the same step would cost a factor of 100.
+    // The monopole needs nothing: its screened integrand decays exponentially.
+    if (lambda >= 2)
+        R.setEpsAbs(1e-12);
+
     R.integrate (0,special::constant::Inf);
 //     std::cout << "\tIdir = " << R.result() << std::endl;
 
