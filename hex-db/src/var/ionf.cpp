@@ -160,7 +160,7 @@ bool IonizationF::run (std::map<std::string,std::string> const & sdata)
     {
         Eshare.push_back(Conv<double>(sdata, "Eshare", name()));
     }
-    catch (std::exception e)
+    catch (std::exception const & e)
     {
         Eshare = readStandardInput<double>();
     }

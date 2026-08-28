@@ -127,7 +127,7 @@ bool SingleDifferentialCrossSectionWrtEnergyShare::run (std::map<std::string,std
         // is there a single energy specified using command line ?
         energy_shares.push_back(Conv<double>(sdata, "Eshare", name()));
     }
-    catch (std::exception e)
+    catch (std::exception const & e)
     {
         // are there more energies specified using the STDIN ?
         energy_shares = readStandardInput<double>();

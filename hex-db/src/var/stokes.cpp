@@ -126,7 +126,7 @@ bool StokesParameters::run (std::map<std::string,std::string> const & sdata)
         // is there a single angle specified using command line ?
         angles.push_back(Conv<double>(sdata, "theta", name()));
     }
-    catch (std::exception e)
+    catch (std::exception const & e)
     {
         // are there more angles specified using the STDIN ?
         angles = readStandardInput<double>();

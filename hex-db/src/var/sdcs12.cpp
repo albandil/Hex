@@ -140,7 +140,7 @@ bool SingleDifferentialCrossSectionWrtRelativeAngle::run (std::map<std::string,s
         // is there a single angle specified using command line ?
         theta12.push_back(Conv<double>(sdata, "theta12", name()));
     }
-    catch (std::exception e)
+    catch (std::exception const & e)
     {
         // are there more angles specified using the STDIN ?
         theta12 = readStandardInput<double>();
@@ -189,7 +189,7 @@ bool SingleDifferentialCrossSectionWrtRelativeAngle::run (std::map<std::string,s
 
     // precompute radial integrals for all combinations of angular momenta
     std::map<int,std::vector<double>> R;
-    for (std::pair<int,std::vector<Info>> const & data : CB)
+    for (auto const & data : CB)
     {
         int L = data.first;
         std::vector<Info> const & info = data.second;
@@ -264,7 +264,7 @@ bool SingleDifferentialCrossSectionWrtRelativeAngle::run (std::map<std::string,s
         double dsigma = 0;
 
         // process all partial wave contributions
-        for (std::pair<int,std::vector<Info>> const & data : CB)
+        for (auto const & data : CB)
         {
             int L = data.first;
             std::vector<Info> const & info = data.second;

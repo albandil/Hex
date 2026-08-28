@@ -232,7 +232,7 @@ void hex_import_ (const char* sqlname)
                 st << cmd1;
                 st.exec();
             }
-            catch (sqlitepp::exception e)
+            catch (sqlitepp::exception const & e)
             {
                 std::cerr << "ERROR: Import failed, code = " << e.code() << " (\"" << e.what() << "\")" << std::endl;
                 std::cerr << "       [Line " << line << "] Failed SQL command was: \"" << cmd1 << "\"" << std::endl;
@@ -275,7 +275,7 @@ void hex_optimize_ ()
     {
         st.exec();
     }
-    catch (sqlitepp::exception e)
+    catch (sqlitepp::exception const & e)
     {
         HexException("Database optimizaion failed, code = %d (\"%s\").", e.code(), e.what());
     }
@@ -333,7 +333,7 @@ void hex_dump_ (const char* dumpfile)
             std::cout << "COMMIT" << std::endl;
         }
     }
-    catch (sqlitepp::exception e)
+    catch (sqlitepp::exception const & e)
     {
         std::cerr << "ERROR: Dump failed, code = " << e.code() << " (\"" << e.what() << "\")" << std::endl;
         std::cerr << "       Failed SQL command was: \"" << dumpcmd << "\"" << std::endl;

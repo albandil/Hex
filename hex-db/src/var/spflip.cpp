@@ -154,7 +154,7 @@ bool SpinFlipCrossSection::run (std::map<std::string,std::string> const & sdata)
         // is there a single energy specified using command line ?
         energies.push_back(Conv<double>(sdata, "Ei", name()));
     }
-    catch (std::exception e)
+    catch (std::exception const & e)
     {
         // are there more energies specified using the STDIN ?
         energies = readStandardInput<double>();

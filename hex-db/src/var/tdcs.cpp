@@ -132,7 +132,7 @@ bool TripleDifferentialCrossSection::run (std::map<std::string,std::string> cons
     {
         dirs.push_back(Conv<std::pair<geom::vec3d,geom::vec3d>>(sdata, "dirs", name()));
     }
-    catch (exception e)
+    catch (exception const & e)
     {
         dirs = readStandardInput<std::pair<geom::vec3d,geom::vec3d>>();
     }

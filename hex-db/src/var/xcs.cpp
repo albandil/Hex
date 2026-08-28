@@ -106,7 +106,7 @@ bool ExtrapolatedCrossSection::run (std::map<std::string,std::string> const & sd
         // is there a single energy specified using command line ?
         energies.push_back(Conv<double>(sdata, "Ei", Id));
 
-    } catch (std::exception e) {
+    } catch (std::exception const & e) {
 
         // are there more energies specified using the STDIN ?
         energies = readStandardInput<double>();
