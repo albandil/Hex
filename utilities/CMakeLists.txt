@@ -31,6 +31,8 @@
 
 cmake_minimum_required(VERSION 3.13)
 
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
+
 add_executable(hex-chebeval chebeval/chebeval.cpp)
 add_executable(hex-f-pattern f-pattern/hex-f-pattern.cpp)
 add_executable(hex-fullborn fullborn/hex-fullborn.cpp)
