@@ -136,6 +136,12 @@ endif()
 
 ## --------------------------------------------------------------------------------- ##
 
+if(BUILD_TESTING)
+    add_subdirectory(tests)
+endif()
+
+## --------------------------------------------------------------------------------- ##
+
 install(TARGETS hex-ecs
     RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
 )

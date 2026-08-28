@@ -55,6 +55,7 @@ option(WITH_SUPERLU_DIST "Build with SuperLU_DIST library"                      
 option(WITH_UMFPACK      "Build with UMFPACK library"                             OFF)
 
 option(BUILD_DEVEL       "Build also unfinished programs"                         OFF)
+option(BUILD_TESTING     "Make the hex-ecs regression tests available to CTest"   ON)
 option(SINGLE_PRECISION  "Use single precision for real numbers"                  OFF)
 
 option(DISABLE_PARALLEL_PRECONDITION "Avoid nested parallelism in preconditioning" ON)
@@ -248,6 +249,12 @@ endif()
 
 # standard GNU installation layout (bin/, lib/, include/hex/, share/doc/Hex/)
 include(GNUInstallDirs)
+
+# the tests are declared in hex-ecs/tests; they are never run by the build itself,
+# only on demand by "ctest"
+if(BUILD_TESTING)
+    enable_testing()
+endif()
 
 # let the installed programs find the installed Hex shared libraries
 set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_FULL_LIBDIR}")
