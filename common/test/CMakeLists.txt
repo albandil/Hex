@@ -29,91 +29,24 @@
 ##                                                                                   ##
 ## --------------------------------------------------------------------------------- ##
 
-cmake_minimum_required(VERSION 3.13)
+# Test of the sparse grid quadrature. Three six-dimensional integrands whose exact
+# values are known are integrated and the results compared; the program returns a
+# non-zero exit code when any of them is off. It takes a fraction of a second, so
+# unlike the hex-ecs tests it can be run after every build.
 
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
-set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
+add_executable(test-spgrid "${CMAKE_CURRENT_LIST_DIR}/test-spgrid.cpp")
 
-set(libhex-common_SOURCES
-    "hex-arrays.cpp"
-    "hex-blas.cpp"
-    "hex-born.cpp"
-    "hex-hdffile.cpp"
-    "hex-hydrogen.cpp"
-    "hex-matrix.cpp"
-    "hex-misc.cpp"
-    "hex-special.cpp"
-    "hex-spgrid.cpp"
-    "hex-symbolic.cpp"
-    "hex-vec3d.cpp"
-    "hex-version.cpp"
-    "hex-vtkfile.cpp"
+# keep the test program out of the directory with the installed ones
+set_target_properties(test-spgrid PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
 )
 
-if(HDF5_FOUND)
-    set(libhex-common_SOURCES ${libhex-common_SOURCES} "hex-h5file.cpp")
-endif()
+# libhex-common exports "../libs" but not its own directory
+target_include_directories(test-spgrid PRIVATE "${CMAKE_CURRENT_LIST_DIR}/..")
 
-add_library(libhex-common SHARED ${libhex-common_SOURCES})
+target_link_libraries(test-spgrid PRIVATE libhex-common)
 
-set_target_properties(libhex-common PROPERTIES PREFIX "")
-
-target_compile_options(libhex-common PUBLIC "${OPTFLAGS}")
-
-target_include_directories(libhex-common PUBLIC
-    ../libs
-    ${BOINC_INCLUDE_DIRS}
-    ${CLN_INCLUDE_DIRS}
-    ${GSL_INCLUDE_DIRS}
-    ${GINAC_INCLUDE_DIRS}
-    ${HDF5_INCLUDE_DIRS}
-    ${MUMPS_INCLUDE_DIRS}
-    ${PNG_INCLUDE_DIRS}
-    ${UMFPACK_INCLUDE_DIRS}
-)
-
-target_link_libraries(libhex-common
-    ${BOINC_LIBRARIES}
-    ${CLN_LIBRARIES}
-    ${GINAC_LIBRARIES}
-    ${GSL_LIBRARIES}
-    ${HDF5_LIBRARIES}
-    ${MUMPS_LIBRARIES}
-    ${PNG_LIBRARIES}
-    ${UMFPACK_LIBRARIES}
-    ${LAPACK_LIBRARIES}
-    ${BLAS_LIBRARIES}
-    OpenMP::OpenMP_CXX
-)
-
-if(WITH_MPI)
-    target_link_libraries(libhex-common MPI::MPI_C)
-endif()
-
-## --------------------------------------------------------------------------------- ##
-
-if(BUILD_TESTING)
-    add_subdirectory(test)
-endif()
-
-## --------------------------------------------------------------------------------- ##
-
-install(TARGETS libhex-common
-    RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
-    LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
-    ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
-)
-
-install(DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/"
-    DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/hex"
-    FILES_MATCHING
-    PATTERN "test" EXCLUDE
-    PATTERN "*.h"
-)
-
-# bundled header-only libraries used by the public headers above
-install(DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/../libs/png++"
-    DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/hex"
-    FILES_MATCHING PATTERN "*.hpp"
+add_test(
+    NAME "common.spgrid"
+    COMMAND test-spgrid
 )

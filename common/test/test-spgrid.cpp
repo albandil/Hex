@@ -1,6 +1,8 @@
+#include <cmath>
+#include <cstdlib>
 #include <iostream>
 
-#include "../src/hex-spgrid.cpp"
+#include "hex-spgrid.h"
 
 // template <class T> using integrand_t = void (*) (int n, int dim, double const * origin, double range, const double * scale, T * eval);
 
@@ -52,19 +54,33 @@ std::pair < spgrid::SparseGrid<double>::integrand_t, double > tests[3] = {
     { &F2, 0.1691130052673656 }
 };
 
+// The quadrature is asked for 1e-8, but the finer of the two rules used below is
+// already the deepest the grid can refine to, so the first integrand stops short
+// of that and ends up around 1e-7. The bound is loose enough to accommodate this
+// and still tight enough to notice a change in the nodes or the weights.
+const double tolerance = 1e-6;
+
 int main (void)
 {
     spgrid::SparseGrid<double> G;
+
+    bool passed = true;
 
     for (int i = 0; i < 3; i++)
     {
         G.integrate_adapt<6>(tests[i].first, spgrid::d6l4n257, spgrid::d6l5n737);
 
+        double error = std::abs(G.result() - tests[i].second);
+
         std::cout << "Test " << i + 1 << std::endl;
         std::cout << "\tresult = " << G.result() << " (exact: " << tests[i].second << ")" << std::endl;
+        std::cout << "\terror  = " << error << (error < tolerance ? "" : "  <-- above the tolerance") << std::endl;
         std::cout << "\tnevals = " << G.evalcount() << std::endl;
         std::cout << "\tncells = " << G.cellcount() << std::endl;
+
+        if (not (error < tolerance))
+            passed = false;
     }
 
-    return 0;
+    return passed ? EXIT_SUCCESS : EXIT_FAILURE;
 }
