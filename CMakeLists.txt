@@ -215,6 +215,15 @@ endif()
 
 ## --------------------------------------------------------------------------------- ##
 
+# standard GNU installation layout (bin/, lib/, include/hex/, share/doc/Hex/)
+include(GNUInstallDirs)
+
+# let the installed programs find the installed Hex shared libraries
+set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_FULL_LIBDIR}")
+set(CMAKE_INSTALL_RPATH_USE_LINK_PATH ON)
+
+## --------------------------------------------------------------------------------- ##
+
 add_subdirectory(common)
 add_subdirectory(utilities)
 
@@ -225,5 +234,15 @@ add_subdirectory(hex-ecs)
 if(WITH_DEVEL)
     add_subdirectory(hex-pecs)
 endif()
+
+## --------------------------------------------------------------------------------- ##
+
+install(FILES README
+    DESTINATION "${CMAKE_INSTALL_DOCDIR}"
+)
+
+install(DIRECTORY html/
+    DESTINATION "${CMAKE_INSTALL_DOCDIR}/html"
+)
 
 ## --------------------------------------------------------------------------------- ##

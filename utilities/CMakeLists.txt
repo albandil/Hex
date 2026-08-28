@@ -53,3 +53,14 @@ target_link_libraries(hex-fullborn PRIVATE libhex-common)
 #target_link_libraries(hex-hdf2hdf PRIVATE libhex-common)
 target_link_libraries(hex-hdf2txt PRIVATE libhex-common)
 target_link_libraries(hex-special PRIVATE libhex-common)
+
+## --------------------------------------------------------------------------------- ##
+
+install(TARGETS
+    hex-chebeval
+    hex-f-pattern
+    hex-fullborn
+    hex-hdf2txt
+    hex-special
+    RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
+)

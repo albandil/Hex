@@ -92,3 +92,24 @@ target_link_libraries(hex-db
     libhex-db
     ${SQLite3_LIBRARIES}
 )
+
+## --------------------------------------------------------------------------------- ##
+
+install(TARGETS libhex-db hex-db
+    RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
+    LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+    ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+)
+
+install(DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/src/"
+    DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/hex/hex-db"
+    FILES_MATCHING
+    PATTERN "var" EXCLUDE
+    PATTERN "*.h"
+)
+
+# bundled SQLite wrapper used by the public headers above
+install(DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/../libs/sqlitepp"
+    DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/hex"
+    FILES_MATCHING PATTERN "*.hpp"
+)

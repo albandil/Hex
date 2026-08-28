@@ -119,3 +119,9 @@ if(WITH_MPI)
         MPI::MPI_C
     )
 endif()
+
+## --------------------------------------------------------------------------------- ##
+
+install(TARGETS hex-ecs
+    RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
+)

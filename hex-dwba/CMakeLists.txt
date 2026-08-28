@@ -56,3 +56,9 @@ target_link_options(hex-dwba PUBLIC ${OpenMP_CXX_FLAGS})
 target_link_libraries(hex-dwba
     libhex-common
 )
+
+## --------------------------------------------------------------------------------- ##
+
+install(TARGETS hex-dwba
+    RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
+)

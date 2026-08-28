@@ -25,3 +25,9 @@ target_include_directories(hex-pecs PUBLIC
 target_link_libraries(hex-pecs
     libhex-common
 )
+
+## --------------------------------------------------------------------------------- ##
+
+install(TARGETS hex-pecs
+    RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
+)

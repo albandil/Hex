@@ -87,3 +87,22 @@ target_link_libraries(libhex-common
 if(WITH_MPI)
     target_link_libraries(libhex-common MPI::MPI_C)
 endif()
+
+## --------------------------------------------------------------------------------- ##
+
+install(TARGETS libhex-common
+    RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
+    LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+    ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+)
+
+install(DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/"
+    DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/hex"
+    FILES_MATCHING PATTERN "*.h"
+)
+
+# bundled header-only libraries used by the public headers above
+install(DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/../libs/png++"
+    DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/hex"
+    FILES_MATCHING PATTERN "*.hpp"
+)
