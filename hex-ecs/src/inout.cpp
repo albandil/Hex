@@ -1029,6 +1029,17 @@ void CommandLine::parse (int argc, char* argv[])
             HexException("Unknown switch \"%s\".", optname.c_str());
         }
     );
+
+    // The out-of-core files are named after the block they hold and not after the
+    // process that writes them. With a scratch directory shared by several processes
+    // of one group this breaks down: they write the same files at the same time, and
+    // they read back blocks that the group master has not written yet.
+    if (parallel and outofcore and shared_scratch and groupsize > 1)
+        HexException
+        (
+            "The combination of --out-of-core, --shared-scratch and --groupsize greater "
+            "than one is not supported. Use --groupsize 1, or drop one of the other two."
+        );
 }
 
 void ReadArrays (std::ifstream & inf, rArray & arr)
