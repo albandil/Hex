@@ -87,8 +87,10 @@ build directory with
 
     ctest --output-on-failure
 
-Tests that would need a library the build was configured without are not created at all. See `tests/CMakeLists.txt` for the
-details.
+Tests that would need a library the build was configured without are not created at all. The distributed ones use the MPI
+launcher found during configuration; extra launcher options belong to the cache variable `MPIEXEC_PREFLAGS`, and with Open
+MPI that should be at least `--bind-to none` so that the multi-threaded ranks are not confined to a single core. See
+`tests/CMakeLists.txt` for the details.
 
 
 Documentation

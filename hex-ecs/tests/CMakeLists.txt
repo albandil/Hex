@@ -43,7 +43,8 @@
 # The distributed tests are started by the launcher that FindMPI has detected.
 # Anything the launcher needs beyond the number of processes belongs to the cache
 # variable MPIEXEC_PREFLAGS; with Open MPI the tests that combine several ranks
-# with several threads want at least "-bind-to none" there.
+# with several threads want at least "--bind-to none" there. Note the two dashes:
+# Open MPI 5 takes "-bind-to none" for a request to run a program called "none".
 
 # Four hours. The KPA test of the sample problem needs close to two on a six-core
 # machine, and the slowest energy of that run converges erratically, so the limit
