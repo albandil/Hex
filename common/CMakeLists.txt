@@ -68,7 +68,6 @@ target_include_directories(libhex-common PUBLIC
     ${GSL_INCLUDE_DIRS}
     ${GINAC_INCLUDE_DIRS}
     ${HDF5_INCLUDE_DIRS}
-    ${MUMPS_INCLUDE_DIRS}
     ${PNG_INCLUDE_DIRS}
     ${UMFPACK_INCLUDE_DIRS}
 )
@@ -79,7 +78,6 @@ target_link_libraries(libhex-common
     ${GINAC_LIBRARIES}
     ${GSL_LIBRARIES}
     ${HDF5_LIBRARIES}
-    ${MUMPS_LIBRARIES}
     ${PNG_LIBRARIES}
     ${UMFPACK_LIBRARIES}
     ${LAPACK_LIBRARIES}

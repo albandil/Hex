@@ -110,6 +110,7 @@ target_include_directories(hex-ecs PUBLIC
     ${GSL_INCLUDE_DIRS}
     ${OpenCL_INCLUDE_DIRS}
     ${MKL_INCLUDE_DIRS}
+    ${MUMPS_INCLUDE_DIRS}
     ${SUPERLU_INCLUDE_DIRS}
     ${SUPERLU_DIST_INCLUDE_DIRS}
 )
@@ -120,6 +121,7 @@ target_link_libraries(hex-ecs
     libhex-common
     ${OpenCL_LIBRARIES}
     ${MKL_LIBRARIES}
+    ${MUMPS_LIBRARIES}
     ${PARDISO_LIBRARIES}
     ${SCALAPACK_LIBRARIES}
     ${SUPERLU_LIBRARIES}
