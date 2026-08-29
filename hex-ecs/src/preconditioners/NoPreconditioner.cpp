@@ -1546,7 +1546,7 @@ void NoPreconditioner::rhs_scat (BlockArray<Complex> & chi, int ie, int instate)
         // optionally transfer to disk
         if (not chi.inmemory())
         {
-            if (not cmd_->shared_scratch and par_->IamGroupMaster())
+            if (not cmd_->shared_scratch or par_->IamGroupMaster())
                 chi.hdfsave(ill);
 
             chi.drop(ill);
