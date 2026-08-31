@@ -6,6 +6,11 @@
 # therefore runs the same problem twice, once with the option and once without it, and
 # compares the partial cross sections that come out.
 #
+# Those blocks are not written to the disk either, so the test also checks that the folded
+# run left out some of the solution files, and that what it did write is still enough for
+# a plain "--stg-extract" that knows nothing about the option to arrive at the same cross
+# sections. That is the reader reconstructing the missing blocks on its own.
+#
 # The problem is deliberately tiny. What is being tested is that the two runs solve the
 # same equations, which does not need a physically converged calculation, so the driver
 # shrinks the sample input to something that takes seconds rather than hours. It does have
@@ -38,6 +43,8 @@ endif()
 if("${ULPS}" STREQUAL "")
     set(ULPS 5)
 endif()
+
+set(TMATRICES "tmat-L${L}-Pi${PI}.sql")
 
 ## --------------------------------------------------------------------------------- ##
 
@@ -123,8 +130,10 @@ function(replace_section text_var anchor lines)
 
 endfunction()
 
-# Replace the single data line that follows the comment line 'anchor'.
-function(replace_line text_var anchor line)
+# Replace the given number of data lines that follow the comment line 'anchor'. This is
+# for the sections that are not terminated by a line of their own, where the number of
+# lines is fixed by the format instead.
+function(replace_lines text_var anchor count lines)
 
     set(text "${${text_var}}")
 
@@ -137,15 +146,25 @@ function(replace_line text_var anchor line)
     string(LENGTH "${anchor}" anchor_length)
     math(EXPR start "${start} + ${anchor_length} + 1")
 
-    string(SUBSTRING "${text}" ${start} -1 tail)
-    string(FIND "${tail}" "\n" stop)
+    # walk over the lines to be dropped
+    set(stop ${start})
+    foreach(i RANGE 1 ${count})
 
-    math(EXPR stop "${start} + ${stop} + 1")
+        string(SUBSTRING "${text}" ${stop} -1 tail)
+        string(FIND "${tail}" "\n" length)
+
+        if(length EQUAL -1)
+            message(FATAL_ERROR "Cannot patch ${INPUT_FILE}: the section below\n  ${anchor}\nis shorter than ${count} lines")
+        endif()
+
+        math(EXPR stop "${stop} + ${length} + 1")
+
+    endforeach()
 
     string(SUBSTRING "${text}" 0 ${start} head)
     string(SUBSTRING "${text}" ${stop} -1 tail)
 
-    set(${text_var} "${head}${line}\n${tail}" PARENT_SCOPE)
+    set(${text_var} "${head}${lines}${tail}" PARENT_SCOPE)
 
 endfunction()
 
@@ -290,7 +309,34 @@ function(numbers_agree a b result_var)
 
 endfunction()
 
-# Compare the numbers in the data (non-comment) lines of two cross section files.
+# Pick out every number of a file, line by line, skipping the comments of both the cross
+# section files ("#") and the T-matrix files ("--") and the lines that carry no numbers.
+function(numbers_of_file path result_var)
+
+    file(STRINGS "${path}" lines)
+
+    set(result "")
+
+    foreach(line IN LISTS lines)
+
+        if(line MATCHES "^#" OR line MATCHES "^--")
+            continue()
+        endif()
+
+        string(REGEX MATCHALL "[-+]?[0-9]+\\.?[0-9]*([eE][-+]?[0-9]+)?" numbers "${line}")
+
+        if(numbers)
+            string(REPLACE ";" " " numbers "${numbers}")
+            list(APPEND result "${numbers}")
+        endif()
+
+    endforeach()
+
+    set(${result_var} "${result}" PARENT_SCOPE)
+
+endfunction()
+
+# Compare the numbers of two result files of the same kind.
 function(compare_results reference folded)
 
     foreach(path "${reference}" "${folded}")
@@ -299,8 +345,8 @@ function(compare_results reference folded)
         endif()
     endforeach()
 
-    file(STRINGS "${reference}" lines_reference REGEX "^[^#]")
-    file(STRINGS "${folded}"    lines_folded    REGEX "^[^#]")
+    numbers_of_file("${reference}" lines_reference)
+    numbers_of_file("${folded}"    lines_folded)
 
     list(LENGTH lines_reference count)
     list(LENGTH lines_folded count_folded)
@@ -309,17 +355,17 @@ function(compare_results reference folded)
         message(FATAL_ERROR "There is no data in ${reference}")
     endif()
 
-    # A partial wave that cannot be reached from the initial state gives files that hold
+    # A partial wave that cannot be reached from the initial state leaves files that hold
     # nothing but the energies. Comparing those would prove nothing at all.
     list(GET lines_reference 0 first)
-    string(REGEX MATCHALL "[^ \t]+" fields "${first}")
+    string(REGEX MATCHALL "[^ ]+" fields "${first}")
     list(LENGTH fields fields)
 
     if(fields LESS 2)
         message(FATAL_ERROR
-            "${reference} contains no cross sections, only the energies. This problem "
-            "has no transition allowed by its total quantum numbers, so the test would "
-            "prove nothing")
+            "${reference} holds one number per line, so it carries no results. This "
+            "problem has no transition allowed by its total quantum numbers and the "
+            "test would prove nothing")
     endif()
 
     if(NOT count EQUAL count_folded)
@@ -333,15 +379,15 @@ function(compare_results reference folded)
         list(GET lines_reference ${i} line_reference)
         list(GET lines_folded    ${i} line_folded)
 
-        string(REGEX MATCHALL "[^ \t]+" fields_reference "${line_reference}")
-        string(REGEX MATCHALL "[^ \t]+" fields_folded    "${line_folded}")
+        string(REGEX MATCHALL "[^ ]+" fields_reference "${line_reference}")
+        string(REGEX MATCHALL "[^ ]+" fields_folded    "${line_folded}")
 
         list(LENGTH fields_reference fields)
         list(LENGTH fields_folded fields_other)
 
         if(NOT fields EQUAL fields_other)
             message(FATAL_ERROR
-                "Different number of columns on line ${i}:\n"
+                "Different number of values on line ${i}:\n"
                 "  reference: ${line_reference}\n"
                 "  folded:    ${line_folded}")
         endif()
@@ -357,10 +403,10 @@ function(compare_results reference folded)
 
             if(NOT agree)
                 message(FATAL_ERROR
-                    "The folded calculation gave a different result in column ${j} of "
+                    "The folded calculation gave a different result in value ${j} of "
                     "line ${i} of ${reference}:\n"
-                    "  reference: ${a}\n"
-                    "  folded:    ${b}\n"
+                    "  reference: ${line_reference}\n"
+                    "  folded:    ${line_folded}\n"
                     "(compared to ${DIGITS} significant digits with a tolerance of ${ULPS} units of the last one)")
             endif()
 
@@ -405,18 +451,26 @@ if(CHANNELS)
         "  L    0   12   13\n")
 
     # keep a few closed channels as well, so that the two groups differ in size
-    replace_line(input
+    replace_lines(input
         "# Maximal energy (Ry) of states included in the asymptotic (outer) region."
-        "  -0.1")
+        1 "  -0.1\n")
 endif()
 
-replace_line(input
+replace_lines(input
     "# L   S   Pi  nL  limit exchange"
-    "  ${L}   *   ${PI}   ${NL}   -1    1")
+    1 "  ${L}   *   ${PI}   ${NL}   -1    1\n")
+
+# An amplitude is only extracted from the angular blocks whose atomic momentum l1 equals
+# that of the final state. With 1s the only final state, the test would never look at any
+# block but (0,l2) and would not notice a reconstructed one being wrong. The n = 2 shell
+# brings in l1 = 1, and the energy has to leave it open.
+replace_lines(input
+    "# Specified by vertical doublets terminated by -1 on the first line."
+    2 "  1  2 -1\n  *  *\n")
 
 replace_section(input
     "#     E[xplicit] <Sample-1> <Sample-2> ... <Sample-last> -1"
-    "  L  -0.35  -0.35  1\n")
+    "  L  -0.15  -0.15  1\n")
 
 file(WRITE "${WORKDIR}/${INPUT_FILE}" "${input}")
 
@@ -460,6 +514,48 @@ endif()
 message(STATUS "The folded run solved for ${solved} of ${all} angular blocks")
 
 ## --------------------------------------------------------------------------------- ##
+
+# The T-matrices are compared as well as the cross sections, and are the stronger check of
+# the two: a cross section is a sum of squared moduli over the partial waves, one of which
+# each angular block feeds, so it would not notice a block that came back with the wrong
+# overall sign.
+compare_results("${WORKDIR}/reference/${TMATRICES}" "${WORKDIR}/folded/${TMATRICES}")
+
+foreach(spin 0 1)
+    set(output "ics-L${L}-S${spin}-Pi${PI}.dat")
+    compare_results("${WORKDIR}/reference/${output}" "${WORKDIR}/folded/${output}")
+endforeach()
+
+## --------------------------------------------------------------------------------- ##
+
+# The blocks that were not solved for are not saved either, which is half the point of
+# the option.
+file(GLOB saved_reference "${WORKDIR}/reference/psi-*")
+file(GLOB saved_folded    "${WORKDIR}/folded/psi-*")
+
+list(LENGTH saved_reference count_reference)
+list(LENGTH saved_folded count_folded)
+
+if(count_reference EQUAL 0)
+    message(FATAL_ERROR "The reference run wrote no solution files at all")
+endif()
+
+if(NOT count_folded LESS count_reference)
+    message(FATAL_ERROR
+        "The folded run wrote ${count_folded} solution files and the reference one "
+        "${count_reference}; the blocks that were not solved for should not have been saved")
+endif()
+
+message(STATUS "The folded run saved ${count_folded} solution files instead of ${count_reference}")
+
+## --------------------------------------------------------------------------------- ##
+
+# A reader that is not told anything about the option has to be able to restore the blocks
+# that are missing from those that are there. Extract the amplitudes of the folded run once
+# more, this time with a plain command line, and compare again.
+run_hex_ecs("${WORKDIR}/folded" reread "${HEX_ECS}" --input "${INPUT_FILE}" --stg-extract)
+
+compare_results("${WORKDIR}/reference/${TMATRICES}" "${WORKDIR}/folded/${TMATRICES}")
 
 foreach(spin 0 1)
     set(output "ics-L${L}-S${spin}-Pi${PI}.dat")

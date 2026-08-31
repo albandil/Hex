@@ -36,6 +36,7 @@
 
 #include <cstdio>
 #include <fstream>
+#include <algorithm>
 #include <vector>
 #include <string>
 
@@ -479,18 +480,78 @@ class InputFile
 };
 
 /**
+ * @brief Sign that relates a solution block to its mirror image.
+ *
+ * The (anti)symmetry of the wave function with respect to the exchange of the two
+ * electrons relates the angular block (l2,l1) to the block (l1,l2) by the factor
+ * @f$ (-1)^{l_1+l_2+L+S} @f$. Every state of the basis satisfies
+ * @f$ l_1 + l_2 = 2n + L + \Pi @f$, so the same sign @f$ (-1)^{S+\Pi} @f$ applies to
+ * all blocks of a given calculation. It is also the sign that anti/symmetrizes the
+ * right-hand side.
+ */
+inline Real exchange_sign (int S, int Pi)
+{
+    return (S + Pi) % 2 == 0 ? 1.0_r : -1.0_r;
+}
+
+/**
+ * @brief Mirror a solution segment.
+ *
+ * Rewrites the solution segment @c src of some angular block (l1,l2) into the segment
+ * @c dst of the mirror block (l2,l1), which amounts to interchanging the two electrons.
+ * The inner region is a square matrix of B-spline coefficients and is transposed; the
+ * two groups of asymptotic channels describe the escape of either of the electrons, so
+ * they change places. The sign that also relates the two blocks is @ref exchange_sign
+ * and is *not* applied here.
+ *
+ * Both segments have the layout
+ * <pre>
+ *   [ Nspline_inner x Nspline_inner ][ Nchan1 x Nspline_outer ][ Nchan2 x Nspline_outer ]
+ * </pre>
+ * except that the mirror block has the channel counts swapped. The two electrons must
+ * share the same B-spline basis, otherwise the two layouts are not compatible at all.
+ */
+void mirror_segment
+(
+    const cArrayView src,
+    cArrayView dst,
+    int Nspline_inner,
+    int Nspline_outer,
+    int Nchan1,
+    int Nchan2
+);
+
+/**
  * @brief Solution input/output class.
  * 
  * On several places in code it is necessary to load some solutions. In order not
  * to bother with the file names and still to keep them consistent, this class
  * will carry the file name and do all operations on it.
+ *
+ * When the exchange symmetry has been folded into the equations (the command line
+ * option \--fold-exchange), the angular blocks with l1 > l2 are never solved for and
+ * their segments are not written at all. Such a block is restored on reading from the
+ * segment of its mirror image, so that the rest of the program still sees a solution
+ * that covers the complete angular basis. What makes this possible is the size of the
+ * inner region, which the writer of the mirror block has to record in its file; see
+ * the constructor argument @c Nspline_inner.
  */
 class SolutionIO
 {
     public:
 
-        SolutionIO () {}
+        SolutionIO () : L_(0), S_(0), Pi_(0), ni_(0), li_(0), mi_(0), E_(0), Nspline_inner_(0) {}
 
+        /**
+         * @brief Constructor.
+         *
+         * @param Nspline_inner Size of the square inner region of a solution segment.
+         *        It is written into every segment file, where it is what a reader needs
+         *        to reconstruct the mirror block from the block itself. Pass it only
+         *        when the mirror blocks are really left out of the output, so that a
+         *        reader never mirrors a solution that was not meant to be mirrored;
+         *        zero, the default, writes all blocks and asks for no reconstruction.
+         */
         SolutionIO
         (
             int L, int S, int Pi,
@@ -498,10 +559,11 @@ class SolutionIO
             Real E,
             std::vector<std::pair<int,int>> const & ang,
             std::vector<std::pair<int,int>> const & chann = std::vector<std::pair<int,int>>(),
-            std::string prefix = "psi"
+            std::string prefix = "psi",
+            int Nspline_inner = 0
         ) : L_(L), S_(S), Pi_(Pi),
             ni_(ni), li_(li), mi_(mi),
-            E_(E), ang_(ang), prefix_(prefix)
+            E_(E), ang_(ang), prefix_(prefix), Nspline_inner_(Nspline_inner)
         {
             if (chann.empty())
             {
@@ -531,23 +593,75 @@ class SolutionIO
                 return format("%s-%g-%d-%d-%d-%d-%d-%d-(%d,%d).hdf", prefix_.c_str(), E_ + 1, L_, S_, Pi_, ni_, li_, mi_, ang_[ill].first, ang_[ill].second);
         }
 
+        /**
+         * @brief Number of elements of a solution segment, or zero when there is none.
+         *
+         * A block whose own file is missing counts with the size of the file of its
+         * mirror image, which it would be reconstructed from and which has the same size.
+         */
+        std::size_t segment_size (int ill) const
+        {
+            HDFFile hdf (name(ill), HDFFile::readonly);
+
+            if (hdf.valid())
+                return hdf.size("array") / 2;
+
+            int Nspline_inner = 0;
+            int illm = mirror_source(ill, Nspline_inner);
+
+            if (illm < 0)
+                return 0;
+
+            return HDFFile(name(illm), HDFFile::readonly).size("array") / 2;
+        }
+
+        /// Position of the block (l2,l1) in the list of angular states, or -1.
+        int mirror (int ill) const
+        {
+            std::pair<int,int> other (ang_[ill].second, ang_[ill].first);
+            auto position = std::find(ang_.begin(), ang_.end(), other);
+            return position == ang_.end() ? -1 : position - ang_.begin();
+        }
+
+        /**
+         * @brief Segment file that a missing block can be reconstructed from.
+         *
+         * Returns the position of the mirror block (l2,l1) when the segment file of the
+         * block @c ill is itself missing, the file of the mirror block is there, and that
+         * file records the size of the inner region -- which only a run that deliberately
+         * leaves the mirror blocks out ever writes. Returns -1 in every other case, so
+         * that an incomplete output of an ordinary run is not mistaken for a folded one.
+         * On success, @c Nspline_inner is set from the file.
+         */
+        int mirror_source (int ill, int & Nspline_inner) const
+        {
+            if (HDFFile(name(ill), HDFFile::readonly).valid())
+                return -1;
+
+            int illm = mirror(ill);
+
+            if (illm < 0 or illm == ill)
+                return -1;
+
+            HDFFile hdf (name(illm), HDFFile::readonly);
+
+            if (not hdf.valid() or not hdf.read("Nspline_inner", &Nspline_inner, 1) or Nspline_inner <= 0)
+                return -1;
+
+            return illm;
+        }
+
         /// Check that the file exists.
         bool check (int ill, std::size_t & total_size) const
         {
             // look for specific solution segment file
             if (ill != SolutionIO::All)
-            {
-                HDFFile fsingle (name(ill), HDFFile::readonly);
-                return fsingle.valid() ? fsingle.size("array")/2 : 0;
-            }
+                return segment_size(ill) > 0;
 
             // look for all solution segment files
             std::vector<std::size_t> size (ang_.size());
             for (unsigned illp = 0; illp < ang_.size(); illp++)
-            {
-                HDFFile fsingle (name(illp), HDFFile::readonly);
-                size[illp] = (fsingle.valid() ? fsingle.size("array")/2 : 0);
-            }
+                size[illp] = segment_size(illp);
 
             // calculate total size
             total_size = std::accumulate(size.begin(), size.end(), 0);
@@ -614,8 +728,9 @@ class SolutionIO
 
                     else
                     {
-                        // simply load the requested solution segment file
-                        if (not solution[i].hdfload(name(i)))
+                        // load the requested solution segment file, or restore the segment
+                        // from the mirror block when it has not been written at all
+                        if (not load_segment(solution[i], i))
                             return false;
 
                         // dump to disk
@@ -623,14 +738,6 @@ class SolutionIO
                         {
                             solution.hdfsave(i);
                             solution[i].drop();
-                        }
-
-                        // read numbers of channels
-                        HDFFile hdf (name(i), HDFFile::readonly);
-                        if (hdf.valid())
-                        {
-                            hdf.read("Nchan1", &chann_[i].first,  1);
-                            hdf.read("Nchan2", &chann_[i].second, 1);
                         }
                     }
             }
@@ -673,6 +780,62 @@ class SolutionIO
             return true;
         }
 
+        /**
+         * @brief Read one solution segment.
+         *
+         * Reads the segment of the angular block @c ill and the numbers of its asymptotic
+         * channels. When the block has not been written, because the exchange symmetry
+         * was folded into the equations, its segment is restored from the segment of the
+         * mirror block (l2,l1) by interchanging the two electrons in it.
+         */
+        bool load_segment (cArray & segment, int ill)
+        {
+            HDFFile hdf (name(ill), HDFFile::readonly);
+
+            if (hdf.valid())
+            {
+                if (not segment.hdfload(name(ill)))
+                    return false;
+
+                hdf.read("Nchan1", &chann_[ill].first,  1);
+                hdf.read("Nchan2", &chann_[ill].second, 1);
+
+                return true;
+            }
+
+            // this block was not solved for; take the mirror block instead
+            int Nspline_inner = 0;
+            int illm = mirror_source(ill, Nspline_inner);
+
+            if (illm < 0)
+                return false;
+
+            cArray source;
+            if (not source.hdfload(name(illm)))
+                return false;
+
+            // the mirror block has the two electrons, and so its channel groups, interchanged
+            int Nchan1 = 0, Nchan2 = 0;
+            HDFFile hdfm (name(illm), HDFFile::readonly);
+            hdfm.read("Nchan1", &Nchan1, 1);
+            hdfm.read("Nchan2", &Nchan2, 1);
+
+            std::size_t inner = std::size_t(Nspline_inner) * std::size_t(Nspline_inner);
+
+            if (source.size() < inner or (source.size() > inner and Nchan1 + Nchan2 == 0))
+                HexException("The solution file \"%s\" does not have the size its own metadata imply.", name(illm).c_str());
+
+            int Nspline_outer = (Nchan1 + Nchan2 == 0 ? 0 : (source.size() - inner) / (Nchan1 + Nchan2));
+
+            segment.resize(source.size());
+            mirror_segment(source, segment, Nspline_inner, Nspline_outer, Nchan1, Nchan2);
+            segment *= exchange_sign(S_, Pi_);
+
+            chann_[ill] = std::make_pair(Nchan2, Nchan1);
+
+            return true;
+        }
+
         bool save_segment (const cArrayView solution, int ill) const
         {
             // open file
@@ -696,6 +859,11 @@ class SolutionIO
             success = (success and hdf.write("Nchan1", &chann_[ill].first, 1));
             success = (success and hdf.write("Nchan2", &chann_[ill].second, 1));
             success = (success and hdf.write("array", solution.data(), solution.size()));
+
+            // this is what lets a reader restore the mirror block from this one
+            if (Nspline_inner_ > 0)
+                success = (success and hdf.write("Nspline_inner", &Nspline_inner_, 1));
+
             return success;
         }
 
@@ -707,6 +875,10 @@ class SolutionIO
         Real E_;
         std::vector<std::pair<int,int>> ang_, chann_;
         std::string prefix_;
+
+        // Size of the inner region to record in the written segments, or zero when the
+        // segments are not meant to be mirrored. See the constructor.
+        int Nspline_inner_;
 };
 
 /**

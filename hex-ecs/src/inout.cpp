@@ -1634,3 +1634,34 @@ void write_grid (Bspline const & bspline, std::string const & basename)
     // write knots (write header only for the first time)
     writeVTK_points(out, cArray(), knots, knots, rArray({0.}));
 }
+
+void mirror_segment
+(
+    const cArrayView src,
+    cArrayView dst,
+    int Nspline_inner,
+    int Nspline_outer,
+    int Nchan1,
+    int Nchan2
+)
+{
+    std::size_t inner = std::size_t(Nspline_inner) * std::size_t(Nspline_inner);
+    std::size_t expected = inner + std::size_t(Nchan1 + Nchan2) * std::size_t(Nspline_outer);
+
+    if (src.size() != expected or dst.size() != expected)
+        HexException("Mirroring of a solution segment of a wrong size (%ld, %ld != %ld).", src.size(), dst.size(), expected);
+
+    // inner region : transpose the matrix of the B-spline coefficients
+    for (int i = 0; i < Nspline_inner; i++)
+    for (int j = 0; j < Nspline_inner; j++)
+        dst[j * Nspline_inner + i] = src[i * Nspline_inner + j];
+
+    // the channels of the escaping first electron become those of the second one,
+    // which are stored after the (now Nchan2) channels of the mirror block
+    for (std::size_t k = 0; k < std::size_t(Nchan1) * std::size_t(Nspline_outer); k++)
+        dst[inner + std::size_t(Nchan2) * Nspline_outer + k] = src[inner + k];
+
+    // ... and vice versa
+    for (std::size_t k = 0; k < std::size_t(Nchan2) * std::size_t(Nspline_outer); k++)
+        dst[inner + k] = src[inner + std::size_t(Nchan1) * Nspline_outer + k];
+}

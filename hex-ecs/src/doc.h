@@ -410,6 +410,16 @@
   either of the electrons). Roughly half of the angular blocks then disappear from
   the memory, from the matrix and from every matrix-vector multiplication.
 
+  The dropped blocks are not written to the disk either. The solution files of a run
+  that folds the exchange symmetry therefore only cover half of the angular basis, and
+  the class @ref SolutionIO restores the missing blocks by (12) whenever it is asked
+  for one of them. Nothing else in the program, nor a later run, has to know about it:
+  what they read is a solution over the complete basis either way. So that a reader
+  never mirrors a solution that was not meant to be mirrored -- an ordinary run that
+  was interrupted in the middle of writing, say, or a positron calculation, where (12)
+  does not hold at all -- only the files of a folded run record the size of the inner
+  region, which is what the reconstruction needs.
+
   This is an exact identity and not an approximation, and it does not change the
   number of iterations: the sought solution already lies in the subspace picked out
   by (12), which the matrix of the set leaves invariant, so the iterations never

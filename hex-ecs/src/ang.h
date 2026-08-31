@@ -100,7 +100,7 @@ class AngularBasis
          * and because every state of the basis satisfies l1 + l2 = 2n + L + Pi, the sign
          * reduces to (-1)^(S+Pi), which is the same for all blocks of the basis.
          */
-        Real exchange_sign () const { return (S_ + Pi_) % 2 == 0 ? 1.0_r : -1.0_r; }
+        Real exchange_sign () const { return ::exchange_sign(S_, Pi_); }
 
         /// Highest orbital number.
         int maxell () const { return maxell_; }
@@ -153,32 +153,5 @@ class AngularBasis
         // Angular integrals.
         rArray f_;
 };
-
-/**
- * @brief Mirror a solution segment.
- *
- * Rewrites the solution segment @c src of some angular block (l1,l2) into the segment
- * @c dst of the mirror block (l2,l1), which amounts to interchanging the two electrons.
- * The inner region is a square matrix of B-spline coefficients and is transposed; the
- * two groups of asymptotic channels describe the escape of either of the electrons, so
- * they change places. The sign that also relates the two blocks is
- * @ref AngularBasis::exchange_sign and is *not* applied here.
- *
- * Both segments have the layout
- * <pre>
- *   [ Nspline_inner x Nspline_inner ][ Nchan1 x Nspline_outer ][ Nchan2 x Nspline_outer ]
- * </pre>
- * except that the mirror block has the channel counts swapped. The two electrons must
- * share the same B-spline basis, otherwise the two layouts are not compatible at all.
- */
-void mirror_segment
-(
-    const cArrayView src,
-    cArrayView dst,
-    int Nspline_inner,
-    int Nspline_outer,
-    int Nchan1,
-    int Nchan2
-);
 
 #endif
