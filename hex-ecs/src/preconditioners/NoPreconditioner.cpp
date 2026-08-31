@@ -75,17 +75,22 @@ NoPreconditioner::NoPreconditioner
     Bspline const & bspline_panel_y
 ) : PreconditionerBase(),
     E_(0), cmd_(&cmd), par_(&par), inp_(&inp), ang_(&ang),
-    A_blocks_ (ang.states().size() * ang.states().size()),
-    B1_blocks_(ang.states().size() * ang.states().size()),
-    B2_blocks_(ang.states().size() * ang.states().size()),
-    Cu_blocks_(ang.states().size() * ang.states().size()),
-    Cl_blocks_(ang.states().size() * ang.states().size()),
-    block_rank_(ang.states().size()),
+    A_blocks_ (ang.states().size() * ang.states_full().size()),
+    B1_blocks_(ang.states().size() * ang.states_full().size()),
+    B2_blocks_(ang.states().size() * ang.states_full().size()),
+    Cu_blocks_(ang.states().size() * ang.states_full().size()),
+    Cl_blocks_(ang.states().size() * ang.states_full().size()),
+    block_rank_(ang.states_full().size()),
     rad_inner_(new RadialIntegrals(bspline_inner,   bspline_inner,   ang.maxlambda() + 1)),
     rad_full_ (new RadialIntegrals(bspline_full,    bspline_full,    ang.maxlambda() + 1)),
     rad_panel_(new RadialIntegrals(bspline_panel_x, bspline_panel_y, ang.maxlambda() + 1)),
     luS_(LUft::Choose("lapack"))
 {
+    // Mirroring a solution segment transposes its inner region and swaps its asymptotic
+    // channels, which only makes sense when both electrons live in the same basis.
+    if (ang.folded() and bspline_panel_x.hash() != bspline_panel_y.hash())
+        HexException("The option --fold-exchange needs the same B-spline basis for both electrons.");
+
     if (not cmd_->rhs_dipV.empty())
     {
         // set up the source solution config file and radial/angular basis
@@ -153,9 +158,10 @@ void NoPreconditioner::setup ()
     // angular momenta of electrons needed by angular blocks
     std::array<std::vector<int>,2> ells;
 
-    // assemble all electrons' angular momenta
-    for (std::pair<int,int> ll : ang_->states()) ells[0].push_back(ll.first);
-    for (std::pair<int,int> ll : ang_->states()) ells[1].push_back(ll.second);
+    // assemble all electrons' angular momenta (also of the blocks that are not solved
+    // for, because they still enter the matrix as columns)
+    for (std::pair<int,int> ll : ang_->states_full()) ells[0].push_back(ll.first);
+    for (std::pair<int,int> ll : ang_->states_full()) ells[1].push_back(ll.second);
 
     // add all final angular momenta
     for (std::tuple<int,int,int> const & st : inp_->outstates)
@@ -465,8 +471,8 @@ BlockSymBandMatrix<Complex> NoPreconditioner::calc_A_block (int ill, int illp, b
     int Nspline_y_inner = rad_panel_->bspline_y().hash() == rad_full_->bspline().hash() ? rad_inner_->bspline().Nspline() : rad_panel_->bspline_y().Nspline();
 
     // angular momenta
-    int l1 = ang_->states()[ill].first;
-    int l2 = ang_->states()[ill].second;
+    int l1 = ang_->states_full()[ill].first;
+    int l2 = ang_->states_full()[ill].second;
 
     BlockSymBandMatrix<Complex> A
     (
@@ -560,7 +566,7 @@ CooMatrix<LU_int_t, Complex> NoPreconditioner::calc_full_block (int ill, int ill
     LU_int_t Nspline_outer_y = Nspline_full_y - Nspline_inner_y;
 
     // angular block
-    int iang = ill * ang_->states().size() + illp;
+    int iang = ill * ang_->states_full().size() + illp;
 
     // convert inner region matrix block to COO matrix
     CooMatrix<LU_int_t,Complex> coo_block;
@@ -632,6 +638,11 @@ void NoPreconditioner::update (Real E, bool full)
     // shorthands
     int order = inp_->order;
     int Nang = ang_->states().size();
+
+    // With the exchange symmetry folded in, only a part of the angular blocks is solved
+    // for, but all of them still enter the matrix as columns. The solved blocks come
+    // first in the full list, so a row index is a valid index into it as well.
+    int Nang_full = ang_->states_full().size();
 
     // B-spline bases
     Bspline const & bspline_full  = rad_full_ ->bspline();
@@ -712,11 +723,11 @@ void NoPreconditioner::update (Real E, bool full)
     }
 
     // calculate number of asymptotic channels (i.e. bound states of the other particle)
-    Nchan_.resize(Nang);
-    for (int ill = 0; ill < Nang; ill++)
+    Nchan_.resize(Nang_full);
+    for (int ill = 0; ill < Nang_full; ill++)
     {
-        int l1 = ang_->states()[ill].first;
-        int l2 = ang_->states()[ill].second;
+        int l1 = ang_->states_full()[ill].first;
+        int l2 = ang_->states_full()[ill].second;
 
         std::pair<int,int> Nbound = bstates(std::max(2*E, inp_->channel_max_E), l1, l2);
 
@@ -728,13 +739,13 @@ void NoPreconditioner::update (Real E, bool full)
 
     // setup blocks
     for (int ill = 0; ill < Nang; ill++) if (par_->isMyGroupWork(ill))
-    for (int illp = 0; illp < Nang; illp++)
+    for (int illp = 0; illp < Nang_full; illp++)
     {
         // angular momenta
-        int l1 = ang_->states()[ill].first;
-        int l2 = ang_->states()[ill].second;
-        int l1p = ang_->states()[illp].first;
-        int l2p = ang_->states()[illp].second;
+        int l1 = ang_->states_full()[ill].first;
+        int l2 = ang_->states_full()[ill].second;
+        int l1p = ang_->states_full()[illp].first;
+        int l2p = ang_->states_full()[illp].second;
 
         // get number of asymptotic bound channels
         int Nchan1 = Nchan_[ill].first;     // # r1 -> inf, l2 bound
@@ -745,15 +756,15 @@ void NoPreconditioner::update (Real E, bool full)
         // initialize diagonal block of the inner problem
         // - do not precompute off-diagonal blocks in lightweight mode
         if (not cmd_->lightweight_full)
-            A_blocks_[ill * Nang + illp] = std::move(calc_A_block(ill, illp));
+            A_blocks_[ill * Nang_full + illp] = std::move(calc_A_block(ill, illp));
 
         // create inner-outer coupling blocks
-        Cu_blocks_[ill * Nang + illp] = CooMatrix<LU_int_t,Complex>
+        Cu_blocks_[ill * Nang_full + illp] = CooMatrix<LU_int_t,Complex>
         (
             block_rank_[ill],
             block_rank_[illp]
         );
-        Cl_blocks_[ill * Nang + illp] = CooMatrix<LU_int_t,Complex>
+        Cl_blocks_[ill * Nang_full + illp] = CooMatrix<LU_int_t,Complex>
         (
             block_rank_[ill],
             block_rank_[illp]
@@ -763,7 +774,7 @@ void NoPreconditioner::update (Real E, bool full)
         if (not inp_->inner_only)
         {
             // outer problem matrix : r2 -> inf, r1 bound
-            B2_blocks_[ill * Nang + illp].resize(Nchan2 * Nchan2p);
+            B2_blocks_[ill * Nang_full + illp].resize(Nchan2 * Nchan2p);
             for (int m = 0; m < Nchan2; m++)
             for (int n = 0; n < Nchan2p; n++)
             {
@@ -782,17 +793,17 @@ void NoPreconditioner::update (Real E, bool full)
                     subblock += inp_->Zp * ang_->f(ill,illp,lambda) * (Xp_[0][l1p][n] | Mtr_L_inner[lambda].dot(Xp_[0][l1][m])) * Mtr_mLm1_outer[lambda];
 
                 // use the block
-                B2_blocks_[ill * Nang + illp][m * Nchan2p + n].hdflink(format("blk-B2-%d-%d-%d-%d.ooc", ill, illp, m, n));
-                B2_blocks_[ill * Nang + illp][m * Nchan2p + n] = std::move(subblock);
+                B2_blocks_[ill * Nang_full + illp][m * Nchan2p + n].hdflink(format("blk-B2-%d-%d-%d-%d.ooc", ill, illp, m, n));
+                B2_blocks_[ill * Nang_full + illp][m * Nchan2p + n] = std::move(subblock);
                 if (cmd_->outofcore)
                 {
-                    B2_blocks_[ill * Nang + illp][m * Nchan2p + n].hdfsave();
-                    B2_blocks_[ill * Nang + illp][m * Nchan2p + n].drop();
+                    B2_blocks_[ill * Nang_full + illp][m * Nchan2p + n].hdfsave();
+                    B2_blocks_[ill * Nang_full + illp][m * Nchan2p + n].drop();
                 }
             }
 
             // outer problem matrix : r1 -> inf, r2 bound
-            B1_blocks_[ill * Nang + illp].resize(Nchan1 * Nchan1p);
+            B1_blocks_[ill * Nang_full + illp].resize(Nchan1 * Nchan1p);
             for (int m = 0; m < Nchan1; m++)
             for (int n = 0; n < Nchan1p; n++)
             {
@@ -811,12 +822,12 @@ void NoPreconditioner::update (Real E, bool full)
                     subblock += inp_->Zp * ang_->f(ill,illp,lambda) * (Xp_[1][l2p][n] | Mtr_L_inner[lambda].dot(Xp_[1][l2][m])) * Mtr_mLm1_outer[lambda];
 
                 // use the block
-                B1_blocks_[ill * Nang + illp][m * Nchan1p + n].hdflink(format("blk-B1-%d-%d-%d-%d.ooc", ill, illp, m, n));
-                B1_blocks_[ill * Nang + illp][m * Nchan1p + n] = std::move(subblock);
+                B1_blocks_[ill * Nang_full + illp][m * Nchan1p + n].hdflink(format("blk-B1-%d-%d-%d-%d.ooc", ill, illp, m, n));
+                B1_blocks_[ill * Nang_full + illp][m * Nchan1p + n] = std::move(subblock);
                 if (cmd_->outofcore)
                 {
-                    B1_blocks_[ill * Nang + illp][m * Nchan1p + n].hdfsave();
-                    B1_blocks_[ill * Nang + illp][m * Nchan1p + n].drop();
+                    B1_blocks_[ill * Nang_full + illp][m * Nchan1p + n].hdfsave();
+                    B1_blocks_[ill * Nang_full + illp][m * Nchan1p + n].drop();
                 }
             }
 
@@ -852,7 +863,7 @@ void NoPreconditioner::update (Real E, bool full)
                     elem += inp_->Zp * ang_->f(ill,illp,lambda) * multipole * rad_full_->Mtr_L_x(lambda)(i,k) * rad_full_->Mtr_mLm1_y(lambda)(j,l);
                 }
 
-                Cu_blocks_[ill * Nang + illp].add(row, col, Xp_[0][l1p][n][k] * elem);
+                Cu_blocks_[ill * Nang_full + illp].add(row, col, Xp_[0][l1p][n][k] * elem);
             }
 
             // transition area r1 > r2, upper : psi_kl expressed in terms of F_nk for 'k' out of inner area
@@ -887,7 +898,7 @@ void NoPreconditioner::update (Real E, bool full)
                     elem += inp_->Zp * ang_->f(ill,illp,lambda) * multipole * rad_full_->Mtr_mLm1_x(lambda)(i,k) * rad_full_->Mtr_L_y(lambda)(j,l);
                 }
 
-                Cu_blocks_[ill * Nang + illp].add(row, col, Xp_[1][l2p][n][l] * elem);
+                Cu_blocks_[ill * Nang_full + illp].add(row, col, Xp_[1][l2p][n][l] * elem);
             }
 
             // transition area r2 > r1, lower : F_nl expressed in terms of psi_kl for 'l' out of outer area
@@ -918,7 +929,7 @@ void NoPreconditioner::update (Real E, bool full)
                     std::size_t row = A_size + (Nchan1 + m) * Nspline_outer + (j - Nspline_inner);
                     std::size_t col = k * Nspline_inner + l;
 
-                    Cl_blocks_[ill * Nang + illp].add(row, col, Sp_[0][l1p][n][k] * elem);
+                    Cl_blocks_[ill * Nang_full + illp].add(row, col, Sp_[0][l1p][n][k] * elem);
                 }
             }
 
@@ -950,7 +961,7 @@ void NoPreconditioner::update (Real E, bool full)
                     std::size_t row = A_size + m * Nspline_outer + (i - Nspline_inner);
                     std::size_t col = k * Nspline_inner + l;
 
-                    Cl_blocks_[ill * Nang + illp].add(row, col, Sp_[1][l2p][n][l] * elem);
+                    Cl_blocks_[ill * Nang_full + illp].add(row, col, Sp_[1][l2p][n][l] * elem);
                 }
             }
         }
@@ -1559,6 +1570,12 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
     // shorthands
     unsigned order = inp_->order;
     unsigned Nang = ang_->states().size();
+    unsigned Nang_full = ang_->states_full().size();
+
+    // The folded matrix is not block-triangular in any useful sense, because a solved
+    // block row also carries the columns of the blocks that are not solved for.
+    if (ang_->folded() and (tri & MatrixSelection::BlockBoth) != MatrixSelection::BlockBoth)
+        HexException("Selection of a part of the angular blocks is not compatible with --fold-exchange.");
 
     // B-spline bases
     Bspline const & bspline_full  = rad_full_ ->bspline();
@@ -1611,6 +1628,38 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
     // so to get correct number of right-hand sides we need to let the process broadcast the number;
     par_->bcast(0, &Nini, 1);
 
+    // Source segments of all angular blocks. Those that are not solved for do not exist
+    // in the source vector and are reconstructed here from their mirror counterparts,
+    // which is the whole point of --fold-exchange. Nothing is copied otherwise.
+    cArrays mirrored (Nang_full - Nang);
+    std::vector<cArrayView> src (Nang_full);
+
+    for (unsigned ill = 0; ill < Nang; ill++)
+        src[ill].reset(v[ill].size(), v[ill].data());
+
+    for (unsigned illp = Nang; illp < Nang_full; illp++)
+    {
+        // the solved block that this one is a mirror image of
+        int illq = ang_->mirror(illp);
+
+        mirrored[illp - Nang].resize(v[illq].size());
+
+        for (unsigned ini = 0; ini < Nini; ini++)
+        {
+            mirror_segment
+            (
+                cArrayView(v[illq], block_rank_[illq] * ini, block_rank_[illq]),
+                cArrayView(mirrored[illp - Nang], block_rank_[illp] * ini, block_rank_[illp]),
+                Nspline_x_inner, Nspline_x_outer,
+                Nchan_[illq].first, Nchan_[illq].second
+            );
+        }
+
+        mirrored[illp - Nang] *= ang_->exchange_sign();
+
+        src[illp].reset(mirrored[illp - Nang].size(), mirrored[illp - Nang].data());
+    }
+
     // for all initial states (right-hand sides)
     for (unsigned ini = 0; ini < Nini; ini++)
     {
@@ -1621,7 +1670,7 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
             cArrayView(q[ill], offset, block_rank_[ill]).fill(0.0_z);
 
             // for all angular blocks in a block row; only executed by one of the processes in a process group
-            for (unsigned illp = 0; illp < Nang; illp++) if (par_->igroupproc() == (int)illp % par_->groupsize())
+            for (unsigned illp = 0; illp < Nang_full; illp++) if (par_->igroupproc() == (int)illp % par_->groupsize())
             {
                 std::size_t offsetp = block_rank_[illp] * ini;
 
@@ -1636,7 +1685,7 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
                 if (ill > illp) selection = (tri & MatrixSelection::StrictLower ? MatrixSelection::Both : MatrixSelection::None);
 
                 // inner-region subset of the vectors
-                cArrayView p_inner (p[illp], offsetp, Nspline_x_inner * Nspline_y_inner);
+                cArrayView p_inner (src[illp], offsetp, Nspline_x_inner * Nspline_y_inner);
                 cArrayView q_inner (q[ill],  offset,  Nspline_x_inner * Nspline_y_inner);
 
                 // inner region part multiplication
@@ -1665,14 +1714,14 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
                 {
                     // read matrix from disk
                     if (cmd_->outofcore and cmd_->wholematrix)
-                        const_cast<BlockSymBandMatrix<Complex> &>(A_blocks_[ill * Nang + illp]).hdfload();
+                        const_cast<BlockSymBandMatrix<Complex> &>(A_blocks_[ill * Nang_full + illp]).hdfload();
 
                     // full diagonal block multiplication
-                    A_blocks_[ill * Nang + illp].dot(1.0_z, p_inner, 1.0_z, q_inner, true, selection);
+                    A_blocks_[ill * Nang_full + illp].dot(1.0_z, p_inner, 1.0_z, q_inner, true, selection);
 
                     // release memory
                     if (cmd_->outofcore and cmd_->wholematrix)
-                        const_cast<BlockSymBandMatrix<Complex> &>(A_blocks_[ill * Nang + illp]).drop();
+                        const_cast<BlockSymBandMatrix<Complex> &>(A_blocks_[ill * Nang_full + illp]).drop();
                 }
 
                 // channel expansion part multiplication
@@ -1690,18 +1739,18 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
                     {
                         // read matrix from disk
                         if (cmd_->outofcore)
-                            const_cast<SymBandMatrix<Complex>&>(B1_blocks_[ill * Nang + illp][m * Nchan1p + n]).hdfload();
+                            const_cast<SymBandMatrix<Complex>&>(B1_blocks_[ill * Nang_full + illp][m * Nchan1p + n]).hdfload();
 
                         // multiply
-                        B1_blocks_[ill * Nang + illp][m * Nchan1p + n].dot
+                        B1_blocks_[ill * Nang_full + illp][m * Nchan1p + n].dot
                         (
-                            1.0_z, cArrayView(p[illp], offsetp + Nspline_x_inner * Nspline_y_inner + n * Nspline_x_outer, Nspline_x_outer),
+                            1.0_z, cArrayView(src[illp], offsetp + Nspline_x_inner * Nspline_y_inner + n * Nspline_x_outer, Nspline_x_outer),
                             1.0_z, cArrayView(q[ill],  offset  + Nspline_x_inner * Nspline_y_inner + m * Nspline_x_outer, Nspline_x_outer)
                         );
 
                         // release memory
                         if (cmd_->outofcore)
-                            const_cast<SymBandMatrix<Complex>&>(B1_blocks_[ill * Nang + illp][m * Nchan1p + n]).drop();
+                            const_cast<SymBandMatrix<Complex>&>(B1_blocks_[ill * Nang_full + illp][m * Nchan1p + n]).drop();
                     }
 
                     // r2 -> inf
@@ -1711,22 +1760,22 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
                     {
                         // read matrix from disk
                         if (cmd_->outofcore)
-                            const_cast<SymBandMatrix<Complex>&>(B2_blocks_[ill * Nang + illp][m * Nchan2p + n]).hdfload();
+                            const_cast<SymBandMatrix<Complex>&>(B2_blocks_[ill * Nang_full + illp][m * Nchan2p + n]).hdfload();
 
                         // multiply
-                        B2_blocks_[ill * Nang + illp][m * Nchan2p + n].dot
+                        B2_blocks_[ill * Nang_full + illp][m * Nchan2p + n].dot
                         (
-                            1.0_z, cArrayView(p[illp], offsetp + Nspline_x_inner * Nspline_y_inner + Nchan1p * Nspline_x_outer + n * Nspline_y_outer, Nspline_y_outer),
+                            1.0_z, cArrayView(src[illp], offsetp + Nspline_x_inner * Nspline_y_inner + Nchan1p * Nspline_x_outer + n * Nspline_y_outer, Nspline_y_outer),
                             1.0_z, cArrayView(q[ill],  offset  + Nspline_x_inner * Nspline_y_inner + Nchan1  * Nspline_x_outer + m * Nspline_y_outer, Nspline_y_outer)
                         );
 
                         // release memory
-                        if (cmd_->outofcore) const_cast<SymBandMatrix<Complex>&>(B2_blocks_[ill * Nang + illp][m * Nchan2p + n]).drop();
+                        if (cmd_->outofcore) const_cast<SymBandMatrix<Complex>&>(B2_blocks_[ill * Nang_full + illp][m * Nchan2p + n]).drop();
                     }
 
                     // multiply by coupling matrices
-                    Cu_blocks_[ill * Nang + illp].dot(1.0_z, cArrayView(p[illp], offsetp, block_rank_[illp]), 1.0_z, cArrayView(q[ill], offset, block_rank_[ill]));
-                    Cl_blocks_[ill * Nang + illp].dot(1.0_z, cArrayView(p[illp], offsetp, block_rank_[illp]), 1.0_z, cArrayView(q[ill], offset, block_rank_[ill]));
+                    Cu_blocks_[ill * Nang_full + illp].dot(1.0_z, cArrayView(src[illp], offsetp, block_rank_[illp]), 1.0_z, cArrayView(q[ill], offset, block_rank_[ill]));
+                    Cl_blocks_[ill * Nang_full + illp].dot(1.0_z, cArrayView(src[illp], offsetp, block_rank_[illp]), 1.0_z, cArrayView(q[ill], offset, block_rank_[ill]));
                 }
             }
         }
@@ -1746,7 +1795,7 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
             {
                 bool RReady = false;
 
-                for (unsigned illp = 0; illp < Nang; illp++) if (par_->igroupproc() == (int)illp % par_->groupsize())
+                for (unsigned illp = 0; illp < Nang_full; illp++) if (par_->igroupproc() == (int)illp % par_->groupsize())
                 {
                     bool RpReady = false;
 
@@ -1758,8 +1807,8 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
                         if (ill <  illp and not (tri & MatrixSelection::BlockStrictUpper)) continue;
                         if (ill >  illp and not (tri & MatrixSelection::BlockStrictLower)) continue;
 
-                        std::size_t chunk = p[ill].size() / Nini;
-                        std::size_t chunkp = p[illp].size() / Nini;
+                        std::size_t chunk = src[ill].size() / Nini;
+                        std::size_t chunkp = src[illp].size() / Nini;
                         std::size_t offset = chunk * ini;
                         std::size_t offsetp = chunkp * ini;
 
@@ -1777,7 +1826,7 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
                             SymBandMatrix<Complex>::sym_band_dot
                             (
                                 Nspline_y_inner, order + 1, R,
-                                inp_->Zp, cArrayView(p[illp], offsetp + k * Nspline_y_inner, Nspline_y_inner),
+                                inp_->Zp, cArrayView(src[illp], offsetp + k * Nspline_y_inner, Nspline_y_inner),
                                 0.0_z,    Rp
                             );
 

@@ -232,11 +232,14 @@ void Solver::solve ()
                 psi.hdfload(ill);
 
             // create the solution writer
-            SolutionIO writer(ang_.L(), ang_.S(), ang_.Pi(), 0, 0, 0, special::constant::Nan, ang_.states(), channels_);
+            SolutionIO writer(ang_.L(), ang_.S(), ang_.Pi(), 0, 0, 0, special::constant::Nan, ang_.states_full(), channels_);
 
             // write the solution to disk
             if (not writer.save(psi, ill))
                 HexException("Failed to save solution to disk - the data are lost!");
+
+            // ... and with it the block that has not been solved for
+            save_mirror_block_(writer, psi[ill], ill);
 
             // release solution from memory if not needed
             if (not psi.inmemory())
@@ -254,13 +257,15 @@ void Solver::solve ()
                   << (computations_done == 0 ? 0 : iterations_done / computations_done)
                   << " CG iterations per energy)" << std::endl;
 
-        // get asymptotical bound states for each of the angular momentum pairs
-        channels_.resize(ang_.states().size());
+        // Get asymptotical bound states for each of the angular momentum pairs. The blocks
+        // that are not solved for are included, because their solution is written out
+        // (reconstructed from the mirror blocks) once the linear system is solved.
+        channels_.resize(ang_.states_full().size());
         bstates_.clear();
-        for (unsigned ill = 0; ill < ang_.states().size(); ill++)
+        for (unsigned ill = 0; ill < ang_.states_full().size(); ill++)
         {
-            int l1 = ang_.states()[ill].first;
-            int l2 = ang_.states()[ill].second;
+            int l1 = ang_.states_full()[ill].first;
+            int l2 = ang_.states_full()[ill].second;
 
             // get number of bound states for each particle at this energy
             channels_[ill] = prec_->bstates(std::max(inp_.Etot[iE_], inp_.channel_max_E), l1, l2);
@@ -279,8 +284,8 @@ void Solver::solve ()
             );
         }
 
-        // calculate size of the hamiltonian
-        std::size_t Hsize = Nspline_inner * Nspline_inner * ang_.states().size();
+        // calculate size of the hamiltonian (of the complete solution, as written to disk)
+        std::size_t Hsize = Nspline_inner * Nspline_inner * ang_.states_full().size();
         for (std::pair<iArray,iArray> const & p : bstates_)
             Hsize += (p.first.size() + p.second.size()) * Nspline_outer;
 
@@ -310,10 +315,10 @@ void Solver::solve ()
             }
 
             // check if the right hand side will be zero for this instate
-            for (unsigned ill = 0; ill < ang_.states().size(); ill++) if (ang_.states()[ill].first == li)
+            for (unsigned ill = 0; ill < ang_.states_full().size(); ill++) if (ang_.states_full()[ill].first == li)
             {
                 // get partia wave
-                int l = ang_.states()[ill].second;
+                int l = ang_.states_full()[ill].second;
 
                 // does this combination have valid 'mi' for this partial wave?
                 if (special::ClebschGordan(li,mi,l,0,inp_.L,mi) != 0)
@@ -329,7 +334,7 @@ void Solver::solve ()
             }
 
             // check if there is some precomputed solution on the disk
-            SolutionIO reader (inp_.L, Spin, inp_.Pi, ni, li, mi, inp_.Etot[iE_], ang_.states(), channels_);
+            SolutionIO reader (inp_.L, Spin, inp_.Pi, ni, li, mi, inp_.Etot[iE_], ang_.states_full(), channels_);
             std::size_t size = 0;
             reader.check(SolutionIO::All, size);
 
@@ -544,7 +549,7 @@ void Solver::solve ()
                         cmd_.rhs_dipV.empty() ? std::get<0>(inp_.instates[instates_[i]]) : 0,
                         cmd_.rhs_dipV.empty() ? std::get<1>(inp_.instates[instates_[i]]) : 0,
                         cmd_.rhs_dipV.empty() ? std::get<2>(inp_.instates[instates_[i]]) : 0,
-                        2 * E_, ang_.states(), channels_
+                        2 * E_, ang_.states_full(), channels_
                     );
 
                     // extract part of the solution that corresponds to the i-th initial state
@@ -559,6 +564,8 @@ void Solver::solve ()
                     if (not writer.save(psiseg, ill))
                         HexException("Failed to save solution to disk - the data are lost!");
 
+                    // ... and with it the block that has not been solved for
+                    save_mirror_block_(writer, psiseg[ill], ill);
                 }
 
                 // releasae solution from memory if not needed
@@ -580,6 +587,38 @@ void Solver::solve ()
     std::cout << std::endl << "All solutions computed." << std::endl;
     if (computations_done > 0)
         std::cout << "\t(typically " << iterations_done / computations_done << " CG iterations per solution)" << std::endl;
+}
+
+void Solver::save_mirror_block_ (SolutionIO const & writer, const cArrayView segment, unsigned ill) const
+{
+    if (not ang_.folded())
+        return;
+
+    int illm = ang_.mirror(ill);
+
+    // a block with l1 = l2 is its own mirror image and has already been written
+    if (illm == (int)ill)
+        return;
+
+    // a block that belongs to another process is empty here
+    if (segment.size() == 0)
+        return;
+
+    std::size_t Nspline_inner = bspline_inner_.Nspline();
+    std::size_t Nspline_outer = bspline_full_.Nspline() - Nspline_inner;
+
+    // the channel counts are only meaningful when there is an outer region at all
+    int Nchan1 = (Nspline_outer > 0 ? channels_[ill].first  : 0);
+    int Nchan2 = (Nspline_outer > 0 ? channels_[ill].second : 0);
+
+    cArray mirror (segment.size());
+
+    mirror_segment(segment, mirror, Nspline_inner, Nspline_outer, Nchan1, Nchan2);
+
+    mirror *= ang_.exchange_sign();
+
+    if (not writer.save_segment(mirror, illm))
+        HexException("Failed to save solution to disk - the data are lost!");
 }
 
 void Solver::apply_preconditioner_ (BlockArray<Complex> const & r, BlockArray<Complex> & z) const
@@ -824,14 +863,20 @@ void Solver::process_solution_ (unsigned iteration, BlockArray<Complex> const & 
             }
 
             // write the solution
-            SolutionIO
+            SolutionIO writer
             (
                 ang_.L(), ang_.S(), ang_.Pi(),
                 std::get<0>(inp_.instates[instates_[i]]),
                 std::get<1>(inp_.instates[instates_[i]]),
                 std::get<2>(inp_.instates[instates_[i]]),
-                2 * E_, ang_.states(), channels_, dir + "/psi"
-            ).save(X);
+                2 * E_, ang_.states_full(), channels_, dir + "/psi"
+            );
+
+            writer.save(X);
+
+            // ... and with it the blocks that have not been solved for
+            for (unsigned ill = 0; ill < x.size(); ill++)
+                save_mirror_block_(writer, X[ill], ill);
         }
     }
 
@@ -841,7 +886,7 @@ void Solver::process_solution_ (unsigned iteration, BlockArray<Complex> const & 
         if (par_.IamMaster())
         {
             // extract amplitudes
-            Amplitudes ampl (bspline_inner_, bspline_full_, inp_, par_, cmd_, ang_.states());
+            Amplitudes ampl (bspline_inner_, bspline_full_, inp_, par_, cmd_, ang_.states_full());
             ampl.verbose(false);
             ampl.extract(dir);
             ampl.writeSQL_files(dir);

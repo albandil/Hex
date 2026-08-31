@@ -377,6 +377,54 @@
   of scattering axis along the projectile moemntum, so that the angular
   momentum projection is zero.
 
+  @subsection exchange Exchange symmetry
+
+  The two electrons are identical, so the spatial part of the wave function is
+  symmetric or antisymmetric with respect to their interchange, depending on the
+  total spin,
+  @f[
+      \Psi_{\mathrm{sc}}(\mathbf{r}_1, \mathbf{r}_2)
+        = (-1)^S \Psi_{\mathrm{sc}}(\mathbf{r}_2, \mathbf{r}_1) \ .
+  @f]
+  Interchanging the arguments of a coupled spherical harmonic gives
+  @f$ \mathcal{Y}_{l_1 l_2}^{LM}(\hat{r}_2,\hat{r}_1)
+       = (-1)^{l_1+l_2-L} \mathcal{Y}_{l_2 l_1}^{LM}(\hat{r}_1,\hat{r}_2) @f$,
+  so the expansion (8) relates the radial function of the angular block
+  @f$ (l_2,l_1) @f$ to that of the block @f$ (l_1,l_2) @f$,
+  <table width = "100%" corder = "0"><tr><td width = "100%" align = "center">
+  @f[
+      \psi_{l_2 l_1}(r_1,r_2) = (-1)^{l_1+l_2+L+S} \psi_{l_1 l_2}(r_2,r_1) \ .
+  @f]
+  </td><td width="0px">(12)</td></tr></table>
+  Every state of the basis satisfies @f$ l_1 + l_2 = 2n + L + \Pi @f$ for some
+  integer @f$ n @f$, so the sign is @f$ (-1)^{S+\Pi} @f$ for all of them at once:
+  it is the same sign that anti/symmetrizes the right-hand side in (3) and (11*).
+
+  The relation (12) means that only half of the angular blocks carry any
+  information. The command line option <code>\--fold-exchange</code> makes use of
+  that: the blocks with @f$ l_1 > l_2 @f$ are dropped from the solved basis, and
+  wherever the matrix of the set needs one of them as a column, its segment of the
+  vector is reconstructed on the fly from the mirror block by (12), which in the
+  B-spline product basis amounts to transposing the matrix of the coefficients (and
+  interchanging the two groups of asymptotic channels, which describe the escape of
+  either of the electrons). Roughly half of the angular blocks then disappear from
+  the memory, from the matrix and from every matrix-vector multiplication.
+
+  This is an exact identity and not an approximation, and it does not change the
+  number of iterations: the sought solution already lies in the subspace picked out
+  by (12), which the matrix of the set leaves invariant, so the iterations never
+  leave it either. It is not to be confused with the input file option
+  <code>exchange</code>, which discards the same blocks without replacing them by
+  anything and does change the answer.
+
+  The gain approaches a factor of two for large @f$ L @f$. There is none at all for
+  @f$ L = \Pi = 0 @f$, where every state of the basis has @f$ l_1 = l_2 @f$ and is
+  its own mirror image; (12) still constrains such a block to be symmetric or
+  antisymmetric under transposition, but exploiting that would call for a
+  symmetrized product basis and is not done. Being a statement about two identical
+  particles, the option is only available for electron impact
+  (@f$ Z_p = -1 @f$), and it needs the same B-spline basis for both of them.
+
   @subsection restrict ECS restrictions on potential
 
   Exterior complex scaling of right hand side poses a serious problem for typical

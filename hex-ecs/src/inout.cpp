@@ -234,6 +234,9 @@ void CommandLine::parse (int argc, char* argv[])
                         "\t--fast-bessel                    Use faster Bessel function evaluation routine (not the Steed/Barnett) when calculating RHS.\n"
                         "\t--multi-rhs                      Solve for all initial states at once. Requires more memory, but might be faster. \n"
                         "\n"
+                        "Angular basis\n"
+                        "\t--fold-exchange                  Solve only the angular blocks with l1 <= l2 and reconstruct the rest from the exchange symmetry.\n"
+                        "\n"
                         "Disk access\n"
                         "\t--own-radial-cache         (-w)  Keep two-electron radial integrals not referenced by preconditioner only on disk (slows down only the initialization).\n"
                         "\t--no-radial-cache          (-r)  Keep all two-electron radial integrals only on disk (slows down also the solution process).\n"
@@ -966,6 +969,14 @@ void CommandLine::parse (int argc, char* argv[])
                     if (ip == PreconditionerBase::RTS_Table->end())
                         HexException("Unknown domain decomposition panel preconditioner");
 
+                    return true;
+                }
+            },
+            {
+                "fold-exchange", "", 0, [&](std::vector<std::string> const & optargs) -> bool
+                {
+                    // drop the angular blocks with l1 > l2 and use the exchange symmetry instead
+                    fold_exchange = true;
                     return true;
                 }
             },

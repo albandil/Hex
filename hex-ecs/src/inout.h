@@ -110,7 +110,7 @@ class CommandLine
               fast_bessel(false), hyb_additional_levels(0), multigrid_depth(0), multigrid_coarse_prec(0), dom_x_panels(1), dom_y_panels(1),
               dom_preconditioner("ILU"), dom_sweeps(-1), scratch(std::getenv("SCRATCHDIR") ? std::getenv("SCRATCHDIR") : "."), analytic_eigenstates(false),
               runtime_postprocess(false), sub_prec_verbose(false), multi_rhs(false), fpe(false), mumps_virtual_memory(false), nthreads(1),
-              checkpoints(false), autostop_tolerance(0), purge(-1)
+              checkpoints(false), autostop_tolerance(0), purge(-1), fold_exchange(false)
         {
 #ifdef _OPENMP
             // initialize the number of threads to OMP_NUM_THREADS
@@ -344,6 +344,16 @@ class CommandLine
 
         /// Delete old run-time post-processing directories.
         int purge;
+
+        /**
+         * @brief Solve only the angular blocks with l1 <= l2.
+         *
+         * The two angular blocks (l1,l2) and (l2,l1) of an electron-impact solution are
+         * related by the exchange symmetry, so only one of them carries information. When
+         * this switch is set, the blocks with l1 > l2 are dropped from the solved basis
+         * and reconstructed from their counterparts whenever they are needed.
+         */
+        bool fold_exchange;
 
         /// Input file for solutions to use at right-hand side with dipole potential.
         std::vector<std::string> rhs_dipV;

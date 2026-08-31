@@ -119,6 +119,17 @@ class Solver
         // compare two T-matrix arrays
         bool check_convergence_ (cArray const & T1, cArray const & T2) const;
 
+        /**
+         * @brief Write out the solution segment of a block that was not solved for.
+         *
+         * With the exchange symmetry folded in, the angular blocks with l1 > l2 are left
+         * out of the linear system. This routine reconstructs the segment of such a block
+         * from the given segment of its mirror counterpart and writes it out, so that the
+         * solution files on the disk always describe the complete angular basis. Does
+         * nothing when the basis is not folded or when the block is its own mirror image.
+         */
+        void save_mirror_block_ (SolutionIO const & writer, const cArrayView segment, unsigned ill) const;
+
     private:
 
         /// Command line parameters.

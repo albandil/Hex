@@ -251,7 +251,7 @@ void CGPreconditioner::CG_init (int iblock) const
 {
     if (cmd_->lightweight_simple)
     {
-        const_cast<BlockSymBandMatrix<Complex> &>(A_blocks_[iblock * ang_->states().size() + iblock])
+        const_cast<BlockSymBandMatrix<Complex> &>(A_blocks_[iblock * ang_->states_full().size() + iblock])
             = calc_A_block(iblock, iblock, true);
     }
 }
@@ -267,8 +267,7 @@ void CGPreconditioner::CG_mmul (int iblock, const cArrayView p, cArrayView q) co
     std::size_t Nspline_outer_y = Nspline_full_y - Nspline_inner_y;
 
     std::size_t Nini = p.size() / block_rank_[iblock];
-    std::size_t Nang = ang_->states().size();
-    std::size_t iang = iblock * Nang + iblock;
+    std::size_t iang = iblock * ang_->states_full().size() + iblock;
 
     for (std::size_t ini = 0; ini < Nini; ini++)
     {
@@ -373,7 +372,7 @@ void CGPreconditioner::CG_exit (int iblock) const
 {
     if (cmd_->lightweight_simple)
     {
-        const_cast<BlockSymBandMatrix<Complex> &>(A_blocks_[iblock * ang_->states().size() + iblock])
+        const_cast<BlockSymBandMatrix<Complex> &>(A_blocks_[iblock * ang_->states_full().size() + iblock])
             .drop();
     }
 }

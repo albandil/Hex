@@ -29,11 +29,17 @@
 ##                                                                                   ##
 ## --------------------------------------------------------------------------------- ##
 
-# Regression tests of hex-ecs. Each of them solves the sample problem written by
+# Regression tests of hex-ecs, of two kinds.
+#
+# Those added by hex_ecs_add_test solve the sample problem written by
 # "hex-ecs --example" using a different combination of preconditioners, matrix
-# factorizers and parallelization modes, and checks that the integral cross
+# factorizers and parallelization modes, and check that the integral cross
 # sections come out. They are full physical calculations, not unit tests, so
 # expect minutes to hours per test rather than seconds.
+#
+# Those added by hex_ecs_add_fold_test check the exchange symmetry folding of the
+# angular basis (the --fold-exchange option) by solving a much smaller problem twice,
+# with and without the option, and comparing the results. Those run in seconds.
 #
 # Run them with
 #     ctest --test-dir <build directory> --output-on-failure
@@ -298,6 +304,162 @@ hex_ecs_add_test(28-channels-coupled-channels
     CHANNELS
     REQUIRES mumps
     RANKS 4 THREADS 1)
+
+## --------------------------------------------------------------------------------- ##
+
+# hex_ecs_add_fold_test(<name>
+#     [L <number>]                   total angular momentum (default 1)
+#     [PI <number>]                  total parity (default 0)
+#     [NL <number>]                  number of angular levels (default 1)
+#     [ARGS <hex-ecs options>...]    options given to both runs of this test
+#     [REQUIRES <feature>...]        one or more of umfpack, mumps, pardiso, opencl
+#     [CHANNELS]                     extend the input file by projectile-only knots
+#     [RANKS <n>]                    run under the MPI launcher with <n> processes
+#     [THREADS <n>]                  value of OMP_NUM_THREADS for the test
+# )
+#
+# Solves a small problem twice, with and without --fold-exchange, and checks that the
+# partial cross sections agree. Unlike the tests above these are not physical calculations
+# and run in seconds; see tests/cmake/run_fold_test.cmake for what is being compared.
+function(hex_ecs_add_fold_test name)
+
+    cmake_parse_arguments(TEST "CHANNELS" "L;PI;NL;RANKS;THREADS" "ARGS;REQUIRES" ${ARGN})
+
+    if(TEST_UNPARSED_ARGUMENTS)
+        message(FATAL_ERROR "hex_ecs_add_fold_test(${name}): unknown arguments ${TEST_UNPARSED_ARGUMENTS}")
+    endif()
+
+    # the default is the smallest basis in which some blocks can be folded at all
+    # (dereference before comparing, so that an explicit zero is not overridden)
+    if("${TEST_L}" STREQUAL "")
+        set(TEST_L 1)
+    endif()
+    if("${TEST_PI}" STREQUAL "")
+        set(TEST_PI 0)
+    endif()
+    if("${TEST_NL}" STREQUAL "")
+        set(TEST_NL 1)
+    endif()
+
+    # an MPI test is only meaningful when there is something to launch it with
+    if(TEST_RANKS)
+        list(APPEND TEST_REQUIRES mpi)
+    endif()
+
+    # skip silently what this build cannot do; the missing features are summarized
+    # once at the end of the configuration
+    set(missing "")
+
+    foreach(feature IN LISTS TEST_REQUIRES)
+        if("${feature}" STREQUAL "umfpack" AND NOT WITH_UMFPACK)
+            list(APPEND missing umfpack)
+        elseif("${feature}" STREQUAL "mumps" AND NOT WITH_MUMPS)
+            list(APPEND missing mumps)
+        elseif("${feature}" STREQUAL "pardiso" AND NOT WITH_PARDISO AND NOT WITH_MKL)
+            list(APPEND missing pardiso)
+        elseif("${feature}" STREQUAL "opencl" AND NOT WITH_OPENCL)
+            list(APPEND missing opencl)
+        elseif("${feature}" STREQUAL "mpi" AND NOT MPIEXEC_EXECUTABLE)
+            list(APPEND missing mpi)
+        endif()
+    endforeach()
+
+    if(missing)
+        set(hex-ecs_TESTS_SKIPPED ${hex-ecs_TESTS_SKIPPED} ${missing} PARENT_SCOPE)
+        return()
+    endif()
+
+    ## ----------------------------------------------------------------------------- ##
+
+    set(launcher "")
+
+    if(TEST_RANKS)
+        set(launcher
+            "${MPIEXEC_EXECUTABLE}"
+            ${MPIEXEC_NUMPROC_FLAG} ${TEST_RANKS}
+            ${MPIEXEC_PREFLAGS}
+        )
+        list(APPEND TEST_ARGS --mpi)
+    endif()
+
+    add_test(
+        NAME "hex-ecs.${name}"
+        COMMAND ${CMAKE_COMMAND}
+                -D "HEX_ECS=$<TARGET_FILE:hex-ecs>"
+                -D "WORKDIR=${CMAKE_CURRENT_BINARY_DIR}/${name}"
+                -D "ARGS=${TEST_ARGS}"
+                -D "LAUNCHER=${launcher}"
+                -D "CHANNELS=${TEST_CHANNELS}"
+                -D "L=${TEST_L}"
+                -D "PI=${TEST_PI}"
+                -D "NL=${TEST_NL}"
+                -P "${CMAKE_CURRENT_LIST_DIR}/cmake/run_fold_test.cmake"
+    )
+
+    set_tests_properties("hex-ecs.${name}" PROPERTIES
+        TIMEOUT     ${HEX_ECS_TEST_TIMEOUT}
+        RUN_SERIAL  ON
+    )
+
+    if(TEST_THREADS)
+        set_tests_properties("hex-ecs.${name}" PROPERTIES
+            ENVIRONMENT "OMP_NUM_THREADS=${TEST_THREADS}"
+        )
+    endif()
+
+endfunction()
+
+## --------------------------------------------------------------------------------- ##
+
+# folding of the exchange symmetry into the angular basis
+#
+# The sample problem these use is small enough for a dense factorization, so most of them
+# ask for "--lu lapack" and run in any build. That keeps the coverage of the option itself
+# independent of which sparse factorizer happens to be available.
+
+hex_ecs_add_fold_test(29-fold-inner-ILU
+    ARGS --preconditioner ILU --lu lapack)
+
+hex_ecs_add_fold_test(30-fold-inner-KPA
+    ARGS --preconditioner KPA)
+
+# The columns of an angular block row are dealt out to the members of an MPI group. There
+# are more of them than there are solved blocks once the basis is folded, so the two do not
+# line up as they do otherwise.
+hex_ecs_add_fold_test(31-fold-inner-ILU-mpi-distributed
+    ARGS --groupsize 2 --shared-scratch --preconditioner ILU --lu lapack
+    RANKS 2 THREADS 1)
+
+# three angular levels, so that blocks are folded across several of them
+hex_ecs_add_fold_test(32-fold-inner-ILU-deep
+    L 3 NL 2
+    ARGS --preconditioner ILU --lu lapack)
+
+hex_ecs_add_fold_test(33-fold-inner-ILU-lightweight
+    ARGS --preconditioner ILU --lu lapack --lightweight-full)
+
+hex_ecs_add_fold_test(34-fold-inner-ILU-out-of-core
+    ARGS --preconditioner ILU --lu lapack --out-of-core)
+
+# mirroring a solution segment has to swap the two groups of asymptotic channels, which
+# only the tests with the projectile knots exercise
+hex_ecs_add_fold_test(35-fold-channels-ILU
+    CHANNELS
+    ARGS --preconditioner ILU --lu lapack)
+
+hex_ecs_add_fold_test(36-fold-channels-ILU-lightweight
+    CHANNELS
+    ARGS --preconditioner ILU --lu lapack --lightweight-full)
+
+# the same with the factorizer that a production run would use
+hex_ecs_add_fold_test(37-fold-channels-umfpack
+    CHANNELS
+    ARGS --preconditioner ILU
+    REQUIRES umfpack)
+
+hex_ecs_add_fold_test(38-fold-inner-ILU-mpi
+    ARGS --shared-scratch --preconditioner ILU --lu lapack
+    RANKS 2 THREADS 2)
 
 ## --------------------------------------------------------------------------------- ##
 

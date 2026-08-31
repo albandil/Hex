@@ -31,6 +31,7 @@
 
 #include <cstdio>
 #include <cmath>
+#include <algorithm>
 #include <vector>
 #include <iostream>
 #include <string>
@@ -241,7 +242,29 @@ int main (int argc, char* argv[])
     // Setup angular data
     //
 
-        AngularBasis ang (inp);
+        // The exchange symmetry is only folded in by the preconditioners that solve the
+        // problem on the whole domain at once and treat the angular blocks one by one.
+        if (cmd.fold_exchange)
+        {
+            std::vector<std::string> supported { "none", "cg", "diag", "ILU", "KPA", "HYB" };
+
+            if (std::find(supported.begin(), supported.end(), cmd.preconditioner) == supported.end())
+            {
+                HexException
+                (
+                    "The option --fold-exchange is not implemented for the preconditioner \"%s\".",
+                    cmd.preconditioner.c_str()
+                );
+            }
+
+            // The process that solves an angular block also writes out the solution of the
+            // mirror block, which some other process is responsible for when the amplitudes
+            // are extracted. The two only see the same files when the scratch is shared.
+            if (par.Ngroup() > 1 and not cmd.shared_scratch)
+                HexException("The option --fold-exchange needs --shared-scratch in a distributed run.");
+        }
+
+        AngularBasis ang (inp, cmd.fold_exchange);
 
         std::cout << "\t-> The matrix of the set contains " << ang.states().size()
                 << " diagonal blocks." << std::endl;
@@ -258,7 +281,7 @@ int main (int argc, char* argv[])
 
         if (cmd.zipdata.file.size() != 0 and par.IamMaster())
         {
-            zip_solution(cmd, inp, par, bspline_inner, bspline_full, ang.states());
+            zip_solution(cmd, inp, par, bspline_inner, bspline_full, ang.states_full());
             std::cout << std::endl << "Done." << std::endl << std::endl;
             return EXIT_SUCCESS;
         }
@@ -318,7 +341,7 @@ int main (int argc, char* argv[])
 
         if (cmd.itinerary & CommandLine::StgExtract)
         {
-            Amplitudes ampl (bspline_inner, bspline_full, inp, par, cmd, ang.states());
+            Amplitudes ampl (bspline_inner, bspline_full, inp, par, cmd, ang.states_full());
 
             if (cmd.dipoles)
             {
