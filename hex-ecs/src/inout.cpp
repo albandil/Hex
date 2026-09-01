@@ -121,7 +121,7 @@ const std::string sample_input =
     "#     (Pi, L),     (Pi+1, L-1), ..., (L, Pi) \n"
     "#     (Pi+1, L+1), (Pi+2, L),   ..., (L+1, Pi+1) \n"
     "#     ...\n"
-    "# The number of columns is equal to L + Pi - 1. The number of rows is equal to nL + 1.\n"
+    "# The number of columns is equal to L + 1 - Pi. The number of rows is equal to nL + 1.\n"
     "# When 'limit > 0' then all pairs with both l1 and l2 > limit are discarded.\n"
     "# When 'exchange = 0' then all pairs with l1 > l2 are discarded.\n"
     "# The options 'limit' and 'exchange' are useful for large angular momenta, where the projectile\n"
