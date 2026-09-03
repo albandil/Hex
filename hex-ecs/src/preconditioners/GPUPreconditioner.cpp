@@ -501,6 +501,8 @@ void GPUCGPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Co
             clFinish(queue_);
 
             // multiply by two-electron (sub-)blocks
+            // (kernels are enqueued back-to-back on the in-order queue without an intermediate
+            // clFinish -- the mandatory download/finish below already waits for all of them)
             for (cl_int lambda = 0; lambda <= rad_inner().maxlambda(); lambda++)
             {
                 // two-electron block - decoupled part
@@ -516,7 +518,6 @@ void GPUCGPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Co
                 clSetKernelArg(mms2d_,  9, sizeof(cl_mem), &dst.handle());
                 clSetKernelArg(mms2d_, 10, sizeof(cl_int), &isrc);
                 clEnqueueNDRangeKernel(queue_, mms2d_, 1, nullptr, &sz, nullptr, 0, nullptr, nullptr);
-                clFinish(queue_);
 
                 // two-electron block - coupled part
                 clSetKernelArg(mms2c_,  0, sizeof(cl_mem), &f.handle());
@@ -528,7 +529,6 @@ void GPUCGPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Co
                 clSetKernelArg(mms2c_,  6, sizeof(cl_mem), &dst.handle());
                 clSetKernelArg(mms2c_,  7, sizeof(cl_int), &isrc);
                 clEnqueueNDRangeKernel(queue_, mms2c_, 1, nullptr, &sz, nullptr, 0, nullptr, nullptr);
-                clFinish(queue_);
             }
 
             // download the data from GPU
@@ -569,7 +569,7 @@ void GPUCGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArra
 
     // performance timers
     std::size_t us_prec = 0, us_spro = 0, us_axby = 0, us_norm = 0;
-    std::size_t us_mmul_1 = 0, us_mmul_2_dcpl = 0, us_mmul_2_cpld = 0;
+    std::size_t us_mmul_1 = 0, us_mmul_2 = 0;
 
     // round 'Nsegsiz' to nearest larger multiple of Nlocal_
     std::size_t Nglobal = Nlocal_ * ((Nsegsiz + Nlocal_ - 1) / Nlocal_);
@@ -623,6 +623,10 @@ void GPUCGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArra
             // which reduces the buffer size to "1/(order + 1)" of the original size. As a drawback we need to call the
             // evaluation (and later multiplication) kernels that many times.
 
+            // all kernels below are enqueued back-to-back on the in-order queue; a single clFinish
+            // after the whole nest is enough since nothing reads A[] on the host, and later GPU-side
+            // consumers (mmls_ in inner_mmul) are enqueued on the same queue and thus already ordered
+            // after these writes without requiring an explicit wait here
             for (int bd = 0; bd <= order; bd++)
             {
                 A[bd].resize((order + 1) * Nspline_inner_x * Nspline_inner_y);
@@ -642,7 +646,6 @@ void GPUCGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArra
                 clSetKernelArg(A1el_, 11, sizeof(cl_int), &bd);
                 clSetKernelArg(A1el_, 12, sizeof(cl_mem), &A[bd].handle());
                 clEnqueueNDRangeKernel(queue_, A1el_, 1, nullptr, &Nsegsiz, nullptr, 0, nullptr, nullptr);
-                clFinish(queue_);
 
                 for (cl_int lambda = 0; lambda <= ang_->maxlambda(); lambda++) if (ang_->f(ill,ill,lambda) != 0)
                 {
@@ -657,7 +660,6 @@ void GPUCGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArra
                     clSetKernelArg(A2eld_,  8, sizeof(cl_int),   &bd);
                     clSetKernelArg(A2eld_,  9, sizeof(cl_mem),   &A[bd].handle());
                     clEnqueueNDRangeKernel(queue_, A2eld_, 1, nullptr, &Nsegsiz, nullptr, 0, nullptr, nullptr);
-                    clFinish(queue_);
 
                     clSetKernelArg(A2elc_,  0, sizeof(cl_mem),   &f.handle());
                     clSetKernelArg(A2elc_,  1, sizeof(cl_int),   &lambda);
@@ -667,9 +669,10 @@ void GPUCGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArra
                     clSetKernelArg(A2elc_,  5, sizeof(cl_int),   &bd);
                     clSetKernelArg(A2elc_,  6, sizeof(cl_mem),   &A[bd].handle());
                     clEnqueueNDRangeKernel(queue_, A2elc_, 1, nullptr, &Nsegsiz, nullptr, 0, nullptr, nullptr);
-                    clFinish(queue_);
                 }
             }
+
+            clFinish(queue_);
         }
 
         // create segment views
@@ -707,9 +710,9 @@ void GPUCGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArra
             {
                 const cl_uchar zero = 0;
                 clEnqueueFillBuffer(queue_, b.handle(), &zero, sizeof(zero), 0, Nsegsiz * sizeof(Complex), 0, nullptr, nullptr);
-                clFinish(queue_);
 
                 // special kernel for BlockSymBandMatrix::dot
+                // (enqueued back-to-back on the in-order queue; one clFinish below suffices)
                 for (int bd = -int(order); bd <= int(order); bd++)
                 {
                     clSetKernelArg(mmls_, 0, sizeof(cl_mem), &A[std::abs(bd)].handle());
@@ -717,9 +720,9 @@ void GPUCGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArra
                     clSetKernelArg(mmls_, 2, sizeof(cl_mem), &a.handle());
                     clSetKernelArg(mmls_, 3, sizeof(cl_mem), &b.handle());
                     clEnqueueNDRangeKernel(queue_, mmls_, 1, nullptr, &Nsegsiz, nullptr, 0, nullptr, nullptr);
-                    clFinish(queue_);
                 }
 
+                clFinish(queue_);
                 us_mmul_1 += timer.microseconds();
             }
             else
@@ -740,14 +743,15 @@ void GPUCGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArra
                 clSetKernelArg(mml1_,12, sizeof(cl_mem), &b.handle());
                 clEnqueueNDRangeKernel(queue_, mml1_, 1, nullptr, &Nsegsiz, nullptr, 0, nullptr, nullptr);
                 clFinish(queue_);
-
                 us_mmul_1 += timer.microseconds();
 
                 // two-electron contribution
+                // (both kernels for every lambda are enqueued back-to-back on the in-order queue;
+                // one clFinish after the whole loop suffices, so mul2 timing covers all lambdas together)
+                timer.reset();
+
                 for (cl_int lambda = 0; lambda <= ang_->maxlambda(); lambda++) if (ang_->f(ill,ill,lambda) != 0)
                 {
-                    timer.reset();
-
                     clSetKernelArg(mml2d_,  0, sizeof(cl_mem),   &t_inner_a_.handle());
                     clSetKernelArg(mml2d_,  1, sizeof(cl_mem),   &t_inner_p_.handle());
                     clSetKernelArg(mml2d_,  2, sizeof(cl_mem),   &f.handle());
@@ -759,10 +763,6 @@ void GPUCGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArra
                     clSetKernelArg(mml2d_,  8, sizeof(cl_mem),   &a.handle());
                     clSetKernelArg(mml2d_,  9, sizeof(cl_mem),   &b.handle());
                     clEnqueueNDRangeKernel(queue_, mml2d_, 1, nullptr, &Nsegsiz, nullptr, 0, nullptr, nullptr);
-                    clFinish(queue_);
-
-                    us_mmul_2_dcpl += timer.microseconds();
-                    timer.reset();
 
                     clSetKernelArg(mml2c_,  0, sizeof(cl_mem),   &f.handle());
                     clSetKernelArg(mml2c_,  1, sizeof(cl_int),   &lambda);
@@ -772,10 +772,10 @@ void GPUCGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArra
                     clSetKernelArg(mml2c_,  5, sizeof(cl_mem),   &a.handle());
                     clSetKernelArg(mml2c_,  6, sizeof(cl_mem),   &b.handle());
                     clEnqueueNDRangeKernel(queue_, mml2c_, 1, nullptr, &Nsegsiz, nullptr, 0, nullptr, nullptr);
-                    clFinish(queue_);
-
-                    us_mmul_2_cpld += timer.microseconds();
                 }
+
+                clFinish(queue_);
+                us_mmul_2 += timer.microseconds();
             }
         };
 
@@ -793,6 +793,10 @@ void GPUCGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArra
             // matrix dimensions
             int m, n, k;
 
+            // the five kernels below form a strict data dependency chain (each reads what the
+            // previous one wrote, via tmA_ and y); the in-order queue already serializes them
+            // correctly, so a single clFinish at the end is enough
+
             m = Nspline_inner_x; n = Nspline_inner_y; k = Nspline_inner_x; // FIXME
             gsize[0] = gsize_proj; gsize[1] = gsize_atom;
             clSetKernelArg(mabt_, 0, sizeof(int), &m);
@@ -802,7 +806,6 @@ void GPUCGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArra
             clSetKernelArg(mabt_, 4, sizeof(cl_mem), &x.handle());
             clSetKernelArg(mabt_, 5, sizeof(cl_mem), &tmA_.handle());
             clEnqueueNDRangeKernel(queue_, mabt_, 2, nullptr, gsize, lsize, 0, nullptr, nullptr);
-            clFinish(queue_);
 
             m = Nspline_inner_y; n = Nspline_inner_y; k = Nspline_inner_x; // FIXME
             gsize[0] = gsize_atom; gsize[1] = gsize_proj;
@@ -813,14 +816,12 @@ void GPUCGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArra
             clSetKernelArg(mabt_, 4, sizeof(cl_mem), &tmA_.handle());
             clSetKernelArg(mabt_, 5, sizeof(cl_mem), &y.handle());
             clEnqueueNDRangeKernel(queue_, mabt_, 2, nullptr, gsize, lsize, 0, nullptr, nullptr);
-            clFinish(queue_);
 
             clSetKernelArg(krdv_, 0, sizeof(Complex), &E_);
             clSetKernelArg(krdv_, 1, sizeof(cl_mem),  &Dl1.handle());
             clSetKernelArg(krdv_, 2, sizeof(cl_mem),  &Dl2.handle());
             clSetKernelArg(krdv_, 3, sizeof(cl_mem),  &y.handle());
             clEnqueueNDRangeKernel(queue_, krdv_, 1, nullptr, &Nspline_inner_x, nullptr, 0, nullptr, nullptr);
-            clFinish(queue_);
 
             m = Nspline_inner_x; n = Nspline_inner_y; k = Nspline_inner_x; // FIXME
             gsize[0] = gsize_proj; gsize[1] = gsize_atom;
@@ -831,7 +832,6 @@ void GPUCGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArra
             clSetKernelArg(matbt_, 4, sizeof(cl_mem), &y.handle());
             clSetKernelArg(matbt_, 5, sizeof(cl_mem), &tmA_.handle());
             clEnqueueNDRangeKernel(queue_, matbt_, 2, nullptr, gsize, lsize, 0, nullptr, nullptr);
-            clFinish(queue_);
 
             m = Nspline_inner_y; n = Nspline_inner_y; k = Nspline_inner_x; // FIXME
             gsize[0] = gsize_atom; gsize[1] = gsize_proj;
@@ -842,8 +842,8 @@ void GPUCGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArra
             clSetKernelArg(matbt_, 4, sizeof(cl_mem), &tmA_.handle());
             clSetKernelArg(matbt_, 5, sizeof(cl_mem), &y.handle());
             clEnqueueNDRangeKernel(queue_, matbt_, 2, nullptr, gsize, lsize, 0, nullptr, nullptr);
-            clFinish(queue_);
 
+            clFinish(queue_);
             us_prec += timer.microseconds();
         };
 
@@ -959,10 +959,10 @@ void GPUCGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArra
     std::cout << std::setw(5) << format("%g", std::accumulate(n.begin(), n.end(), 0) / float(n.size()));
 
     // GPU kernel timing
-    std::size_t us_total = us_axby + us_mmul_1 + us_mmul_2_cpld + us_mmul_2_dcpl + us_norm + us_prec + us_spro;
+    std::size_t us_total = us_axby + us_mmul_1 + us_mmul_2 + us_norm + us_prec + us_spro;
     std::cout << " [prec: " << format("%2d", int(us_prec * 100. / us_total)) << "%"
               << ", mul1: " << format("%2d", int(us_mmul_1 * 100. / us_total)) << "%"
-              << ", mul2: " << format("%2d", int((us_mmul_2_cpld+us_mmul_2_dcpl) * 100. / us_total)) << "%"
+              << ", mul2: " << format("%2d", int(us_mmul_2 * 100. / us_total)) << "%"
               << ", axby: " << format("%2d", int(us_axby * 100. / us_total)) << "%"
               << ", norm: " << format("%2d", int(us_norm * 100. / us_total)) << "%"
               << ", spro: " << format("%2d", int(us_spro * 100. / us_total)) << "%"
