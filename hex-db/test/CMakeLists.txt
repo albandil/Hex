@@ -36,6 +36,9 @@
 # The Fortran binding is only tested when a Fortran compiler is available. It is
 # the sole use of Fortran in the project, so the language is enabled here and not
 # in the top-level CMakeLists.txt.
+#
+# The third test is a regression test of the ionization quantities; it reports its
+# own verdict through the exit code.
 
 # the three cross sections that the sample T-matrices give, one per line
 set(HEX_DB_EXPECTED "16\\.5930[^\n]*\n[^\n]*14\\.0468[^\n]*\n[^\n]*12\\.3309")
@@ -98,3 +101,28 @@ else()
     message(STATUS "The hex-db Fortran binding test was left out, no Fortran compiler")
 
 endif()
+
+## --------------------------------------------------------------------------------- ##
+
+add_executable(test-hexdb-ionization "${CMAKE_CURRENT_LIST_DIR}/test-hexdb-ionization.cpp")
+
+set_target_properties(test-hexdb-ionization PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
+)
+
+target_link_libraries(test-hexdb-ionization PRIVATE libhex-common libhex-db)
+
+target_include_directories(test-hexdb-ionization PRIVATE
+    "${CMAKE_CURRENT_LIST_DIR}/../../common"
+    "${CMAKE_CURRENT_LIST_DIR}/../../libs"
+)
+
+file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/ionization")
+
+add_test(
+    NAME "hex-db.ionization"
+    COMMAND test-hexdb-ionization
+    WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/ionization"
+)
+
+## --------------------------------------------------------------------------------- ##
