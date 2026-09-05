@@ -52,7 +52,7 @@ createNewScatteringQuantity(SingleDifferentialCrossSectionWrtRelativeAngle, "sdc
 
 std::string SingleDifferentialCrossSectionWrtRelativeAngle::description ()
 {
-    return "Single differential ionization cross section with respect to the relative scattering angle.";
+    return "Single differential ionization cross section with respect to the cosine of the relative scattering angle.";
 }
 
 std::vector<std::string> SingleDifferentialCrossSectionWrtRelativeAngle::dependencies ()
@@ -117,8 +117,8 @@ bool SingleDifferentialCrossSectionWrtRelativeAngle::run (std::map<std::string,s
     int  S = Conv<int>(sdata, "S",  name());
     double Ei = Conv<double>(sdata, "Ei", name()) * efactor;
 
-    // maximal momentum
-    double kmax = std::sqrt(Ei);
+    // maximal momentum available to either outgoing electron
+    double kmax = std::sqrt(Ei - 1./(ni*ni));
 
     // info structure
     typedef struct
@@ -148,7 +148,7 @@ bool SingleDifferentialCrossSectionWrtRelativeAngle::run (std::map<std::string,s
 
     // write header
     std::cout << logo("#") <<
-        "# Single differential cross section (wrt relative angle) in " << unit_name(Lunits) << " for\n" <<
+        "# Single differential cross section (wrt cosine of the relative angle) in " << unit_name(Lunits) << " for\n" <<
         "#     ni = " << ni << ", li = " << li << ", mi = " << mi << ",\n" <<
         "#     S = " << S << ", Ei = " << Ei << " " << unit_name(Eunits) << "\n" <<
         "# ordered by relative angle in " << unit_name(Aunits) << "\n" <<
@@ -156,8 +156,8 @@ bool SingleDifferentialCrossSectionWrtRelativeAngle::run (std::map<std::string,s
     OutputTable table;
     table.setWidth(15);
     table.setAlignment(OutputTable::left);
-    table.write("# theta12  ", "dsigma   ");
-    table.write("# ---------", "---------");
+    table.write("# theta12  ", "dsigma/dcos");
+    table.write("# ---------", "-----------");
 
     // compose query
     sqlitepp::statement st (session());
@@ -257,7 +257,6 @@ bool SingleDifferentialCrossSectionWrtRelativeAngle::run (std::map<std::string,s
     for (double t : theta12)
     {
         // goniometric functions of theta
-        double sint = std::sin(t * afactor);
         double cost = std::cos(t * afactor);
 
         // sum over all partial waves
@@ -282,9 +281,13 @@ bool SingleDifferentialCrossSectionWrtRelativeAngle::run (std::map<std::string,s
 
                 for (int lambda = minlambda; lambda <= maxlambda; lambda++)
                 {
+                    // NOTE: This yields the cross section differential with respect to
+                    //       cos(θ₁₂), not to θ₁₂ itself; multiply by sin(θ₁₂) for the latter.
+                    //       Only λ = 0 survives ∫d(cos θ₁₂), and computef(0,l₁,l₂,l₁,l₂,L) = 1,
+                    //       so integrating this over cos(θ₁₂) reproduces the 'ics' value.
                     double angfactor = (2*lambda+1) * special::pow_int(-1, lambda)
                         * special::computef(lambda,l1,l2,l1p,l2p,L)
-                        * 0.5 * gsl_sf_legendre_Pl(lambda, cost); // * sint;
+                        * 0.5 * gsl_sf_legendre_Pl(lambda, cost);
 
                     //std::cout << "t = " << t << ", L = " << L << ", ill = " << ill << ", illp = " << illp << ", lambda = " << lambda << ", angfactor = " << angfactor << ", R = " << R[L][ill*Nang+illp] << std::endl;
                     dsigma += R[L][ill * Nang + illp] * angfactor;

@@ -174,28 +174,40 @@ bool SingleDifferentialCrossSectionWrtEnergyShare::run (std::map<std::string,std
     // process all energy shares
     for (double x : energy_shares)
     {
-        // Given the definition of ionf in hex-ecs, the sdcs is
+        // The integral cross section is obtained from the expansions stored in 'ionf' as
         //
-        //     1
-        //    ---- |f(k₁,k₂)|²
-        //    k₁k₂
+        //             π/4
+        //     2S + 1   ⌠
+        //     ------ ⎮  ∑ |Ξ(k₁ = kₘₐₓ sin β)|² dβ
+        //      4 kᵢ   ⌡
+        //              0
         //
-        // summed over all partial waves.
+        // (see the 'ics' quantity). Substituting the energy share x = (k₁/kₘₐₓ)² = sin²β,
+        // which gives dβ = E_tot dx / (2 k₁k₂), turns the integrand into the cross section
+        // differential with respect to the energy share,
+        //
+        //     dσ     2S + 1            E_tot
+        //     -- = ------ ∑ |Ξ|² · ---------- ,
+        //     dx    4 kᵢ             2 k₁ k₂
+        //
+        // summed over all partial waves. Note that x is dimensionless, so the result is a
+        // plain area and does not depend on the energy unit used for E_tot and kᵢ.
         double dsigma = 0;
 
         // translate energy share to hyper-angle and momenta
         double Etot = Ei - 1./(ni*ni);
         double kmax = std::sqrt(Etot);
+        double ki = std::sqrt(Ei);
         double k1 = std::sqrt(Etot * x);
         double k2 = std::sqrt(Etot * (1 - x));
-        double alpha = k1/kmax;
+        double sin_beta = k1/kmax;
 
         // process all partial wave contributions
         for (Chebyshev<double,Complex> const & cb : CB)
-            dsigma += sqrabs(cb.clenshaw(alpha, cb.tail(1e-10)));
+            dsigma += sqrabs(cb.clenshaw(sin_beta, cb.tail(1e-10)));
 
         // write line to table
-        table.write(x, dsigma * lfactor * lfactor / (k1 * k2));
+        table.write(x, 0.25 * (2*S + 1) * dsigma * Etot * lfactor * lfactor / (2 * k1 * k2 * ki));
     }
 
     return true;

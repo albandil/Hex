@@ -35,10 +35,6 @@
 
 // --------------------------------------------------------------------------------- //
 
-#include <gsl/gsl_sf.h>
-
-// --------------------------------------------------------------------------------- //
-
 #include "hex-arrays.h"
 #include "hex-interpolate.h"
 #include "hex-chebyshev.h"
@@ -226,7 +222,7 @@ bool IonizationF::run (std::map<std::string,std::string> const & sdata)
         // for all impact energies evaluate the radial part
         cArray f0(E_arr.size());
         for (std::size_t ie = 0; ie < E_arr.size(); ie++)
-            f0[ie] = cheb_arr[ie].clenshaw(k1[ie], cheb_arr[ie].tail(1e-8)) / gsl_sf_pow_int(k1[ie] * k2[ie], 2);
+            f0[ie] = cheb_arr[ie].clenshaw(k1[ie], cheb_arr[ie].tail(1e-8)) / (k1[ie] * k2[ie]);
 
         // interpolate
         f_out[i] = interpolate(E_arr, f0, { Ei })[0];

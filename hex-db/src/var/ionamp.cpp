@@ -230,16 +230,15 @@ bool IonizationAmplitude::run (std::map<std::string,std::string> const & sdata)
                 int l2 = std::get<2>(Lll_arr[ie][il]);
 
                 // evaluate the radial part for this angular & linear momenta
-                Complex f = cheb_arr[ie][il].clenshaw(k1[ie],cheb_arr[ie][il].tail(1e-8)) / gsl_sf_pow_int(k1[ie] * k2[ie], 2);
+                Complex f = cheb_arr[ie][il].clenshaw(k1[ie],cheb_arr[ie][il].tail(1e-8)) / (k1[ie] * k2[ie]);
 
                 // evaluate bispherical function
-                Complex YY = 0;
-                for (int m = -l1; m <= l1; m++)
-                {
-                    YY += special::ClebschGordan(l1,m,l2,mi-m,L,mi)
-                          * special::sphY(l1,m,dirs[idir].first.x*afactor,dirs[idir].first.y*afactor)
-                          * special::sphY(l2,m,dirs[idir].second.x*afactor,dirs[idir].second.y*afactor);
-                }
+                Complex YY = special::sphBiY
+                (
+                    l1, l2, L, mi,
+                    dirs[idir].first.x*afactor, dirs[idir].first.y*afactor,
+                    dirs[idir].second.x*afactor, dirs[idir].second.y*afactor
+                );
 
                 // evaluate Coulomb phaseshifts
                 Complex sig1 = special::coul_F_sigma(1., l1,k1[ie]);

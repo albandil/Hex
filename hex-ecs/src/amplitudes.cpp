@@ -600,18 +600,27 @@ void Amplitudes::writeSQL_files (std::string directory)
             cArray const & Xi_S1 = data[ill * inp_.Etot.size() + ie].second;
 
             // save singlet data as BLOBs
-            fsql << "INSERT OR REPLACE INTO \"ionf\" VALUES ("
-                 << T.ni << "," << T.li << "," << T.mi << ","
-                 << inp_.L << ", 0, " << inp_.Etot[ie] + 1. / (T.ni * T.ni) << ", "
-                 << ang_[ill].first << ", " << ang_[ill].second << ", "
-                 << Xi_S0.toBlob().c_str() << ");" << std::endl;
+            // NOTE: Skip the spin that has not been calculated in this run. Its expansion is
+            //       empty and writing it would blank any existing row (same primary key) when
+            //       the batch is imported next to the data from a run with the other spin.
+            if (not Xi_S0.empty())
+            {
+                fsql << "INSERT OR REPLACE INTO \"ionf\" VALUES ("
+                     << T.ni << "," << T.li << "," << T.mi << ","
+                     << inp_.L << ", 0, " << inp_.Etot[ie] + 1. / (T.ni * T.ni) << ", "
+                     << ang_[ill].first << ", " << ang_[ill].second << ", "
+                     << Xi_S0.toBlob().c_str() << ");" << std::endl;
+            }
 
             // save triplet data as BLOBs
-            fsql << "INSERT OR REPLACE INTO \"ionf\" VALUES ("
-                 << T.ni << "," << T.li << "," << T.mi << ","
-                 << inp_.L << ", 1, " << inp_.Etot[ie] + 1. / (T.ni * T.ni) << ", "
-                 << ang_[ill].first << ", " << ang_[ill].second << ", "
-                 << Xi_S1.toBlob().c_str() << ");" << std::endl;
+            if (not Xi_S1.empty())
+            {
+                fsql << "INSERT OR REPLACE INTO \"ionf\" VALUES ("
+                     << T.ni << "," << T.li << "," << T.mi << ","
+                     << inp_.L << ", 1, " << inp_.Etot[ie] + 1. / (T.ni * T.ni) << ", "
+                     << ang_[ill].first << ", " << ang_[ill].second << ", "
+                     << Xi_S1.toBlob().c_str() << ");" << std::endl;
+            }
         }
     }
 
@@ -1363,18 +1372,18 @@ void Amplitudes::computeSigmaIon_ (Amplitudes::Transition T)
         // integrator
         ClenshawCurtis<decltype(fsqr),double> integrator(fsqr);
 
-        // integrate singlet
+        // integrate singlet (the spin weight (2S+1)/4 is the same as in computeSigma_)
         if (not Xi_Sl1l2[T][ill * Nenergy + ie].first.empty())
         {
             CB = Chebyshev<double,Complex>(Xi_Sl1l2[T][ill * Nenergy + ie].first, 0., kmax); tail = CB.tail(1e-10); 
-            sigma_S[T].first[ie] += integrator.integrate(0, special::constant::pi_quart, &n) / ki[ie];
+            sigma_S[T].first[ie] += 0.25 * integrator.integrate(0, special::constant::pi_quart, &n) / ki[ie];
         }
 
         // integrate triplet
         if (not Xi_Sl1l2[T][ill * Nenergy + ie].second.empty())
         {
             CB = Chebyshev<double,Complex>(Xi_Sl1l2[T][ill * Nenergy + ie].second, 0., kmax); tail = CB.tail(1e-10); 
-            sigma_S[T].second[ie] += integrator.integrate(0, special::constant::pi_quart, &n) / ki[ie];
+            sigma_S[T].second[ie] += 0.75 * integrator.integrate(0, special::constant::pi_quart, &n) / ki[ie];
         }
     }
 }
