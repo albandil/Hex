@@ -25,6 +25,13 @@
 // approximation, which is off by per cent this far from the classical turning point.
 // That is what test 1 guards against.
 //
+// A loss of accuracy is also reported in a second, unrelated place: below the classical
+// turning point of a large angular momentum, where F is exponentially small. GSL cannot
+// be trusted there either -- over a sweep of that region its value came out non-finite in
+// a third of the cases -- so coul_F answers from the uniform approximation, which holds to
+// a couple of per cent throughout. Test 6 covers that region; note that the zero-energy
+// limit is of no use in it, k**2 r being no longer small.
+//
 // The whole thing takes a fraction of a second, so like the sparse grid test it can be
 // run after every build.
 
@@ -54,6 +61,21 @@ const Reference references [] =
 // set. The bound is loose enough for that and still tight enough to notice any change
 // of the formula or of the branch that selects it.
 const double tolerance = 1e-6;
+
+// Points below the classical turning point of a large angular momentum, ordered by
+// decreasing rho/rho_t. GSL reports a loss of accuracy at every one of them and coul_F
+// falls back on the uniform approximation, whose error over this region was measured
+// against mpmath at 0.4 to 2.1 per cent in F and up to 4.3 per cent in F'; the tolerance
+// below leaves room for that and still catches a return to GSL's value, to the
+// zero-energy limit, or to anything else that is wrong by more than a small factor.
+const Reference barriers [] =
+{
+    { 15, 0.0650239, 25.0365, 9.26781313336667025e-08, 8.12040353479437451e-07, "the case reported from hex-ecs extraction; rho/rho_t = 0.25" },
+    { 30, 0.05,      60.0,    4.21581649982650681e-18, 4.05398881463497470e-17, "rho/rho_t = 0.18; GSL's own value is 70 % off here" }
+};
+
+// See the comment above the table.
+const double barrier_tolerance = 5e-2;
 
 bool check (char const * what, double result, double expected, double tol)
 {
@@ -201,6 +223,66 @@ int main (void)
     }
 
     passed &= (nfailed == 0);
+
+    // 6. the classically forbidden region of a large angular momentum
+    //    This is the other face of the loss of accuracy, and it has nothing to do with
+    //    a small wavenumber: below the classical turning point F falls off
+    //    exponentially and GSL abandons it while still handing back a number, one that
+    //    is wrong by tens of per cent or not finite at all. The uniform approximation
+    //    is what coul_F has to answer with there, so the test pins both the value and
+    //    the branch that produced it.
+
+    std::cout << "Test 6: the region below the classical turning point" << std::endl;
+
+    for (Reference const & ref : barriers)
+    {
+        std::cout << "  l = " << ref.l << ", k = " << ref.k << ", r = " << ref.r
+                  << " (" << ref.comment << ")" << std::endl;
+
+        // the premise: GSL alone does not manage this point
+        gsl_sf_result f, fpr, g, gpr;
+        double expF, expG;
+        int errgsl = gsl_sf_coulomb_wave_FG_e
+        (
+            -1.0 / ref.k, ref.k * ref.r, ref.l, 0,
+            &f, &fpr, &g, &gpr, &expF, &expG
+        );
+
+        if (errgsl != GSL_ELOSS)
+        {
+            std::cout << "\tGSL returned " << gsl_strerror(errgsl)
+                      << " instead of a loss of accuracy  <-- the point no longer tests"
+                         " the fallback" << std::endl;
+            passed = false;
+        }
+
+        double F, Fp;
+        int err = special::coul_F(1, ref.l, ref.k, ref.r, F, Fp);
+
+        if (err != GSL_SUCCESS)
+        {
+            std::cout << "\tcoul_F failed with " << gsl_strerror(err) << std::endl;
+            passed = false;
+            continue;
+        }
+
+        passed &= check("F ", F,  ref.F,  barrier_tolerance);
+        passed &= check("F'", Fp, ref.Fp, barrier_tolerance);
+
+        // The value has to be the one of the uniform approximation. Without this the
+        // test would also accept the zero-energy limit at the first point, which is
+        // only a factor of eight out and would slip through a per-cent tolerance at
+        // some other radius.
+        double Fu, Fpu;
+        special::coul_F_michel(1, ref.l, ref.k, ref.r, Fu, Fpu);
+
+        if (F != Fu or Fp != Fpu)
+        {
+            std::cout << "\tthe value did not come from the uniform approximation"
+                         "  <-- expected coul_F_michel" << std::endl;
+            passed = false;
+        }
+    }
 
     std::cout << (passed ? "All tests passed." : "Some tests failed.") << std::endl;
 

@@ -675,6 +675,22 @@ int special::coul_F (int Z, int l, double k, double r, double& F, double& Fp)
             //   approximation is off by per cent; prefer the limit there.
             if (Z > 0 and k * k * r < 1e-6 * Z)
                 return coul_F_zero_energy(Z, l, k, r, F, Fp);
+
+            // - NOTE: Below the classical turning point F is exponentially small and
+            //   GSL's own value is unusable there anyway; over a sample of the whole
+            //   region it came out non-finite in a third of the cases and wrong by
+            //   more than a per cent in another third, while the uniform
+            //   approximation stayed within two per cent everywhere. This is the
+            //   ordinary state of affairs for a large angular momentum near the
+            //   origin, not a fault, so keep quiet about it. The message is left for
+            //   the region around and beyond the turning point, where a loss of
+            //   accuracy would be a surprise and where the value matters.
+            {
+                double rho_t = eta + std::sqrt(eta * eta + l * (l + 1.));
+
+                if (k * r < 0.8 * rho_t)
+                    return coul_F_michel(Z, l, k, r, F, Fp);
+            }
 #ifndef WITH_BOINC
             fprintf(stderr, "[coul_F] GSL_ELOSS @ k = %g, r = %g, l = %d\n", k, r, l);
 #endif
