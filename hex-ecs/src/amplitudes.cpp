@@ -1172,7 +1172,7 @@ Chebyshev<double,Complex> Amplitudes::fcheb (cArrayView const & PsiSc, Real kmax
     Real rho = (cmd_.extract_rho > 0) ? cmd_.extract_rho : t[Nreknot-2].real();
 
     // debug output
-    std::ofstream dbg ("debug.log");
+    //std::ofstream dbg ("debug.log");
 
     // we want to approximate the following function f_{ℓ₁ℓ₂}^{LS}(k₁,k₂)
     auto fLSl1l2k1k2 = [&](Real k1) -> Complex
@@ -1271,7 +1271,7 @@ Chebyshev<double,Complex> Amplitudes::fcheb (cArrayView const & PsiSc, Real kmax
         Q.setEps(1e-6);
         Complex res = 2.0_r * rho * Q.integrate(0., special::constant::pi_half) / special::constant::sqrt_pi;
 
-        dbg << "CB " << k1 << " " << res.real() << " " << res.imag() << std::endl;
+        //dbg << "CB " << k1 << " " << res.real() << " " << res.imag() << std::endl;
 
         return res;
     };
