@@ -78,13 +78,12 @@ void db_ioncs (sqlite3_context* pdb, int n, sqlite3_value** val)
 {
     assert(n == 1);
 
-    // get blob data as text; reinterpret_cast is safe as we are using
-    // the low ASCII only
-    std::string blob = reinterpret_cast<const char*>(sqlite3_value_text(*val));
-
-    // convert text data to binary array
+    // copy the coefficients out of the BLOB
+    // NOTE: sqlite3_value_bytes has to be called after sqlite3_value_blob, never
+    //       before it, and both return zero/null for a NULL column.
     cArray coeffs;
-    coeffs.fromBlob(blob);
+    void const * bytes = sqlite3_value_blob(*val);
+    coeffs.fromBytes(bytes, sqlite3_value_bytes(*val));
 
     // some blobs can be empty
     if (coeffs.empty())
@@ -402,7 +401,7 @@ bool IntegralCrossSection::updateTable ()
             "SELECT ni, li, mi, "
                    "0,  0,  0,  "
                    "S,  Ei, L,  "
-                   "SUM(0.25*(2*S+1)*IONCS(QUOTE(cheb))/SQRT(Ei)) "
+                   "SUM(0.25*(2*S+1)*IONCS(cheb)/SQRT(Ei)) "
                 "FROM 'ionf' "
                 "GROUP BY ni, li, mi, S, Ei, L";
     st6.exec();

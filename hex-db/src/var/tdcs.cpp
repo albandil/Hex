@@ -139,14 +139,14 @@ bool TripleDifferentialCrossSection::run (std::map<std::string,std::string> cons
 
     // energy and encoded Chebyshev approximation
     double E;
-    std::string blob;
+    sqlitepp::blob blob = { nullptr, 0 };
 
     // angular variables
     int L, l1, l2;
 
     // create query statement
     sqlitepp::statement st (session());
-    st << "SELECT L, l1, l2, Ei, QUOTE(cheb) FROM 'ionf' "
+    st << "SELECT L, l1, l2, Ei, cheb FROM 'ionf' "
           "WHERE ni = :ni "
           "  AND li = :li "
           "  AND mi = :mi "
@@ -181,7 +181,7 @@ bool TripleDifferentialCrossSection::run (std::map<std::string,std::string> cons
         Lll_arr.back().push_back(std::make_tuple(L,l1,l2));
 
         // decode Chebyshev expansion from hexadecimal format
-        cb.fromBlob(blob); 
+        cb.fromBytes(blob.data, blob.size);
 
         // save Chebyshev expansion
         cheb_arr.back().push_back(Chebyshev<double,Complex>(cb, 0., 1.));

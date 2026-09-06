@@ -117,7 +117,7 @@ bool SingleDifferentialCrossSectionWrtEnergyShare::run (std::map<std::string,std
 
     // energy shares and cross sections
     int l1, l2, L;
-    std::string blob;
+    sqlitepp::blob blob = { nullptr, 0 };
     std::vector<Chebyshev<double,Complex>> CB;
     rArray energy_shares;
 
@@ -148,7 +148,7 @@ bool SingleDifferentialCrossSectionWrtEnergyShare::run (std::map<std::string,std
 
     // compose query
     sqlitepp::statement st (session());
-    st << "SELECT L,l1,l2,QUOTE(cheb) FROM 'ionf' "
+    st << "SELECT L,l1,l2,cheb FROM 'ionf' "
             "WHERE ni = :ni "
             "  AND li = :li "
             "  AND mi = :mi "
@@ -162,11 +162,11 @@ bool SingleDifferentialCrossSectionWrtEnergyShare::run (std::map<std::string,std
     // retrieve data (terminate if no data)
     while (st.exec())
     {
-        if (not blob.empty())
+        if (blob.size != 0)
         {
             // translate blob to Chebyshev coefficients
             cArray coeffs;
-            coeffs.fromBlob(blob);
+            coeffs.fromBytes(blob.data, blob.size);
             CB.emplace_back(coeffs, 0, 1);
         }
     }

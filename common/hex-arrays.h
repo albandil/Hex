@@ -1082,6 +1082,31 @@ template <class T, class Alloc_> class NumberArray : public Array<T, Alloc_>
         }
 
         /**
+         * @brief Copy from raw bytes.
+         *
+         * Fills the array from a block of memory holding its elements one after
+         * another, which is what an SQL BLOB column contains once it is read
+         * without the detour through the hexadecimal notation of @ref fromBlob.
+         * Any incomplete trailing element is ignored.
+         *
+         * @warning The data are assumed to possess the endianness of the current machine.
+         *
+         * @param bytes Pointer to the first byte, or nullptr for an empty array.
+         * @param count Number of bytes available at that address.
+         */
+        void fromBytes (void const * bytes, std::size_t count)
+        {
+            if (data() != nullptr and size() != 0)
+                Alloc::free (ArrayView<T>::array_);
+
+            ArrayView<T>::N_ = (bytes == nullptr ? 0 : count / sizeof(T));
+            ArrayView<T>::array_ = Alloc::alloc(size());
+
+            if (size() != 0)
+                std::memcpy(data(), bytes, size() * sizeof(T));
+        }
+
+        /**
          * @brief Link to HDF file.
          * 
          * In order to avoid repetitious specifying of the HDF filename,

@@ -163,11 +163,11 @@ bool IonizationF::run (std::map<std::string,std::string> const & sdata)
 
     // energy and encoded Chebyshev approximation
     double E;
-    std::string blob;
+    sqlitepp::blob blob = { nullptr, 0 };
 
     // create query statement
     sqlitepp::statement st (session());
-    st << "SELECT Ei, QUOTE(cheb) FROM 'ionf' "
+    st << "SELECT Ei, cheb FROM 'ionf' "
           "WHERE ni = :ni "
           "  AND li = :li "
           "  AND mi = :mi "
@@ -190,8 +190,8 @@ bool IonizationF::run (std::map<std::string,std::string> const & sdata)
         // save energy
         E_arr.push_back(E);
 
-        // decode Chebyshev expansion from hexadecimal format
-        cb.fromBlob(blob);
+        // copy the Chebyshev expansion out of the BLOB
+        cb.fromBytes(blob.data, blob.size);
 
         // save Chebyshev expansion
         cheb_arr.push_back

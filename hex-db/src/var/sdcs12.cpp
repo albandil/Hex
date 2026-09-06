@@ -130,7 +130,7 @@ bool SingleDifferentialCrossSectionWrtRelativeAngle::run (std::map<std::string,s
 
     // parameters
     int l1, l2, L;
-    std::string blob;
+    sqlitepp::blob blob = { nullptr, 0 };
     std::map<int,std::vector<Info>> CB;
     rArray theta12;
 
@@ -161,7 +161,7 @@ bool SingleDifferentialCrossSectionWrtRelativeAngle::run (std::map<std::string,s
 
     // compose query
     sqlitepp::statement st (session());
-    st << "SELECT L,l1,l2,QUOTE(cheb) FROM 'ionf' "
+    st << "SELECT L,l1,l2,cheb FROM 'ionf' "
             "WHERE ni = :ni "
             "  AND li = :li "
             "  AND mi = :mi "
@@ -175,11 +175,11 @@ bool SingleDifferentialCrossSectionWrtRelativeAngle::run (std::map<std::string,s
     // retrieve data (terminate if no data)
     while (st.exec())
     {
-        if (not blob.empty())
+        if (blob.size != 0)
         {
             // translate blob to Chebyshev coefficients
             cArray coeffs;
-            coeffs.fromBlob(blob);
+            coeffs.fromBytes(blob.data, blob.size);
             Chebyshev<double,Complex> cb (coeffs, 0, 1);
 
             // store data
