@@ -50,3 +50,25 @@ add_test(
     NAME "common.spgrid"
     COMMAND test-spgrid
 )
+
+# Test of the Coulomb wave function at very small wavenumbers, where GSL gives up and
+# the zero-energy limit has to take over. Reference values come from mpmath; the program
+# returns a non-zero exit code when any of the checks is off. It is as quick as the test
+# above.
+
+add_executable(test-coulomb "${CMAKE_CURRENT_LIST_DIR}/test-coulomb.cpp")
+
+# keep the test program out of the directory with the installed ones
+set_target_properties(test-coulomb PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
+)
+
+# libhex-common exports "../libs" but not its own directory
+target_include_directories(test-coulomb PRIVATE "${CMAKE_CURRENT_LIST_DIR}/..")
+
+target_link_libraries(test-coulomb PRIVATE libhex-common)
+
+add_test(
+    NAME "common.coulomb"
+    COMMAND test-coulomb
+)

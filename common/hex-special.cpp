@@ -534,6 +534,13 @@ int special::coul_F_michel (int Z, int l, double k, double r, double& F, double&
     // initialize parameters
     double eta = -Z/k;
     double rho_t = eta + std::sqrt(eta*eta + l*(l+1));
+
+    // The approximation is built around the classical turning point 'rho_t'. An
+    // attractive field has none for l = 0 (there rho_t = 0) and everything below
+    // would degenerate to NaN; refuse such arguments rather than return garbage.
+    if (rho_t <= 0.)
+        return GSL_EDOM;
+
     double x = (k*r-rho_t)/rho_t;
     double a = 1 - 2*eta/rho_t;
     double phi, phip;
@@ -583,6 +590,48 @@ int special::coul_F_michel (int Z, int l, double k, double r, double& F, double&
     return GSL_ERROR_SELECT_2(err, errp);
 }
 
+int special::coul_F_zero_energy (int Z, int l, double k, double r, double& F, double& Fp)
+{
+    // At vanishing energy the term k² of the radial equation
+    //     F'' + (k² + 2Z/r - l(l+1)/r²) F = 0
+    // can be dropped and the solution that is regular in the origin is a Bessel
+    // function (Abramowitz & Stegun 14.6.8),
+    //     F_l(-Z/k, kr)  ⟶  sqrt(π k r) J_{2l+1}(sqrt(8 Z r)) ,
+    // the normalization being fixed by the small-radius form C_l(η) (kr)^(l+1) of
+    // the full function. The neglected term is the only source of error, so the
+    // limit is accurate to the order of k²r/Z.
+
+    if (Z <= 0 or k <= 0. or r < 0.)
+        return GSL_EDOM;
+
+    // origin (Abramowitz & Stegun 14.6.2 in the same limit)
+    if (r == 0.)
+    {
+        F = 0.;
+        Fp = (l == 0 ? std::sqrt(special::constant::two_pi * Z / k) : 0.);
+        return GSL_SUCCESS;
+    }
+
+    // argument of the Bessel functions
+    double x = std::sqrt(8. * Z * r);
+
+    gsl_sf_result J, Jlo, Jhi;
+    int err  = gsl_sf_bessel_Jn_e(2*l + 1, x, &J);
+    int errlo = gsl_sf_bessel_Jn_e(2*l,     x, &Jlo);
+    int errhi = gsl_sf_bessel_Jn_e(2*l + 2, x, &Jhi);
+
+    // derivative of the Bessel function with respect to its argument
+    double dJ = 0.5 * (Jlo.val - Jhi.val);
+
+    F = std::sqrt(special::constant::pi * k * r) * J.val;
+
+    // NOTE: As everywhere else in this file, the derivative is taken with respect
+    //       to ρ = kr, not to r; hence the sqrt(π/k) instead of sqrt(π k).
+    Fp = std::sqrt(special::constant::pi / k) * (0.5 * J.val / std::sqrt(r) + std::sqrt(2. * Z) * dJ);
+
+    return GSL_ERROR_SELECT_3(err, errlo, errhi);
+}
+
 int special::coul_F (int Z, int l, double k, double r, double& F, double& Fp)
 {
     if (r < 0.)
@@ -620,6 +669,12 @@ int special::coul_F (int Z, int l, double k, double r, double& F, double& Fp)
             // "Loss of accuracy."
             // - This sometimes happens for large angular momenta close to
             //   the origin. We will use the uniform approximation instead.
+            // - NOTE: For large angular momenta this is also how a very small 'k'
+            //   announces itself. That is the zero-energy regime again, where the
+            //   limit used below is exact to some eight digits while the uniform
+            //   approximation is off by per cent; prefer the limit there.
+            if (Z > 0 and k * k * r < 1e-6 * Z)
+                return coul_F_zero_energy(Z, l, k, r, F, Fp);
 #ifndef WITH_BOINC
             fprintf(stderr, "[coul_F] GSL_ELOSS @ k = %g, r = %g, l = %d\n", k, r, l);
 #endif
@@ -627,12 +682,22 @@ int special::coul_F (int Z, int l, double k, double r, double& F, double& Fp)
 
         case GSL_ERUNAWAY:
             // "Iterative method out of control."
-            // - This sometimes happens for very small 'k' and small 'k*r'.
-            //   We will use value at 'r = 0' instead.
+            // - This happens for very small 'k', where the Sommerfeld parameter
+            //   η = -Z/k is enormous and the continued fractions used by GSL stop
+            //   converging. The function itself is perfectly well behaved there;
+            //   it is just that k² is by then negligible next to 2Z/r, so we can
+            //   use the zero-energy limit. GSL gives up while k²r is of the order
+            //   of 1e-8, where the limit is good to some eight digits; the guard
+            //   below tolerates k²r up to 1e-6 Z, where it still holds to 1e-5.
+            // - NOTE: Do not use the value at 'r = 0' here, as an earlier version
+            //   of this code did. F oscillates in 'r' however small the energy is,
+            //   and the value in the origin says nothing about the value at r > 0.
+            if (Z > 0 and k * k * r < 1e-6 * Z)
+                return coul_F_zero_energy(Z, l, k, r, F, Fp);
 #ifndef WITH_BOINC
             fprintf(stderr, "[coul_F] GSL_ERUNAWAY @ k = %g, r = %g, l = %d\n", k, r, l);
 #endif
-            return coul_F(Z, l, k, 0, F, Fp);
+            return (Z > 0 ? coul_F_zero_energy(Z, l, k, r, F, Fp) : err);
     }
 
     if (std::isfinite(f.val) and std::isfinite(fp.val))

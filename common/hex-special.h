@@ -715,6 +715,28 @@ inline Complex dric_h_plus (int n, double x)
 int coul_F_michel (int Z, int l, double k, double r, double& F, double& Fp);
 
 /**
+ * @brief Zero-energy limit of the Coulomb wave function (and its derivative).
+ *
+ * In the limit of vanishing energy the regular Coulomb function becomes a Bessel
+ * function (Abramowitz & Stegun 14.6.8),
+ * @f[
+ *     F_l(-Z/k, kr) \longrightarrow \sqrt{\pi k r} \, J_{2l+1}(\sqrt{8Zr}) \ ,
+ * @f]
+ * with a relative error of the order of @f$ k^2 r / Z @f$. This is the regime where
+ * the iterative scheme of GSL breaks down (it does so while @f$ k^2 r \sim 10^{-8} @f$,
+ * where the formula above is essentially exact). Defined for an attractive field only,
+ * i.e. for @f$ Z > 0 @f$.
+ *
+ * @param Z Residual nuclear charge.
+ * @param l Angular momentum.
+ * @param k Wavenumber.
+ * @param r Radial coordinate.
+ * @param F Output reference for resulting value.
+ * @param Fp Output reference for resulting derivative (with respect to @f$ \rho = kr @f$).
+ */
+int coul_F_zero_energy (int Z, int l, double k, double r, double& F, double& Fp);
+
+/**
  * @brief Evaluate Coulomb wave function (and its derivative).
  * @param Z Residual nuclear charge.
  * @param l Angular momentum.
