@@ -126,3 +126,30 @@ add_test(
 )
 
 ## --------------------------------------------------------------------------------- ##
+
+# The fourth test covers the summation of the partial ionization cross sections over
+# the total angular momentum, which needs a database of its own; it also reports its
+# verdict through the exit code.
+
+add_executable(test-hexdb-pwsum "${CMAKE_CURRENT_LIST_DIR}/test-hexdb-pwsum.cpp")
+
+set_target_properties(test-hexdb-pwsum PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
+)
+
+target_link_libraries(test-hexdb-pwsum PRIVATE libhex-common libhex-db)
+
+target_include_directories(test-hexdb-pwsum PRIVATE
+    "${CMAKE_CURRENT_LIST_DIR}/../../common"
+    "${CMAKE_CURRENT_LIST_DIR}/../../libs"
+)
+
+file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/pwsum")
+
+add_test(
+    NAME "hex-db.pwsum"
+    COMMAND test-hexdb-pwsum
+    WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/pwsum"
+)
+
+## --------------------------------------------------------------------------------- ##
