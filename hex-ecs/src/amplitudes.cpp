@@ -1183,6 +1183,13 @@ Chebyshev<double,Complex> Amplitudes::fcheb (cArrayView const & PsiSc, Real kmax
         // compute momentum of the other electron
         Real k2 = std::sqrt(kmax*kmax - k1*k1);
 
+        // B-spline evaluation buffers
+        // - Only the (order+1) B-splines that are non-zero on the knot interval containing
+        //   the evaluation point are ever needed, so the buffers are indexed relatively to
+        //   the first of them. They are allocated here, and not in the integrand below,
+        //   because the integrand is evaluated many times per call.
+        cArray B1 (order + 1), dB1 (order + 1), B2 (order + 1), dB2 (order + 1);
+
         // Xi integrand
         auto integrand = [&](Real alpha) -> Complex
         {
@@ -1219,31 +1226,32 @@ Chebyshev<double,Complex> Amplitudes::fcheb (cArrayView const & PsiSc, Real kmax
             int iknot1 = bspline_inner_.knot(r1);
             int iknot2 = bspline_inner_.knot(r2);
 
-            // auxiliary variables
-            cArray B1 (Nspline), dB1 (Nspline), B2 (Nspline), dB2 (Nspline);
+            // index of the first B-spline stored in the buffers above
+            int base1 = iknot1 - order;
+            int base2 = iknot2 - order;
 
             // evaluate the B-splines
-            for (int ispline1 = std::max(0,iknot1-order); ispline1 <= iknot1; ispline1++)
+            for (int ispline1 = std::max(0,base1); ispline1 <= iknot1; ispline1++)
             {
-                B1[ispline1]  = bspline_inner_.bspline(ispline1,iknot1,order,r1);
-                dB1[ispline1] = bspline_inner_.dspline(ispline1,iknot1,order,r1);
+                B1[ispline1-base1]  = bspline_inner_.bspline(ispline1,iknot1,order,r1);
+                dB1[ispline1-base1] = bspline_inner_.dspline(ispline1,iknot1,order,r1);
             }
-            for (int ispline2 = std::max(0,iknot2-order); ispline2 <= iknot2; ispline2++)
+            for (int ispline2 = std::max(0,base2); ispline2 <= iknot2; ispline2++)
             {
-                B2[ispline2]  = bspline_inner_.bspline(ispline2,iknot2,order,r2);
-                dB2[ispline2] = bspline_inner_.dspline(ispline2,iknot2,order,r2);
+                B2[ispline2-base2]  = bspline_inner_.bspline(ispline2,iknot2,order,r2);
+                dB2[ispline2-base2] = bspline_inner_.dspline(ispline2,iknot2,order,r2);
             }
 
             // evaluate the solution
             Complex Psi = 0., ddr1_Psi = 0., ddr2_Psi = 0., ddrho_Psi = 0.;
-            for (int ispline1 = std::max(0,iknot1-order); ispline1 <= iknot1; ispline1++)
-            for (int ispline2 = std::max(0,iknot2-order); ispline2 <= iknot2; ispline2++)
+            for (int ispline1 = std::max(0,base1); ispline1 <= iknot1; ispline1++)
+            for (int ispline2 = std::max(0,base2); ispline2 <= iknot2; ispline2++)
             {
                 int idx = ispline1 * Nspline + ispline2;
 
-                Psi      += PsiSc[idx] *  B1[ispline1] *  B2[ispline2];
-                ddr1_Psi += PsiSc[idx] * dB1[ispline1] *  B2[ispline2];
-                ddr2_Psi += PsiSc[idx] *  B1[ispline1] * dB2[ispline2];
+                Psi      += PsiSc[idx] *  B1[ispline1-base1] *  B2[ispline2-base2];
+                ddr1_Psi += PsiSc[idx] * dB1[ispline1-base1] *  B2[ispline2-base2];
+                ddr2_Psi += PsiSc[idx] *  B1[ispline1-base1] * dB2[ispline2-base2];
             }
 
             if (cos_alpha != 0.)

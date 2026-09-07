@@ -389,8 +389,10 @@ void Chebyshev<double,double>::generate (Functor const & f, int n, double a, dou
     std::vector<double> fvals (N);
 
     // evaluate nodes and function
+    // - dynamic scheduling: the cost of 'f' can vary by orders of magnitude between
+    //   the nodes (e.g. when 'f' is itself an adaptive quadrature)
     double pi_over_N = special::constant::pi / N;
-    # pragma omp parallel for firstprivate(pi_over_N)
+    # pragma omp parallel for schedule(dynamic,1) firstprivate(pi_over_N)
     for (int k = 0; k < N; k++)
     {
         double xk = std::cos(pi_over_N * (k + 0.5));
@@ -420,8 +422,10 @@ void Chebyshev<double,Complex>::generate (Functor const & f, int n, double a, do
     cArray fvals(4*N);
 
     // evaluate nodes and function
+    // - dynamic scheduling: the cost of 'f' can vary by orders of magnitude between
+    //   the nodes (e.g. when 'f' is itself an adaptive quadrature)
     double pi_over_N = special::constant::pi / N;
-    # pragma omp parallel for firstprivate(pi_over_N)
+    # pragma omp parallel for schedule(dynamic,1) firstprivate(pi_over_N)
     for (int k = 0; k < N; k++)
     {
         double xk = std::cos(pi_over_N * (k + 0.5));
