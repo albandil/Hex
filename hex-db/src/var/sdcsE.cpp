@@ -203,8 +203,9 @@ bool SingleDifferentialCrossSectionWrtEnergyShare::run (std::map<std::string,std
         double sin_beta = k1/kmax;
 
         // process all partial wave contributions
+        // NOTE: The expansions hold Ξ / sqrt(k₁ k₂), so the factor is restored here.
         for (Chebyshev<double,Complex> const & cb : CB)
-            dsigma += sqrabs(cb.clenshaw(sin_beta, cb.tail(1e-10)));
+            dsigma += k1 * k2 * sqrabs(cb.clenshaw(sin_beta, cb.tail(1e-10)));
 
         // write line to table
         table.write(x, 0.25 * (2*S + 1) * dsigma * Etot * lfactor * lfactor / (2 * k1 * k2 * ki));

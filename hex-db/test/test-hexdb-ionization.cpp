@@ -100,9 +100,14 @@ const double tolerance = 1e-4;
 
 // --------------------------------------------------------------------------------- //
 
-// One angular channel of the synthetic solution. The radial amplitude is given as a
-// function of the normalized momentum u = k₁/kₘₐₓ ∈ [0,1], which makes the exchange
-// symmetry easy to state: the partner channel (ℓ₂,ℓ₁) carries G(√(1-u²)).
+// One angular channel of the synthetic solution. What hex-ecs stores, and therefore
+// what G gives here, is the radial amplitude with its threshold behaviour divided out,
+//
+//     G(u) = Ξ(k₁) / sqrt(k₁ k₂) ,      u = k₁/kₘₐₓ ∈ [0,1] ,
+//
+// so the reference formulae below carry the factor sqrt(k₁ k₂), or k₁ k₂ where they are
+// quadratic in the amplitude. The factor is symmetric in the two momenta, so G obeys the
+// same exchange symmetry as Ξ: the partner channel (ℓ₂,ℓ₁) carries G(√(1-u²)).
 struct Channel
 {
     int L, l1, l2;
@@ -280,7 +285,8 @@ double reference_ics (int L, int S)
         for (Channel const & c : channels) if (c.L == L)
             sum += sqrabs(c.G(std::sin(beta)));
 
-        return sum;
+        // |Ξ|² = k₁ k₂ |G|², with k₁ = kₘₐₓ sin β and k₂ = kₘₐₓ cos β
+        return testEtot * std::sin(beta) * std::cos(beta) * sum;
     };
 
     return 0.25 * (2*S + 1) * simpson(integrand, 0., 0.25 * special::constant::pi, 4096) / testKi;
@@ -365,6 +371,9 @@ int main (void)
         double k1 = std::sqrt(testEtot * x);
         double k2 = std::sqrt(testEtot * (1 - x));
 
+        // |Ξ|² = k₁ k₂ |G|²
+        sum *= k1 * k2;
+
         return 0.25 * (2*S + 1) * sum * testEtot / (2 * k1 * k2 * testKi);
     };
 
@@ -406,7 +415,8 @@ int main (void)
 
         double k1 = std::sqrt(testEtot * x);
         double k2 = std::sqrt(testEtot * (1 - x));
-        Complex expected = c.G(std::sqrt(x)) / (k1 * k2);
+        // 'ionf' prints Ξ/(k₁k₂), and Ξ = sqrt(k₁ k₂) G
+        Complex expected = c.G(std::sqrt(x)) / std::sqrt(k1 * k2);
 
         check("ionf      (" + std::to_string(c.l1) + "," + std::to_string(c.l2) +
               ") x = " + std::to_string(x) + ", Re",
@@ -470,9 +480,14 @@ int main (void)
     //    angle and its coefficient is diagonal in the angular channels. These two
     //    numbers were recorded from the fixed code; they move if the momenta that
     //    enter those phases, or the angular algebra around them, change.
+    //
+    //    NOTE: They last moved when the stored expansions were changed to hold
+    //          Ξ/sqrt(k₁k₂) instead of Ξ, which reweights the hyperangular integrand
+    //          by k₁k₂. Check 4 above, which the relative phases do not reach, pins
+    //          the normalization that the new values were recorded with.
 
-    check("sdcs12    θ₁₂ = 1, S = 0", sdcs12(1.0, 0), 0.189948);
-    check("sdcs12    θ₁₂ = 2, S = 1", sdcs12(2.0, 1), 0.897863);
+    check("sdcs12    θ₁₂ = 1, S = 0", sdcs12(1.0, 0), 0.219382);
+    check("sdcs12    θ₁₂ = 2, S = 1", sdcs12(2.0, 1), 1.13554);
 
     // ------------------------------------------------------------------------- //
     // 6. the triply differential cross section against the ionization amplitude

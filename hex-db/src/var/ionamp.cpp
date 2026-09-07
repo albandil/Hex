@@ -230,7 +230,7 @@ bool IonizationAmplitude::run (std::map<std::string,std::string> const & sdata)
                 int l2 = std::get<2>(Lll_arr[ie][il]);
 
                 // evaluate the radial part for this angular & linear momenta
-                Complex f = cheb_arr[ie][il].clenshaw(k1[ie],cheb_arr[ie][il].tail(1e-8)) / (k1[ie] * k2[ie]);
+                Complex f = cheb_arr[ie][il].clenshaw(k1[ie],cheb_arr[ie][il].tail(1e-8)) / std::sqrt(k1[ie] * k2[ie]);
 
                 // evaluate bispherical function
                 Complex YY = special::sphBiY

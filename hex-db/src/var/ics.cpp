@@ -107,8 +107,15 @@ void db_ioncs (sqlite3_context* pdb, int n, sqlite3_value** val)
     //  ⌡                   ⌡
     //  0                   0
     //
+    // NOTE: The stored expansion holds Ξ / sqrt(k₁ k₂), so |Ξ|² is the square of the
+    //       expansion times k₁ k₂ = E_tot sin β cos β. The energy is not available in a
+    //       scalar SQL function, so only sin β cos β is taken here and the caller has to
+    //       multiply the result by E_tot; see @ref IntegralCrossSection::updateTable.
     int tail = CB.tail(1e-10);
-    auto fsqr = [&](double beta) -> double { return sqrabs(CB.clenshaw(std::sin(beta), tail)); };
+    auto fsqr = [&](double beta) -> double
+    {
+        return std::sin(beta) * std::cos(beta) * sqrabs(CB.clenshaw(std::sin(beta), tail));
+    };
     ClenshawCurtis<decltype(fsqr),double> integrator(fsqr);
     double result = integrator.integrate(0, special::constant::pi_quart);
 
@@ -492,12 +499,14 @@ bool IntegralCrossSection::updateTable ()
 
     // Insert ionization (no interpolation needed: L is used as the partial wave number here.
 
+    // NOTE: The factor (Ei - 1/ni²) = E_tot is the one that IONCS leaves out; see the
+    //       note at @ref db_ioncs.
     sqlitepp::statement st6 (session());
     st6 << "INSERT OR REPLACE INTO 'ics' "
             "SELECT ni, li, mi, "
                    "0,  0,  0,  "
                    "S,  Ei, L,  "
-                   "SUM(0.25*(2*S+1)*IONCS(cheb)/SQRT(Ei)) "
+                   "SUM(0.25*(2*S+1)*(Ei-1.0/(ni*ni))*IONCS(cheb)/SQRT(Ei)) "
                 "FROM 'ionf' "
                 "GROUP BY ni, li, mi, S, Ei, L";
     st6.exec();

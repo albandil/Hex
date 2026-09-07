@@ -219,7 +219,7 @@ bool TripleDifferentialCrossSection::run (std::map<std::string,std::string> cons
                 int l2 = std::get<2>(Lll_arr[ie][il]);
 
                 // evaluate the radial part for this angular & linear momenta
-                Complex f = cheb_arr[ie][il].clenshaw(sqrt(Eshare),cheb_arr[ie][il].tail(1e-8)) / (k1 * k2);
+                Complex f = cheb_arr[ie][il].clenshaw(sqrt(Eshare),cheb_arr[ie][il].tail(1e-8)) / std::sqrt(k1 * k2);
 
                 // evaluate bispherical function
                 // NOTE evaluating sphY is the bottleneck; unfortunately, we need to compute this

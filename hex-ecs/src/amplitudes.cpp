@@ -1182,7 +1182,20 @@ Chebyshev<double,Complex> Amplitudes::fcheb (cArrayView const & PsiSc, Real kmax
     // debug output
     //std::ofstream dbg ("debug.log");
 
-    // we want to approximate the following function f_{ℓ₁ℓ₂}^{LS}(k₁,k₂)
+    // We want to approximate the radial part of the ionization amplitude with the
+    // threshold behaviour divided out,
+    //
+    //     g_{ℓ₁ℓ₂}^{LS}(k₁) = Ξ_{ℓ₁ℓ₂}^{LS}(k₁) / sqrt(k₁ k₂) ,
+    //
+    // rather than Ξ itself. Ξ vanishes as sqrt(k₁ k₂) whenever one of the electrons is
+    // left without energy, which is a square-root cusp at either end of the interval and
+    // limits the Chebyshev coefficients of Ξ to an algebraic decay (measured exponent 2.2).
+    // The quotient is smooth from end to end and its expansion converges geometrically,
+    // reaching in tens of evaluations an accuracy that Ξ does not reach in thousands.
+    //
+    // NOTE: The Chebyshev nodes are the roots of the Chebyshev polynomial, which lie
+    //       strictly inside the interval, so the quotient is never evaluated where
+    //       sqrt(k₁ k₂) vanishes. The bound below is only a guard.
     auto fLSl1l2k1k2 = [&](Real k1) -> Complex
     {
         if (k1 == 0 or k1*k1 >= kmax*kmax)
@@ -1281,7 +1294,8 @@ Chebyshev<double,Complex> Amplitudes::fcheb (cArrayView const & PsiSc, Real kmax
 
         //dbg << "CB " << k1 << " " << res.real() << " " << res.imag() << std::endl;
 
-        return res;
+        // divide out the threshold behaviour
+        return res / std::sqrt(k1 * k2);
     };
 
     // Chebyshev approximation
@@ -1373,9 +1387,14 @@ void Amplitudes::computeSigmaIon_ (Amplitudes::Transition T)
         // Chebyshev expansion coefficients
         Chebyshev<double,Complex> CB;
 
-        // integrand |f|²
+        // Integrand |Ξ|². The expansion holds Ξ / sqrt(k₁ k₂), so the factor k₁ k₂ that
+        // was divided out in @ref fcheb is restored here.
         int tail; int n;
-        auto fsqr = [&](double beta) -> double { return sqrabs(CB.clenshaw(kmax * std::sin(beta), tail)); };
+        auto fsqr = [&](double beta) -> double
+        {
+            Real k1 = kmax * std::sin(beta), k2 = kmax * std::cos(beta);
+            return k1 * k2 * sqrabs(CB.clenshaw(k1, tail));
+        };
 
         // integrator
         ClenshawCurtis<decltype(fsqr),double> integrator(fsqr);

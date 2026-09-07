@@ -95,6 +95,15 @@ bool IonizationF::initialize (sqlitepp::session & db)
 
 bool IonizationF::createTable ()
 {
+    // NOTE: The 'cheb' blob holds the Chebyshev expansion coefficients, on the interval
+    //       (0,kₘₐₓ) of the momentum of the first electron, of the radial part of the
+    //       ionization amplitude divided by sqrt(k₁ k₂), not of the amplitude Ξ itself.
+    //       The factor is what makes Ξ vanish at either end of the interval, and dividing
+    //       it out turns a square-root cusp into a smooth function, which the expansion
+    //       resolves with tens of coefficients instead of thousands. Every reader of the
+    //       blob therefore has to multiply the factor back in; see @ref IonizationF::run
+    //       and the other quantities built on 'ionf'.
+
     sqlitepp::statement st (session());
     st <<
         "CREATE TABLE IF NOT EXISTS 'ionf' ("
@@ -222,7 +231,7 @@ bool IonizationF::run (std::map<std::string,std::string> const & sdata)
         // for all impact energies evaluate the radial part
         cArray f0(E_arr.size());
         for (std::size_t ie = 0; ie < E_arr.size(); ie++)
-            f0[ie] = cheb_arr[ie].clenshaw(k1[ie], cheb_arr[ie].tail(1e-8)) / (k1[ie] * k2[ie]);
+            f0[ie] = cheb_arr[ie].clenshaw(k1[ie], cheb_arr[ie].tail(1e-8)) / std::sqrt(k1[ie] * k2[ie]);
 
         // interpolate
         f_out[i] = interpolate(E_arr, f0, { Ei })[0];

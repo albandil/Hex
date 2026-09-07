@@ -238,12 +238,13 @@ bool SingleDifferentialCrossSectionWrtRelativeAngle::run (std::map<std::string,s
                 Complex phase1 = phase1n / phase1d; phase1 /= std::abs(phase1);
                 Complex phase2 = phase2n / phase2d; phase2 /= std::abs(phase2);
 
-                // radial parts (ionf) calculated by hex-ecs
+                // Radial parts (ionf) calculated by hex-ecs. The expansions hold
+                // Ξ / sqrt(k₁ k₂), so the factor is restored in the product below.
                 Complex u = f.clenshaw(cos_alpha, tail);
                 Complex v = fp.clenshaw(cos_alpha, tailp);
 
                 // use real part only, we are summing symmetrically, so the imaginary goes away
-                Complex result = phase0 * phase1 * phase2 * u * std::conj(v);
+                Complex result = phase0 * phase1 * phase2 * k1 * k2 * u * std::conj(v);
                 //std::cout << ill << " " << illp << " " << alpha << " " << result << std::endl;
                 return result.real();
             };

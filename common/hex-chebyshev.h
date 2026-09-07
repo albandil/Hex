@@ -435,8 +435,13 @@ void Chebyshev<double,Complex>::generate (Functor const & f, int n, double a, do
     // execute the transform
     gsl_fft_complex_radix2_forward(reinterpret_cast<double*>(fvals.data()), 1, 4 * N);
 
-    // copy normalized coefficients
-    C = fvals / Real(N);
+    // Copy the normalized coefficients. Only the leading 'N' elements of the transform
+    // are the coefficients of the expansion; the rest of the length-4N transform is the
+    // mirrored and negated copy of them that the symmetric input produces, and it must
+    // not be assigned to 'C' along with them.
+    C.resize(N);
+    for (int i = 0; i < N; i++)
+        C[i] = fvals[i] / Real(N);
 }
 
 #endif /* HEX_CHEBYSHEV */
