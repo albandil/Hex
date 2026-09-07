@@ -109,6 +109,141 @@ Complex Bspline::dspline (int i, int iknot, int k, Complex r) const
 
 
 // ----------------------------------------------------------------------- //
+//  Simultaneous evaluation of all B-splines of an interval                //
+// ----------------------------------------------------------------------- //
+
+namespace
+{
+
+/**
+ * @brief Cox-de Boor recurrence for the whole set of B-splines of an interval.
+ *
+ * Runs the triangular scheme once for all (order+1) B-splines that are non-zero
+ * between the 'iknot'-th and 'iknot+1'-th knot, instead of once per spline. The
+ * knots are read through the functor 'tk', so that the same code serves both the
+ * real and the complex arithmetic. The array 'b' is a workspace of (order+2)
+ * elements, 'nspline' is the number of B-splines of the basis. See @ref
+ * Bspline::bsplines for the meaning of the other parameters.
+ */
+template <class T, class KnotFunctor>
+void deboor_all (int iknot, int order, int nspline, T r, KnotFunctor tk, T * const restrict b, T * const restrict B, T * const restrict dB)
+{
+    // Index of the leftmost B-spline of the set. This is negative near the origin,
+    // where some of the splines of the set do not exist; those keep the initial zero,
+    // which is also the value the recurrence expects of them.
+    int base = iknot - order;
+
+    // The set can also run past the last B-spline of the basis, in the last few
+    // intervals of the grid. Those splines do not exist either, but their lower-order
+    // parents are still needed here, so only the top of the triangle is cut away. This
+    // is also what keeps the knot indices below within the bounds of the knot sequence.
+    auto ntop = [&](int ord) { return std::min(order, nspline - 1 - base + order - ord); };
+
+    // initialize zero-order B-splines (only the 'iknot'-th one is non-zero here)
+    for (int n = 0; n <= order + 1; n++)
+        b[n] = (n == order ? 1. : 0.);
+
+    // one step of the recurrence, raising the order of the whole set from 'ord-1' to 'ord'
+    auto raise = [&](int ord)
+    {
+        for (int n = std::max(order - ord, -base); n <= ntop(ord); n++)
+        {
+            T t1 = tk(base + n),       t2 = tk(base + n + ord);
+            T t3 = tk(base + n + 1),   t4 = tk(base + n + ord + 1);
+
+            b[n] = (t2 == t1 ? T(0.) : b[n]     * (r  - t1) / (t2 - t1))
+                 + (t4 == t3 ? T(0.) : b[n + 1] * (t4 - r ) / (t4 - t3));
+        }
+    };
+
+    // raise the order to just below the requested one
+    for (int ord = 1; ord < order; ord++)
+        raise(ord);
+
+    // form the derivatives from the B-splines of the order one lower
+    if (dB != nullptr)
+    {
+        for (int n = 0; n <= order; n++)
+        {
+            if (base + n < 0 or base + n >= nspline)
+            {
+                dB[n] = 0.;
+                continue;
+            }
+
+            T t1 = tk(base + n),       t2 = tk(base + n + order);
+            T t3 = tk(base + n + 1),   t4 = tk(base + n + order + 1);
+
+            T S1 = (t2 == t1 ? T(0.) : T(order) / (t2 - t1));
+            T S2 = (t4 == t3 ? T(0.) : T(order) / (t4 - t3));
+
+            dB[n] = b[n] * S1 - b[n + 1] * S2;
+        }
+    }
+
+    // raise the order to the requested one
+    if (order > 0)
+        raise(order);
+
+    // return the collected values
+    for (int n = 0; n <= order; n++)
+        B[n] = (base + n < nspline ? b[n] : T(0.));
+}
+
+}
+
+void Bspline::bsplines (int iknot, Complex r, Complex * const restrict B, Complex * const restrict dB) const
+{
+    // NOTE: The caller's responsibility is to check that 'r' lies in the interval
+    //       bounded by the 'iknot'-th and 'iknot+1'-th knot.
+
+#ifdef _OPENMP
+    unsigned ithread = omp_get_thread_num();
+#else
+    unsigned ithread = 0;
+#endif
+
+    // knots bounding the stencil that the recurrence touches
+    int first = std::max(0, iknot - order_);
+    int last  = std::min(Nknot_ - 1, iknot + order_ + 1);
+
+    // use the real path whenever neither the evaluation point nor the stencil is rotated
+    if (r.imag() == 0 and t_[first].imag() == 0 and t_[last].imag() == 0)
+    {
+        // workspace, followed by the real counterparts of the output arrays
+        Real * const restrict b   = reinterpret_cast<Real*>(work_[ithread].data());
+        Real * const restrict rB  = b  + order_ + 2;
+        Real * const restrict rdB = rB + order_ + 1;
+
+        deboor_all<Real>
+        (
+            iknot, order_, Nspline_, r.real(),
+            [this](int i) -> Real { return t_[i].real(); },
+            b, rB, dB == nullptr ? nullptr : rdB
+        );
+
+        for (int n = 0; n <= order_; n++)
+            B[n] = rB[n];
+
+        if (dB != nullptr)
+        for (int n = 0; n <= order_; n++)
+            dB[n] = rdB[n];
+    }
+    else
+    {
+        Complex * const restrict b = reinterpret_cast<Complex*>(work_[ithread].data());
+
+        deboor_all<Complex>
+        (
+            iknot, order_, Nspline_, r,
+            [this](int i) -> Complex { return t_[i]; },
+            b, B, dB
+        );
+    }
+}
+
+
+// ----------------------------------------------------------------------- //
 //  Evaluation of B-splines on a grid                                      //
 // ----------------------------------------------------------------------- //
 

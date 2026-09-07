@@ -113,6 +113,35 @@ class Bspline
          */
         Complex dspline (int i, int iknot, int k, Complex r) const;
 
+        /**
+         * @brief Evaluate all B-splines that are non-zero on a knot interval.
+         *
+         * Evaluates the (order+1) B-splines @f$ B_{iknot-order}, \dots, B_{iknot} @f$,
+         * which are the only ones that do not vanish between the 'iknot'-th and the
+         * 'iknot+1'-th knot, and optionally also their first derivatives. The results
+         * are the same as those of @ref bspline and @ref dspline called for each of
+         * those splines in turn, but the whole set costs @f$ O(k^2) @f$ instead of
+         * @f$ O(k^3) @f$, because the triangular recurrence is shared by all of them
+         * and the derivatives reuse the splines of the order one lower. Real arithmetic
+         * is used whenever the evaluation point and the whole knot stencil are real.
+         *
+         * The results are stored by increasing spline index, i.e. the element 'n'
+         * belongs to the spline 'iknot - order + n'. Near either end of the grid some
+         * of those splines do not exist (their index is negative, or not below
+         * @ref Nspline); their elements are still written (as zeros), so that both
+         * arrays always have (order+1) elements.
+         *
+         * Note that the evaluation point has to lie in the interval bounded by the
+         * 'iknot'-th and 'iknot+1'-th knot.
+         *
+         * @param iknot Index of the left knot.
+         * @param r     Coordinate (independent variable).
+         * @param B     Array of (order+1) elements to receive the B-splines.
+         * @param dB    Array of (order+1) elements to receive the derivatives,
+         *              or 'nullptr' when the derivatives are not needed.
+         */
+        void bsplines (int iknot, Complex r, Complex * B, Complex * dB = nullptr) const;
+
         /** 
          * @brief B-spline.
          * 

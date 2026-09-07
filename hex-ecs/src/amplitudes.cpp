@@ -859,14 +859,22 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> &
         cArray dj_R0 = special::dric_jv(inp_.Za - 1, inp_.maxell, kf[0], eval_r) * kf[0];
 
         // evaluate B-splines and their derivatives at evaluation radius
+        // - all but the (order+1) B-splines of the evaluation interval vanish there
         cArray Bspline_R0 (Nspline_full), Dspline_R0 (Nspline_full);
-        for (int ispline = 0; ispline < Nspline_full; ispline++)
         {
-            // evaluate B-spline
-            Bspline_R0[ispline] = bspline_full_.bspline(ispline, eval_knot, order, eval_r);
+            cArray B (order + 1), dB (order + 1);
+            bspline_full_.bsplines(eval_knot, eval_r, B.data(), dB.data());
 
-            // evaluate B-spline derivative
-            Dspline_R0[ispline] = bspline_full_.dspline(ispline, eval_knot, order, eval_r);
+            for (int n = 0; n <= order; n++)
+            {
+                int ispline = eval_knot - order + n;
+
+                if (0 <= ispline and ispline < Nspline_full)
+                {
+                    Bspline_R0[ispline] = B[n];
+                    Dspline_R0[ispline] = dB[n];
+                }
+            }
         }
 
         // evaluate Wronskians for angular momentum eigenchannels
@@ -1230,17 +1238,9 @@ Chebyshev<double,Complex> Amplitudes::fcheb (cArrayView const & PsiSc, Real kmax
             int base1 = iknot1 - order;
             int base2 = iknot2 - order;
 
-            // evaluate the B-splines
-            for (int ispline1 = std::max(0,base1); ispline1 <= iknot1; ispline1++)
-            {
-                B1[ispline1-base1]  = bspline_inner_.bspline(ispline1,iknot1,order,r1);
-                dB1[ispline1-base1] = bspline_inner_.dspline(ispline1,iknot1,order,r1);
-            }
-            for (int ispline2 = std::max(0,base2); ispline2 <= iknot2; ispline2++)
-            {
-                B2[ispline2-base2]  = bspline_inner_.bspline(ispline2,iknot2,order,r2);
-                dB2[ispline2-base2] = bspline_inner_.dspline(ispline2,iknot2,order,r2);
-            }
+            // evaluate the B-splines and their derivatives
+            bspline_inner_.bsplines(iknot1, r1, B1.data(), dB1.data());
+            bspline_inner_.bsplines(iknot2, r2, B2.data(), dB2.data());
 
             // evaluate the solution
             Complex Psi = 0., ddr1_Psi = 0., ddr2_Psi = 0., ddrho_Psi = 0.;
