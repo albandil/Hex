@@ -187,7 +187,7 @@ void deboor_all (int iknot, int order, int nspline, T r, KnotFunctor tk, T * con
 
     // return the collected values
     for (int n = 0; n <= order; n++)
-        B[n] = (base + n < nspline ? b[n] : T(0.));
+        B[n] = (0 <= base + n and base + n < nspline ? b[n] : T(0.));
 }
 
 }
@@ -841,6 +841,7 @@ Complex Bspline::eval (const cArrayView coeff, Real x) const
 
 Complex Bspline::eval (const cArrayView coeff, Real x, Real y) const
 {
+    // map real coordinates to complex contour
     Complex w = rotate(x);
     Complex z = rotate(y);
 
@@ -848,24 +849,24 @@ Complex Bspline::eval (const cArrayView coeff, Real x, Real y) const
     int xknot = knot(w);
     int yknot = knot(z);
 
-    // get bounding B-splines
-    int leftxspline = xknot - order_;
-    int rightxspline = xknot;
-    int leftyspline = yknot - order_;
-    int rightyspline = yknot;
-
-    // evaluate B-splines
-    cArray evBx(Nspline_), evBy(Nspline_);
-    for (int ixspline = leftxspline; ixspline <= rightxspline; ixspline++)
-        evBx[ixspline] = bspline(ixspline,xknot,order_,w);
-    for (int iyspline = leftyspline; iyspline <= rightyspline; iyspline++)
-        evBx[iyspline] = bspline(iyspline,yknot,order_,z);
+    // evaluate the B-splines that are non-zero in the evaluation point
+    cArray evBx (order_ + 1), evBy (order_ + 1);
+    bsplines(xknot, w, evBx.data());
+    bsplines(yknot, z, evBy.data());
 
     // sum the expansion
     Complex result = 0.;
-    for (int ixspline = leftxspline; ixspline <= rightxspline; ixspline++)
-    for (int iyspline = leftyspline; iyspline <= rightyspline; iyspline++)
-        result += coeff[ixspline * Nspline_ + iyspline] * evBx[ixspline] * evBy[iyspline];
+    for (int m = 0; m <= order_; m++)
+    for (int n = 0; n <= order_; n++)
+    {
+        int ixspline = xknot - order_ + m;
+        int iyspline = yknot - order_ + n;
+
+        // skip the splines of the set that do not exist
+        if (0 <= ixspline and ixspline < Nspline_ and 0 <= iyspline and iyspline < Nspline_)
+            result += coeff[ixspline * Nspline_ + iyspline] * evBx[m] * evBy[n];
+    }
+
     return result;
 }
 
