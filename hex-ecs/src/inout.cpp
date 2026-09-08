@@ -303,6 +303,7 @@ void CommandLine::parse (int argc, char* argv[])
                         "\t--eigenchannels                  Use angular momentum eigenchannels in extraction to accelerate R-convergence.\n"
                         "\t--extract-rho-begin              Where to start averaging / extrapolating the T-matrix.\n"
                         "\t--extract-rho[-end]              Radius for T-matrix extraction.\n"
+                        "\t--extract-rho-ion                Hyper-radius for ionization amplitude extraction, by default equal to --extract-rho.\n"
                         "\t--extract-samples                Number of evaluations of the T-matrix between --extract-rho-begin and --extract-rho.\n"
                         "\t--extract-extrapolate            Radially extrapolate the extracted T-matrices instead of simple averaging.\n"
                         "\t--runtime-postprocess            Evaluate T-matrices after every iteration.\n"
@@ -850,6 +851,14 @@ void CommandLine::parse (int argc, char* argv[])
                 {
                     // end of averaging/extrapolation window
                     extract_rho = std::atof(optargs[0].c_str());
+                    return true;
+                }
+            },
+            {
+                "extract-rho-ion", "", 1, [&](std::vector<std::string> const & optargs) -> bool
+                {
+                    // hyperradius of the ionization surface integral
+                    extract_rho_ion = std::atof(optargs[0].c_str());
                     return true;
                 }
             },
@@ -1404,6 +1413,47 @@ void InputFile::read (std::ifstream & inf)
             std::cout << "         energy Etot = " << max_Etot << " Ry. Program will use all energetically allowed" << std::endl;
             std::cout << "         asymptotic channels in cases with Etot > Easy." << std::endl;
 
+        }
+
+        // Check that the complex grid can absorb the fastest wave in the calculation.
+        //   In the exterior complex-scaled region the outgoing wave exp(i k r) turns into
+        //   exp(i k r cos(theta)) exp(-k r sin(theta)), so it dies away over the length
+        //       l = 1 / (k sin(theta)) .
+        //   The B-spline basis has to resolve that decay; once the first complex interval
+        //   grows to the order of 'l' the absorber starts to reflect, and the reflected
+        //   flux contaminates the solution in a layer reaching back into the real grid.
+        //   It shows up first in the ionization amplitude, whose surface integral is by
+        //   default evaluated at the very end of the real grid.
+
+        if (cknots.size() > 1 and max_Etot > 0)
+        {
+            // fastest wave: the projectile in the elastic channel of the most bound
+            // initial state, k^2 = Etot + Za^2/ni^2
+            int ni_min = 0;
+            for (auto state : instates)
+                if (ni_min == 0 or std::get<0>(state) < ni_min)
+                    ni_min = std::get<0>(state);
+
+            if (ni_min > 0)
+            {
+                Real kmax = std::sqrt(max_Etot + Real(Za*Za) / (ni_min*ni_min));
+                Real decay = 1. / (kmax * std::sin(ecstheta));
+                Real h = cknots[1] - cknots[0];
+
+                if (h > 0.75 * decay)
+                {
+                    std::cout << std::endl;
+                    std::cout << "Warning: The complex region may be too coarse to absorb the fastest wave." << std::endl;
+                    std::cout << "         At the highest total energy, Etot = " << max_Etot << " Ry, the outgoing wave" << std::endl;
+                    std::cout << "         decays over" << std::endl;
+                    std::cout << "         1/(k sin(theta)) = " << decay << " a.u. behind the turning point, but the first" << std::endl;
+                    std::cout << "         complex interval is " << h << " a.u. The absorber will reflect, and the" << std::endl;
+                    std::cout << "         reflected flux biases the extracted amplitudes near the end of the real" << std::endl;
+                    std::cout << "         grid, the ionization one most of all." << std::endl;
+                    std::cout << "         Use a first complex interval of " << 0.75 * decay << " a.u. or less, or keep the" << std::endl;
+                    std::cout << "         ionization surface well inside the real grid with --extract-rho-ion." << std::endl;
+                }
+            }
         }
     }
 

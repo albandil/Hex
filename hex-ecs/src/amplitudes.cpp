@@ -1168,6 +1168,55 @@ void Amplitudes::writeMultiDipoles_(Amplitudes::Transition T)
     }
 }
 
+/**
+ * @brief Is a Chebyshev expansion resolved?
+ *
+ * True when the trailing coefficients have all fallen below @c eps times the largest
+ * one, which is what an expansion that has run out of structure looks like.
+ *
+ * @note This deliberately does not use @ref Chebyshev::tail, which returns the first
+ *       coefficient that is small next to the running sum of their magnitudes. The
+ *       radial ionization amplitude carries the residual interference of the finite
+ *       extraction radius, so its coefficients oscillate, and any one of them passing
+ *       through a node satisfies that condition by accident. Measured on the L = 0
+ *       run at a total energy of 30 Ry and rho = 500, the expansion genuinely needs
+ *       about 1950 coefficients -- the spectrum stays near four per cent of its
+ *       maximum until it drops off a cliff there -- yet the old test ended the
+ *       doubling at N = 1024 for three of the fourteen angular blocks, among them the
+ *       two that carry most of the cross section. Half of their spectrum was then
+ *       missing and aliased back onto what was kept, which is positive-definite in
+ *       |Xi|^2 and pushed the cross section up by a factor of two, erratically,
+ *       wherever the accident happened to strike.
+ *
+ * The last N/32 coefficients are tested. On the same run that leaves the resolved
+ * blocks passing with three orders of magnitude to spare while all three truncated
+ * ones fail, so the outcome does not depend on the exact fraction.
+ */
+static bool cheb_resolved (Chebyshev<double,Complex> const & CB, double eps)
+{
+    NumberArray<Complex> const & C = CB.coeffs();
+    int N = C.size();
+
+    if (N < 8)
+        return false;
+
+    double Cmax = 0;
+    for (int k = 0; k < N; k++)
+        Cmax = std::max(Cmax, std::abs(C[k]));
+
+    // a expansion that is identically zero has nothing left to resolve
+    if (Cmax == 0.)
+        return true;
+
+    for (int k = N - std::max(4, N/32); k < N; k++)
+    {
+        if (std::abs(C[k]) > eps * Cmax)
+            return false;
+    }
+
+    return true;
+}
+
 Chebyshev<double,Complex> Amplitudes::fcheb (cArrayView const & PsiSc, Real kmax, int l1, int l2)
 {
     // shorthands
@@ -1176,8 +1225,19 @@ Chebyshev<double,Complex> Amplitudes::fcheb (cArrayView const & PsiSc, Real kmax
     int Nreknot = bspline_inner_.Nreknot();
     int order   = bspline_inner_.order();
 
-    // determine evaluation radius
-    Real rho = (cmd_.extract_rho > 0) ? cmd_.extract_rho : t[Nreknot-2].real();
+    // Determine the hyperradius of the surface integral.
+    //   The default is the last real knot, which is the worst place to put it: the
+    //   surface then lies on the complex-scaling boundary, where the basis is one-sided
+    //   and the absorber is at work, and the amplitude comes out contaminated. At a
+    //   total energy of 30 Ry on the R = 500 grid that default overestimates the
+    //   ionization cross section by a factor of 2.7, while every radius between 250 and
+    //   400 agrees to one part in ten thousand. Prefer 'extract-rho-ion', which is not
+    //   tied to the T-matrix window and can therefore be placed well inside.
+    Real rho = bspline_inner_.R2()/2;
+    if (cmd_.extract_rho_ion > 0)
+        rho = cmd_.extract_rho_ion;
+    else if (cmd_.extract_rho > 0)
+        rho = cmd_.extract_rho;
 
     // debug output
     //std::ofstream dbg ("debug.log");
@@ -1314,13 +1374,20 @@ Chebyshev<double,Complex> Amplitudes::fcheb (cArrayView const & PsiSc, Real kmax
             // build the approximation
             CB.generate(fLSl1l2k1k2, N, 0., kmax);
 
-            // check tail
-            if (CB.tail(1e-5) != N)
+            // check that the expansion has run out of structure
+            if (cheb_resolved(CB, 1e-5))
                 break;
 
             // limit subdivision
             if (N > 32768)
-                HexException("ERROR: Non-convergent Chebyshev expansion.");
+                HexException
+                (
+                    "ERROR: Chebyshev expansion of the ionization amplitude did not "
+                    "converge for l1 = %d, l2 = %d at kmax = %g (rho = %g). The number "
+                    "of coefficients needed grows with the extraction radius, so a "
+                    "smaller --extract-rho will bring it down.",
+                    l1, l2, kmax, rho
+                );
         }
     }
 

@@ -105,7 +105,7 @@ class CommandLine
               lightweight_full(false), lightweight_radial_cache(false), shared_scratch(false), reuse_dia_blocks(false),
               kpa_simple_rad(false), ocl_platform(0), ocl_device(-1), factorizer("umfpack"), groupsize(1),
               parallel_factorization(false), parallel_extraction(true), ilu_max_iter(10), max_sub_iter(0), fail_on_sub_iter(true),
-              carry_initial_guess(false), gpu_multiply(false), extract_extrapolate(false), extract_rho(-1), extract_rho_begin(-1), extract_samples(-1),
+              carry_initial_guess(false), gpu_multiply(false), extract_extrapolate(false), extract_rho(-1), extract_rho_begin(-1), extract_rho_ion(-1), extract_samples(-1),
               refine_solution(false), map_solution(), map_solution_target(), ssor(-1), noluupdate(false), coupling_limit(-1), couple_all(true),
               mumps_outofcore(false), mumps_verbose(0), mumps_relax(20), kpa_drop(-1), write_intermediate_solutions(false),
               fast_bessel(false), hyb_additional_levels(0), multigrid_depth(0), multigrid_coarse_prec(0), dom_x_panels(1), dom_y_panels(1),
@@ -249,6 +249,12 @@ class CommandLine
 
         /// Radial distance where to start radial averaging/extrapolation of the T-matrix.
         Real extract_rho_begin;
+
+        /// Hyperradius of the surface integral that extracts the ionization amplitude.
+        /// Independent of @ref extract_rho, which is the end of the T-matrix window and
+        /// cannot be pushed below half the grid; the ionization surface has no such
+        /// restriction and is best placed well inside the complex-scaling boundary.
+        Real extract_rho_ion;
 
         /// Extraction averaging/extrapolation sample count.
         int extract_samples;
