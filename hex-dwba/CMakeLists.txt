@@ -37,6 +37,7 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
 
 set(hex-dwba_SOURCES
     "src/dwba.cpp"
+    "src/ionization.cpp"
     "src/potential.cpp"
     "src/ui.cpp"
     "src/wave_distort.cpp"

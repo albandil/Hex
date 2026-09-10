@@ -434,6 +434,32 @@ Complex ric_j (int n, Complex z);
  */
 cArray ric_jv (int Z, int lmax, double k, Complex r, bool fast_bessel = false);
 
+/**
+ * @brief Unallocated vectorized interface for the spherical Bessel functions.
+ *
+ * Fills @c j with @f$ j_0(x) \dots j_{lmax}(x) @f$. Unlike @ref ric_jv this writes into
+ * a caller-supplied buffer and works in plain double precision, so it can be used in a
+ * hot loop without allocating.
+ *
+ * The array routines of GSL cannot be handed the whole range blindly. For a large
+ * @c lmax and a small argument @c gsl_sf_bessel_jl_steed_array fills the array with NaN
+ * while reporting success, and @c gsl_sf_bessel_jl_array underflows it to zero,
+ * @f$ j_0 @f$ included. Both misbehave only where the high orders have long underflowed
+ * -- @f$ j_l(x) @f$ falls off super-exponentially once @f$ l @f$ passes @f$ x @f$ -- so
+ * only the orders that are still representable are asked for, with a margin around the
+ * turning point @f$ l \approx x @f$ whose width grows as @f$ x^{1/3} @f$, and the rest
+ * is set to the zero it would underflow to.
+ *
+ * Evaluating the whole array at once also costs @f$ O(l_{max}) @f$ rather than the
+ * @f$ O(l_{max}^2) @f$ of calling @ref ric_j for every order in turn, each of which
+ * starts its own continued fraction.
+ *
+ * @param lmax Angular momentum limit.
+ * @param x Argument.
+ * @param j Output buffer of lmax + 1 elements.
+ */
+void sph_jv (int lmax, double x, double * j);
+
 /** Derivative of Riccati-Bessel function
  * 
  * @param n Degree of the function.

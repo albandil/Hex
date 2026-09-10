@@ -196,6 +196,42 @@ Complex special::cfgamma (Complex s, Complex z)
     return cf * std::pow(z,s) * std::exp(-z);
 }
 
+void special::sph_jv (int lmax, double x, double * j)
+{
+    for (int l = 0; l <= lmax; l++)
+        j[l] = 0.;
+
+    if (x <= 0.)
+    {
+        j[0] = 1.;
+        return;
+    }
+
+    // last order that is not hopelessly beyond the turning point l ~ x
+    int lcut = std::min<int>(lmax, (int)std::ceil(x + 6. * std::cbrt(std::max(x,1.))) + 30);
+
+    if (gsl_sf_bessel_jl_steed_array(lcut, x, j) == GSL_SUCCESS)
+    {
+        bool ok = true;
+        for (int l = 0; l <= lcut and ok; l++)
+            ok = std::isfinite(j[l]);
+
+        if (ok)
+        {
+            for (int l = lcut + 1; l <= lmax; l++)
+                j[l] = 0.;
+            return;
+        }
+    }
+
+    // fall back to the scalar routine, which is slower but never silently wrong
+    for (int l = 0; l <= lmax; l++)
+    {
+        gsl_sf_result r;
+        j[l] = (l <= lcut and gsl_sf_bessel_jl_e(l, x, &r) == GSL_SUCCESS ? r.val : 0.);
+    }
+}
+
 cArray special::ric_jv (int Z, int lmax, double k, Complex r, bool fast_bessel)
 {
     // results

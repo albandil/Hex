@@ -29,6 +29,7 @@
 //                                                                                   //
 //  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
+#include <algorithm>
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
@@ -38,6 +39,7 @@
 #include <vector>
 
 #include <gsl/gsl_errno.h>
+#include <gsl/gsl_integration.h>
 #include <gsl/gsl_sf.h>
 
 #include "hex-arrays.h"
@@ -350,15 +352,302 @@ double cross_section (int n, int l, double Ei)
 
 // --------------------------------------------------------------------------------- //
 
+//
+// Total plane-wave Born cross section (no exchange) for the ionization
+//
+//     e(k_i) + H(1s)  ->  e(k_f) + p + e(kappa) ,
+//
+// obtained from the very same first-order amplitude as the excitations above, with
+// the bound final state replaced by a continuum state of the ejected electron. The
+// continuum state is normalized to the delta-function in the momentum,
+//
+//     P_{kappa,l}(r) = sqrt(2/pi) F_l(-1/kappa, kappa r) ,
+//
+//     int_0^infty P_{kappa,l}(r) P_{kappa',l}(r) dr = delta(kappa - kappa') ,
+//
+// so that the sum over the final states is int dkappa sum_{l m}. This is the same
+// function as Hydrogen::F up to the factor 1/kappa that the latter carries as part
+// of the normalization of the full three-dimensional scattering state.
+//
+// Nothing else changes. The screening term of the potential V = 1/|R - r| - 1/R
+// again enters only through the overlap <f|1s>, which now vanishes identically by
+// the orthogonality of the continuum to the bound spectrum, exactly as it does for
+// every excitation; the initial state is still spherical, so a final partial wave
+// "l" is again fed by the single multipole "l" alone. Therefore
+//
+//     M_l(q,kappa) = int_0^infty P_{kappa,l}(r) j_l(qr) P_1s(r) dr
+//
+// plays the role of the bound form factor (*), and the derivation carries over term
+// by term, leaving the singly differential cross section
+//
+//     dsigma/dkappa = 8 pi / k_i^2 sum_l (2l+1)
+//                     int_{|k_i-k_f|}^{k_i+k_f} M_l(q,kappa)^2 dq / q^3
+//
+// with the energy conservation  E_i = 1 + kappa^2 + k_f^2  fixing k_f, and finally
+//
+//     sigma = int_0^{sqrt(E_i - 1)} dsigma/dkappa dkappa .
+//
+// The ejected electron is the atomic one and the scattered electron is the
+// projectile: they are distinguishable at this order, the full range of kappa is
+// integrated over, and each ionization event is counted once.
+//
+// Unlike the bound form factor, M_l(q,kappa) has no elementary closed form, so it is
+// integrated numerically. Doing that adaptively for every momentum transfer anew is
+// ruinously slow, because each evaluation of the integrand costs a Coulomb function.
+// Instead the radial integral is discretized once per (kappa, l) on a composite
+// Gauss-Legendre grid whose panels resolve the fastest oscillation present, and the
+// form factor is then a plain dot product for every q. The integrand is the product
+// of the continuum function with P_1s, so it is damped by exp(-r) and the grid can
+// stop at a modest radius. Against the closed forms above, evaluated for the bound
+// transitions, the same grid reproduces the form factor to thirteen digits.
+//
+
+// --------------------------------------------------------------------------------- //
+
+/// Radial extent of the quadrature grid; the integrand is damped by exp(-r) from P_1s.
+static const double ION_RMAX = 30.;
+
+/// Gauss-Legendre panels per wavelength of the fastest oscillation, and their order.
+static const double ION_PANELS_PER_WAVE = 2.;
+static const int    ION_GL_ORDER        = 16;
+
+/// Panels x order used for the momentum-transfer and the ejected-momentum integrals.
+static const int    ION_Q_PANELS        = 4;
+static const int    ION_K_PANELS        = 4;
+
+/**
+ * @brief Composite Gauss-Legendre nodes and weights on an interval.
+ */
+void gauss_legendre_nodes
+(
+    double a, double b, int panels, int order,
+    std::vector<double> & x, std::vector<double> & w
+)
+{
+    x.clear(); w.clear();
+    x.reserve(panels*order); w.reserve(panels*order);
+
+    gsl_integration_glfixed_table * tab = gsl_integration_glfixed_table_alloc(order);
+    double h = (b - a) / panels;
+
+    for (int p = 0; p < panels; p++)
+    {
+        for (int i = 0; i < order; i++)
+        {
+            double xi, wi;
+            gsl_integration_glfixed_point(a + p*h, a + (p+1)*h, i, &xi, &wi, tab);
+            x.push_back(xi); w.push_back(wi);
+        }
+    }
+
+    gsl_integration_glfixed_table_free(tab);
+}
+
+/**
+ * @brief Regular Coulomb functions F_0 ... F_lmax at a single radius.
+ *
+ * The array routine of GSL degrades as its highest order grows: the recursion, which
+ * descends from that order, fails outright for a part of the arguments needed here and
+ * loses accuracy in the rest. The remedy is the same as for the Bessel functions --
+ * ask only for the orders that can carry any weight. The classical turning point of
+ * the partial wave @f$ l @f$ lies at
+ * @f[
+ *     r_t(l) = \frac{\sqrt{1 + k^2 l(l+1)} - 1}{k^2}
+ *     \qquad \Longleftrightarrow \qquad
+ *     l(l+1) = 2r + k^2 r^2 \,,
+ * @f]
+ * so at a given radius every order above @c lcut below sits under the centrifugal
+ * barrier with a wide margin and is set to zero. Should the recursion still fail on
+ * the orders that were asked for, the scalar routine takes over; it carries its own
+ * asymptotic and WKB branches, but only within the barrier are those reliable, which
+ * is why it is never called above @c lcut either.
+ *
+ * The functions are returned in the plain Coulomb normalization, i.e. without the
+ * factor sqrt(2/pi) of the momentum-normalized radial function.
+ *
+ * @param k Momentum of the continuum electron.
+ * @param lmax Highest order requested.
+ * @param r Radius.
+ * @param F Output array of lmax + 1 elements.
+ */
+void coulomb_F_array (double k, int lmax, double r, double * F)
+{
+    for (int l = 0; l <= lmax; l++)
+        F[l] = 0.;
+
+    if (r <= 0. or k <= 0.)
+        return;
+
+    // highest order that is not hopelessly under the centrifugal barrier
+    double lturn = std::sqrt(2.*r + k*k*r*r);
+    int lcut = std::min<int>(lmax, (int)std::ceil(lturn) + 20);
+
+    double expF = 0.;
+    int err = gsl_sf_coulomb_wave_F_array(0., lcut, -1./k, k*r, F, &expF);
+
+    bool ok = ((err == GSL_SUCCESS or err == GSL_EUNDRFLW) and std::isfinite(expF));
+
+    if (ok)
+    {
+        double scale = std::exp(expF);
+        for (int l = 0; l <= lcut and ok; l++)
+        {
+            F[l] *= scale;
+            ok = std::isfinite(F[l]);
+        }
+    }
+
+    if (not ok)
+    {
+        for (int l = 0; l <= lcut; l++)
+        {
+            // Hydrogen::F carries the sqrt(2/pi)/k normalization of the free state
+            double v = k * Hydrogen::F(k,l,r) / special::constant::sqrt_two * special::constant::sqrt_pi;
+            F[l] = (std::isfinite(v) ? v : 0.);
+        }
+    }
+
+    for (int l = lcut + 1; l <= lmax; l++)
+        F[l] = 0.;
+}
+
+/**
+ * @brief Singly differential Born cross section for ionization.
+ *
+ * Returns @f$ \mathrm{d}\sigma/\mathrm{d}\kappa @f$ at the ejected momentum "kappa",
+ * summed over the angular momenta of the ejected electron. The sum is truncated where
+ * the highest orders no longer contribute; the estimate of the truncation point is
+ * kinematic, and is raised until the last few orders are negligible, so that the
+ * result does not depend on it.
+ *
+ * @param Ei Impact energy (Ry).
+ * @param kappa Momentum of the ejected electron (a.u.).
+ */
+double dsigma_dkappa (double Ei, double kappa)
+{
+    double ki = std::sqrt(Ei);
+    double Ef = Ei - 1. - kappa * kappa;
+
+    // no room left for the scattered electron (or none for the ejected one)
+    if (Ef <= 0. or kappa <= 0.)
+        return 0;
+
+    double kf = std::sqrt(Ef);
+    double qmin = std::abs(ki - kf), qmax = ki + kf;
+
+    if (qmin <= 0. or qmax <= qmin)
+        return 0;
+
+    // radial grid, resolving the fastest oscillation of the integrand
+    std::vector<double> r, wr;
+    int rpanels = std::max(1, (int)std::ceil(ION_RMAX * (kappa + qmax)
+                                             / (2 * special::constant::pi) * ION_PANELS_PER_WAVE));
+    gauss_legendre_nodes(0., ION_RMAX, rpanels, ION_GL_ORDER, r, wr);
+    std::size_t N = r.size();
+
+    // momentum transfer grid, in the logarithmic variable (dq/q^3 -> exp(-2t) dt)
+    std::vector<double> t, wt;
+    gauss_legendre_nodes(std::log(qmin), std::log(qmax), ION_Q_PANELS, ION_GL_ORDER, t, wt);
+
+    // the 1s function is independent of everything that is iterated below
+    std::vector<double> P1s(N);
+    for (std::size_t i = 0; i < N; i++)
+        P1s[i] = Hydrogen::P(1,0,r[i]);
+
+    for (int lmax = (int)std::ceil(4. * (kappa + qmax)) + 12; ; lmax += 32)
+    {
+        // A[l][i] = w_i P_{kappa,l}(r_i) P_1s(r_i)
+        std::vector<double> A ((lmax+1) * N), F (lmax+1);
+        for (std::size_t i = 0; i < N; i++)
+        {
+            coulomb_F_array(kappa, lmax, r[i], F.data());
+
+            for (int l = 0; l <= lmax; l++)
+                A[l*N+i] = wr[i] * special::constant::sqrt_two / special::constant::sqrt_pi * F[l] * P1s[i];
+        }
+
+        // S[l] = int M_l(q,kappa)^2 dq / q^3
+        std::vector<double> S (lmax+1, 0.), M (lmax+1), j (lmax+1);
+        for (std::size_t n = 0; n < t.size(); n++)
+        {
+            double q = std::exp(t[n]);
+
+            std::fill(M.begin(), M.end(), 0.);
+            for (std::size_t i = 0; i < N; i++)
+            {
+                special::sph_jv(lmax, q * r[i], j.data());
+
+                for (int l = 0; l <= lmax; l++)
+                    M[l] += A[l*N+i] * j[l];
+            }
+
+            for (int l = 0; l <= lmax; l++)
+                S[l] += wt[n] * M[l] * M[l] / (q * q);
+        }
+
+        // every term is non-negative, so the truncation error is bounded by the tail
+        double sum = 0, tail = 0;
+        for (int l = 0; l <= lmax; l++)
+        {
+            double c = (2*l + 1) * S[l];
+            sum += c;
+            if (l >= lmax - 2)
+                tail += c;
+        }
+
+        if (sum == 0. or tail < 1e-10 * sum or lmax > 400)
+            return 8. * special::constant::pi / (ki * ki) * sum;
+    }
+}
+
+/**
+ * @brief Total Born cross section for ionization.
+ *
+ * Integrates @ref dsigma_dkappa over the momentum of the ejected electron. The
+ * substitution @f$ \kappa = \kappa_{\max} \sin\varphi @f$ is used: at the upper end
+ * the interval of the momentum transfer closes as
+ * @f$ q_{\max} - q_{\min} = 2k_f = 2\sqrt{\kappa_{\max}^2 - \kappa^2} @f$, which leaves
+ * a square-root edge in @f$ \kappa @f$ that would cripple the convergence of the
+ * quadrature; in @f$ \varphi @f$ the integrand is smooth at both ends and a few dozen
+ * nodes exhaust it.
+ *
+ * @param Ei Impact energy (Ry).
+ */
+double cross_section_ionization (double Ei)
+{
+    // nothing to do below the ionization threshold
+    if (Ei <= 1.)
+        return 0;
+
+    double kmax = std::sqrt(Ei - 1.);
+
+    std::vector<double> phi, wphi;
+    gauss_legendre_nodes(0., 0.5 * special::constant::pi, ION_K_PANELS, ION_GL_ORDER, phi, wphi);
+
+    double sigma = 0;
+
+    # pragma omp parallel for schedule (dynamic) reduction (+:sigma)
+    for (std::size_t i = 0; i < phi.size(); i++)
+        sigma += wphi[i] * kmax * std::cos(phi[i]) * dsigma_dkappa(Ei, kmax * std::sin(phi[i]));
+
+    return sigma;
+}
+
+// --------------------------------------------------------------------------------- //
+
 const std::string usage =
     "\nUsage:\n\n"
-    "  hex-fullborn [--form-factor] <n> <l> [<x> ...]\n\n"
+    "  hex-fullborn [--form-factor] <n> <l> [<x> ...]\n"
+    "  hex-fullborn --ionization [<x> ...]\n\n"
     "Writes the total plane-wave Born cross section (no exchange) of the 1s -> nl\n"
     "transition in hydrogen, summed over the final magnetic sublevels, for every\n"
     "impact energy <x> given. The elastic channel is obtained with n = 1, l = 0.\n"
     "With \"--form-factor\" the screened multipole Born form factor M_l(q) is written\n"
-    "instead, for every momentum transfer <x> given. When no <x> is given on the\n"
-    "command line, the values are read from the standard input.\n\n"
+    "instead, for every momentum transfer <x> given. With \"--ionization\" the total\n"
+    "cross section of 1s -> continuum is written, integrated over the energy and\n"
+    "summed over the angular momentum of the ejected electron; <n> and <l> are then\n"
+    "not used. When no <x> is given on the command line, the values are read from\n"
+    "the standard input.\n\n"
     "Energies are in Rydbergs, momenta in atomic units, cross sections in a_0^2.\n\n";
 
 int main (int argc, char * argv[])
@@ -366,47 +655,72 @@ int main (int argc, char * argv[])
     // do not let GSL abort on underflows; they are legitimate here
     gsl_set_error_handler_off();
 
-    bool ff = false;
+    bool ff = false, ion = false;
     std::vector<const char*> args;
 
     for (int iarg = 1; iarg < argc; iarg++)
     {
         if (std::strcmp(argv[iarg],"--form-factor") == 0)
             ff = true;
+        else if (std::strcmp(argv[iarg],"--ionization") == 0)
+            ion = true;
         else
             args.push_back(argv[iarg]);
     }
 
-    if (args.size() < 2)
+    if (ff and ion)
+    {
+        std::cerr << "The options \"--form-factor\" and \"--ionization\" are mutually exclusive." << std::endl;
+        return EXIT_FAILURE;
+    }
+
+    // the ionization channel is not labelled by a final bound state
+    std::size_t first = (ion ? 0 : 2);
+
+    if (args.size() < first)
     {
         std::cout << usage;
         return EXIT_FAILURE;
     }
 
-    int n = std::atoi(args[0]);
-    int l = std::atoi(args[1]);
+    int n = 0, l = 0;
 
-    if (n < 1 or l < 0 or l >= n)
+    if (not ion)
     {
-        std::cerr << "Invalid final state (" << n << "," << l << ")." << std::endl;
-        return EXIT_FAILURE;
+        n = std::atoi(args[0]);
+        l = std::atoi(args[1]);
+
+        if (n < 1 or l < 0 or l >= n)
+        {
+            std::cerr << "Invalid final state (" << n << "," << l << ")." << std::endl;
+            return EXIT_FAILURE;
+        }
     }
 
     std::cout << std::scientific << std::setprecision(10);
 
-    std::cout << "# Plane-wave Born (no exchange) cross section, 1s -> " << Hydrogen::stateName(n,l) << std::endl;
-
-    if (n == 1)
-        std::cout << "# elastic channel, screened by the attraction to the nucleus" << std::endl;
+    if (ion)
+    {
+        std::cout << "# Plane-wave Born (no exchange) cross section, 1s -> ionization" << std::endl;
+        std::cout << "# ionization threshold: " << 1. << " Ry" << std::endl;
+        std::cout << "# Ei [Ry]\tsigma [a_0^2]" << std::endl;
+    }
     else
-        std::cout << "# excitation threshold: " << 1. - 1./(n*n) << " Ry" << std::endl;
-    std::cout << (ff ? "# q [a.u.]\tM_l(q)" : "# Ei [Ry]\tsigma [a_0^2]") << std::endl;
+    {
+        std::cout << "# Plane-wave Born (no exchange) cross section, 1s -> " << Hydrogen::stateName(n,l) << std::endl;
+
+        if (n == 1)
+            std::cout << "# elastic channel, screened by the attraction to the nucleus" << std::endl;
+        else
+            std::cout << "# excitation threshold: " << 1. - 1./(n*n) << " Ry" << std::endl;
+        std::cout << (ff ? "# q [a.u.]\tM_l(q)" : "# Ei [Ry]\tsigma [a_0^2]") << std::endl;
+    }
 
     // collect the abscissae from the command line, or from the standard input when there are none
     rArray xs;
-    if (args.size() > 2)
+    if (args.size() > first)
     {
-        for (std::size_t i = 2; i < args.size(); i++)
+        for (std::size_t i = first; i < args.size(); i++)
             xs.push_back(std::atof(args[i]));
     }
     else
@@ -416,7 +730,12 @@ int main (int argc, char * argv[])
     }
 
     for (double x : xs)
-        std::cout << x << "\t" << (ff ? formfactor(n,l,x) : cross_section(n,l,x)) << std::endl;
+    {
+        double y = (ion ? cross_section_ionization(x)
+                        : (ff ? formfactor(n,l,x) : cross_section(n,l,x)));
+
+        std::cout << x << "\t" << y << std::endl;
+    }
 
     return EXIT_SUCCESS;
 }

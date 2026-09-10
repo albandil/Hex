@@ -47,6 +47,7 @@
 // --------------------------------------------------------------------------------- //
 
 #include "dwba.h"
+#include "ionization.h"
 
 // --------------------------------------------------------------------------------- //
 
@@ -57,9 +58,13 @@ using special::constant::pi;
 std::string help_text =
     "Usage:\n"
     "\thex-dwba [options] <ni> <li> <nf> <lf> <Ei> <L> [<rmax>]\n"
+    "\thex-dwba --ionization <Ei> <L>\n"
     "\n"
     "Available options:\n"
     "\t--help           display this help\n"
+    "\t--ionization     partial ionization cross sections of H(1s) in the plane\n"
+    "\t                 wave Born approximation, without exchange; the atomic\n"
+    "\t                 quantum numbers and <rmax> are then not used\n"
     "\t--nodistort      compute only plane wave Born approximation\n"
     "\t--nodirect       skip computation of direct T-matrix\n"
     "\t--noexchange     skip computation of exchange T-matrix\n"
@@ -91,7 +96,7 @@ int main (int argc, char *argv[])
     // parse command line
     //
 
-    bool distort = true, direct = true, exchange = true, subtract = false;
+    bool distort = true, direct = true, exchange = true, subtract = false, ionization = false;
     std::vector<const char*> params;
     for (int iarg = 1; iarg < argc; iarg++)
     {
@@ -125,6 +130,11 @@ int main (int argc, char *argv[])
                 std::cout << "Not computing exchange contribution." << std::endl;
                 exchange = false;
             }
+            else if (param == std::string("ionization"))
+            {
+                std::cout << "Computing partial ionization cross sections." << std::endl;
+                ionization = true;
+            }
             else if (param == std::string("subtract"))
             {
                 std::cout << "Calculating Born subtraction data." << std::endl;
@@ -143,6 +153,63 @@ int main (int argc, char *argv[])
         }
     }
     std::cout << std::endl;
+
+    //
+    // ionization: the final state is the continuum, so only the energy and the total
+    // angular momenta are read; everything else of the excitation interface is unused
+    //
+
+    if (ionization)
+    {
+        if (params.size() < 2)
+        {
+            std::cout << std::endl << help_text << std::endl;
+            std::exit(EXIT_SUCCESS);
+        }
+
+        double Ei = strtod(params[0], 0);
+        Range<int> Ls (params[1]);
+
+        if (Ls.first < 0)
+            HexException("The total angular momentum cannot be negative.");
+
+        std::cout << "Initial quantum numbers" << std::endl;
+        std::cout << "\thydrogen Ni = 1" << std::endl;
+        std::cout << "\thydrogen Li = 0" << std::endl;
+        std::cout << "\tprojectile ki = " << std::sqrt(Ei) << std::endl << std::endl;
+        std::cout << "Final quantum numbers" << std::endl;
+        std::cout << "\thydrogen: continuum, 0 to " << Ei - 1. << " Ry" << std::endl;
+        if (Ls.first == Ls.last)
+            std::cout << "\ttotal L = " << Ls.first << std::endl << std::endl;
+        else
+            std::cout << "\ttotal L = " << Ls.first << " ... " << Ls.last << std::endl << std::endl;
+
+        std::cout << "Running the computation..." << std::endl << std::endl;
+
+        rArray sigma;
+        int lamax = 0;
+
+        pwba_ionization (Ei, Ls.first, Ls.last, sigma, lamax);
+
+        std::cout << "Ejected electron angular momenta used: 0 ... " << lamax << std::endl << std::endl;
+        std::cout << std::setw(10) << std::right << "E [Ry]"
+                  << std::setw(6)  << "L"
+                  << "    " << std::left << "sigma [a0^2]" << std::endl;
+
+        double sum = 0;
+        for (int L = Ls.first; L <= Ls.last; L++)
+        {
+            std::cout << std::setw(10) << std::right << Ei
+                      << std::setw(6)  << L
+                      << "    " << std::left << sigma[L - Ls.first] << std::endl;
+            sum += sigma[L - Ls.first];
+        }
+
+        std::cout << std::endl << "Sum over the computed L: " << sum << std::endl;
+        std::cout << std::endl << "Done." << std::endl << std::endl;
+
+        return 0;
+    }
 
     // add default rmax
     params.push_back("-1");
