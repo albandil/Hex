@@ -29,78 +29,45 @@
 ##                                                                                   ##
 ## --------------------------------------------------------------------------------- ##
 
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
-set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
+# Finds the BOINC client libraries, needed to build Hex as a BOINC application.
+#
+# Looked for in this order:
+#   1. BOINC_LIBRARIES, if the user has set it -- taken as given, not verified
+#   2. a plain search for boinc_api.h, libboinc_api and libboinc
+#
+# The two libraries have to be linked in this order: libboinc_api calls into
+# libboinc, not the other way round.
+#
+# Results: BOINC_FOUND, BOINC_INCLUDE_DIRS, BOINC_LIBRARIES, BOINC::BOINC
 
-set(libhex-common_SOURCES
-    "hex-arrays.cpp"
-    "hex-blas.cpp"
-    "hex-born.cpp"
-    "hex-hdffile.cpp"
-    "hex-hydrogen.cpp"
-    "hex-matrix.cpp"
-    "hex-misc.cpp"
-    "hex-special.cpp"
-    "hex-spgrid.cpp"
-    "hex-symbolic.cpp"
-    "hex-vec3d.cpp"
-    "hex-version.cpp"
-    "hex-vtkfile.cpp"
-)
+include("${CMAKE_CURRENT_LIST_DIR}/HexFindHelper.cmake")
 
-if(HDF5_FOUND)
-    set(libhex-common_SOURCES ${libhex-common_SOURCES} "hex-h5file.cpp")
+if(BOINC_LIBRARIES)
+
+    hex_find_result(BOINC
+        REQUIRED_VARS BOINC_LIBRARIES
+        TARGET        BOINC::BOINC
+        INCLUDE_DIRS  ${BOINC_INCLUDE_DIRS}
+        LIBRARIES     ${BOINC_LIBRARIES}
+    )
+
+    return()
+
 endif()
 
-add_library(libhex-common SHARED ${libhex-common_SOURCES})
-
-set_target_properties(libhex-common PROPERTIES PREFIX "")
-
-target_include_directories(libhex-common PUBLIC
-    ../libs
+find_path(BOINC_INCLUDE_DIR
+    NAMES boinc_api.h
+    PATH_SUFFIXES boinc BOINC
 )
 
-# PUBLIC throughout: the installed headers of libhex-common include the headers of
-# GSL, HDF5, CLN/GiNaC and png++, so its consumers need them too. The Hex::* targets
-# are empty for the dependencies that are switched off, hence no conditionals here.
-target_link_libraries(libhex-common PUBLIC
-    Hex::config
-    Hex::blas
-    Hex::boinc
-    Hex::cln
-    Hex::ginac
-    Hex::gsl
-    Hex::hdf5
-    Hex::lapack
-    Hex::mpi
-    Hex::openmp
-    Hex::png
+find_library(BOINC_API_LIBRARY NAMES boinc_api)
+find_library(BOINC_LIBRARY     NAMES boinc)
+
+hex_find_result(BOINC
+    REQUIRED_VARS BOINC_API_LIBRARY BOINC_LIBRARY BOINC_INCLUDE_DIR
+    TARGET        BOINC::BOINC
+    INCLUDE_DIRS  ${BOINC_INCLUDE_DIR}
+    LIBRARIES     ${BOINC_API_LIBRARY} ${BOINC_LIBRARY}
 )
 
-## --------------------------------------------------------------------------------- ##
-
-if(BUILD_TESTING)
-    add_subdirectory(test)
-endif()
-
-## --------------------------------------------------------------------------------- ##
-
-install(TARGETS libhex-common
-    RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
-    LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
-    ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
-)
-
-install(DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/"
-    DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/hex"
-    FILES_MATCHING
-    PATTERN "test" EXCLUDE
-    PATTERN "*.h"
-)
-
-# bundled header-only libraries used by the public headers above
-install(DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/../libs/png++"
-    DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/hex"
-    FILES_MATCHING PATTERN "*.hpp"
-)
+mark_as_advanced(BOINC_INCLUDE_DIR BOINC_API_LIBRARY BOINC_LIBRARY)

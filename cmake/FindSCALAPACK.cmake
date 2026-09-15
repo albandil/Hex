@@ -29,78 +29,83 @@
 ##                                                                                   ##
 ## --------------------------------------------------------------------------------- ##
 
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
-set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
+# Finds ScaLAPACK, the distributed dense linear algebra library.
+#
+# Looked for in this order:
+#   1. SCALAPACK_LIBRARIES, if the user has set it -- taken as given
+#   2. MKL::MKL_SCALAPACK, when the build already uses Intel MKL
+#   3. scalapack.pc, shipped by some distributions
+#   4. a plain search for libscalapack, including the directories of the MPI library
+#
+# hex-ecs declares the ScaLAPACK routines itself, so no header is needed -- the
+# library alone is the whole dependency.
+#
+# Results: SCALAPACK_FOUND, SCALAPACK_INCLUDE_DIRS, SCALAPACK_LIBRARIES,
+#          ScaLAPACK::ScaLAPACK
 
-set(libhex-common_SOURCES
-    "hex-arrays.cpp"
-    "hex-blas.cpp"
-    "hex-born.cpp"
-    "hex-hdffile.cpp"
-    "hex-hydrogen.cpp"
-    "hex-matrix.cpp"
-    "hex-misc.cpp"
-    "hex-special.cpp"
-    "hex-spgrid.cpp"
-    "hex-symbolic.cpp"
-    "hex-vec3d.cpp"
-    "hex-version.cpp"
-    "hex-vtkfile.cpp"
-)
+include("${CMAKE_CURRENT_LIST_DIR}/HexFindHelper.cmake")
 
-if(HDF5_FOUND)
-    set(libhex-common_SOURCES ${libhex-common_SOURCES} "hex-h5file.cpp")
+if(SCALAPACK_LIBRARIES)
+
+    hex_find_result(SCALAPACK
+        REQUIRED_VARS SCALAPACK_LIBRARIES
+        TARGET        ScaLAPACK::ScaLAPACK
+        INCLUDE_DIRS  ${SCALAPACK_INCLUDE_DIRS}
+        LIBRARIES     ${SCALAPACK_LIBRARIES}
+    )
+
+    return()
+
 endif()
 
-add_library(libhex-common SHARED ${libhex-common_SOURCES})
+# MKL brings its own ScaLAPACK, and mixing it with the Netlib one does not work
+if(TARGET MKL::MKL_SCALAPACK)
 
-set_target_properties(libhex-common PROPERTIES PREFIX "")
+    set(SCALAPACK_MKL_TARGET MKL::MKL_SCALAPACK)
 
-target_include_directories(libhex-common PUBLIC
-    ../libs
-)
+    hex_find_result(SCALAPACK
+        REQUIRED_VARS SCALAPACK_MKL_TARGET
+        TARGET        ScaLAPACK::ScaLAPACK
+        LIBRARIES     MKL::MKL_SCALAPACK
+    )
 
-# PUBLIC throughout: the installed headers of libhex-common include the headers of
-# GSL, HDF5, CLN/GiNaC and png++, so its consumers need them too. The Hex::* targets
-# are empty for the dependencies that are switched off, hence no conditionals here.
-target_link_libraries(libhex-common PUBLIC
-    Hex::config
-    Hex::blas
-    Hex::boinc
-    Hex::cln
-    Hex::ginac
-    Hex::gsl
-    Hex::hdf5
-    Hex::lapack
-    Hex::mpi
-    Hex::openmp
-    Hex::png
-)
+    return()
 
-## --------------------------------------------------------------------------------- ##
-
-if(BUILD_TESTING)
-    add_subdirectory(test)
 endif()
 
-## --------------------------------------------------------------------------------- ##
+find_package(PkgConfig QUIET)
 
-install(TARGETS libhex-common
-    RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
-    LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
-    ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+if(PKG_CONFIG_FOUND)
+    pkg_check_modules(PC_SCALAPACK QUIET scalapack)
+endif()
+
+hex_mpi_library_dirs(_mpi_dirs)
+
+find_library(SCALAPACK_LIBRARY
+    NAMES scalapack scalapack-openmpi scalapack-mpich scalapack-mpich2 scalapack-lam
+    HINTS ${PC_SCALAPACK_LIBRARY_DIRS} ${_mpi_dirs}
 )
 
-install(DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/"
-    DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/hex"
-    FILES_MATCHING
-    PATTERN "test" EXCLUDE
-    PATTERN "*.h"
+# builds that keep BLACS apart from ScaLAPACK
+find_library(SCALAPACK_BLACS_LIBRARY
+    NAMES blacs-openmpi blacs-mpich blacs
+    HINTS ${PC_SCALAPACK_LIBRARY_DIRS} ${_mpi_dirs}
 )
 
-# bundled header-only libraries used by the public headers above
-install(DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/../libs/png++"
-    DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/hex"
-    FILES_MATCHING PATTERN "*.hpp"
+set(_scalapack_libraries ${SCALAPACK_LIBRARY})
+
+if(SCALAPACK_BLACS_LIBRARY)
+    list(APPEND _scalapack_libraries "${SCALAPACK_BLACS_LIBRARY}")
+endif()
+
+hex_find_result(SCALAPACK
+    REQUIRED_VARS SCALAPACK_LIBRARY
+    TARGET        ScaLAPACK::ScaLAPACK
+    LIBRARIES     ${_scalapack_libraries}
+    VERSION       "${PC_SCALAPACK_VERSION}"
 )
+
+unset(_mpi_dirs)
+unset(_scalapack_libraries)
+
+mark_as_advanced(SCALAPACK_LIBRARY SCALAPACK_BLACS_LIBRARY)

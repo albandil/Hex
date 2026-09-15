@@ -29,78 +29,90 @@
 ##                                                                                   ##
 ## --------------------------------------------------------------------------------- ##
 
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
-set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
+# Finds GiNaC, the symbolic algebra library, and the CLN it is built on.
+#
+# Looked for in this order:
+#   1. GINAC_LIBRARIES, if the user has set it -- taken as given, not verified
+#   2. ginac-config.cmake, exported by GiNaC 1.8 and later
+#   3. ginac.pc, which GiNaC itself installs
+#   4. a plain search for ginac/ginac.h and libginac
+#
+# GiNaC exposes CLN in its own headers, so CLN is part of the result in every case.
+#
+# Results: GINAC_FOUND, GINAC_INCLUDE_DIRS, GINAC_LIBRARIES, GiNaC::GiNaC
 
-set(libhex-common_SOURCES
-    "hex-arrays.cpp"
-    "hex-blas.cpp"
-    "hex-born.cpp"
-    "hex-hdffile.cpp"
-    "hex-hydrogen.cpp"
-    "hex-matrix.cpp"
-    "hex-misc.cpp"
-    "hex-special.cpp"
-    "hex-spgrid.cpp"
-    "hex-symbolic.cpp"
-    "hex-vec3d.cpp"
-    "hex-version.cpp"
-    "hex-vtkfile.cpp"
-)
+include("${CMAKE_CURRENT_LIST_DIR}/HexFindHelper.cmake")
 
-if(HDF5_FOUND)
-    set(libhex-common_SOURCES ${libhex-common_SOURCES} "hex-h5file.cpp")
+if(GINAC_LIBRARIES)
+
+    hex_find_result(GINAC
+        REQUIRED_VARS GINAC_LIBRARIES
+        TARGET        GiNaC::GiNaC
+        INCLUDE_DIRS  ${GINAC_INCLUDE_DIRS}
+        LIBRARIES     ${GINAC_LIBRARIES}
+    )
+
+    return()
+
 endif()
 
-add_library(libhex-common SHARED ${libhex-common_SOURCES})
+find_package(ginac CONFIG QUIET)
 
-set_target_properties(libhex-common PROPERTIES PREFIX "")
+if(ginac_FOUND AND TARGET ginac::ginac)
 
-target_include_directories(libhex-common PUBLIC
-    ../libs
-)
+    set(ginac_FOUND ginac::ginac)
 
-# PUBLIC throughout: the installed headers of libhex-common include the headers of
-# GSL, HDF5, CLN/GiNaC and png++, so its consumers need them too. The Hex::* targets
-# are empty for the dependencies that are switched off, hence no conditionals here.
-target_link_libraries(libhex-common PUBLIC
-    Hex::config
-    Hex::blas
-    Hex::boinc
-    Hex::cln
-    Hex::ginac
-    Hex::gsl
-    Hex::hdf5
-    Hex::lapack
-    Hex::mpi
-    Hex::openmp
-    Hex::png
-)
+    hex_find_result(GINAC
+        REQUIRED_VARS ginac_FOUND
+        TARGET        GiNaC::GiNaC
+        LIBRARIES     ginac::ginac
+        VERSION       "${ginac_VERSION}"
+    )
 
-## --------------------------------------------------------------------------------- ##
+    return()
 
-if(BUILD_TESTING)
-    add_subdirectory(test)
 endif()
 
-## --------------------------------------------------------------------------------- ##
+find_package(PkgConfig QUIET)
 
-install(TARGETS libhex-common
-    RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
-    LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
-    ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+if(PKG_CONFIG_FOUND)
+    pkg_check_modules(PC_GINAC QUIET ginac)
+endif()
+
+find_path(GINAC_INCLUDE_DIR
+    NAMES ginac/ginac.h
+    HINTS ${PC_GINAC_INCLUDE_DIRS}
 )
 
-install(DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/"
-    DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/hex"
-    FILES_MATCHING
-    PATTERN "test" EXCLUDE
-    PATTERN "*.h"
+find_library(GINAC_LIBRARY
+    NAMES ginac
+    HINTS ${PC_GINAC_LIBRARY_DIRS}
 )
 
-# bundled header-only libraries used by the public headers above
-install(DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/../libs/png++"
-    DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/hex"
-    FILES_MATCHING PATTERN "*.hpp"
+# the headers of GiNaC include those of CLN, and its symbols resolve against it
+find_package(CLN QUIET)
+
+set(_ginac_includes ${GINAC_INCLUDE_DIR})
+set(_ginac_libraries ${GINAC_LIBRARY})
+
+if(CLN_FOUND)
+    list(APPEND _ginac_includes ${CLN_INCLUDE_DIRS})
+    list(APPEND _ginac_libraries ${CLN_LIBRARIES})
+endif()
+
+if(_ginac_includes)
+    list(REMOVE_DUPLICATES _ginac_includes)
+endif()
+
+hex_find_result(GINAC
+    REQUIRED_VARS GINAC_LIBRARY GINAC_INCLUDE_DIR
+    TARGET        GiNaC::GiNaC
+    INCLUDE_DIRS  ${_ginac_includes}
+    LIBRARIES     ${_ginac_libraries}
+    VERSION       "${PC_GINAC_VERSION}"
 )
+
+unset(_ginac_includes)
+unset(_ginac_libraries)
+
+mark_as_advanced(GINAC_INCLUDE_DIR GINAC_LIBRARY)

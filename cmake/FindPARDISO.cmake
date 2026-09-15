@@ -29,78 +29,42 @@
 ##                                                                                   ##
 ## --------------------------------------------------------------------------------- ##
 
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
-set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
+# Finds the stand-alone PARDISO library from pardiso-project.org.
+#
+# This is the separately licensed library, not the PARDISO that comes inside Intel
+# MKL; for the latter use WITH_MKL. hex-ecs declares its entry points itself, so
+# there is no header to find, and the library is distributed as a single shared
+# object that the user usually has to point at:
+#
+#   -D PARDISO_LIBRARIES=/opt/pardiso/libpardiso700-GNU831-X86-64.so
+#
+# Results: PARDISO_FOUND, PARDISO_INCLUDE_DIRS, PARDISO_LIBRARIES, PARDISO::PARDISO
 
-set(libhex-common_SOURCES
-    "hex-arrays.cpp"
-    "hex-blas.cpp"
-    "hex-born.cpp"
-    "hex-hdffile.cpp"
-    "hex-hydrogen.cpp"
-    "hex-matrix.cpp"
-    "hex-misc.cpp"
-    "hex-special.cpp"
-    "hex-spgrid.cpp"
-    "hex-symbolic.cpp"
-    "hex-vec3d.cpp"
-    "hex-version.cpp"
-    "hex-vtkfile.cpp"
-)
+include("${CMAKE_CURRENT_LIST_DIR}/HexFindHelper.cmake")
 
-if(HDF5_FOUND)
-    set(libhex-common_SOURCES ${libhex-common_SOURCES} "hex-h5file.cpp")
+if(PARDISO_LIBRARIES)
+
+    hex_find_result(PARDISO
+        REQUIRED_VARS PARDISO_LIBRARIES
+        TARGET        PARDISO::PARDISO
+        INCLUDE_DIRS  ${PARDISO_INCLUDE_DIRS}
+        LIBRARIES     ${PARDISO_LIBRARIES}
+    )
+
+    return()
+
 endif()
 
-add_library(libhex-common SHARED ${libhex-common_SOURCES})
-
-set_target_properties(libhex-common PROPERTIES PREFIX "")
-
-target_include_directories(libhex-common PUBLIC
-    ../libs
+# the release archives carry the compiler and the architecture in the file name,
+# so a bare "pardiso" is only one of the possibilities
+find_library(PARDISO_LIBRARY
+    NAMES pardiso pardiso700 pardiso600 pardiso500
 )
 
-# PUBLIC throughout: the installed headers of libhex-common include the headers of
-# GSL, HDF5, CLN/GiNaC and png++, so its consumers need them too. The Hex::* targets
-# are empty for the dependencies that are switched off, hence no conditionals here.
-target_link_libraries(libhex-common PUBLIC
-    Hex::config
-    Hex::blas
-    Hex::boinc
-    Hex::cln
-    Hex::ginac
-    Hex::gsl
-    Hex::hdf5
-    Hex::lapack
-    Hex::mpi
-    Hex::openmp
-    Hex::png
+hex_find_result(PARDISO
+    REQUIRED_VARS PARDISO_LIBRARY
+    TARGET        PARDISO::PARDISO
+    LIBRARIES     ${PARDISO_LIBRARY}
 )
 
-## --------------------------------------------------------------------------------- ##
-
-if(BUILD_TESTING)
-    add_subdirectory(test)
-endif()
-
-## --------------------------------------------------------------------------------- ##
-
-install(TARGETS libhex-common
-    RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
-    LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
-    ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
-)
-
-install(DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/"
-    DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/hex"
-    FILES_MATCHING
-    PATTERN "test" EXCLUDE
-    PATTERN "*.h"
-)
-
-# bundled header-only libraries used by the public headers above
-install(DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/../libs/png++"
-    DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/hex"
-    FILES_MATCHING PATTERN "*.hpp"
-)
+mark_as_advanced(PARDISO_LIBRARY)
