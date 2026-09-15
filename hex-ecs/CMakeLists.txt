@@ -29,8 +29,6 @@
 ##                                                                                   ##
 ## --------------------------------------------------------------------------------- ##
 
-cmake_minimum_required(VERSION 3.13)
-
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
@@ -103,38 +101,27 @@ if(DISABLE_PARALLEL_PRECONDITION)
     target_compile_definitions(hex-ecs PRIVATE DISABLE_PARALLEL_PRECONDITION)
 endif()
 
-target_include_directories(hex-ecs PUBLIC
+target_include_directories(hex-ecs PRIVATE
     src
     ../common
     "${CMAKE_CURRENT_BINARY_DIR}"
-    ${GSL_INCLUDE_DIRS}
-    ${OpenCL_INCLUDE_DIRS}
-    ${MKL_INCLUDE_DIRS}
-    ${MUMPS_INCLUDE_DIRS}
-    ${SUPERLU_INCLUDE_DIRS}
-    ${SUPERLU_DIST_INCLUDE_DIRS}
 )
 
-target_compile_options(hex-ecs PUBLIC ${OpenMP_CXX_FLAGS} ${OPTFLAGS})
-
-target_link_libraries(hex-ecs
+# The factorizers and the GPU preconditioner are what pulls in the solver libraries;
+# GSL, BLAS/LAPACK and MPI come through libhex-common.
+target_link_libraries(hex-ecs PRIVATE
     libhex-common
-    ${OpenCL_LIBRARIES}
-    ${MKL_LIBRARIES}
-    ${MUMPS_LIBRARIES}
-    ${PARDISO_LIBRARIES}
-    ${SCALAPACK_LIBRARIES}
-    ${SUPERLU_LIBRARIES}
-    ${SUPERLU_DIST_LIBRARIES}
-    OpenMP::OpenMP_CXX
+    Hex::config
+    Hex::mkl
+    Hex::mumps
+    Hex::opencl
+    Hex::openmp
+    Hex::pardiso
+    Hex::scalapack
+    Hex::superlu
+    Hex::superlu_dist
+    Hex::umfpack
 )
-
-if(WITH_MPI)
-    target_link_libraries(hex-ecs
-        ${SCALAPACK_LIBRARIES}
-        MPI::MPI_C
-    )
-endif()
 
 ## --------------------------------------------------------------------------------- ##
 

@@ -29,9 +29,13 @@
 ##                                                                                   ##
 ## --------------------------------------------------------------------------------- ##
 
-cmake_minimum_required(VERSION 3.13)
+cmake_minimum_required(VERSION 3.20)
 
 project(Hex)
+
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
+
+include(HexDependency)
 
 # hex-ecs uses std::filesystem
 set(CMAKE_CXX_STANDARD 17)
@@ -62,188 +66,254 @@ option(DISABLE_PARALLEL_PRECONDITION "Avoid nested parallelism in preconditionin
 
 ## --------------------------------------------------------------------------------- ##
 
-set(BOINC_INCLUDE_DIRS     "" CACHE STRING "BOINC include directories")
-set(BOINC_LIBRARIES        "" CACHE STRING "BOINC libraries (libboinc_api, libboinc)")
-
-set(CLN_INCLUDE_DIRS       "" CACHE STRING "CLN include directories")
-set(CLN_LIBRARIES          "" CACHE STRING "CLN libraries")
-
-set(GINAC_INCLUDE_DIRS     "" CACHE STRING "GINAC include directories")
-set(GINAC_LIBRARIES        "" CACHE STRING "GINAC libraries")
-
-set(GSL_INCLUDE_DIRS       "" CACHE STRING "GNU Scientific Library include directories")
-set(GSL_LIBRARIES          "" CACHE STRING "GNU Scientific Library libraries")
-
-set(OpenCL_INCLUDE_DIRS    "" CACHE STRING "OpenCL include directories")
-set(OpenCL_LIBRARIES       "" CACHE STRING "OpenCL libraries")
-
-set(MKL_INCLUDE_DIRS       "" CACHE STRING "MKL include directories (not used)")
-set(MKL_LIBRARIES          "" CACHE STRING "MKL libraries")
-
-set(MUMPS_INCLUDE_DIRS     "" CACHE STRING "MUMPS include directories")
-set(MUMPS_LIBRARIES        "" CACHE STRING "MUMPS libraries")
-
-set(PARDISO_INCLUDE_DIRS   "" CACHE STRING "Stand-alone PARDISO include directories (not used)")
-set(PARDISO_LIBRARIES      "" CACHE STRING "Stand-alone PARDISO libraries")
-
-set(PNG_INCLUDE_DIRS       "" CACHE STRING "libpng include directories")
-set(PNG_LIBRARIES          "" CACHE STRING "libpng libraries")
-
-set(SQLite3_INCLUDE_DIRS   "" CACHE STRING "SQLite3 include directories")
-set(SQLite3_LIBRARIES      "" CACHE STRING "SQLite3 libraries")
-
-set(SCALAPACK_INCLUDE_DIRS "" CACHE STRING "SCALAPACK include directories (not used)")
-set(SCALAPACK_LIBRARIES    "" CACHE STRING "SCALAPACK libraries")
-
-set(SUPERLU_INCLUDE_DIRS   "" CACHE STRING "SuperLU include directories")
-set(SUPERLU_LIBRARIES      "" CACHE STRING "SuperLU libraries")
-
-set(SUPERLU_DIST_INCLUDE_DIRS "" CACHE STRING "SuperLU_DIST include directories")
-set(SUPERLU_DIST_LIBRARIES    "" CACHE STRING "SuperLU_DIST libraries")
-
-set(UMFPACK_INCLUDE_DIRS   "" CACHE STRING "UMFPACK include directories")
-set(UMFPACK_LIBRARIES      "" CACHE STRING "UMFPACK libraries")
+# The dependencies below have no find module in CMake itself, so Hex brings its own
+# in cmake/. Each of them accepts <PKG>_LIBRARIES (and <PKG>_INCLUDE_DIRS) as a
+# complete, ready-made answer: setting those bypasses the search, which is what the
+# more baroque installations of MUMPS and PARDISO need. Otherwise the usual hints
+# apply -- CMAKE_PREFIX_PATH, <PKG>_ROOT, and the <PKG>_LIBRARY cache entries that
+# the search itself creates.
 
 ## --------------------------------------------------------------------------------- ##
 
-if(WITH_CLN AND NOT CLN_LIBRARIES)
-    set(CLN_LIBRARIES cln)
-endif()
+# unconditional dependencies
+find_package(OpenMP  REQUIRED)
+find_package(BLAS    REQUIRED)
+find_package(LAPACK  REQUIRED)
+find_package(GSL     REQUIRED)
+find_package(SQLite3 REQUIRED)
 
-if(WITH_GINAC AND NOT GINAC_LIBRARIES)
-    set(GINAC_LIBRARIES ginac)
-endif()
-
-if(NOT GSL_LIBRARIES)
-    set(GSL_LIBRARIES gsl gslcblas)
-endif()
-
-if(NOT SQLite3_LIBRARIES)
-    set(SQLite3_LIBRARIES sqlite3)
-endif()
-
-## --------------------------------------------------------------------------------- ##
-
-find_package(OpenMP REQUIRED)
-find_package(BLAS   REQUIRED)
-find_package(LAPACK REQUIRED)
-
+# Optional dependencies. An enabled WITH_* option is taken as a hard requirement,
+# so that a missing library is reported here rather than at link time. All of these
+# honour the usual search hints -- CMAKE_PREFIX_PATH, <PKG>_ROOT, and the cache
+# entries the searches create, such as OpenCL_LIBRARY or SUPERLU_INCLUDE_DIR.
 if(WITH_MPI)
-    find_package(MPI)
+    find_package(MPI REQUIRED COMPONENTS C)
 endif()
 
+if(WITH_OPENCL)
+    find_package(OpenCL REQUIRED)
+endif()
+
+if(WITH_PNG)
+    find_package(PNG REQUIRED)
+endif()
+
+if(WITH_BOINC)
+    find_package(BOINC REQUIRED)
+endif()
+
+if(WITH_CLN)
+    find_package(CLN REQUIRED)
+endif()
+
+if(WITH_GINAC)
+    find_package(GINAC REQUIRED)
+endif()
+
+if(WITH_MKL)
+    find_package(MKL REQUIRED)
+endif()
+
+if(WITH_MUMPS)
+    find_package(MUMPS REQUIRED)
+endif()
+
+if(WITH_PARDISO)
+    find_package(PARDISO REQUIRED)
+endif()
+
+if(WITH_SUPERLU)
+    find_package(SUPERLU REQUIRED)
+endif()
+
+if(WITH_SUPERLU_DIST)
+    find_package(SUPERLU_DIST REQUIRED)
+endif()
+
+if(WITH_UMFPACK)
+    find_package(UMFPACK REQUIRED)
+endif()
+
+# after MKL, which brings a ScaLAPACK of its own that must not be mixed with the
+# Netlib one
+if(WITH_SCALAPACK)
+    find_package(SCALAPACK REQUIRED)
+endif()
+
+# HDF5 is enabled by default and degrades gracefully: the parts of the code that
+# need it are gated on HDF5_FOUND, so a missing HDF5 is not an error.
 if(WITH_HDF5)
     find_package(HDF5)
 endif()
 
 ## --------------------------------------------------------------------------------- ##
 
-# use long integers
-add_definitions(-D_LONGINT)
+# Hex::config holds what applies to every target of the project: the global
+# preprocessor macros and the optimization flags. Everything links it, directly or
+# through libhex-common, so this is the single place to change them.
 
-# release requirements on IEEE conformance to enable fast math
-if("${CMAKE_BUILD_TYPE}" STREQUAL "Release")
-    set(OPTFLAGS ${OPTFLAGS} -fno-rounding-math -fno-signed-zeros)
-endif()
+add_library(hex-config INTERFACE)
+add_library(Hex::config ALIAS hex-config)
 
-# select the floating-point type; also, do not check complex overflows in FP64,
-# where they do not occur
-if(SINGLE_PRECISION)
-    add_definitions(-DSINGLE)
-else()
-    set(OPTFLAGS ${OPTFLAGS} -fcx-limited-range)
-endif()
+target_compile_definitions(hex-config INTERFACE
+    _LONGINT                                    # use long integers
+    $<$<BOOL:${SINGLE_PRECISION}>:SINGLE>       # select the floating-point type
+)
 
-if(WITH_BOINC)
-    message(STATUS "Building for BOINC")
-    message(STATUS "    includes:  ${BOINC_INCLUDE_DIRS}")
-    message(STATUS "    libraries: ${BOINC_LIBRARIES}")
-    add_definitions(-DWITH_BOINC)
-endif()
+# These are GCC/Clang/icpx spellings, and they are meant for the C++ sources only:
+# the project also builds a C and a Fortran test program, and gfortran does not
+# accept them. Unlike a plain if(CMAKE_BUILD_TYPE STREQUAL "Release"), the
+# generator expression is also correct under a multi-configuration generator.
+if(CMAKE_CXX_COMPILER_ID MATCHES "^(GNU|Clang|AppleClang|Intel|IntelLLVM)$")
 
-if(WITH_CLN)
-    message(STATUS "Building with CLN")
-    message(STATUS "    includes:  ${CLN_INCLUDE_DIRS}")
-    message(STATUS "    libraries: ${CLN_LIBRARIES}")
-    add_definitions(-DWITH_CLN)
-endif()
+    # release requirements on IEEE conformance to enable fast math
+    target_compile_options(hex-config INTERFACE
+        "$<$<AND:$<CONFIG:Release>,$<COMPILE_LANGUAGE:CXX>>:-fno-rounding-math>"
+        "$<$<AND:$<CONFIG:Release>,$<COMPILE_LANGUAGE:CXX>>:-fno-signed-zeros>"
+    )
 
-if(WITH_GINAC)
-    message(STATUS "Building with GiNaC")
-    message(STATUS "    includes:  ${GINAC_INCLUDE_DIRS}")
-    message(STATUS "    libraries: ${GINAC_LIBRARIES}")
-    add_definitions(-DWITH_GINAC)
-endif()
-
-if(WITH_OPENCL)
-    message(STATUS "Building with OpenCL")
-    message(STATUS "    includes:  ${OpenCL_INCLUDE_DIRS}")
-    message(STATUS "    libraries: ${OpenCL_LIBRARIES}")
-    add_definitions(-DWITH_OPENCL)
-endif()
-
-if(WITH_PNG)
-    if(NOT PNG_LIBRARIES)
-        set(PNG_LIBRARIES png)
+    # do not check complex overflows in FP64, where they do not occur
+    if(NOT SINGLE_PRECISION)
+        target_compile_options(hex-config INTERFACE
+            "$<$<COMPILE_LANGUAGE:CXX>:-fcx-limited-range>"
+        )
     endif()
-    message(STATUS "Building with PNG")
-    message(STATUS "    includes:  ${PNG_INCLUDE_DIRS}")
-    message(STATUS "    libraries: ${PNG_LIBRARIES}")
-    add_definitions(-DWITH_PNG)
+
 endif()
 
-if(WITH_MKL)
-    message(STATUS "Building with MKL")
-    message(STATUS "    includes:  ${MKL_INCLUDE_DIRS}")
-    message(STATUS "    libraries: ${MKL_LIBRARIES}")
-    add_definitions(-DWITH_MKL)
-endif()
+## --------------------------------------------------------------------------------- ##
 
-if(WITH_MUMPS)
-    message(STATUS "Building with MUMPS")
-    message(STATUS "    includes:  ${MUMPS_INCLUDE_DIRS}")
-    message(STATUS "    libraries: ${MUMPS_LIBRARIES}")
-    add_definitions(-DWITH_MUMPS)
-endif()
+# Every dependency becomes an interface library Hex::<name> carrying its include
+# directories, its libraries and the macro that switches on the code using it. The
+# targets exist even when the dependency is disabled, in which case they are empty,
+# so the subdirectories below link them without testing any option.
 
-if(WITH_PARDISO)
-    message(STATUS "Building with the stand-alone PARDISO")
-    message(STATUS "    libraries: ${PARDISO_LIBRARIES}")
-    add_definitions(-DWITH_PARDISO)
-endif()
+hex_dependency(blas
+    ENABLED      TRUE
+    DESCRIPTION  "BLAS"
+    TARGETS      BLAS::BLAS
+)
 
-if(WITH_SCALAPACK)
-    message(STATUS "Building with ScaLAPACK")
-    message(STATUS "    includes:  ${SCALAPACK_INCLUDE_DIRS}")
-    message(STATUS "    libraries: ${SCALAPACK_LIBRARIES}")
-    add_definitions(-DWITH_SCALAPACK)
-endif()
+hex_dependency(boinc
+    ENABLED      "${WITH_BOINC}"
+    DEFINE       WITH_BOINC
+    DESCRIPTION  "BOINC, built as a BOINC application"
+    TARGETS      BOINC::BOINC
+)
 
-if(WITH_SUPERLU)
-    message(STATUS "Building with SuperLU")
-    message(STATUS "    includes:  ${SUPERLU_INCLUDE_DIRS}")
-    message(STATUS "    libraries: ${SUPERLU_LIBRARIES}")
-    add_definitions(-DWITH_SUPERLU)
-endif()
+hex_dependency(cln
+    ENABLED      "${WITH_CLN}"
+    DEFINE       WITH_CLN
+    DESCRIPTION  "CLN, Class Library for Numbers"
+    TARGETS      CLN::CLN
+)
 
-if(WITH_SUPERLU_DIST)
-    message(STATUS "Building with SuperLU_DIST")
-    message(STATUS "    includes:  ${SUPERLU_DIST_INCLUDE_DIRS}")
-    message(STATUS "    libraries: ${SUPERLU_DIST_LIBRARIES}")
-    add_definitions(-DWITH_SUPERLU_DIST)
-endif()
+hex_dependency(ginac
+    ENABLED      "${WITH_GINAC}"
+    DEFINE       WITH_GINAC
+    DESCRIPTION  "GiNaC, symbolic Born amplitudes"
+    TARGETS      GiNaC::GiNaC
+)
 
-if(WITH_UMFPACK)
-    message(STATUS "Building with UMFPACK")
-    message(STATUS "    includes:  ${UMFPACK_INCLUDE_DIRS}")
-    message(STATUS "    libraries: ${UMFPACK_LIBRARIES}")
-    add_definitions(-DWITH_UMFPACK)
-endif()
+hex_dependency(gsl
+    ENABLED      TRUE
+    DESCRIPTION  "GNU Scientific Library"
+    TARGETS      GSL::gsl GSL::gslcblas
+)
 
-if(MPI_FOUND)
-    message(STATUS "Building with MPI")
-    add_definitions(-DWITH_MPI)
-endif()
+hex_dependency(hdf5
+    ENABLED      "${HDF5_FOUND}"
+    DESCRIPTION  "HDF5, needed by the hex-hdf2hdf conversion utility"
+    TARGETS      HDF5::HDF5
+)
+
+hex_dependency(lapack
+    ENABLED      TRUE
+    DESCRIPTION  "LAPACK"
+    TARGETS      LAPACK::LAPACK
+)
+
+hex_dependency(mkl
+    ENABLED      "${WITH_MKL}"
+    DEFINE       WITH_MKL
+    DESCRIPTION  "Intel MKL PARDISO, sparse LU in hex-ecs"
+    TARGETS      MKL::MKL
+)
+
+hex_dependency(mpi
+    ENABLED      "${WITH_MPI}"
+    DEFINE       WITH_MPI
+    DESCRIPTION  "MPI, distributed runs of hex-ecs"
+    TARGETS      MPI::MPI_C
+)
+
+hex_dependency(mumps
+    ENABLED      "${WITH_MUMPS}"
+    DEFINE       WITH_MUMPS
+    DESCRIPTION  "MUMPS, distributed LU in hex-ecs and the coupled preconditioner"
+    TARGETS      MUMPS::MUMPS
+)
+
+hex_dependency(opencl
+    ENABLED      "${WITH_OPENCL}"
+    DEFINE       WITH_OPENCL
+    DESCRIPTION  "OpenCL, the GPU preconditioner of hex-ecs"
+    TARGETS      OpenCL::OpenCL
+)
+
+hex_dependency(openmp
+    ENABLED      TRUE
+    DESCRIPTION  "OpenMP"
+    TARGETS      OpenMP::OpenMP_CXX
+)
+
+hex_dependency(pardiso
+    ENABLED      "${WITH_PARDISO}"
+    DEFINE       WITH_PARDISO
+    DESCRIPTION  "stand-alone PARDISO, sparse LU in hex-ecs"
+    TARGETS      PARDISO::PARDISO
+)
+
+hex_dependency(png
+    ENABLED      "${WITH_PNG}"
+    DEFINE       WITH_PNG
+    DESCRIPTION  "libpng, printing the matrix structure for debugging"
+    TARGETS      PNG::PNG
+)
+
+hex_dependency(scalapack
+    ENABLED      "${WITH_SCALAPACK}"
+    DEFINE       WITH_SCALAPACK
+    DESCRIPTION  "ScaLAPACK, distributed dense LU in hex-ecs"
+    TARGETS      ScaLAPACK::ScaLAPACK
+)
+
+hex_dependency(sqlite3
+    ENABLED      TRUE
+    DESCRIPTION  "SQLite3"
+    TARGETS      SQLite::SQLite3
+)
+
+hex_dependency(superlu
+    ENABLED      "${WITH_SUPERLU}"
+    DEFINE       WITH_SUPERLU
+    DESCRIPTION  "SuperLU, sparse LU in hex-ecs"
+    TARGETS      SuperLU::SuperLU
+)
+
+hex_dependency(superlu_dist
+    ENABLED      "${WITH_SUPERLU_DIST}"
+    DEFINE       WITH_SUPERLU_DIST
+    DESCRIPTION  "SuperLU_DIST, distributed LU in hex-ecs"
+    TARGETS      SuperLU::SuperLUDist
+)
+
+hex_dependency(umfpack
+    ENABLED      "${WITH_UMFPACK}"
+    DEFINE       WITH_UMFPACK
+    DESCRIPTION  "UMFPACK, sparse LU in hex-ecs"
+    TARGETS      UMFPACK::UMFPACK
+)
 
 ## --------------------------------------------------------------------------------- ##
 
@@ -281,6 +351,16 @@ install(FILES README.md
 
 install(DIRECTORY html/
     DESTINATION "${CMAKE_INSTALL_DOCDIR}/html"
+)
+
+## --------------------------------------------------------------------------------- ##
+
+feature_summary(WHAT ENABLED_FEATURES QUIET_ON_EMPTY
+    DESCRIPTION "Hex will be built against:"
+)
+
+feature_summary(WHAT DISABLED_FEATURES QUIET_ON_EMPTY
+    DESCRIPTION "Hex will be built without (see the WITH_* options):"
 )
 
 ## --------------------------------------------------------------------------------- ##

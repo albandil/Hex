@@ -29,78 +29,56 @@
 ##                                                                                   ##
 ## --------------------------------------------------------------------------------- ##
 
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
-set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
+# Finds Intel MKL, used by hex-ecs for its PARDISO sparse LU factorization.
+#
+# Looked for in this order:
+#   1. MKL_LIBRARIES, if the user has set it -- taken as given, not verified
+#   2. MKLConfig.cmake, which every oneAPI installation ships
+#
+# The config package is what builds the MKL link line, whose order and choice of
+# threading and interface layer are easy to get wrong by hand. It is steered by the
+# cache variables MKL_INTERFACE, MKL_THREADING, MKL_LINK and MKL_MPI, and it also
+# exports MKL::MKL_SCALAPACK, which FindSCALAPACK picks up.
+#
+# The interface layer defaults to lp64 here, not to the ilp64 default of MKL
+# itself: the PARDISO prototypes in hex-ecs/src/factorizers/lu-pardiso.h declare
+# their integer arguments as "int". This is independent of _LONGINT, which only
+# selects the integer type Hex uses towards UMFPACK and SuperLU.
+#
+# Results: MKL_FOUND, MKL_INCLUDE_DIRS, MKL_LIBRARIES, MKL::MKL
 
-set(libhex-common_SOURCES
-    "hex-arrays.cpp"
-    "hex-blas.cpp"
-    "hex-born.cpp"
-    "hex-hdffile.cpp"
-    "hex-hydrogen.cpp"
-    "hex-matrix.cpp"
-    "hex-misc.cpp"
-    "hex-special.cpp"
-    "hex-spgrid.cpp"
-    "hex-symbolic.cpp"
-    "hex-vec3d.cpp"
-    "hex-version.cpp"
-    "hex-vtkfile.cpp"
-)
+include("${CMAKE_CURRENT_LIST_DIR}/HexFindHelper.cmake")
 
-if(HDF5_FOUND)
-    set(libhex-common_SOURCES ${libhex-common_SOURCES} "hex-h5file.cpp")
+if(MKL_LIBRARIES)
+
+    hex_find_result(MKL
+        REQUIRED_VARS MKL_LIBRARIES
+        TARGET        MKL::MKL
+        INCLUDE_DIRS  ${MKL_INCLUDE_DIRS}
+        LIBRARIES     ${MKL_LIBRARIES}
+    )
+
+    return()
+
 endif()
 
-add_library(libhex-common SHARED ${libhex-common_SOURCES})
-
-set_target_properties(libhex-common PROPERTIES PREFIX "")
-
-target_include_directories(libhex-common PUBLIC
-    ../libs
-)
-
-# PUBLIC throughout: the installed headers of libhex-common include the headers of
-# GSL, HDF5, CLN/GiNaC and png++, so its consumers need them too. The Hex::* targets
-# are empty for the dependencies that are switched off, hence no conditionals here.
-target_link_libraries(libhex-common PUBLIC
-    Hex::config
-    Hex::blas
-    Hex::boinc
-    Hex::cln
-    Hex::ginac
-    Hex::gsl
-    Hex::hdf5
-    Hex::lapack
-    Hex::mpi
-    Hex::openmp
-    Hex::png
-)
-
-## --------------------------------------------------------------------------------- ##
-
-if(BUILD_TESTING)
-    add_subdirectory(test)
+if(NOT DEFINED MKL_INTERFACE)
+    set(MKL_INTERFACE "lp64" CACHE STRING "MKL integer interface layer (lp64 or ilp64)")
 endif()
 
-## --------------------------------------------------------------------------------- ##
+# setvars.sh of oneAPI exports MKLROOT, while find_package looks for MKL_ROOT
+if(NOT MKL_ROOT AND NOT DEFINED ENV{MKL_ROOT} AND DEFINED ENV{MKLROOT})
+    set(MKL_ROOT "$ENV{MKLROOT}")
+endif()
 
-install(TARGETS libhex-common
-    RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
-    LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
-    ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
-)
+find_package(MKL CONFIG QUIET)
 
-install(DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/"
-    DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/hex"
-    FILES_MATCHING
-    PATTERN "test" EXCLUDE
-    PATTERN "*.h"
-)
+if(MKL_FOUND AND TARGET MKL::MKL)
+    message(STATUS "Found MKL: ${MKL_ROOT} (interface ${MKL_INTERFACE})")
+    return()
+endif()
 
-# bundled header-only libraries used by the public headers above
-install(DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/../libs/png++"
-    DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/hex"
-    FILES_MATCHING PATTERN "*.hpp"
+hex_find_result(MKL
+    REQUIRED_VARS MKL_ROOT
+    TARGET        MKL::MKL
 )

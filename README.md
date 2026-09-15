@@ -21,7 +21,7 @@ state), or by matching asymptotics of solution of dripole-driven Schrödinger eq
 
 The hard requirements for HEX are:
 
- - C++17 compiler and CMake 3.13 or later
+ - C++17 compiler and CMake 3.20 or later
  - BLAS and LAPACK (e.g. OpenBLAS or Intel MKL)
  - GNU Scientific Library
  - SQLite3
@@ -44,4 +44,21 @@ The following are nice to have, as they add some additional capabilities:
  - libpng (printing matrix structure for debugging/illustrative purposes)
  - Doxygen (for generated documentation)
 
-See `CMakeLists.txt` for details on enabling the optional features.
+Every optional dependency is switched on by a `WITH_*` option, which `CMakeLists.txt` lists with a short description,
+so a build with UMFPACK and OpenCL is configured as
+
+    cmake -D WITH_UMFPACK=ON -D WITH_OPENCL=ON ..
+
+The libraries themselves are searched for automatically, by the find modules of CMake and by those in `cmake/`. An
+installation in an unusual place is pointed at the standard way, with `CMAKE_PREFIX_PATH` or a per-package `<PKG>_ROOT`:
+
+    cmake -D WITH_SUPERLU=ON -D CMAKE_PREFIX_PATH=$HOME/opt/SuperLU ..
+
+Should the search not work out, setting `<PKG>_LIBRARIES` (and `<PKG>_INCLUDE_DIRS` if headers are needed) skips it and
+uses what is given, which is occasionally necessary for MUMPS and for the stand-alone PARDISO:
+
+    cmake -D WITH_MUMPS=ON -D MUMPS_INCLUDE_DIRS=/usr/include/mumps \
+          -D MUMPS_LIBRARIES="-L/usr/lib64/mpi/gcc/openmpi5/lib64;zmumps;mumps_common;pord" ..
+
+A `WITH_*` option that is on is a hard requirement: if the library cannot be found, the configuration stops and says so,
+rather than leaving it out. The configuration ends with a summary of what the build will and will not use.

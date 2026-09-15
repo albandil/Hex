@@ -29,78 +29,83 @@
 ##                                                                                   ##
 ## --------------------------------------------------------------------------------- ##
 
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
-set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
+# Finds CLN, the Class Library for Numbers.
+#
+# Looked for in this order:
+#   1. CLN_LIBRARIES, if the user has set it -- taken as given, not verified
+#   2. cln.pc, which CLN itself installs
+#   3. a plain search for cln/cln.h and libcln
+#
+# Results: CLN_FOUND, CLN_INCLUDE_DIRS, CLN_LIBRARIES, CLN::CLN and cln::cln
 
-set(libhex-common_SOURCES
-    "hex-arrays.cpp"
-    "hex-blas.cpp"
-    "hex-born.cpp"
-    "hex-hdffile.cpp"
-    "hex-hydrogen.cpp"
-    "hex-matrix.cpp"
-    "hex-misc.cpp"
-    "hex-special.cpp"
-    "hex-spgrid.cpp"
-    "hex-symbolic.cpp"
-    "hex-vec3d.cpp"
-    "hex-version.cpp"
-    "hex-vtkfile.cpp"
-)
+include("${CMAKE_CURRENT_LIST_DIR}/HexFindHelper.cmake")
 
-if(HDF5_FOUND)
-    set(libhex-common_SOURCES ${libhex-common_SOURCES} "hex-h5file.cpp")
+if(CLN_LIBRARIES)
+
+    # taken as given
+    set(_cln_includes ${CLN_INCLUDE_DIRS})
+    set(_cln_libraries ${CLN_LIBRARIES})
+    set(_cln_required CLN_LIBRARIES)
+    set(_cln_version "")
+
+else()
+
+    find_package(PkgConfig QUIET)
+
+    if(PKG_CONFIG_FOUND)
+        pkg_check_modules(PC_CLN QUIET cln)
+    endif()
+
+    find_path(CLN_INCLUDE_DIR
+        NAMES cln/cln.h
+        HINTS ${PC_CLN_INCLUDE_DIRS}
+    )
+
+    find_library(CLN_LIBRARY
+        NAMES cln
+        HINTS ${PC_CLN_LIBRARY_DIRS}
+    )
+
+    set(_cln_includes ${CLN_INCLUDE_DIR})
+    set(_cln_libraries ${CLN_LIBRARY})
+    set(_cln_required CLN_LIBRARY CLN_INCLUDE_DIR)
+    set(_cln_version "${PC_CLN_VERSION}")
+
 endif()
 
-add_library(libhex-common SHARED ${libhex-common_SOURCES})
-
-set_target_properties(libhex-common PROPERTIES PREFIX "")
-
-target_include_directories(libhex-common PUBLIC
-    ../libs
+hex_find_result(CLN
+    REQUIRED_VARS ${_cln_required}
+    TARGET        CLN::CLN
+    INCLUDE_DIRS  ${_cln_includes}
+    LIBRARIES     ${_cln_libraries}
+    VERSION       "${_cln_version}"
 )
 
-# PUBLIC throughout: the installed headers of libhex-common include the headers of
-# GSL, HDF5, CLN/GiNaC and png++, so its consumers need them too. The Hex::* targets
-# are empty for the dependencies that are switched off, hence no conditionals here.
-target_link_libraries(libhex-common PUBLIC
-    Hex::config
-    Hex::blas
-    Hex::boinc
-    Hex::cln
-    Hex::ginac
-    Hex::gsl
-    Hex::hdf5
-    Hex::lapack
-    Hex::mpi
-    Hex::openmp
-    Hex::png
-)
+# GiNaC's installed config package does find_package(CLN REQUIRED) and then links
+# the target cln::cln, the name created by the FindCLN.cmake that GiNaC bundles but
+# does not install. Provide that name as well, so that ginac-config.cmake resolves
+# against this module instead of failing on an unknown target.
+if(CLN_FOUND AND NOT TARGET cln::cln)
 
-## --------------------------------------------------------------------------------- ##
+    add_library(cln::cln INTERFACE IMPORTED GLOBAL)
 
-if(BUILD_TESTING)
-    add_subdirectory(test)
+    if(CLN_INCLUDE_DIRS)
+        set_target_properties(cln::cln PROPERTIES
+            INTERFACE_INCLUDE_DIRECTORIES "${CLN_INCLUDE_DIRS}"
+        )
+    endif()
+
+    if(CLN_LIBRARIES)
+        set_target_properties(cln::cln PROPERTIES
+            INTERFACE_LINK_LIBRARIES "${CLN_LIBRARIES}"
+        )
+    endif()
+
 endif()
 
-## --------------------------------------------------------------------------------- ##
+unset(_cln_includes)
+unset(_cln_libraries)
+unset(_cln_required)
+unset(_cln_version)
 
-install(TARGETS libhex-common
-    RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
-    LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
-    ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
-)
-
-install(DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/"
-    DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/hex"
-    FILES_MATCHING
-    PATTERN "test" EXCLUDE
-    PATTERN "*.h"
-)
-
-# bundled header-only libraries used by the public headers above
-install(DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/../libs/png++"
-    DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/hex"
-    FILES_MATCHING PATTERN "*.hpp"
-)
+mark_as_advanced(CLN_INCLUDE_DIR CLN_LIBRARY)

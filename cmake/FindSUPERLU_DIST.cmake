@@ -29,78 +29,71 @@
 ##                                                                                   ##
 ## --------------------------------------------------------------------------------- ##
 
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
-set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
+# Finds SuperLU_DIST, the distributed sparse LU factorization.
+#
+# Looked for in this order:
+#   1. SUPERLU_DIST_LIBRARIES, if the user has set it -- taken as given
+#   2. superlu_distConfig.cmake, exported by recent releases
+#   3. a plain search for superlu_zdefs.h and libsuperlu_dist
+#
+# The search covers the directories of the MPI library, because distributions that
+# offer several MPI flavours install SuperLU_DIST next to the flavour it was built
+# against instead of into the default library path.
+#
+# Results: SUPERLU_DIST_FOUND, SUPERLU_DIST_INCLUDE_DIRS, SUPERLU_DIST_LIBRARIES,
+#          SuperLU::SuperLUDist
 
-set(libhex-common_SOURCES
-    "hex-arrays.cpp"
-    "hex-blas.cpp"
-    "hex-born.cpp"
-    "hex-hdffile.cpp"
-    "hex-hydrogen.cpp"
-    "hex-matrix.cpp"
-    "hex-misc.cpp"
-    "hex-special.cpp"
-    "hex-spgrid.cpp"
-    "hex-symbolic.cpp"
-    "hex-vec3d.cpp"
-    "hex-version.cpp"
-    "hex-vtkfile.cpp"
-)
+include("${CMAKE_CURRENT_LIST_DIR}/HexFindHelper.cmake")
 
-if(HDF5_FOUND)
-    set(libhex-common_SOURCES ${libhex-common_SOURCES} "hex-h5file.cpp")
+if(SUPERLU_DIST_LIBRARIES)
+
+    hex_find_result(SUPERLU_DIST
+        REQUIRED_VARS SUPERLU_DIST_LIBRARIES
+        TARGET        SuperLU::SuperLUDist
+        INCLUDE_DIRS  ${SUPERLU_DIST_INCLUDE_DIRS}
+        LIBRARIES     ${SUPERLU_DIST_LIBRARIES}
+    )
+
+    return()
+
 endif()
 
-add_library(libhex-common SHARED ${libhex-common_SOURCES})
+find_package(superlu_dist CONFIG QUIET)
 
-set_target_properties(libhex-common PROPERTIES PREFIX "")
+if(superlu_dist_FOUND AND TARGET superlu_dist::superlu_dist)
 
-target_include_directories(libhex-common PUBLIC
-    ../libs
-)
+    set(superlu_dist_FOUND superlu_dist::superlu_dist)
 
-# PUBLIC throughout: the installed headers of libhex-common include the headers of
-# GSL, HDF5, CLN/GiNaC and png++, so its consumers need them too. The Hex::* targets
-# are empty for the dependencies that are switched off, hence no conditionals here.
-target_link_libraries(libhex-common PUBLIC
-    Hex::config
-    Hex::blas
-    Hex::boinc
-    Hex::cln
-    Hex::ginac
-    Hex::gsl
-    Hex::hdf5
-    Hex::lapack
-    Hex::mpi
-    Hex::openmp
-    Hex::png
-)
+    hex_find_result(SUPERLU_DIST
+        REQUIRED_VARS superlu_dist_FOUND
+        TARGET        SuperLU::SuperLUDist
+        LIBRARIES     superlu_dist::superlu_dist
+        VERSION       "${superlu_dist_VERSION}"
+    )
 
-## --------------------------------------------------------------------------------- ##
+    return()
 
-if(BUILD_TESTING)
-    add_subdirectory(test)
 endif()
 
-## --------------------------------------------------------------------------------- ##
+hex_mpi_library_dirs(_mpi_dirs)
 
-install(TARGETS libhex-common
-    RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
-    LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
-    ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+find_path(SUPERLU_DIST_INCLUDE_DIR
+    NAMES superlu_zdefs.h
+    PATH_SUFFIXES superlu_dist superlu-dist SuperLU_DIST
 )
 
-install(DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/"
-    DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/hex"
-    FILES_MATCHING
-    PATTERN "test" EXCLUDE
-    PATTERN "*.h"
+find_library(SUPERLU_DIST_LIBRARY
+    NAMES superlu_dist superlu-dist
+    HINTS ${_mpi_dirs}
 )
 
-# bundled header-only libraries used by the public headers above
-install(DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/../libs/png++"
-    DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/hex"
-    FILES_MATCHING PATTERN "*.hpp"
+hex_find_result(SUPERLU_DIST
+    REQUIRED_VARS SUPERLU_DIST_LIBRARY SUPERLU_DIST_INCLUDE_DIR
+    TARGET        SuperLU::SuperLUDist
+    INCLUDE_DIRS  ${SUPERLU_DIST_INCLUDE_DIR}
+    LIBRARIES     ${SUPERLU_DIST_LIBRARY}
 )
+
+unset(_mpi_dirs)
+
+mark_as_advanced(SUPERLU_DIST_INCLUDE_DIR SUPERLU_DIST_LIBRARY)

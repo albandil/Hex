@@ -29,78 +29,84 @@
 ##                                                                                   ##
 ## --------------------------------------------------------------------------------- ##
 
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
-set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
+# Finds UMFPACK, the sparse LU factorization of SuiteSparse.
+#
+# Looked for in this order:
+#   1. UMFPACK_LIBRARIES, if the user has set it -- taken as given, not verified
+#   2. UMFPACKConfig.cmake, exported by SuiteSparse 6 and later
+#   3. umfpack.pc, shipped by some distributions
+#   4. a plain search for umfpack.h and libumfpack
+#
+# Results: UMFPACK_FOUND, UMFPACK_INCLUDE_DIRS, UMFPACK_LIBRARIES, UMFPACK::UMFPACK
 
-set(libhex-common_SOURCES
-    "hex-arrays.cpp"
-    "hex-blas.cpp"
-    "hex-born.cpp"
-    "hex-hdffile.cpp"
-    "hex-hydrogen.cpp"
-    "hex-matrix.cpp"
-    "hex-misc.cpp"
-    "hex-special.cpp"
-    "hex-spgrid.cpp"
-    "hex-symbolic.cpp"
-    "hex-vec3d.cpp"
-    "hex-version.cpp"
-    "hex-vtkfile.cpp"
-)
+include("${CMAKE_CURRENT_LIST_DIR}/HexFindHelper.cmake")
 
-if(HDF5_FOUND)
-    set(libhex-common_SOURCES ${libhex-common_SOURCES} "hex-h5file.cpp")
+if(UMFPACK_LIBRARIES)
+
+    hex_find_result(UMFPACK
+        REQUIRED_VARS UMFPACK_LIBRARIES
+        TARGET        UMFPACK::UMFPACK
+        INCLUDE_DIRS  ${UMFPACK_INCLUDE_DIRS}
+        LIBRARIES     ${UMFPACK_LIBRARIES}
+    )
+
+    return()
+
 endif()
 
-add_library(libhex-common SHARED ${libhex-common_SOURCES})
+# the config package of SuiteSparse; CONFIG mode, so this does not recurse into
+# the present module
+find_package(UMFPACK CONFIG QUIET)
 
-set_target_properties(libhex-common PROPERTIES PREFIX "")
+if(UMFPACK_FOUND AND TARGET SuiteSparse::UMFPACK)
 
-target_include_directories(libhex-common PUBLIC
-    ../libs
-)
+    hex_find_result(UMFPACK
+        REQUIRED_VARS UMFPACK_LIBRARY
+        TARGET        UMFPACK::UMFPACK
+        LIBRARIES     SuiteSparse::UMFPACK
+        VERSION       "${UMFPACK_VERSION}"
+    )
 
-# PUBLIC throughout: the installed headers of libhex-common include the headers of
-# GSL, HDF5, CLN/GiNaC and png++, so its consumers need them too. The Hex::* targets
-# are empty for the dependencies that are switched off, hence no conditionals here.
-target_link_libraries(libhex-common PUBLIC
-    Hex::config
-    Hex::blas
-    Hex::boinc
-    Hex::cln
-    Hex::ginac
-    Hex::gsl
-    Hex::hdf5
-    Hex::lapack
-    Hex::mpi
-    Hex::openmp
-    Hex::png
-)
+    return()
 
-## --------------------------------------------------------------------------------- ##
-
-if(BUILD_TESTING)
-    add_subdirectory(test)
 endif()
 
-## --------------------------------------------------------------------------------- ##
+find_package(PkgConfig QUIET)
 
-install(TARGETS libhex-common
-    RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
-    LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
-    ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+if(PKG_CONFIG_FOUND)
+    pkg_check_modules(PC_UMFPACK QUIET umfpack)
+endif()
+
+find_path(UMFPACK_INCLUDE_DIR
+    NAMES umfpack.h
+    HINTS ${PC_UMFPACK_INCLUDE_DIRS}
+    PATH_SUFFIXES suitesparse SuiteSparse ufsparse
 )
 
-install(DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/"
-    DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/hex"
-    FILES_MATCHING
-    PATTERN "test" EXCLUDE
-    PATTERN "*.h"
+find_library(UMFPACK_LIBRARY
+    NAMES umfpack
+    HINTS ${PC_UMFPACK_LIBRARY_DIRS}
 )
 
-# bundled header-only libraries used by the public headers above
-install(DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/../libs/png++"
-    DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/hex"
-    FILES_MATCHING PATTERN "*.hpp"
+# UMFPACK needs AMD and the SuiteSparse configuration object; shared builds carry
+# them as dependencies, static ones do not
+find_library(UMFPACK_AMD_LIBRARY NAMES amd HINTS ${PC_UMFPACK_LIBRARY_DIRS})
+find_library(UMFPACK_CONFIG_LIBRARY NAMES suitesparseconfig HINTS ${PC_UMFPACK_LIBRARY_DIRS})
+
+set(_umfpack_libraries ${UMFPACK_LIBRARY})
+
+foreach(_extra ${UMFPACK_AMD_LIBRARY} ${UMFPACK_CONFIG_LIBRARY})
+    list(APPEND _umfpack_libraries "${_extra}")
+endforeach()
+
+hex_find_result(UMFPACK
+    REQUIRED_VARS UMFPACK_LIBRARY UMFPACK_INCLUDE_DIR
+    TARGET        UMFPACK::UMFPACK
+    INCLUDE_DIRS  ${UMFPACK_INCLUDE_DIR}
+    LIBRARIES     ${_umfpack_libraries}
+    VERSION       "${PC_UMFPACK_VERSION}"
 )
+
+unset(_umfpack_libraries)
+
+mark_as_advanced(UMFPACK_INCLUDE_DIR UMFPACK_LIBRARY UMFPACK_AMD_LIBRARY UMFPACK_CONFIG_LIBRARY)

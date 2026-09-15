@@ -29,8 +29,6 @@
 ##                                                                                   ##
 ## --------------------------------------------------------------------------------- ##
 
-cmake_minimum_required(VERSION 3.13)
-
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
 
 add_executable(hex-chebeval chebeval/chebeval.cpp)
@@ -59,10 +57,9 @@ if(HDF5_FOUND)
 
     target_include_directories(hex-hdf2hdf PRIVATE
         "${CMAKE_CURRENT_LIST_DIR}/../common"
-        ${HDF5_INCLUDE_DIRS}
     )
 
-    target_link_libraries(hex-hdf2hdf PRIVATE libhex-common ${HDF5_LIBRARIES})
+    target_link_libraries(hex-hdf2hdf PRIVATE libhex-common Hex::hdf5)
 
 endif()
 

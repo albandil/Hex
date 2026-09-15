@@ -29,78 +29,73 @@
 ##                                                                                   ##
 ## --------------------------------------------------------------------------------- ##
 
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
-set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
+# Finds SuperLU, the serial sparse LU factorization.
+#
+# Looked for in this order:
+#   1. SUPERLU_LIBRARIES, if the user has set it -- taken as given, not verified
+#   2. superluConfig.cmake, exported by SuperLU 5.3 and later
+#   3. superlu.pc, shipped by most distributions
+#   4. a plain search for slu_zdefs.h and libsuperlu
+#
+# Results: SUPERLU_FOUND, SUPERLU_INCLUDE_DIRS, SUPERLU_LIBRARIES, SuperLU::SuperLU
 
-set(libhex-common_SOURCES
-    "hex-arrays.cpp"
-    "hex-blas.cpp"
-    "hex-born.cpp"
-    "hex-hdffile.cpp"
-    "hex-hydrogen.cpp"
-    "hex-matrix.cpp"
-    "hex-misc.cpp"
-    "hex-special.cpp"
-    "hex-spgrid.cpp"
-    "hex-symbolic.cpp"
-    "hex-vec3d.cpp"
-    "hex-version.cpp"
-    "hex-vtkfile.cpp"
-)
+include("${CMAKE_CURRENT_LIST_DIR}/HexFindHelper.cmake")
 
-if(HDF5_FOUND)
-    set(libhex-common_SOURCES ${libhex-common_SOURCES} "hex-h5file.cpp")
+if(SUPERLU_LIBRARIES)
+
+    hex_find_result(SUPERLU
+        REQUIRED_VARS SUPERLU_LIBRARIES
+        TARGET        SuperLU::SuperLU
+        INCLUDE_DIRS  ${SUPERLU_INCLUDE_DIRS}
+        LIBRARIES     ${SUPERLU_LIBRARIES}
+    )
+
+    return()
+
 endif()
 
-add_library(libhex-common SHARED ${libhex-common_SOURCES})
+find_package(superlu CONFIG QUIET)
 
-set_target_properties(libhex-common PROPERTIES PREFIX "")
+if(superlu_FOUND AND TARGET superlu::superlu)
 
-target_include_directories(libhex-common PUBLIC
-    ../libs
-)
+    set(superlu_FOUND superlu::superlu)
 
-# PUBLIC throughout: the installed headers of libhex-common include the headers of
-# GSL, HDF5, CLN/GiNaC and png++, so its consumers need them too. The Hex::* targets
-# are empty for the dependencies that are switched off, hence no conditionals here.
-target_link_libraries(libhex-common PUBLIC
-    Hex::config
-    Hex::blas
-    Hex::boinc
-    Hex::cln
-    Hex::ginac
-    Hex::gsl
-    Hex::hdf5
-    Hex::lapack
-    Hex::mpi
-    Hex::openmp
-    Hex::png
-)
+    hex_find_result(SUPERLU
+        REQUIRED_VARS superlu_FOUND
+        TARGET        SuperLU::SuperLU
+        LIBRARIES     superlu::superlu
+        VERSION       "${superlu_VERSION}"
+    )
 
-## --------------------------------------------------------------------------------- ##
+    return()
 
-if(BUILD_TESTING)
-    add_subdirectory(test)
 endif()
 
-## --------------------------------------------------------------------------------- ##
+find_package(PkgConfig QUIET)
 
-install(TARGETS libhex-common
-    RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
-    LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
-    ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+if(PKG_CONFIG_FOUND)
+    pkg_check_modules(PC_SUPERLU QUIET superlu)
+endif()
+
+# hex-ecs includes slu_zdefs.h in FP64 and slu_cdefs.h in FP32; both sit next to
+# each other, so looking for one of them is enough
+find_path(SUPERLU_INCLUDE_DIR
+    NAMES slu_zdefs.h
+    HINTS ${PC_SUPERLU_INCLUDE_DIRS}
+    PATH_SUFFIXES superlu SuperLU
 )
 
-install(DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/"
-    DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/hex"
-    FILES_MATCHING
-    PATTERN "test" EXCLUDE
-    PATTERN "*.h"
+find_library(SUPERLU_LIBRARY
+    NAMES superlu
+    HINTS ${PC_SUPERLU_LIBRARY_DIRS}
 )
 
-# bundled header-only libraries used by the public headers above
-install(DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/../libs/png++"
-    DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/hex"
-    FILES_MATCHING PATTERN "*.hpp"
+hex_find_result(SUPERLU
+    REQUIRED_VARS SUPERLU_LIBRARY SUPERLU_INCLUDE_DIR
+    TARGET        SuperLU::SuperLU
+    INCLUDE_DIRS  ${SUPERLU_INCLUDE_DIR}
+    LIBRARIES     ${SUPERLU_LIBRARY}
+    VERSION       "${PC_SUPERLU_VERSION}"
 )
+
+mark_as_advanced(SUPERLU_INCLUDE_DIR SUPERLU_LIBRARY)

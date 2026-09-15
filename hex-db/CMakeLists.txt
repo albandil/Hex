@@ -29,10 +29,6 @@
 ##                                                                                   ##
 ## --------------------------------------------------------------------------------- ##
 
-cmake_minimum_required(VERSION 3.13)
-
-find_package(SQLite3 REQUIRED)
-
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
@@ -75,12 +71,12 @@ target_include_directories(libhex-db PUBLIC
     src
     ../common
     ../libs
-    ${SQLite3_INCLUDE_DIRS}
 )
 
 target_link_libraries(libhex-db PRIVATE
     libhex-common
-    ${SQLite3_LIBRARIES}
+    Hex::config
+    Hex::sqlite3
 )
 
 set(hex-db_SOURCES
@@ -89,10 +85,9 @@ set(hex-db_SOURCES
 
 add_executable(hex-db ${hex-db_SOURCES})
 
-target_link_libraries(hex-db
+target_link_libraries(hex-db PRIVATE
     libhex-common
     libhex-db
-    ${SQLite3_LIBRARIES}
 )
 
 ## --------------------------------------------------------------------------------- ##
