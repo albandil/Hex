@@ -14,36 +14,44 @@
     //    $sqlite3  ... path to the "sqlite3" shell program
     //    $gnuplot  ... path to the "gnuplot" program (only Canvas terminal needed)
     include "paths.inc";
-    
+
     // scattering quantity to set in the HTML form
     $var = isset($_POST["qty"]) ? $_POST["qty"] : "ccs";
-    
+
     // energy units
     $Eunits = isset($_POST["Eunits"]) ? $_POST["Eunits"] : "Ry";
-    
+
     // length units
     $Tunits = isset($_POST["Tunits"]) ? $_POST["Tunits"] : "a.u.";
-    
+
     // angular units
     $Aunits = isset($_POST["Aunits"]) ? $_POST["Aunits"] : "deg";
-    
-    if (isset($_POST["Eall"]))
-    {
+
+    if (!isset($_POST["thmin"]))
+        $_POST["thmin"] = 0;
+    if (!isset($_POST["thmax"]))
+        $_POST["thmax"] = 3.14159265359;
+    if (!isset($_POST["dth"]))
+        $_POST["dth"] = 1;
+
+    if (!isset($_POST["Emin"]) || isset($_POST["Eall"]))
         $_POST["Emin"] = -1;
+    if (!isset($_POST["Emax"]) || isset($_POST["Eall"]))
         $_POST["Emax"] =  0;
+    if (!isset($_POST["dE"])   || isset($_POST["Eall"]))
         $_POST["dE"]    = 1;
-    }
-    
+
     // compute standard input for Hex-db (angles)
     if (in_array($var, array("scatamp", "dcs", "asy")))
         $nums = range($_POST["thmin"], $_POST["thmax"], $_POST["dth"]);
-    
+
     // compute standard input for Hex-db (energies)
     if (in_array($var, array("ics", "ccs", "xcs", "colls", "momtf", "spflip", "tcs")))
         $nums = range($_POST["Emin"], $_POST["Emax"], $_POST["dE"]);
 
     // number of states to show in the table of available data (without ionization)
     $states = 9;
+
 ?>
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">

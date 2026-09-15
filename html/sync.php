@@ -45,8 +45,8 @@
     // Truncation of the response.
     // header('VAMDC-TRUNCATED: 2.9 %');
 
+    echo "<" . "?xml version=\"1.0\" encoding=\"UTF-8\"?>";
 ?>
-<?xml version="1.0" encoding="UTF-8"?>
 <XSAMSData xmlns="http://vamdc.org/xml/xsams/1.0"
            xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
            xsi:schemaLocation="http://vamdc.org/xml/xsams/1.0 http://vamdc.org/xml/xsams/1.0">
