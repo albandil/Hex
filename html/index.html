@@ -1,88 +1,86 @@
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
- "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<!DOCTYPE html>
+<html lang="en">
 
-<html xmlns="http://www.w3.org/1999/xhtml">
- 
 <head>
+	<meta charset="utf-8"/>
+	<meta name="viewport" content="width=device-width, initial-scale=1"/>
+
 	<title>Hex scattering database</title>
-	<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
-	
-	<link rel="icon" type="image/gif" href="hexe-small.gif" />
-	
-	<style>
-		<!-- @import "style.css"; -->
-	</style>
-	
+
+	<link rel="icon" type="image/gif" href="hexe-small.gif"/>
+	<link rel="stylesheet" href="style.css"/>
+
 	<script>
-		function setMod(mod,cur,str)
-		{
-			if (mod == cur)
-			{
-				mod.style.background = "#ECB489";
-				document.getElementById("moddescr").innerHTML = str;
-			}
-			else
-			{
-				mod.style.background = "#FFFFFF";
-			}
-		}
-		function jsColours(cur)
-		{
-			setMod (
-				document.getElementById("mod-ecs"), cur,
+		var modDescr = {
+			"mod-ecs":
 				"A low-energy code that solves the full Schrödinger equation " +
 				"in the scattering form for two electrons in the proton field. " +
 				"The boundary conditions are avoided using the method of " +
-				"exterior complex scaling."
-			);
-			setMod (
-				document.getElementById("mod-dwba"), cur,
-				"High-energy code. This one computes the scattering T-matrices" +
+				"exterior complex scaling.",
+			"mod-dwba":
+				"High-energy code. This one computes the scattering T-matrices " +
 				"using the first order of the distorted or plane " +
-				"wave Born approximation."
-			);
-			/*setMod (
-				document.getElementById("mod-pwba2"), cur,
+				"wave Born approximation.",
+			/*"mod-pwba2":
 				"Intermediate-energy code. This one computes the " +
 				"scattering T-matrices using the second order of the plane " +
-				"wave Born approximation."
-			);*/
-			setMod (
-				document.getElementById("mod-db"), cur,
+				"wave Born approximation.",*/
+			"mod-db":
 				"The database interface module. Data from the computational " +
 				"modules are stored in an intermediate SQLite database. This " +
 				"module can be used, then, to extract requested derived " +
 				"observable quantities, like cross sections of various correlation " +
-				"data"
-			);
-			setMod (
-				document.getElementById("mod-data"), cur,
+				"data.",
+			"mod-data":
 				"The database of the precomputed T-matrices, which is available " +
 				"through this web portal. Use the bottom link \"Go to web " +
 				"interface\" to access the data that have been computed by us " +
 				"up to this date."
-			);
+		};
+
+		function jsColours(cur)
+		{
+			for (var id in modDescr)
+			{
+				var mod = document.getElementById(id);
+
+				if (mod == null)
+					continue;
+
+				if (mod == cur)
+				{
+					mod.className = "module active";
+					document.getElementById("moddescr").innerHTML = modDescr[id];
+				}
+				else
+				{
+					mod.className = "module";
+				}
+			}
 		}
 	</script>
 </head>
- 
+
 <body>
 
 	<div class = "ramec">
 
-	<!-- header -->
+	<header class="brand">
+		<a href="index.html"><img src="hexe.gif" alt="Hex logo"/></a>
+		<div>
+			<div class="nadpis">Hex</div>
+			<div class="podnadpis">scattering database</div>
+		</div>
+	</header>
 
-	<center>
-	<table border = "0">
-		<tr><td>
-			<a href = "index.html"><img src = "hexe.gif" border = "0"/></a>
-		</td><td>
-			<div class = "nadpis">Hex</div>
-			
-			<div class = "podnadpis">scattering database</div>
-		</td></tr>
-	</table>
-	</center>
+	<nav class="nav">
+		<a href="index.html" class="current">Overview</a>
+		<a href="hex-ecs.html">Hex-ecs</a>
+		<a href="hex-dwba.html">Hex-dwba</a>
+		<a href="hex-db.html">Hex-db</a>
+		<a href="database.html">Data</a>
+		<a href="db.php">Web interface</a>
+	</nav>
 
 	<!-- explanation -->
 
@@ -91,67 +89,56 @@
 		This acronym actually covers several distinct things:
 	</div>
 
-	<div><center>
-		<table class = "modules">
-			<tr>
-				<td id = "mod-ecs" bgcolor = "#ECB489" onmouseover = "jsColours(this)">
-					<a href = "hex-ecs.html">Hex-ecs</a>
-				</td><td id = "mod-dwba" onmouseover = "jsColours(this)">
-					<a href = "hex-dwba.html">Hex-dwba</a>
-				<!--</td><td id = "mod-pwba2" onmouseover = "jsColours(this)">
-				<a href = "hex-pwba2.html">Hex-pwba2</a>-->
-				</td><td id = "mod-db" onmouseover = "jsColours(this)">
-					<a href = "hex-db.html">Hex-db</a>
-				</td><td id = "mod-data" onmouseover = "jsColours(this)">
-					<a href = "database.html">Database</a>
-				</td>
-			</tr>
-			<tr><td colspan = "5" bgcolor = "#ECB489">
-				<div class = "text" id = "moddescr">
-					A low-energy code that solves the full
-					Schrödinger equation in the scattering form for two electrons
-					in the proton field. The boundary conditions are avoided
-					using the method of exterior complex scaling.
-				</div>
-			</td></tr>
-		</table>
-	</center></div>
-	
-	<img src = "logo.png" style = "float:right;width:175px;margin-left:20px;margin-right:20px;"/>
+	<div class = "modules">
+		<div class = "module-list">
+			<a class = "module active" id = "mod-ecs" href = "hex-ecs.html"
+			   onmouseover = "jsColours(this)" onfocus = "jsColours(this)">Hex-ecs</a>
+			<a class = "module" id = "mod-dwba" href = "hex-dwba.html"
+			   onmouseover = "jsColours(this)" onfocus = "jsColours(this)">Hex-dwba</a>
+			<!-- <a class = "module" id = "mod-pwba2" href = "hex-pwba2.html"
+			   onmouseover = "jsColours(this)" onfocus = "jsColours(this)">Hex-pwba2</a> -->
+			<a class = "module" id = "mod-db" href = "hex-db.html"
+			   onmouseover = "jsColours(this)" onfocus = "jsColours(this)">Hex-db</a>
+			<a class = "module" id = "mod-data" href = "database.html"
+			   onmouseover = "jsColours(this)" onfocus = "jsColours(this)">Database</a>
+		</div>
+		<div class = "module-descr" id = "moddescr">
+			A low-energy code that solves the full
+			Schrödinger equation in the scattering form for two electrons
+			in the proton field. The boundary conditions are avoided
+			using the method of exterior complex scaling.
+		</div>
+	</div>
 
-	<div class = "text" style = "">
+	<img class = "sidefigure" src = "logo.png" alt = ""/>
+
+	<div class = "text">
 		The current source code of the programs can be freely downloaded at
 		the Hex project page at <a href = "http://sourceforge.net/projects/hecs/">SourceForge</a>
 		and also here: <a href = "hex-src.tar.gz">source</a>, <a href="hex-win64.7z">win64 binaries</a>.
 	</div>
-	
-	<div class = "text" style = "">
+
+	<div class = "text">
 		The package is maintained by the Institute of Theoretical Physics at the
 		Charles University in Prague, Czech Republic, in the collaboration with
 		the Astronomical Institute of the Czech Academy of Sciences.
 	</div>
 
-	<br/>
 <!--
 	<a href="https://ilmandel.cc/boinc/Hex"><img src = "pb_boinc.gif" style = "float:left;width:115px;margin-left:10px;margin-right:10px;margin-top:10px;margin-bottom:10px;"/></a>
 
-	<div class = "text" style = "">
+	<div class = "text">
 		You can help with extension of the database using your own computer!
 		Apart from supercomputers, Hex runs also on the Boinc network. See the
 		<a href="https://ilmandel.cc/boinc/Hex">Hex@home</a> project page for details.
 		(Only IPv6 access is supported currently.)
 	</div>
-
-	<br/>
 -->
-	<center>
-        <span style = "padding:10px;margin:10px;border:solid;border-width:1px;background:#880000;">
-		<a href = "db.php" style = "color: white; text-decoration: none;">Go to web interface</a>
-		</span>
-	</center>
-	
-	<br/><br/>
-	
+
+	<div class = "actions">
+		<a class = "cta" href = "db.php">Go to web interface</a>
+	</div>
+
 	</div> <!-- rám -->
 
 	<div class = "pata"><a href = "mailto:jakub.benda@seznam.cz?subject=Hex web">Jakub Benda</a> &copy; 2017</div>

@@ -53,23 +53,20 @@
     $states = 9;
 
 ?>
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
- "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<!DOCTYPE html>
+<html lang="en">
 
-<html xmlns="http://www.w3.org/1999/xhtml">
- 
 <head>
-    <title>Hex scattering database</title>
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
-    
-    <link rel="icon" type="image/gif" href="hexe-small.gif" />
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1"/>
 
-    <link type="text/css" href="gnuplot_mouse.css" rel="stylesheet">
-    
-    <!-- Load stylesheet-->
-    <style type="text/css">
-        <!-- @import "style.css"; -->
-    </style>
+    <title>Web interface — Hex scattering database</title>
+
+    <link rel="icon" type="image/gif" href="hexe-small.gif"/>
+
+    <!-- Load stylesheets -->
+    <link type="text/css" href="gnuplot_mouse.css" rel="stylesheet"/>
+    <link type="text/css" href="style.css" rel="stylesheet"/>
 
     <!-- Copy value of $states [from PHP] to Nstates [JavaScript] -->
     <script type = "text/javascript" language = "javascript">
@@ -292,31 +289,36 @@
 
     <div class = "grid">
 
-    <!-- header -->
+    <header class="brand">
+        <a href="index.html"><img src="hexe.gif" alt="Hex logo"/></a>
+        <div>
+            <div class="nadpis">Hex</div>
+            <div class="podnadpis">scattering database</div>
+        </div>
+    </header>
 
-    <center>
-    <table border = "0">
-        <tr><td>
-            <a href = "index.html"><img src = "hexe.gif" border = "0" alt = "logo"/></a>
-        </td><td>
-            <div class = "nadpis">Hex</div>
-            
-            <div class = "podnadpis">scattering database</div>
-        </td></tr>
-    </table>
-    </center>
+    <nav class="nav">
+        <a href="index.html">Overview</a>
+        <a href="hex-ecs.html">Hex-ecs</a>
+        <a href="hex-dwba.html">Hex-dwba</a>
+        <a href="hex-db.html">Hex-db</a>
+        <a href="database.html">Data</a>
+        <a href="db.php" class="current">Web interface</a>
+    </nav>
 
-    <!-- body -->
+    <div class = "columns">
+    <div class = "column">
 
-    <table width = "100%" style = "table-layout:fixed;"><tr><td valign = "top" width = "50%">
-
-    <div class = "sekce">Input:</div>
+    <div class = "sekce">Input</div>
 
     <!-- scattering variable -->
-    <form name = "data" action = "db.php" method = "post" style = "margin: 10px">
-        <div class = "text">Choose what to compute:</div>
-        <center>
-            <select name = "qty" title = "scattering quantity to compute" onchange = "this.form.submit()">
+    <form name = "data" action = "db.php" method = "post" class = "panel">
+
+        <!-- scattering variable -->
+        <div class = "field">
+        <div class = "field-label">Quantity to compute</div>
+        <div class = "field-row">
+            <select class = "wide" name = "qty" title = "scattering quantity to compute" onchange = "this.form.submit()">
                 <option value = "scatamp" <?php if ($var == "scatamp") echo "selected = \"selected\""; ?> >scatering amplitude</option>
                 <option value = "dcs" <?php if ($var == "dcs") echo "selected = \"selected\""; ?> >differential cross section</option>
                 <option value = "asy" <?php if ($var == "asy") echo "selected = \"selected\""; ?> >spin asymmetry</option>
@@ -328,42 +330,50 @@
                 <option value = "spflip" <?php if ($var == "spflip") echo "selected = \"selected\""; ?> >spin-flip cross section</option>
                 <option value = "tcs" <?php if ($var == "tcs") echo "selected = \"selected\""; ?> >total cross section</option>
             </select>
-        </center>
+        </div>
+        </div>
 
         <!-- units -->
-        <div class = "text">Choose units:</div>
-        <center>
-            <span class = "text">Energy: <select name = "Eunits" title = "energy units for energy input">
+        <div class = "field">
+        <div class = "field-label">Units</div>
+        <div class = "field-row">
+            <label>Energy: <select name = "Eunits" title = "energy units for energy input">
                 <option value = "Ry" <?php if ($Eunits == "Ry") echo "selected = \"selected\""; ?> >Rydberg</option>
                 <option value = "a.u." <?php if ($Eunits == "a.u.") echo "selected = \"selected\""; ?> >Hartree (a.u.)</option>
                 <option value = "eV" <?php if ($Eunits == "eV") echo "selected = \"selected\""; ?> >eV</option>
-            </select>, <span class = "text">Angles: <select name = "Aunits" title = "angular units">
+            </select></label>
+            <label>Angles: <select name = "Aunits" title = "angular units">
                 <option value = "deg" <?php if ($Aunits == "deg") echo "selected = \"selected\""; ?> >degrees</option>
                 <option value = "rad" <?php if ($Aunits == "rad") echo "selected = \"selected\""; ?> >radians</option>
-            </select> ,  Output: <select name = "Tunits" title = "length units for (dimensioned) output">
+            </select></label>
+            <label>Output: <select name = "Tunits" title = "length units for (dimensioned) output">
                 <option value = "a.u." <?php if ($Tunits == "a.u.") echo "selected = \"selected\""; ?> >a.u.</option>
                 <option value = "cgs" <?php if ($Tunits == "cgs") echo "selected = \"selected\""; ?> >cgs</option>
-            </select></span>
-        </center>
+            </select></label>
+        </div>
+        </div>
 
         <!-- initial atomic state -->
-        <div class = "text">Set initial atomic state(s):</div>
-        <center>
-            \(n_i\) = <input type = "text" title = "initial principal quantum number" name = "ni" size = "3" value = "<?php echo (isset($_POST["ni"]) ? $_POST["ni"] : 1); ?>" required = "required"/>
-            \(l_i\) = <input type = "text" title = "initial orbital quantum number" name = "li" size = "3" value = "<?php echo (isset($_POST["li"]) ? $_POST["li"] : 0); ?>" required = "required"/>
-            \(m_i\) = <input type = "text" title = "initial magnetic quantum number" name = "mi" size = "3" value = "<?php echo (isset($_POST["mi"]) ? $_POST["mi"] : 0); ?>" required = "required"/>
-        </center>
+        <div class = "field">
+        <div class = "field-label">Initial atomic state</div>
+        <div class = "field-row">
+            <label>\(n_i\) = <input type = "text" title = "initial principal quantum number" name = "ni" size = "3" value = "<?php echo (isset($_POST["ni"]) ? $_POST["ni"] : 1); ?>" required = "required"/></label>
+            <label>\(l_i\) = <input type = "text" title = "initial orbital quantum number" name = "li" size = "3" value = "<?php echo (isset($_POST["li"]) ? $_POST["li"] : 0); ?>" required = "required"/></label>
+            <label>\(m_i\) = <input type = "text" title = "initial magnetic quantum number" name = "mi" size = "3" value = "<?php echo (isset($_POST["mi"]) ? $_POST["mi"] : 0); ?>" required = "required"/></label>
+        </div>
+        </div>
         
         <!-- final tomic state -->
 <?php
             if ($var != "tcs")
             {
-                printf("\t\t<div class = \"text\">Set final atomic state(s):</div>\n");
-                printf("\t\t<center>\n");
-                printf("\t\t\t\\(n_f\\) = <input type = \"text\" title = \"final principal quantum number\" name = \"nf\" size = \"3\" value = \"%s\" required = \"required\"/>\n", isset($_POST["nf"]) ? $_POST["nf"] : "1");
-                printf("\t\t\t\\(l_f\\) = <input type = \"text\" title = \"final orbital quantum number\" name = \"lf\" size = \"3\" value = \"%s\" required = \"required\"/>\n", isset($_POST["lf"]) ? $_POST["lf"] : "0");
-                printf("\t\t\t\\(m_f\\) = <input type = \"text\" title = \"final magnetic quantum number\" name = \"mf\" size = \"3\" value = \"%s\" required = \"required\"/>\n", isset($_POST["mf"]) ? $_POST["mf"] : "0");
-                printf("\t\t</center>\n");
+                printf("\t\t<div class = \"field\">\n");
+                printf("\t\t<div class = \"field-label\">Final atomic state</div>\n");
+                printf("\t\t<div class = \"field-row\">\n");
+                printf("\t\t\t<label>\\(n_f\\) = <input type = \"text\" title = \"final principal quantum number\" name = \"nf\" size = \"3\" value = \"%s\" required = \"required\"/></label>\n", isset($_POST["nf"]) ? $_POST["nf"] : "1");
+                printf("\t\t\t<label>\\(l_f\\) = <input type = \"text\" title = \"final orbital quantum number\" name = \"lf\" size = \"3\" value = \"%s\" required = \"required\"/></label>\n", isset($_POST["lf"]) ? $_POST["lf"] : "0");
+                printf("\t\t\t<label>\\(m_f\\) = <input type = \"text\" title = \"final magnetic quantum number\" name = \"mf\" size = \"3\" value = \"%s\" required = \"required\"/></label>\n", isset($_POST["mf"]) ? $_POST["mf"] : "0");
+                printf("\t\t</div>\n\t\t</div>\n");
             }
 ?>
         
@@ -371,31 +381,32 @@
 <?php
             if (in_array($var, array("scatamp", "dcs", "asy", "ics", "momtf")))
             {
-                printf("\t\t<div class = \"text\" title = \"'E' is the impact energy, 'L' is the total angular momentum, 'S' is the total spin.\">Set global quantum numbers:</div>\n");
-                printf("\t\t<center>\n");
+                printf("\t\t<div class = \"field\">\n");
+                printf("\t\t<div class = \"field-label\" title = \"'E' is the impact energy, 'L' is the total angular momentum, 'S' is the total spin.\">Global quantum numbers</div>\n");
+                printf("\t\t<div class = \"field-row\">\n");
                 
                 // single impact energy
                 if (in_array($var, array("scatamp", "dcs", "asy")))
                 {
-                    printf("\t\t\t\\(E\\) = <input type = \"text\" title = \"impact energy of the incoming electron\" name = \"E\" size = \"3\" value = \"%s\" required = \"required\"/>\n", isset($_POST["E"]) ? $_POST["E"] : "");
+                    printf("\t\t\t<label>\\(E\\) = <input type = \"text\" title = \"impact energy of the incoming electron\" name = \"E\" size = \"3\" value = \"%s\" required = \"required\"/></label>\n", isset($_POST["E"]) ? $_POST["E"] : "");
                 }
                 
                 // total angular momentum
                 if (in_array($var, array("ics")))
                 {
-                    printf("\t\t\t\\(L\\) = <input type = \"text\" title = \"total orbital momentum of the two electrons\" name = \"L\" size = \"3\" value = \"%s\" required = \"required\"/>\n", isset($_POST["L"]) ? $_POST["L"] : "");
+                    printf("\t\t\t<label>\\(L\\) = <input type = \"text\" title = \"total orbital momentum of the two electrons\" name = \"L\" size = \"3\" value = \"%s\" required = \"required\"/></label>\n", isset($_POST["L"]) ? $_POST["L"] : "");
                 }
                 
                 // total spin
                 if (in_array($var, array("scatamp", "dcs", "ics", "momtf")))
                 {
-                    printf("\t\t\t\\(S\\) = <select name = \"S\" title = \"total spin of the two electrons\">\n");
+                    printf("\t\t\t<label>\\(S\\) = <select name = \"S\" title = \"total spin of the two electrons\">\n");
                     printf("\t\t\t<option value = \"0\"" . ((isset($_POST["S"]) and $_POST["S"] == "0") ? " selected=\"selected\"" : "") . ">0</option>\n");
                     printf("\t\t\t<option value = \"1\"" . ((isset($_POST["S"]) and $_POST["S"] == "1") ? " selected=\"selected\"" : "") . ">1</option>\n");
-                    printf("\t\t\t</select>\n");
+                    printf("\t\t\t</select></label>\n");
                 }
                 
-                printf("\t\t</center>\n");
+                printf("\t\t</div>\n\t\t</div>\n");
             }
 ?>
 
@@ -403,12 +414,13 @@
 <?php
             if (in_array($var, array("scatamp", "dcs", "asy")))
             {
-                printf("\t\t<div class = \"text\">Set angular range:</div>\n");
-                printf("\t\t<center>\n");
-                printf("\t\t\t\\(\\theta_{\mathrm{min}}\\) = <input type = \"text\" title = \"smallest scattering angle\" name = \"thmin\" size = \"5\" value = \"%s\" required = \"required\"/>\n", $_POST["thmin"]);
-                printf("\t\t\t\\(\\theta_{\mathrm{max}}\\) = <input type = \"text\" title = \"largest scattering angle\" name = \"thmax\" size = \"5\" value = \"%s\" required = \"required\"/>\n", $_POST["thmax"]);
-                printf("\t\t\t\\(\\Delta\\theta\\) = <input type = \"text\" title = \"spacing between the scattering angles\" name = \"dth\" size = \"5\" value = \"%s\" required = \"required\"/>\n", $_POST["dth"]);
-                printf("\t\t</center>\n");
+                printf("\t\t<div class = \"field\">\n");
+                printf("\t\t<div class = \"field-label\">Angular range</div>\n");
+                printf("\t\t<div class = \"field-row\">\n");
+                printf("\t\t\t<label>\\(\\theta_{\mathrm{min}}\\) = <input type = \"text\" title = \"smallest scattering angle\" name = \"thmin\" size = \"5\" value = \"%s\" required = \"required\"/></label>\n", $_POST["thmin"]);
+                printf("\t\t\t<label>\\(\\theta_{\mathrm{max}}\\) = <input type = \"text\" title = \"largest scattering angle\" name = \"thmax\" size = \"5\" value = \"%s\" required = \"required\"/></label>\n", $_POST["thmax"]);
+                printf("\t\t\t<label>\\(\\Delta\\theta\\) = <input type = \"text\" title = \"spacing between the scattering angles\" name = \"dth\" size = \"5\" value = \"%s\" required = \"required\"/></label>\n", $_POST["dth"]);
+                printf("\t\t</div>\n\t\t</div>\n");
             }
 ?>
 
@@ -428,35 +440,33 @@
                     $chckstatus = "";
                 }
                 
-                printf("\t\t<div class = \"text\" title = \"Set to '-1','0','1' to get all computed data. Otherwise you will get interpolated result. The interpolation is linear for most cases. Only for all integral cross sections at energies behind the ionization threshold the interpolation uses csplines.\">Set uniform energy range:</div>\n");
-                printf("\t\t<center>\n");
-                printf("\t\t\t\\(E_{\mathrm{min}}\\) = <input type = \"text\" title = \"lowest impact energy\" id = \"iEmin\" name = \"Emin\" size = \"5\" value = \"%s\" $editstatus required = \"required\"/>\n", isset($_POST["Emin"]) ? $_POST["Emin"] : "");
-                printf("\t\t\t\\(E_{\mathrm{max}}\\) = <input type = \"text\" title = \"highest impact energy\" id = \"iEmax\" name = \"Emax\" size = \"5\" value = \"%s\" $editstatus required = \"required\"/>\n", isset($_POST["Emax"]) ? $_POST["Emax"] : "");
-                printf("\t\t\t\\(\\Delta E\\) = <input type = \"text\" title = \"impact energy spacing\" id = \"idE\" name = \"dE\" size = \"5\" value = \"%s\" $editstatus required = \"required\"/>\n", isset($_POST["dE"]) ? $_POST["dE"] : "");
-                printf("\t\t</center>\n");
+                printf("\t\t<div class = \"field\">\n");
+                printf("\t\t<div class = \"field-label\" title = \"Set to '-1','0','1' to get all computed data. Otherwise you will get interpolated result. The interpolation is linear for most cases. Only for all integral cross sections at energies behind the ionization threshold the interpolation uses csplines.\">Uniform energy range</div>\n");
+                printf("\t\t<div class = \"field-row\">\n");
+                printf("\t\t\t<label>\\(E_{\mathrm{min}}\\) = <input type = \"text\" title = \"lowest impact energy\" id = \"iEmin\" name = \"Emin\" size = \"5\" value = \"%s\" $editstatus required = \"required\"/></label>\n", isset($_POST["Emin"]) ? $_POST["Emin"] : "");
+                printf("\t\t\t<label>\\(E_{\mathrm{max}}\\) = <input type = \"text\" title = \"highest impact energy\" id = \"iEmax\" name = \"Emax\" size = \"5\" value = \"%s\" $editstatus required = \"required\"/></label>\n", isset($_POST["Emax"]) ? $_POST["Emax"] : "");
+                printf("\t\t\t<label>\\(\\Delta E\\) = <input type = \"text\" title = \"impact energy spacing\" id = \"idE\" name = \"dE\" size = \"5\" value = \"%s\" $editstatus required = \"required\"/></label>\n", isset($_POST["dE"]) ? $_POST["dE"] : "");
+                printf("\t\t</div>\n");
                 
-                printf("\t\t<div class = \"text\">or</div>\n");
-                printf("\t\t<center>\n");
-                printf("\t\t\t<input type = \"checkbox\" name = \"Eall\" onclick = \"jsEallClick()\" value = \"1\"$chckstatus> retrieve all available energies.\n");
-                printf("\t\t</center>\n");
+                printf("\t\t<div class = \"field-row\">\n");
+                printf("\t\t\t<label><input type = \"checkbox\" name = \"Eall\" onclick = \"jsEallClick()\" value = \"1\"$chckstatus/> or retrieve all available energies</label>\n");
+                printf("\t\t</div>\n\t\t</div>\n");
             }
 ?>
         
-        <div class = "text">Graph axis scales:</div>
-            <center>
-                Horizontal: <select name = "xscale" title = "horizontal scale">
+        <div class = "field">
+        <div class = "field-label">Graph axis scales</div>
+            <div class = "field-row">
+                <label>Horizontal: <select name = "xscale" title = "horizontal scale">
                     <option value = "lin" <?php if (!isset($_POST["xscale"]) or $_POST["xscale"] != "log") echo "selected = \"selected\""; ?> >linear</option>
                     <option value = "log" <?php if (isset($_POST["xscale"]) and $_POST["xscale"] == "log") echo "selected = \"selected\""; ?> >logarithmic</option>
-                </select>
-                &nbsp;&nbsp;&nbsp;
-                Vertical: <select name = "yscale" title = "vertical scale">
+                </select></label>
+                <label>Vertical: <select name = "yscale" title = "vertical scale">
                     <option value = "lin" <?php if (!isset($_POST["yscale"]) or $_POST["yscale"] != "log") echo "selected = \"selected\""; ?> >linear</option>
                     <option value = "log" <?php if (isset($_POST["yscale"]) and $_POST["yscale"] == "log") echo "selected = \"selected\""; ?> >logarithmic</option>
-                </select>
-            </center>
+                </select></label>
+            </div>
         </div>
-        
-        <br/>
         
         <!-- hidden element containing the output from hex-db -->
 <?php
@@ -467,20 +477,20 @@
 ?>
 
         <!-- view/download buttons -->
-        <center>
+        <div class = "field-row">
             <input type = "submit" value = "View data" name = "view"/>
-            &nbsp;&nbsp;&nbsp;
             <input type = "submit" value = "Download as TXT" name = "download" <?php
                 if (!isset($_POST["qty"]) or !isset($_POST["view"]))
                     echo "disabled=\"disabled\"";
             ?>/>
-        </center>
+        </div>
 
     </form>
 
-    </td><td valign = "top" width = "50%">
+    </div>
+    <div class = "column">
 
-    <div class = "sekce">Output:</div>
+    <div class = "sekce">Output</div>
     <div class = "text">
         This section contains a graphical preview of the selected data.
         It uses Gnuplot's HTML5 Canvas output, which allows a trivial interaction.
@@ -489,13 +499,11 @@
         will not display the graphs correctly.
     </div>
 
-    <div>
+    <div class = "plot">
         <canvas id="gnuplot_canvas" width="500" height="350" onkeypress="gnuplot.do_hotkey();" tabindex="0">
             Sorry, your browser seems not to support the HTML 5 canvas element.
         </canvas>
-    </div>
 
-    <div>
         <table id="gnuplot_mousebox" class="mbunder">
         <tr>
         <!-- <td class="icon" onclick="gnuplot.toggle_grid();"><img src="grid.png" id="gnuplot_grid_icon" alt="#" title="toggle grid"></td> -->
@@ -505,17 +513,17 @@
         <td class="icon" onclick='gnuplot.toggle_plot("gnuplot_canvas_plot_2")'>&#10113;</td>
         <td class="mb0">x</td><td class="mb1"><span id="gnuplot_canvas_x">&nbsp;</span></td>
         <td class="mb0">y</td><td class="mb1"><span id="gnuplot_canvas_y">&nbsp;</span></td>
+        </tr>
         </table>
     </div>
 
-    </td></tr><tr><td colspan="2" width = "100%">
-    
-        <div style="height: 1px; background-color: #880000; text-align: center">
-            <span class = "sekce" style = "text-align: center; position: relative; top: -10px; background: white;">
-                <a name = "avail-head"></a><a href = "#avail-head" id = "avail-link" onclick = "jsAvailClick()">&nbsp;&#x25BC; Available data &#x25BC;&nbsp;</a>
-            </span>
+    </div>
+    </div> <!-- columns -->
+
+        <div class = "collapsible">
+            <a name = "avail-head"></a><a class = "toggle" href = "#avail-head" id = "avail-link" onclick = "jsAvailClick()">&#x25BC; Available data &#x25BC;</a>
         </div>
-        <br/>
+
         <div class = "text" style = "display:none;" id = "avail-more-1">
             The simple table below ilustrates the current state of the contents
             of the database. The rows of the table are different initial atomic
@@ -529,15 +537,16 @@
             that are not present, do not hesitate to contact the author.
         </div>
         
-        <center><table class = "availdata" id = "avail-more-2" style = "display:none;">
+        <div class = "table-scroll" id = "avail-more-2" style = "display:none;">
+        <table class = "availdata">
             <colgroup>
                 <col/>
-                <?php $W = 55/($states + 2); for ($i = 0; $i <= $states+1; $i++) echo "<col width=\"$W%\">"; ?>
+                <?php $W = 55/($states + 2); for ($i = 0; $i <= $states+1; $i++) echo "<col style=\"width:$W%\"/>"; ?>
                 <col/>
             </colgroup>
             <tr>
-                <td rowspan = "2" colspan = "2" style = "border-width:0;"></td>
-                <td colspan = "<?php echo ($states+1); ?>" align = "center" style = "border-width:0;">
+                <td rowspan = "2" colspan = "2" class = "nolines"></td>
+                <td colspan = "<?php echo ($states+1); ?>" class = "nolines">
                     \(n_f\)
                     <select id = "alf" title = "lf" onchange = "jsDataAngular()">
                         <option value = "s" selected = "selected">s</option>
@@ -550,14 +559,14 @@
                         <option value = "j">j</option>
                     </select>
                 </td>
-                <td style = "border-width:0;"></td>
+                <td class = "nolines"></td>
             </tr>
             <tr>
-                <?php for ($i = 1; $i <= $states; $i++) echo "<td id = \"head-f-$i\" bgcolor = \"#880000\" style = \"color: white;\">$i</td>"; ?>
-                <td bgcolor = "#880000" style = "color: white;">ion.</td>
+                <?php for ($i = 1; $i <= $states; $i++) echo "<td id = \"head-f-$i\" class = \"head\">$i</td>"; ?>
+                <td class = "head">ion.</td>
             </tr>
             <tr>
-                <td rowspan = "<?php echo $states; ?>" align = "center" style = "border-width:0;">
+                <td rowspan = "<?php echo $states; ?>" class = "nolines">
                     \(n_i\)
                     <br/>
                     <select id = "ali" title = "li" onchange = "jsDataAngular()">
@@ -571,27 +580,27 @@
                         <option value = "j">j</option>
                     </select>
                 </td>
-                <td id = "head-i-1" bgcolor = "#880000" style = "color: white;">1</td>
+                <td id = "head-i-1" class = "head">1</td>
                 <?php for ($i = 1; $i <= $states; $i++) echo "<td id = \"dat-1-$i\"></td>"; echo "\n"; ?>
                 <td id = "dat-1-0"></td>
-                <td rowspan = "<?php echo $states; ?>" width = "40%" id = "datadescr" valign = "top">
-                    <!-- notes, to be written by JS -->
+                <td rowspan = "<?php echo $states; ?>" style = "width:34%" class = "descr" id = "datadescr">
+                    Pick a cell of the table to see which data are available
+                    for that transition.
                 </td>
             </tr>
 <?php
             for ($i = 2; $i <= $states; $i++)
             {
                 echo "\t\t\t<tr>\n";
-                echo "\t\t\t\t<td id = \"head-i-$i\" bgcolor = \"#880000\" style = \"color: white;\">$i</td>";
+                echo "\t\t\t\t<td id = \"head-i-$i\" class = \"head\">$i</td>";
                 for ($j = 1; $j <= $states; $j++)
                     echo "<td id = \"dat-$i-$j\"></td>";
                 echo "<td id = \"dat-$i-0\"></td>";
                 echo "\n\t\t\t</tr>\n";
             }
 ?>
-        </table></center>
-    
-    </td></tr></table>
+        </table>
+        </div>
 
     </div> <!-- rám -->
 

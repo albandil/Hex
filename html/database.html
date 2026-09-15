@@ -1,17 +1,14 @@
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
- "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<!DOCTYPE html>
+<html lang="en">
 
-<html xmlns="http://www.w3.org/1999/xhtml">
- 
 <head>
-	<title>Hex scattering database</title>
-	<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
-	
-	<link rel="icon" type="image/gif" href="hexe-small.gif" />
-	
-	<style>
-		<!-- @import "style.css"; -->
-	</style>
+	<meta charset="utf-8"/>
+	<meta name="viewport" content="width=device-width, initial-scale=1"/>
+
+	<title>Data — Hex scattering database</title>
+
+	<link rel="icon" type="image/gif" href="hexe-small.gif"/>
+	<link rel="stylesheet" href="style.css"/>
 
 	<script type="text/x-mathjax-config">
 		MathJax.Hub.Config({
@@ -28,21 +25,22 @@
 
 	<div class = "ramec2">
 
-	<!-- header -->
+	<header class="brand">
+		<a href="index.html"><img src="hexe.gif" alt="Hex logo"/></a>
+		<div>
+			<div class="nadpis">Hex</div>
+			<div class="podnadpis">scattering database</div>
+		</div>
+	</header>
 
-	<center>
-	<table border = "0">
-		<tr><td>
-			<a href = "index.html"><img src = "hexe.gif" border = "0"/></a>
-		</td><td>
-			<div class = "nadpis">Hex</div>
-			
-			<div class = "podnadpis">scattering database</div>
-		</td></tr>
-	</table>
-	</center>
-
-	<!-- body -->
+	<nav class="nav">
+		<a href="index.html">Overview</a>
+		<a href="hex-ecs.html">Hex-ecs</a>
+		<a href="hex-dwba.html">Hex-dwba</a>
+		<a href="hex-db.html">Hex-db</a>
+		<a href="database.html" class="current">Data</a>
+		<a href="db.php">Web interface</a>
+	</nav>
 
 	<div class = "sekce">Hex-data</div>
 
@@ -52,57 +50,49 @@
 		C/C++ API of SQLite to access the data. The whole database can also be easily
 		reconstructed using hex-db from the published data:
 	</div>
-	<div style = "font-family:monospace;background:black;color:white;margin:10px;padding:5px">
-		&gt; hex-db --database &lt;path-to-DB-file&gt; --new --import Hex-170205.sql --update
-	</div>
-	<div class = "text" style = "text-indent:0;">
+	<div class = "code">&gt; hex-db --database &lt;path-to-DB-file&gt; --new --import Hex-170205.sql --update</div>
+	<div class = "text-noindent">
 		The most recent data pack can be obtained below. You will need to decompress
 		it first. The file is compressed by LZMA2 (xz), which can be decoded e.g. by
 		<a href = "http://www.7-zip.org/">7zip</a> (Windows) or using the standard
 		<a href = "http://tukaani.org/xz/">xz-tools</a> (Linux). Expect the resulting
 		file to inflate approximately ten times!
 	</div>
-	<center>
-		<span style = "margin:10px;padding:5px;background:yellow;">
-			<a href = "Hex-170210.sql.xz">Hex-170210.sql.xz</a> - 7.5 MiB
-		</span>
-	</center>
+	<div class = "actions">
+		<a class = "download" href = "Hex-170210.sql.xz">Hex-170210.sql.xz<span class = "filesize">7.5 MiB</span></a>
+	</div>
 
-	<br/>
-	
-	<div class = "text" style = "text-indent:0;">
+	<div class = "text-noindent">
 		Please cite the following articles when using Hex:
 	</div>
 	
-	<div class = "text" style = "padding-left:10px; text-indent:0;">
+	<div class = "reference">
 		Benda J., Houfek K.,<br/>
 		<a href="http://www.sciencedirect.com/science/article/pii/S0010465514002161"><i>Collisions of electrons with hydrogen atoms I. Package outline and high energy code</i></a>,<br/>
 		Comput. Phys. Commun. 185 (2014) 2893-2902.
 	</div>
 	
-	<div class = "text" style = "padding-left:10px; text-indent:0;">
+	<div class = "reference">
 		Benda J., Houfek K.,<br/>
 		<a href = "http://www.sciencedirect.com/science/article/pii/S0010465514001866"><i>Collisions of electrons with hydrogen atoms II. Low-energy program using the method of the exterior complex scaling</i></a>,<br/>
 		Comput. Phys. Commun. 185 (2014) 2903-2912.
 	</div>
 	
-	<div class = "text" style = "padding-left:10px; text-indent:0;">
+	<div class = "reference">
 		Benda J., Houfek K.,<br/>
 		<a href = "http://www.sciencedirect.com/science/article/pii/S0010465516300911"><i>New version of hex-ecs, the B-spline implementation of exterior complex scaling method for solution of electron–hydrogen scattering</i></a>,<br/>
 		Comput. Phys. Commun. 204 (2016) 216-217.
 	</div>
 	
-	<div class = "text" style = "padding-left:10px; text-indent:0;">
+	<div class = "reference">
 		Benda J., Houfek K.,<br/>
 		<a href="http://www.sciencedirect.com/science/article/pii/S0010465516303654"><i>Reducing the dimensionality of grid based methods for electron-atom scattering calculations below ionization threshold</i></a>,<br/>
 		Comput. Phys. Commun. 213 (2017) 46-51.
 	</div>
 	
-	<br/>
-	
-	<div class = "text" style = "text-indent:0;">Data contained in the database:</div>
+	<div class = "sekce">Contents of the database</div>
 
-	<div><center>
+	<div class = "table-scroll">
 		<table class="logtable">
 			<tr>
 				<th>Insertion date</th>
@@ -123,7 +113,7 @@
 				</td>
 			</tr>
 		</table>
-	</center></div>
+	</div>
 
 	</div> <!-- rám -->
 
