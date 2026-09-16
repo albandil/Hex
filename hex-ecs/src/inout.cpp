@@ -300,7 +300,7 @@ void CommandLine::parse (int argc, char* argv[])
                         "\n"
                         "Post-processing\n"
                         "\t--no-parallel-extraction         Disallow parallel extraction of T-matrices (e.g. when the whole solution does not fit into the memory).\n"
-                        "\t--eigenchannels                  Use angular momentum eigenchannels in extraction to accelerate R-convergence.\n"
+                        "\t--eigenchannels            (-E)  Use angular momentum eigenchannels in extraction to accelerate R-convergence.\n"
                         "\t--extract-rho-begin              Where to start averaging / extrapolating the T-matrix.\n"
                         "\t--extract-rho[-end]              Radius for T-matrix extraction.\n"
                         "\t--extract-rho-ion                Hyper-radius for ionization amplitude extraction, by default equal to --extract-rho.\n"
@@ -871,7 +871,7 @@ void CommandLine::parse (int argc, char* argv[])
                 }
             },
             {
-                "eigenchannels", "", 0, [&](std::vector<std::string> const & optargs) -> bool
+                "eigenchannels", "E", 0, [&](std::vector<std::string> const & optargs) -> bool
                 {
                     // use angular momentum eigenchannels for T-matrix extraction
                     eigenchannels = true;
