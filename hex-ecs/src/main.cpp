@@ -238,6 +238,23 @@ int main (int argc, char* argv[])
             inp.rknots_ext.empty() ? inp.rknots.back() + inp.cknots : inp.rknots.back() + inp.rknots_ext.back() + inp.cknots
         );
 
+        // The Kronecker product approximation writes an angular block as a sum of products
+        // of one-electron operators, which is what the inner region is: a square of
+        // coefficients in the product basis of the two radial bases. The outer region is
+        // not of that form at all, because its unknowns are amplitudes of the asymptotic
+        // channels, so a block that carries any channel has no Kronecker structure left to
+        // approximate. Without this check the mismatch only shows up as a failed assertion
+        // in the middle of the first iteration, and in a build with NDEBUG not even that.
+        if (not inp.inner_only and cmd.preconditioner == "KPA")
+        {
+            HexException
+            (
+                "The preconditioner \"KPA\" cannot be used when the projectile has real knots "
+                "of its own, because the asymptotic channel blocks are not Kronecker products. "
+                "Use \"HYB\", which applies KPA to the blocks without channels and ILU to the rest."
+            );
+        }
+
     //
     // Setup angular data
     //
