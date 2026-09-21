@@ -36,6 +36,7 @@
 // --------------------------------------------------------------------------------- //
 
 #include "hex-arrays.h"
+#include "hex-blas.h"
 #include "hex-csrmatrix.h"
 #include "hex-densematrix.h"
 #include "hex-misc.h"
@@ -202,7 +203,7 @@ void NoPreconditioner::setup ()
         SymBandMatrix<Complex> const & bS = (i == 0 ? rint->S_x() : rint->S_y());
         Bspline const & bspline = (i == 0 ? rint->bspline_x() : rint->bspline_y());
         std::size_t Nspline = bspline.Nspline();
-        cArray D (Nspline), tmp (Nspline);
+        cArray D (Nspline);
         ColMatrix<Complex> CR (Nspline, Nspline);
 
         // particle charge (first is electron, second is either electron or positron)
@@ -259,35 +260,40 @@ void NoPreconditioner::setup ()
             Hl_[i][l].Cl = CR;
             Hl_[i][l].Dl = D;
 
-            if (verbose_) std::cout << "\t\t- time: " << timer.nice_time() << std::endl;
-
-            // check CR' . S . CR = 1
-            Real orthoErr = 0;
-            for (unsigned j = 0; j < Nspline; j++)
+            // verify the diagonalization (diagnostic only, costs 2 N³ operations)
+            if (verbose_)
             {
-                bS.dot(1.0, CR.col(j), 0.0, tmp);
+                std::cout << "\t\t- time: " << timer.nice_time() << std::endl;
+
+                cArray Mdata (Nspline * Nspline), Pdata (Nspline * Nspline);
+                ColMatrixView<Complex> MC  (Nspline, Nspline, Mdata);     // M . CR
+                ColMatrixView<Complex> P   (Nspline, Nspline, Pdata);     // CR' . M . CR
+                RowMatrixView<Complex> CRT (Nspline, Nspline, CR.data()); // CR' (shallow transpose)
+
+                // check CR' . S . CR = 1
+                for (unsigned j = 0; j < Nspline; j++)
+                    bS.dot(1.0, CR.col(j), 0.0, MC.col(j));
+                blas::gemm(1.0_z, CRT, MC, 0.0_z, P); // N³ operations
+
+                Real orthoErr = 0;
+                for (unsigned j = 0; j < Nspline; j++)
                 for (unsigned i = 0; i < Nspline; i++)
-                {
-                    Complex prod = (CR.col(i) | tmp);
-                    orthoErr += sqrabs(i == j ? prod - 1.0_z : prod);
-                }
-            }
+                    orthoErr += sqrabs(Pdata[j * Nspline + i] - (i == j ? 1.0_z : 0.0_z));
 
-            if (verbose_) std::cout << "\t\t- orthogonality error: " << std::sqrt(orthoErr) / Nspline << std::endl;
+                std::cout << "\t\t- orthogonality error: " << std::sqrt(orthoErr) / Nspline << std::endl;
 
-            // check CR' . S⁻¹ . H . CR = D
-            Real simError = 0;
-            for (unsigned j = 0; j < Nspline; j++)
-            {
-                bHl.dot(1.0, CR.col(j), 0.0, tmp);
+                // check CR' . S⁻¹ . H . CR = D
+                for (unsigned j = 0; j < Nspline; j++)
+                    bHl.dot(1.0, CR.col(j), 0.0, MC.col(j));
+                blas::gemm(1.0_z, CRT, MC, 0.0_z, P); // N³ operations
+
+                Real simError = 0;
+                for (unsigned j = 0; j < Nspline; j++)
                 for (unsigned i = 0; i < Nspline; i++)
-                {
-                    Complex prod = (CR.col(i) | tmp);
-                    simError += sqrabs(i == j ? prod - D[j] : prod);
-                }
-            }
+                    simError += sqrabs(Pdata[j * Nspline + i] - (i == j ? D[j] : 0.0_z));
 
-            if (verbose_) std::cout << "\t\t- similarity error: " << std::sqrt(simError) / Nspline << std::endl;
+                std::cout << "\t\t- similarity error: " << std::sqrt(simError) / Nspline << std::endl;
+            }
 
             // write to disk and abandon for now
             Hl_[i][l].hdfsave();
