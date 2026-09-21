@@ -66,3 +66,10 @@ uses what is given, which is occasionally necessary for MUMPS and for the stand-
 
 A `WITH_*` option that is on is a hard requirement: if the library cannot be found, the configuration stops and says so,
 rather than leaving it out. The configuration ends with a summary of what the build will and will not use.
+
+### References
+
+ 1. Benda J., Houfek K., *Collisions of electrons with hydrogen atoms I. Package outline and high energy code*, Comput. Phys. Commun. 185 (2014) 2893-2902.
+ 2. Benda J., Houfek K., *Collisions of electrons with hydrogen atoms II. Low-energy program using the method of the exterior complex scaling*, Comput. Phys. Commun. 185 (2014) 2903-2912.
+ 3. Benda J., Houfek K., *New version of hex-ecs, the B-spline implementation of exterior complex scaling method for solution of electron–hydrogen scattering*, Comput. Phys. Commun. 204 (2016) 216-217.
+ 4. Benda J., Houfek K., *Reducing the dimensionality of grid based methods for electron-atom scattering calculations below ionization threshold*, Comput. Phys. Commun. 213 (2017) 46-51.
