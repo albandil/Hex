@@ -19,6 +19,8 @@ Finally, `hex-ecs` can be used to calculate bound states of two-electron atoms a
 either by means of the Fermi golden rule formula (as a dipole transition between the initial bound and final scattering
 state), or by matching asymptotics of solution of dripole-driven Schrödinger equation.
 
+![Sample results from hex-ecs](cs-1s.png)
+
 The hard requirements for HEX are:
 
  - C++17 compiler and CMake 3.20 or later
