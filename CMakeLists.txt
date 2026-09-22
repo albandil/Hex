@@ -288,10 +288,20 @@ hex_dependency(scalapack
     TARGETS      ScaLAPACK::ScaLAPACK
 )
 
+# FindSQLite3 names its target SQLite3::SQLite3 since CMake 4.3 and keeps the older
+# SQLite::SQLite3 as a deprecated alias, which warns when linked. CMake 3.14 to 4.2
+# offer only the old name, so take whichever is there rather than raise the required
+# version to a release that has only just appeared.
+if(TARGET SQLite3::SQLite3)
+    set(HEX_SQLITE3_TARGET SQLite3::SQLite3)
+else()
+    set(HEX_SQLITE3_TARGET SQLite::SQLite3)
+endif()
+
 hex_dependency(sqlite3
     ENABLED      TRUE
     DESCRIPTION  "SQLite3"
-    TARGETS      SQLite::SQLite3
+    TARGETS      ${HEX_SQLITE3_TARGET}
 )
 
 hex_dependency(superlu
