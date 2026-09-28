@@ -61,6 +61,39 @@ target_include_directories(libhex-common PUBLIC
     ../libs
 )
 
+## --------------------------------------------------------------------------------- ##
+
+# The version and git commit shown in the "logo" banner (hex-version.cpp) are
+# derived from git rather than hand-maintained: the version is the name of the
+# nearest reachable tag (e.g. v2.03) and the commit is the short hash. Both fall
+# back to "unknown" outside a git checkout, e.g. a source tarball.
+#
+# hex-version-git.h is (re)written by a custom target that runs on every build,
+# not only on reconfiguration, so a rebuild always reflects the current commit;
+# it is only rewritten when its content changes, so this does not force
+# hex-version.cpp to recompile except when the version or commit actually moved.
+
+find_package(Git QUIET)
+
+set(HEX_VERSION_HEADER "${CMAKE_CURRENT_BINARY_DIR}/hex-version-git.h")
+
+add_custom_target(hex-version-check
+    COMMAND ${CMAKE_COMMAND}
+        "-DHEX_SOURCE_DIR=${PROJECT_SOURCE_DIR}"
+        "-DHEX_GIT_EXECUTABLE=${GIT_EXECUTABLE}"
+        "-DHEX_OUTPUT_FILE=${HEX_VERSION_HEADER}"
+        -P "${PROJECT_SOURCE_DIR}/cmake/GenerateHexVersion.cmake"
+    BYPRODUCTS "${HEX_VERSION_HEADER}"
+    COMMENT "Determining Hex version from git"
+    VERBATIM
+)
+
+add_dependencies(libhex-common hex-version-check)
+
+target_include_directories(libhex-common PRIVATE
+    "${CMAKE_CURRENT_BINARY_DIR}"
+)
+
 # PUBLIC throughout: the installed headers of libhex-common include the headers of
 # GSL, HDF5, CLN/GiNaC and png++, so its consumers need them too. The Hex::* targets
 # are empty for the dependencies that are switched off, hence no conditionals here.
