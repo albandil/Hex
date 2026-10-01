@@ -49,6 +49,7 @@
     #define NSPLINE_ATOM 1  // needed by "mmul_1el", "mmul_2el", "mul_ABt" and "kron_div"
     #define NSPLINE_PROJ 1  // needed by "mmul_1el", "mmul_2el", "mul_ABt" and "kron_div"
     #define BLOCK_SIZE  16  // block size and local size in "mul_ABt"
+    #define WPT          4  // register-blocking factor ("work per thread") in "mul_ABt" and "mul_AtBt"
     #define ANGULAR_BASIS_SIZE   1  // coupled number of angular states
     #define ZA           1  // nuclear charge, hydrogen = +1
     #define ZP          -1  // projectile charge, electron = -1
@@ -64,6 +65,10 @@
 
 // Derived variables.
 #define NROW (NSPLINE_ATOM * NSPLINE_PROJ)
+
+// number of work-items along the register-blocked axis of "mul_ABt" / "mul_AtBt";
+// each of them covers WPT output columns of the BLOCK_SIZE-wide tile
+#define RTS (BLOCK_SIZE / WPT)
 
 // --------------------------------------------------------------------------------- //
 
@@ -927,24 +932,25 @@ kernel void mul_ABt
     global Complex       * const restrict C
 )
 {
-    // destination block indices
-    private int irow_block = get_group_id(0);
-    private int icol_block = get_group_id(1);
-
-    // global destination index
-    private int irow_glob = get_global_id(0);
-    private int icol_glob = get_global_id(1);
-
-    // group worker threads; indices within the destination block
+    // row index (one per work-item, as before)
     private int irow_loc = get_local_id(0);
-    private int icol_loc = get_local_id(1);
+    private int irow_glob = get_group_id(0) * BLOCK_SIZE + irow_loc;
 
-    // work arrays
+    // column index; each work-item owns WPT columns spaced RTS apart, so together the RTS
+    // work-items of a row cover the whole BLOCK_SIZE-wide output tile of this work-group
+    private int icol_loc = get_local_id(1);
+    private int icol_base = get_group_id(1) * BLOCK_SIZE + icol_loc;
+
+    // work arrays (same footprint as the one-output-per-thread version; only the number of
+    // threads populating and consuming them changes)
     local Complex Aloc[BLOCK_SIZE][BLOCK_SIZE];
     local Complex Bloc[BLOCK_SIZE][BLOCK_SIZE];
 
-    // aggregated scalar product of the destination element C[idy,idx]
-    private Complex res = 0;
+    // aggregated scalar products of the WPT destination elements owned by this work-item
+    private Complex res[WPT];
+    # pragma unroll
+    for (private int w = 0; w < WPT; w++)
+        res[w] = 0;
 
     // calculate number of blocks
     private int Nblock = ((k + BLOCK_SIZE - 1) / BLOCK_SIZE);
@@ -952,25 +958,53 @@ kernel void mul_ABt
     // for all source blocks
     for (private int iblock = 0; iblock < Nblock; iblock++)
     {
-        // get indices of the current elements in the matrices
-        private int Arow = irow_glob, Acol = iblock * BLOCK_SIZE + icol_loc;
-        private int Bcol = icol_glob, Brow = iblock * BLOCK_SIZE + irow_loc;
-
-        // load elements of the source blocks into the local memory, pad by zeros
-        barrier(CLK_LOCAL_MEM_FENCE);
-        Aloc[icol_loc][irow_loc] = (Arow < m && Acol < k ? A[Arow * k + Acol] : (Complex)(0.,0.));
-        Bloc[irow_loc][icol_loc] = (Brow < k && Bcol < n ? B[Brow + k * Bcol] : (Complex)(0.,0.));
         barrier(CLK_LOCAL_MEM_FENCE);
 
-        // each group's thread will calculate one of the scalar products
+        // load a BLOCK_SIZE x BLOCK_SIZE tile of A; each of the RTS work-items in this row
+        // loads WPT elements along the (local) k-direction to cover the full tile width
+        # pragma unroll
+        for (private int w = 0; w < WPT; w++)
+        {
+            private int kloc = icol_loc + w * RTS;
+            private int Arow = irow_glob, Acol = iblock * BLOCK_SIZE + kloc;
+            Aloc[kloc][irow_loc] = (Arow < m && Acol < k ? A[Arow * k + Acol] : (Complex)(0.,0.));
+        }
+
+        // load a BLOCK_SIZE x BLOCK_SIZE tile of B; each work-item loads its WPT columns
+        # pragma unroll
+        for (private int w = 0; w < WPT; w++)
+        {
+            private int cloc = icol_loc + w * RTS;
+            private int Brow = iblock * BLOCK_SIZE + irow_loc, Bcol = icol_base + w * RTS;
+            Bloc[irow_loc][cloc] = (Brow < k && Bcol < n ? B[Brow + k * Bcol] : (Complex)(0.,0.));
+        }
+
+        barrier(CLK_LOCAL_MEM_FENCE);
+
+        // each work-item accumulates its WPT scalar products, reusing the same Aloc[K][irow_loc]
+        // load across all WPT of them
+        # pragma unroll
         for (private int K = 0; K < BLOCK_SIZE; K++)
+        {
             if (iblock * BLOCK_SIZE + K < k)
-                res += cmul(Aloc[K][irow_loc],Bloc[K][icol_loc]);
+            {
+                private Complex a = Aloc[K][irow_loc];
+
+                # pragma unroll
+                for (private int w = 0; w < WPT; w++)
+                    res[w] += cmul(a, Bloc[K][icol_loc + w * RTS]);
+            }
+        }
     }
 
-    // store result to device memory
-    if (irow_glob < m && icol_glob < n)
-        C[irow_glob * n + icol_glob] = res;
+    // store results to device memory
+    # pragma unroll
+    for (private int w = 0; w < WPT; w++)
+    {
+        private int icol_glob = icol_base + w * RTS;
+        if (irow_glob < m && icol_glob < n)
+            C[irow_glob * n + icol_glob] = res[w];
+    }
 }
 
 /**
@@ -995,24 +1029,25 @@ kernel void mul_AtBt
     global Complex       * const restrict C
 )
 {
-    // destination block indices
-    private int irow_block = get_group_id(0);
-    private int icol_block = get_group_id(1);
-
-    // global destination index
-    private int irow_glob = get_global_id(0);
-    private int icol_glob = get_global_id(1);
-
-    // group worker threads; indices within the destination block
+    // row index (one per work-item, as before)
     private int irow_loc = get_local_id(0);
-    private int icol_loc = get_local_id(1);
+    private int irow_glob = get_group_id(0) * BLOCK_SIZE + irow_loc;
 
-    // work arrays
+    // column index; each work-item owns WPT columns spaced RTS apart, so together the RTS
+    // work-items of a row cover the whole BLOCK_SIZE-wide output tile of this work-group
+    private int icol_loc = get_local_id(1);
+    private int icol_base = get_group_id(1) * BLOCK_SIZE + icol_loc;
+
+    // work arrays (same footprint as the one-output-per-thread version; only the number of
+    // threads populating and consuming them changes)
     local Complex Aloc[BLOCK_SIZE][BLOCK_SIZE];
     local Complex Bloc[BLOCK_SIZE][BLOCK_SIZE];
 
-    // aggregated scalar product of the destination element C[idy,idx]
-    private Complex res = 0;
+    // aggregated scalar products of the WPT destination elements owned by this work-item
+    private Complex res[WPT];
+    # pragma unroll
+    for (private int w = 0; w < WPT; w++)
+        res[w] = 0;
 
     // calculate number of blocks
     private int Nblock = ((k + BLOCK_SIZE - 1) / BLOCK_SIZE);
@@ -1020,24 +1055,51 @@ kernel void mul_AtBt
     // for all source blocks
     for (private int iblock = 0; iblock < Nblock; iblock++)
     {
-        // get indices of the current elements in the matrices
-        private int Arow = irow_glob, Acol = iblock * BLOCK_SIZE + icol_loc;
-        private int Bcol = icol_glob, Brow = iblock * BLOCK_SIZE + irow_loc;
-
-        // load elements of the source blocks into the local memory, pad by zeros
-        barrier(CLK_LOCAL_MEM_FENCE);
-        Aloc[icol_loc][irow_loc] = (Arow < m && Acol < k ? A[Arow + k * Acol] : (Complex)(0.,0.));
-        Bloc[irow_loc][icol_loc] = (Brow < k && Bcol < n ? B[Brow + k * Bcol] : (Complex)(0.,0.));
         barrier(CLK_LOCAL_MEM_FENCE);
 
-        // each group's thread will calculate one of the scalar products
+        // load a BLOCK_SIZE x BLOCK_SIZE tile of A (column-major); each of the RTS work-items
+        // in this row loads WPT elements along the (local) k-direction to cover the full tile
+        # pragma unroll
+        for (private int w = 0; w < WPT; w++)
+        {
+            private int kloc = icol_loc + w * RTS;
+            private int Arow = irow_glob, Acol = iblock * BLOCK_SIZE + kloc;
+            Aloc[kloc][irow_loc] = (Arow < m && Acol < k ? A[Arow + k * Acol] : (Complex)(0.,0.));
+        }
+
+        // load a BLOCK_SIZE x BLOCK_SIZE tile of B; each work-item loads its WPT columns
+        # pragma unroll
+        for (private int w = 0; w < WPT; w++)
+        {
+            private int cloc = icol_loc + w * RTS;
+            private int Brow = iblock * BLOCK_SIZE + irow_loc, Bcol = icol_base + w * RTS;
+            Bloc[irow_loc][cloc] = (Brow < k && Bcol < n ? B[Brow + k * Bcol] : (Complex)(0.,0.));
+        }
+
+        barrier(CLK_LOCAL_MEM_FENCE);
+
+        // each work-item accumulates its WPT scalar products, reusing the same Aloc[K][irow_loc]
+        // load across all WPT of them
         # pragma unroll
         for (private int K = 0; K < BLOCK_SIZE; K++)
+        {
             if (iblock * BLOCK_SIZE + K < k)
-                res += cmul(Aloc[K][irow_loc],Bloc[K][icol_loc]);
+            {
+                private Complex a = Aloc[K][irow_loc];
+
+                # pragma unroll
+                for (private int w = 0; w < WPT; w++)
+                    res[w] += cmul(a, Bloc[K][icol_loc + w * RTS]);
+            }
+        }
     }
 
-    // store result to device memory
-    if (irow_glob < m && icol_glob < n)
-        C[irow_glob * n + icol_glob] = res;
+    // store results to device memory
+    # pragma unroll
+    for (private int w = 0; w < WPT; w++)
+    {
+        private int icol_glob = icol_base + w * RTS;
+        if (irow_glob < m && icol_glob < n)
+            C[irow_glob * n + icol_glob] = res[w];
+    }
 }

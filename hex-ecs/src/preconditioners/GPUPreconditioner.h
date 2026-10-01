@@ -117,6 +117,11 @@ class GPUCGPreconditioner : public virtual KPACGPreconditioner
         std::size_t Nlocal_;
         std::size_t blocksize_;
 
+        // register-blocking factor ("work per thread") for the mul_ABt / mul_AtBt GEMM kernels;
+        // each work-item computes wpt_ output columns instead of one, so the local work-group
+        // size along that axis is blocksize_ / wpt_
+        std::size_t wpt_;
+
         // memory allocation flags
         cl_mem_flags smallRODataFlags_, smallRWDataFlags_;
         cl_mem_flags largeRODataFlags_, largeRWDataFlags_;

@@ -45,6 +45,7 @@ The following are nice to have, as they add some additional capabilities:
  - ScaLAPACK (for distributed dense LU decomposition in `hex-ecs`)
  - HDF5 (needed by the `hex-hdf2hdf` conversion utility)
  - OpenCL (for GPU acceleration in `hex-ecs`)
+ - CLBlast (faster dense matrix products in the GPU preconditioner of `hex-ecs`; only pays off once CLBlast has been tuned for the GPU, see its `clblast_tuner_*` programs)
  - libpng (printing matrix structure for debugging/illustrative purposes)
  - Doxygen (for generated documentation)
 

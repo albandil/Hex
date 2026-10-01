@@ -51,6 +51,7 @@ option(WITH_MKL          "Build with MKL PARDISO"                               
 option(WITH_MPI          "Build with MPI"                                         ON)
 option(WITH_MUMPS        "Build with MUMPS (enables coupled preconditioner)"      OFF)
 option(WITH_OPENCL       "Build with OpenCL support (enables GPU preconditioner)" OFF)
+option(WITH_CLBLAST      "Use CLBlast for the dense GEMMs of the GPU preconditioner" OFF)
 option(WITH_PARDISO      "Build with the stand-alone PARDISO library"             OFF)
 option(WITH_PNG          "Build with libpng library (for debugging)"              OFF)
 option(WITH_SCALAPACK    "Build with ScaLAPACK library"                           OFF)
@@ -92,6 +93,13 @@ endif()
 
 if(WITH_OPENCL)
     find_package(OpenCL REQUIRED)
+endif()
+
+if(WITH_CLBLAST)
+    if(NOT WITH_OPENCL)
+        message(FATAL_ERROR "WITH_CLBLAST requires WITH_OPENCL")
+    endif()
+    find_package(CLBlast REQUIRED)
 endif()
 
 if(WITH_PNG)
@@ -199,6 +207,13 @@ hex_dependency(boinc
     DEFINE       WITH_BOINC
     DESCRIPTION  "BOINC, built as a BOINC application"
     TARGETS      BOINC::BOINC
+)
+
+hex_dependency(clblast
+    ENABLED      "${WITH_CLBLAST}"
+    DEFINE       WITH_CLBLAST
+    DESCRIPTION  "CLBlast, tuned GEMM in the GPU preconditioner of hex-ecs"
+    TARGETS      clblast
 )
 
 hex_dependency(cln

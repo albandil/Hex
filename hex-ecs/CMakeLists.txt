@@ -111,6 +111,7 @@ target_include_directories(hex-ecs PRIVATE
 # GSL, BLAS/LAPACK and MPI come through libhex-common.
 target_link_libraries(hex-ecs PRIVATE
     libhex-common
+    Hex::clblast
     Hex::config
     Hex::mkl
     Hex::mumps
